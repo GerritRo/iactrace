@@ -40,7 +40,7 @@ def hexshow(result, hex_centers, hex_size=None, ax=None, **kwargs):
         hexagon = RegularPolygon(
             (x, y),
             numVertices=6,
-            radius=hex_size / np.sqrt(3),
+            radius=hex_size,
             orientation=np.pi/6,  # flat-top
             facecolor=cmap((value - vmin) / (vmax - vmin)) if vmax > vmin else 'white',
             edgecolor='gray',

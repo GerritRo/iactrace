@@ -1,62 +1,55 @@
 """Compiled simulation - pure JAX pytree for efficient rendering."""
 
 import jax
+import equinox as eqx
 import jax.numpy as jnp
-from typing import NamedTuple, Callable
-from ..core.geometry import intersect_plane, check_occlusions_batch
+from jax import Array
+
+from typing import Callable
+from functools import partial
+from ..core.geometry import intersect_plane, check_occlusions
 from ..core.reflection import reflect
 
-
-class CompiledSimulation(NamedTuple):
+class CompiledSimulation(eqx.Module):
     """
     Pure JAX pytree containing all telescope data for simulation.
-
     This is the output of Telescope.compile() - contains only arrays and
     a JIT-compiled render function. No Python overhead, fully composable.
     """
     # Mirror data
-    mirror_points: jnp.ndarray       # (n_mirrors, n_samples, 3)
-    mirror_normals: jnp.ndarray      # (n_mirrors, n_samples, 3)
-    mirror_positions: jnp.ndarray    # (n_mirrors, 3)
-    mirror_rotations: jnp.ndarray    # (n_mirrors, 3, 3)
-
+    mirror_points: Array       # (n_mirrors, n_samples, 3)
+    mirror_normals: Array      # (n_mirrors, n_samples, 3)
+    mirror_positions: Array    # (n_mirrors, 3)
+    mirror_rotations: Array    # (n_mirrors, 3, 3)
+    
     # Obstruction data
-    cyl_p1: jnp.ndarray             # (n_cyl, 3)
-    cyl_p2: jnp.ndarray             # (n_cyl, 3)
-    cyl_radius: jnp.ndarray         # (n_cyl,)
-    box_p1: jnp.ndarray             # (n_box, 3)
-    box_p2: jnp.ndarray             # (n_box, 3)
-
+    cyl_p1: Array             # (n_cyl, 3)
+    cyl_p2: Array             # (n_cyl, 3)
+    cyl_radius: Array         # (n_cyl,)
+    box_p1: Array             # (n_box, 3)
+    box_p2: Array             # (n_box, 3)
+    
     # Sensor configuration
-    sensor_plane_pos: jnp.ndarray    # (3,)
-    sensor_plane_normal: jnp.ndarray # (3,)
-    sensor_config: dict              # Sensor parameters
-    accumulate_fn: Callable          # Accumulation function
-
-    # Source type
-    source_type: str                 # 'point' or 'infinity'
-
-    def __call__(self, source_input):
+    sensor_plane_pos: Array    # (3,)
+    sensor_plane_normal: Array # (3,)
+    sensor_config: dict = eqx.field(static=True)
+    accumulate_fn: Callable = eqx.field(static=True)
+    
+    def __call__(self, source_input, source_type, **overrides):
         """
-        Render the telescope simulation.
-
         Args:
-            source_input:
-                - For 'point': single position array (3,) or batch (N, 3)
-                - For 'infinity': single direction (3,) or batch (N, 3)
-
-        Returns:
-            Rendered image (sensor-dependent shape)
+            source_input: source positions/directions
+            **overrides: mirror_normals=new_normals, etc.
         """
-        # Expand single source to batch for consistent processing
         if source_input.ndim == 1:
-            source_input = source_input[None, :]  # (1, 3)
+            source_input = source_input[None, :]
+        
+        sim = replace(self, **overrides) if overrides else self
+        return _render_kernel(sim, source_input, source_type)
 
-        return _render_kernel(self, source_input)
-
-
-@jax.jit
-def _render_kernel(sim: CompiledSimulation, sources):
+    
+@partial(jax.jit, static_argnames=['source_type'])
+def _render_kernel(sim: CompiledSimulation , sources, source_type):
     """
     Core rendering kernel - processes ALL sources at once, loops over mirrors.
 
@@ -81,31 +74,22 @@ def _render_kernel(sim: CompiledSimulation, sources):
         tn_single = tn_all[mirror_idx]  # (n_samples, 3)
 
         # Compute directions for ALL sources at once
-        if sim.source_type == 'point':
+        if source_type == 'point':
             # dirs: (N_sources, n_samples, 3)
             dirs = tp_single[None, :, :] - sources[:, None, :]
             dirs = dirs / jnp.linalg.norm(dirs, axis=-1, keepdims=True)
-        elif sim.source_type == 'infinity':
+        elif source_type == 'infinity':
             # Broadcast directions to all samples
             dirs = jnp.broadcast_to(sources[:, None, :],
                                    (sources.shape[0], tp_single.shape[0], 3))
         else:
             raise ValueError(f"Unknown source type: {sim.source_type}")
 
-        # Check occlusions for ALL sources
-        has_cylinders = len(sim.cyl_p1) > 0
-        has_boxes = len(sim.box_p1) > 0
-
-        if has_cylinders or has_boxes:
-            box_p1 = sim.box_p1 if has_boxes else None
-            box_p2 = sim.box_p2 if has_boxes else None
-            # tp_single is (n_samples, 3), broadcast to (N_sources, n_samples, 3)
-            tp_broadcast = jnp.broadcast_to(tp_single[None, :, :], dirs.shape)
-            shadow_mask = check_occlusions_batch(tp_broadcast, -dirs,
-                                                 sim.cyl_p1, sim.cyl_p2, sim.cyl_radius,
-                                                 box_p1, box_p2)
-        else:
-            shadow_mask = jnp.ones((sources.shape[0], tp_single.shape[0]))
+        # tp_single is (n_samples, 3), broadcast to (N_sources, n_samples, 3)
+        tp_broadcast = jnp.broadcast_to(tp_single[None, :, :], dirs.shape)
+        shadow_mask = check_occlusions(tp_broadcast, -dirs,
+                                       sim.cyl_p1, sim.cyl_p2, sim.cyl_radius,
+                                       sim.box_p1, sim.box_p2)
 
         # Reflect rays off mirror (vmap over sources, then over samples)
         tn_broadcast = jnp.broadcast_to(tn_single[None, :, :], dirs.shape)
@@ -132,7 +116,7 @@ def _render_kernel(sim: CompiledSimulation, sources):
     if sim.sensor_config['type'] == 'square':
         acc0 = jnp.zeros((sim.sensor_config['height'], sim.sensor_config['width']))
     elif sim.sensor_config['type'] == 'hexagonal':
-        acc0 = jnp.zeros(len(sim.sensor_config['hex_centers']))
+        acc0 = jnp.zeros(sim.sensor_config['hex_amount'])
     else:
         raise ValueError(f"Unknown sensor type: {sim.sensor_config['type']}")
 
@@ -141,54 +125,3 @@ def _render_kernel(sim: CompiledSimulation, sources):
     final_img, _ = jax.lax.scan(render_single_mirror, acc0, jnp.arange(n_mirrors))
 
     return final_img
-
-
-def _render_per_mirror(sim, source_input, mirror_idx):
-    """
-    Render contribution from a single mirror (useful for debugging/visualization).
-
-    Args:
-        sim: CompiledSimulation
-        source_input: Source position or direction
-        mirror_idx: Index of mirror to render
-
-    Returns:
-        Image from single mirror
-    """
-    # Transform points/normals for single mirror
-    tp = jnp.einsum('ij,nj->ni', sim.mirror_rotations[mirror_idx],
-                   sim.mirror_points[mirror_idx]) + sim.mirror_positions[mirror_idx]
-    tn = jnp.einsum('ij,nj->ni', sim.mirror_rotations[mirror_idx],
-                   sim.mirror_normals[mirror_idx])
-
-    # Compute directions
-    if sim.source_type == 'point':
-        dirs = tp - source_input
-        dirs = dirs / jnp.linalg.norm(dirs, axis=-1, keepdims=True)
-    else:
-        dirs = jnp.broadcast_to(source_input, tp.shape)
-
-    # Check occlusions
-    has_cylinders = len(sim.cyl_p1) > 0
-    has_boxes = len(sim.box_centers) > 0
-
-    if has_cylinders or has_boxes:
-        box_centers = sim.box_centers if has_boxes else None
-        box_sizes = sim.box_sizes if has_boxes else None
-        shadow_mask = check_occlusions_batch(tp[None, :, :], -dirs[None, :, :],
-                                             sim.cyl_p1, sim.cyl_p2, sim.cyl_radius,
-                                             box_centers, box_sizes)[0]
-    else:
-        shadow_mask = jnp.ones(tp.shape[0])
-
-    # Reflect
-    reflected, cos_angle = jax.vmap(reflect, in_axes=(0, 0))(dirs, tn)
-
-    # Intersect
-    pts = jax.vmap(intersect_plane, in_axes=(0, 0, None, None))(
-        tp, reflected, sim.sensor_plane_pos, sim.sensor_plane_normal
-    )
-
-    # Accumulate
-    values = cos_angle[:, 0] * shadow_mask
-    return sim.accumulate_fn(pts[:, 0], pts[:, 1], values)

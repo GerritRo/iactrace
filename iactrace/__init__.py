@@ -6,7 +6,7 @@ This package provides efficient, differentiable simulation of IACT optical syste
 
 from .telescope.telescope import Telescope
 from .telescope.obstructions import Cylinder, Box
-from .samplers.mirror_out import MCIntegrator, GridIntegrator
+from .samplers.mirror_out import MCIntegrator
 from .sensors.square import SquareSensor
 from .sensors.hexagonal import HexagonalSensor
 from .viz.plotting import hexshow, plot_telescope_geometry, plot_focal_plane

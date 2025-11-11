@@ -141,43 +141,38 @@ def intersect_box(ray_origin, ray_direction, point1, point2):
     return jnp.where(hit, t_result, jnp.inf)
 
 
-def check_occlusions_batch(ray_origins, ray_directions, cyl_p1, cyl_p2, cyl_radius,
+def check_occlusions(ray_origins, ray_directions, 
+                           cyl_p1=None, cyl_p2=None, cyl_radius=None,
                            box_p1=None, box_p2=None):
     """
     Check if rays are occluded by cylinders and boxes.
 
-    Args:
-        ray_origins: Ray origins (N, M, 3)
-        ray_directions: Ray directions (N, M, 3)
-        cyl_p1: Cylinder start points (n_cyl, 3)
-        cyl_p2: Cylinder end points (n_cyl, 3)
-        cyl_radius: Cylinder radii (n_cyl,)
-        box_p1: Box first corners (n_box, 3), optional
-        box_p2: Box opposite diagonal corners (n_box, 3), optional
-
     Returns:
         Shadow mask (N, M) - 1.0 if not occluded, 0.0 if occluded
     """
-    def min_cylinder_t(origin, direction):
-        """Find minimum t across all cylinders."""
-        ts = vmap(intersect_cylinder, in_axes=(None, None, 0, 0, 0))(
-            origin, direction, cyl_p1, cyl_p2, cyl_radius)
-        return jnp.min(ts)
+    shadow_mask = jnp.ones(ray_origins.shape[:-1])
+    
+    if len(cyl_p1) > 0:
+        def min_cylinder_t(origin, direction):
+            """Find minimum t across all cylinders."""
+            ts = vmap(intersect_cylinder, in_axes=(None, None, 0, 0, 0))(
+                origin, direction, cyl_p1, cyl_p2, cyl_radius)
+            return jnp.min(ts)
 
-    # Check cylinder occlusions
-    t_cylinders = vmap(vmap(min_cylinder_t, in_axes=(0, 0)), in_axes=(0, 0))(
-        ray_origins, ray_directions)
+        # Check cylinder occlusions
+        t_cylinders = vmap(vmap(min_cylinder_t, in_axes=(0, 0)), in_axes=(0, 0))(
+            ray_origins, ray_directions)
 
-    shadow_mask = jnp.where(t_cylinders < 1e10, 0.0, 1.0)
+        shadow_mask = shadow_mask * jnp.where(t_cylinders < 1e10, 0.0, 1.0)
 
-    # Check box occlusions if provided
-    if box_p1 is not None and len(box_p1) > 0:
+    if len(box_p1) > 0:
         def min_box_t(origin, direction):
             """Find minimum t across all boxes."""
             ts = vmap(intersect_box, in_axes=(None, None, 0, 0))(
                 origin, direction, box_p1, box_p2)
             return jnp.min(ts)
 
+        # Check box occlusions
         t_boxes = vmap(vmap(min_box_t, in_axes=(0, 0)), in_axes=(0, 0))(
             ray_origins, ray_directions)
 

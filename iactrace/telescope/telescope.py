@@ -55,17 +55,19 @@ class Telescope:
         # Compute mirror positions on dish
         if self.surface_type == 'spherical':
             Tmirrors, _ = spherical_surface(self.dish_radius, self.mirror_positions[:, :2])
+            align_z = 2*self.dish_radius
         elif self.surface_type == 'parabolic':
             Tmirrors, _ = parabolic_surface(self.focal_length, self.mirror_positions[:, :2])
+            align_z = 2*self.focal_length
         else:
             raise ValueError(f"Unknown surface type: {self.surface_type}")
 
         # Compute rotations to look at focal point (with optional perturbation)
         if key is not None and self.alignment_perturbation > 0:
             align_target = jax.random.normal(key, Tmirrors.shape) * self.alignment_perturbation + \
-                          jnp.array([0, 0, self.focal_length])
+                          jnp.array([0, 0, align_z])
         else:
-            align_target = jnp.tile(jnp.array([0, 0, self.focal_length]), (len(Tmirrors), 1))
+            align_target = jnp.tile(jnp.array([0, 0, align_z]), (len(Tmirrors), 1))
 
         Rmirrors = vmap(look_at_rotation, in_axes=(0, 0))(Tmirrors, align_target)
 
@@ -130,7 +132,7 @@ class Telescope:
 
         # Extract obstructions
         cyl_p1, cyl_p2, cyl_radius, box_p1, box_p2 = self._extract_obstructions()
-
+        
         # Create compiled simulation
         return CompiledSimulation(
             mirror_points=mirror_array.points,
@@ -145,8 +147,7 @@ class Telescope:
             sensor_plane_pos=sensor_plane[0],
             sensor_plane_normal=sensor_plane[1],
             sensor_config=sensor.to_config(),
-            accumulate_fn=sensor.make_accumulate_fn(),
-            source_type=source_type
+            accumulate_fn=sensor.make_accumulate_fn()
         )
 
     @classmethod

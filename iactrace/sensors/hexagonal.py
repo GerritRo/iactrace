@@ -117,7 +117,7 @@ class HexagonalSensor:
         """Convert to configuration dict for compilation."""
         return {
             'type': 'hexagonal',
-            'hex_centers': self.hex_centers,
+            'hex_amount': len(self.hex_centers),
             'mode': 'analytic'
         }
 

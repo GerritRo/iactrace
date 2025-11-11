@@ -1,5 +1,5 @@
 """Integration/sampling methods for mirror facets."""
 
-from .monte_carlo import MCIntegrator, GridIntegrator, MirrorArray
+from .mirror_out import MCIntegrator, MirrorArray
 
-__all__ = ['MCIntegrator', 'GridIntegrator', 'MirrorArray']
+__all__ = ['MCIntegrator', 'MirrorArray']
