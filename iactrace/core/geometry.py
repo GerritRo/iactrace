@@ -4,40 +4,41 @@ import jax.numpy as jnp
 from jax import vmap
 
 
-def intersect_plane(ray_origin, ray_direction, plane_center, plane_normal):
+def intersect_plane(ray_origin, ray_direction, plane_center, plane_rotation):
     """
-    Intersect rays with a plane and return 2D coordinates on the plane.
-
+    Intersect rays with a plane defined by center and rotation matrix.
+    
     Args:
         ray_origin: Ray origins (..., 3)
         ray_direction: Ray directions (..., 3)
         plane_center: Plane center (3,)
-        plane_normal: Plane normal (3,)
-
+        plane_rotation: Plane rotation matrix (3, 3)
+            The Z-axis of this rotation defines the normal
+            The X and Y axes define the plane coordinate system
+    
     Returns:
         2D coordinates on plane (..., 2)
     """
-    # Find t parameter
+    # Extract normal and basis vectors from rotation matrix
+    u1 = plane_rotation[:, 0]  # X-axis in plane coordinates
+    u2 = plane_rotation[:, 1]  # Y-axis in plane coordinates
+    plane_normal = plane_rotation[:, 2]  # Z-axis = normal
+    
+    # Find t parameter for intersection
     ndotd = jnp.sum(ray_direction * plane_normal, axis=-1)
     ndoto = jnp.sum(ray_origin * plane_normal, axis=-1)
     ndotp = jnp.sum(plane_normal * plane_center)
     t = (ndotp - ndoto) / ndotd
-
-    # Plane basis
-    axis = jnp.where(jnp.abs(plane_normal[0]) < 0.9,
-                     jnp.array([1.0, 0.0, 0.0]),
-                     jnp.array([0.0, 1.0, 0.0]))
-    u1 = jnp.cross(plane_normal, axis)
-    u1 = u1 / jnp.linalg.norm(u1)
-    u2 = jnp.cross(plane_normal, u1)
-
-    # Project directly
-    op = ray_origin - plane_center
-    x = jnp.sum(op * u1, axis=-1) + t * jnp.sum(ray_direction * u1, axis=-1)
-    y = jnp.sum(op * u2, axis=-1) + t * jnp.sum(ray_direction * u2, axis=-1)
-
+    
+    # Intersection point
+    intersection = ray_origin + t[..., None] * ray_direction
+    
+    # Project onto plane coordinate system
+    op = intersection - plane_center
+    x = jnp.sum(op * u1, axis=-1)
+    y = jnp.sum(op * u2, axis=-1)
+    
     return jnp.stack([x, y], axis=-1)
-
 
 def intersect_cylinder(ray_origin, ray_direction, point1, point2, radius):
     """

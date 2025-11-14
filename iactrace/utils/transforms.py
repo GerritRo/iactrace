@@ -2,7 +2,6 @@
 
 import jax.numpy as jnp
 
-
 def look_at_rotation(mirror_pos, target_pos=jnp.array([0., 0., 0.]), up=jnp.array([0., 1., 0.])):
     """
     Compute rotation matrix to look from mirror_pos towards target_pos.
@@ -24,3 +23,41 @@ def look_at_rotation(mirror_pos, target_pos=jnp.array([0., 0., 0.]), up=jnp.arra
     up_corrected = jnp.cross(right, forward)
 
     return jnp.column_stack([right, up_corrected, forward])
+
+
+def euler_to_matrix(tip, tilt, rotation):
+    """
+    Convert Euler angles (degrees) to rotation matrix.
+    
+    Args:
+        tip: Rotation around X-axis (degrees)
+        tilt: Rotation around Y-axis (degrees)
+        rotation: Rotation around Z-axis (degrees)
+    
+    Returns:
+        Rotation matrix (3, 3)
+    """
+    # Convert to radians
+    rx, ry, rz = jnp.radians(jnp.array([tip, tilt, rotation]))
+    
+    # Rotation matrices
+    Rx = jnp.array([
+        [1, 0, 0],
+        [0, jnp.cos(rx), -jnp.sin(rx)],
+        [0, jnp.sin(rx), jnp.cos(rx)]
+    ])
+    
+    Ry = jnp.array([
+        [jnp.cos(ry), 0, jnp.sin(ry)],
+        [0, 1, 0],
+        [-jnp.sin(ry), 0, jnp.cos(ry)]
+    ])
+    
+    Rz = jnp.array([
+        [jnp.cos(rz), -jnp.sin(rz), 0],
+        [jnp.sin(rz), jnp.cos(rz), 0],
+        [0, 0, 1]
+    ])
+    
+    # Apply: Rz * Ry * Rx (extrinsic order)
+    return Rz @ Ry @ Rx
