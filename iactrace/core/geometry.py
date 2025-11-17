@@ -1,5 +1,3 @@
-"""Core geometry intersection functions for ray tracing."""
-
 import jax.numpy as jnp
 from jax import vmap
 

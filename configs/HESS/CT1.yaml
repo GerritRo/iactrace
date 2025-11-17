@@ -5340,7 +5340,7 @@ obstructions:
   r: 0.8000
 sensors:
 - id: science_camera
-  type: hexagon_sensor
+  type: hexagonal
   position:
   - 0.0000
   - 0.0000
@@ -7271,3 +7271,20 @@ sensors:
   - -0.3455
   - -0.3455
   - -0.3455
+- id: camera_lid
+  type: square
+  position:
+  - 0.0000
+  - 0.0000
+  - 15.0000
+  orientation:
+  - 0.0000
+  - 180.0000
+  - 0.0000
+  width: 1000
+  height: 1000
+  bounds:
+  - -0.8000
+  - 0.8000
+  - -0.8000
+  - 0.8000

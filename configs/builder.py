@@ -76,15 +76,16 @@ class TelescopeConfigBuilder:
         return self
     
     def add_square_sensor_array(self, sensor_id, position, orientation, 
-                                pixel_x, pixel_y):
+                                width, height, bounds):
         """Add sensor with square pixels"""
         self.config['sensors'].append({
             'id': sensor_id,
-            'type': 'square_sensor',
+            'type': 'square',
             'position': [float(x) for x in position],
             'orientation': [float(x) for x in orientation],
-            'centers_x': [float(x) for x in pixel_x],
-            'centers_y': [float(x) for x in pixel_y],
+            'width': int(width),
+            'height': int(height),
+            'bounds': [float(x) for x in bounds]
         })
         return self
     
@@ -93,7 +94,7 @@ class TelescopeConfigBuilder:
         """Add sensor with hexagonal pixels"""
         self.config['sensors'].append({
             'id': sensor_id,
-            'type': 'hexagon_sensor',
+            'type': 'hexagonal',
             'position': [float(x) for x in position],
             'orientation': [float(x) for x in orientation],
             'centers_x': [float(x) for x in pixel_x],

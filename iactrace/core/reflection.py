@@ -1,5 +1,3 @@
-"""Reflection and surface roughness functions."""
-
 import jax
 import jax.numpy as jnp
 

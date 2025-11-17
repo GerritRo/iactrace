@@ -1,12 +1,13 @@
-"""Telescope configuration and compilation."""
-
 import jax
 import jax.numpy as jnp
 import equinox as eqx
+import dataclasses
 import yaml
 
 from .apertures import DiskAperture, PolygonAperture
 from .surfaces import AsphericSurface
+from ..core import render
+from ..sensors import SquareSensor, HexagonalSensor
 
 class Telescope(eqx.Module):
     """
@@ -24,11 +25,6 @@ class Telescope(eqx.Module):
     mirror_surfaces: list
     mirror_apertures: list
     
-    # Sensor plane geometry
-    sensor_positions: jax.Array  # (L, 3)
-    sensor_rotations: jax.Array  # (L, 3)
-    sensor_configs: list = eqx.field(static=True)
-    
     # Obstructions
     cyl_p1: jax.Array  # (C, 3)
     cyl_p2: jax.Array  # (C, 3)
@@ -36,20 +32,22 @@ class Telescope(eqx.Module):
     box_p1: jax.Array  # (B, 3)
     box_p2: jax.Array  # (B, 3)
     
+    # Sensors
+    sensors: list
+    
     # Metadata 
     name: str = eqx.field(static=True)
     
     # Define which parameters are frozen:
-    _frozen: frozenset
+    _frozen: frozenset = eqx.field(static=True)
 
     def __init__(self, mirror_positions, mirror_rotations,
                  mirror_points, mirror_normals,
                  mirror_surfaces, mirror_apertures,
-                 sensor_positions, sensor_rotations,
-                 sensor_configs,
+                 sensors,
                  cyl_p1=None, cyl_p2=None, cyl_r=None,
                  box_p1=None, box_p2=None,
-                 name="telescope", frozen=None):
+                 name="telescope", _frozen=None):
         """
         Initialize Telescope with all required data.
         
@@ -72,10 +70,8 @@ class Telescope(eqx.Module):
         self.mirror_rotations = jnp.array(mirror_rotations)
         self.mirror_points = jnp.array(mirror_points)
         self.mirror_normals = jnp.array(mirror_normals)
-
-        # Sensor plane positions and rotations
-        self.sensor_positions = jnp.array(sensor_positions)
-        self.sensor_rotations = jnp.array(sensor_rotations)
+        self.mirror_surfaces = mirror_surfaces
+        self.mirror_apertures = mirror_apertures
         
         # Obstructions (default to empty)
         self.cyl_p1 = jnp.array(cyl_p1) if cyl_p1 is not None else jnp.zeros((0, 3))
@@ -85,20 +81,18 @@ class Telescope(eqx.Module):
         self.box_p2 = jnp.array(box_p2) if box_p2 is not None else jnp.zeros((0, 3))
         
         # Static metadata
-        self.mirror_surfaces = mirror_surfaces
-        self.mirror_apertures = mirror_apertures
-        self.sensor_configs = sensor_configs
+        self.sensors = sensors
         self.name = name
         
         # Standard setting is to freeze all parameters:
-        if frozen is None:
+        if _frozen is None:
             array_fields = frozenset(
                 k for k, v in self.__dict__.items() 
                 if isinstance(v, jax.Array)
             )
             self._frozen = array_fields
         else:
-            self._frozen = frozen
+            self._frozen = _frozen
 
     @classmethod
     def from_yaml(cls, filename, integrator, sampling_key=None):
@@ -173,15 +167,24 @@ class Telescope(eqx.Module):
         box_p2 = jnp.array(box_p2_list) if box_p2_list else None
         
         # Parse sensors
-        sensors = config.get('sensors', [])
-        sensor_positions = []
-        sensor_rotations = []
-        sensor_configs = []
+        sensors = []
         
-        for sensor in sensors:
-            sensor_positions.append(sensor['position'])
-            sensor_rotations.append(sensor['orientation'])
-            sensor_configs.append(sensor)
+        for sensor_data in config.get('sensors', []):
+            sensor_type = sensor_data['type']
+            if sensor_type == 'square':
+                sensor = SquareSensor(position=sensor_data['position'],
+                                      rotation=sensor_data['orientation'],
+                                      width=sensor_data['width'],
+                                      height=sensor_data['height'],
+                                      bounds=tuple(sensor_data['bounds']))
+            elif sensor_type == 'hexagonal':
+                pixel_centers = jnp.array([sensor_data['centers_x'], sensor_data['centers_y']]).T
+                sensor = HexagonalSensor(position=sensor_data['position'],
+                                         rotation=sensor_data['orientation'],
+                                         hex_centers=pixel_centers)
+            else:
+                raise ValueError(f"Unknown sensor type: {sensor_type}")
+            sensors.append(sensor)
 
         # Return Object:
         return cls(
@@ -191,38 +194,66 @@ class Telescope(eqx.Module):
             mirror_normals=mirror_normals,
             mirror_surfaces=mirror_surfaces,
             mirror_apertures=mirror_apertures,
+            sensors=sensors,
             cyl_p1=cyl_p1,
             cyl_p2=cyl_p2,
             cyl_r=cyl_r,
             box_p1=box_p1,
             box_p2=box_p2,
-            sensor_positions=sensor_positions,
-            sensor_rotations=sensor_rotations,
-            sensor_configs=sensor_configs,
             name=telescope_name
         )
     
-    # Simple methods
+    def __call__(self, sources, source_type='point', sensor_idx=0, **overrides):
+        """
+        Render sources through telescope.
+
+        Args:
+            sources: Source positions (N, 3) or directions (N, 3)
+            source_type: 'point' or 'infinity'
+            sensor_idx: Which sensor to use (default 0)
+            **overrides: Override fields (e.g., mirror_normals=new_normals)
+
+        Returns:
+            Rendered image
+        """
+        # Apply overrides if provided
+        telescope = self
+        if overrides:
+            for key, value in overrides.items():
+                telescope = eqx.tree_at(lambda t: getattr(t, key), telescope, value)
+
+        return render(telescope, sources, source_type, sensor_idx)
+    
     def freeze(self, *field_names):
         """Freeze fields (make non-trainable)"""
-        return eqx.tree_at(lambda t: t._frozen, self, 
-                          self._frozen | frozenset(field_names))
+        return dataclasses.replace(
+            self,
+            _frozen=self._frozen | frozenset(field_names)
+        )
     
     def unfreeze(self, *field_names):
         """Unfreeze fields (make trainable)"""
-        return eqx.tree_at(lambda t: t._frozen, self,
-                          self._frozen - frozenset(field_names))
+        return dataclasses.replace(
+            self,
+            _frozen=self._frozen - frozenset(field_names)
+        )
     
     def freeze_all(self):
         """Freeze all array fields"""
-        fields = {k for k, v in vars(self).items() if isinstance(v, jax.Array)}
-        return self.freeze(*fields)
+        fields = frozenset(
+            k for k, v in vars(self).items() 
+            if isinstance(v, jax.Array)
+        )
+        return dataclasses.replace(self, _frozen=fields)
     
     def with_trainable(self, *field_names):
         """Set exactly these fields as trainable, freeze rest"""
-        fields = {k for k, v in vars(self).items() if isinstance(v, jax.Array)}
-        frozen = fields - set(field_names)
-        return eqx.tree_at(lambda t: t._frozen, self, frozenset(frozen))
+        all_fields = frozenset(
+            k for k, v in vars(self).items() 
+            if isinstance(v, jax.Array)
+        )
+        new_frozen = all_fields - frozenset(field_names)
+        return dataclasses.replace(self, _frozen=new_frozen)
     
     def is_frozen(self, field_name):
         """Check if field is frozen"""

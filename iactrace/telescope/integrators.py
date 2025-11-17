@@ -1,5 +1,3 @@
-"""Monte Carlo integrator using random disk sampling."""
-
 import jax
 import jax.numpy as jnp
 from ..core.reflection import roughen_normals
@@ -11,10 +9,6 @@ class MCIntegrator:
         self.roughness = roughness
 
     def sample(self, surfaces, apertures, key):
-        """
-        surfaces  : AsphericSurface
-        apertures : DiskAperture / PolygonAperture
-        """
         N = len(surfaces)
         keys = jax.random.split(key, N+1)
         
@@ -31,6 +25,6 @@ class MCIntegrator:
         mirror_normals = jnp.array(mirror_normals)
         
         if self.roughness > 0:
-            mirror_normals = roughen_normals(mirror_normals, self.roughness, key_rough)
+            mirror_normals = roughen_normals(mirror_normals, self.roughness, keys[-1])
 
         return mirror_points, mirror_normals

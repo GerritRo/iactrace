@@ -1,4 +1,3 @@
-"""Surface generation functions for mirror facets."""
 import jax
 import jax.numpy as jnp
 import equinox as eqx

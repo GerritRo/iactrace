@@ -1,5 +1,3 @@
-"""Transformation and rotation utilities."""
-
 import jax.numpy as jnp
 
 def look_at_rotation(mirror_pos, target_pos=jnp.array([0., 0., 0.]), up=jnp.array([0., 1., 0.])):
@@ -25,18 +23,18 @@ def look_at_rotation(mirror_pos, target_pos=jnp.array([0., 0., 0.]), up=jnp.arra
     return jnp.column_stack([right, up_corrected, forward])
 
 
-def euler_to_matrix(tip, tilt, rotation):
+def euler_to_matrix(tip_tilt_rotation):
     """
     Convert Euler angles (degrees) to rotation matrix.
     
     Args:
-        tip: Rotation around X-axis (degrees)
-        tilt: Rotation around Y-axis (degrees)
-        rotation: Rotation around Z-axis (degrees)
+        tip_tilt_rotation: List of all 3 transformations(3,)
     
     Returns:
         Rotation matrix (3, 3)
     """
+    tip, tilt, rotation = tip_tilt_rotation[0], tip_tilt_rotation[1], tip_tilt_rotation[2]
+    
     # Convert to radians
     rx, ry, rz = jnp.radians(jnp.array([tip, tilt, rotation]))
     
