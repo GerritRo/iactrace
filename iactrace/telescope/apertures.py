@@ -35,6 +35,8 @@ class DiskAperture(Aperture):
         pts = sample_disk(key, shape)
         return pts * self.radius
 
+    def area(self):
+        return jnp.pi * self.radius**2
 
 class PolygonAperture(Aperture):
     """Polygonal aperture."""
@@ -50,3 +52,8 @@ class PolygonAperture(Aperture):
     
     def sample(self, key, shape):
         return sample_polygon(key, self.vertices, shape)
+    
+    def area(self):
+        x = self.vertices[:, 0]
+        y = self.vertices[:, 1]
+        return 0.5 * jnp.abs(jnp.sum(x * jnp.roll(y, -1) - jnp.roll(x, -1) * y))

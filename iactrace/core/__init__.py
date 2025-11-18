@@ -3,7 +3,7 @@
 from .geometry import intersect_plane, intersect_cylinder, intersect_box, check_occlusions
 from .reflection import reflect, roughen_normals
 from .transforms import look_at_rotation, euler_to_matrix
-from .render import render
+from .render import render, render_debug
 
 __all__ = [
     'intersect_plane',
@@ -14,5 +14,6 @@ __all__ = [
     'roughen_normals',
     'look_at_rotation',
     'euler_to_matrix',
-    'render'
+    'render',
+    'render_debug'
 ]

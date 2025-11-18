@@ -23,6 +23,51 @@ def look_at_rotation(mirror_pos, target_pos=jnp.array([0., 0., 0.]), up=jnp.arra
     return jnp.column_stack([right, up_corrected, forward])
 
 
+def look_at_euler(mirror_pos, target_pos=jnp.array([0., 0., 0.]), up=jnp.array([0., 1., 0.])):
+    """
+    Compute euler angles to look from mirror_pos towards target_pos.
+
+    Args:
+        mirror_pos: Position to look from (3,)
+        target_pos: Position to look at (3,)
+        up: Up vector (3,)
+
+    Returns:
+        Euler angles (3, )
+    """
+    forward = target_pos - mirror_pos
+    forward = forward / jnp.linalg.norm(forward)
+
+    right = jnp.cross(up, forward)
+    right = right / jnp.linalg.norm(right)
+
+    up_corrected = jnp.cross(forward, right)
+
+    # Rotation matrix: local -> world
+    R = jnp.column_stack([right, up_corrected, forward])
+
+    # Compute tilt
+    sy = -R[2,0]  # sin(tilt)
+    cy = jnp.sqrt(1 - sy**2)
+
+    # Avoid gimbal problem
+    tip = jax.lax.cond(
+        cy > 1e-6,
+        lambda _: jnp.arctan2(R[2,1], R[2,2]),
+        lambda _: 0.0,
+        operand=None
+    )
+    rotation = jax.lax.cond(
+        cy > 1e-6,
+        lambda _: jnp.arctan2(R[1,0], R[0,0]),
+        lambda _: jnp.arctan2(-R[0,1], R[1,1]),
+        operand=None
+    )
+    tilt = jnp.arcsin(sy)
+
+    return jnp.rad2deg(jnp.array([tip, tilt, rotation]))
+
+
 def euler_to_matrix(tip_tilt_rotation):
     """
     Convert Euler angles (degrees) to rotation matrix.

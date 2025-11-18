@@ -6,7 +6,7 @@ import yaml
 
 from .apertures import DiskAperture, PolygonAperture
 from .surfaces import AsphericSurface
-from ..core import render
+from ..core import render, render_debug
 from ..sensors import SquareSensor, HexagonalSensor
 
 class Telescope(eqx.Module):
@@ -22,6 +22,7 @@ class Telescope(eqx.Module):
     mirror_rotations: jax.Array  # (N, 3)
     mirror_points: jax.Array  # (N, M, 3) - sampled surface points
     mirror_normals: jax.Array  # (N, M, 3) - surface normals
+    mirror_weights: jax.Array # (N, M, 1) - sampling weights
     mirror_surfaces: list
     mirror_apertures: list
     
@@ -42,7 +43,7 @@ class Telescope(eqx.Module):
     _frozen: frozenset = eqx.field(static=True)
 
     def __init__(self, mirror_positions, mirror_rotations,
-                 mirror_points, mirror_normals,
+                 mirror_points, mirror_normals, mirror_weights,
                  mirror_surfaces, mirror_apertures,
                  sensors,
                  cyl_p1=None, cyl_p2=None, cyl_r=None,
@@ -56,6 +57,7 @@ class Telescope(eqx.Module):
             mirror_rotations: Mirror rotation euler angles (N, 3)
             mirror_points: Sampled points on mirror surfaces (N, M, 3)
             mirror_normals: Normals at sampled points (N, M, 3)
+            mirror_weights: Cos angle to z axis at sampling
             cyl_p1, cyl_p2, cyl_radius: Cylinder obstructions
             box_p1, box_p2: Box obstructions
             sensor_positions: Sensor plane positions (L, 3)
@@ -70,6 +72,7 @@ class Telescope(eqx.Module):
         self.mirror_rotations = jnp.array(mirror_rotations)
         self.mirror_points = jnp.array(mirror_points)
         self.mirror_normals = jnp.array(mirror_normals)
+        self.mirror_weights = jnp.array(mirror_weights)
         self.mirror_surfaces = mirror_surfaces
         self.mirror_apertures = mirror_apertures
         
@@ -140,7 +143,7 @@ class Telescope(eqx.Module):
         mirror_rotations = jnp.array(mirror_rotations)
         
         # Sample mirrors:
-        mirror_points, mirror_normals = integrator.sample(
+        mirror_points, mirror_normals, mirror_weights = integrator.sample(
             mirror_surfaces, mirror_apertures, sampling_key
         )
 
@@ -192,6 +195,7 @@ class Telescope(eqx.Module):
             mirror_rotations=mirror_rotations,
             mirror_points=mirror_points,
             mirror_normals=mirror_normals,
+            mirror_weights=mirror_weights,
             mirror_surfaces=mirror_surfaces,
             mirror_apertures=mirror_apertures,
             sensors=sensors,
@@ -203,7 +207,7 @@ class Telescope(eqx.Module):
             name=telescope_name
         )
     
-    def __call__(self, sources, source_type='point', sensor_idx=0, **overrides):
+    def __call__(self, sources, source_type='point', sensor_idx=0, debug=False, **overrides):
         """
         Render sources through telescope.
 
@@ -222,7 +226,10 @@ class Telescope(eqx.Module):
             for key, value in overrides.items():
                 telescope = eqx.tree_at(lambda t: getattr(t, key), telescope, value)
 
-        return render(telescope, sources, source_type, sensor_idx)
+        if debug == False:
+            return render(telescope, sources, source_type, sensor_idx)
+        else:
+            return render_debug(telescope, sources, source_type, sensor_idx)
     
     def freeze(self, *field_names):
         """Freeze fields (make non-trainable)"""

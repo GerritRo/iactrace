@@ -1,5 +1,5 @@
 """Visualization tools."""
 
-from .plotting import hexshow, plot_telescope_geometry, plot_focal_plane
+from .plotting import hexshow
 
-__all__ = ['hexshow', 'plot_telescope_geometry', 'plot_focal_plane']
+__all__ = ['hexshow']

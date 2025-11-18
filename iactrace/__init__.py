@@ -9,7 +9,7 @@ from .telescope.obstructions import Cylinder, Box
 from .telescope.integrators import MCIntegrator
 from .sensors.square import SquareSensor
 from .sensors.hexagonal import HexagonalSensor
-from .viz.plotting import hexshow, plot_telescope_geometry, plot_focal_plane
+from .viz.plotting import hexshow
 
 __version__ = "0.1.0"
 
@@ -22,6 +22,4 @@ __all__ = [
     'SquareSensor',
     'HexagonalSensor',
     'hexshow',
-    'plot_telescope_geometry',
-    'plot_focal_plane',
 ]

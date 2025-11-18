@@ -1,5 +1,3 @@
-"""Setup script for IACTrace."""
-
 from setuptools import setup, find_packages
 
 with open("README.md", "r", encoding="utf-8") as fh:
@@ -8,8 +6,8 @@ with open("README.md", "r", encoding="utf-8") as fh:
 setup(
     name="iactrace",
     version="0.1.0",
-    author="Your Name",
-    author_email="your.email@example.com",
+    author="Gerrit Roellinghoff",
+    author_email="gerrit.roellinghoff@fau.de",
     description="JAX-based optical ray tracing for Imaging Atmospheric Cherenkov Telescopes",
     long_description=long_description,
     long_description_content_type="text/markdown",
