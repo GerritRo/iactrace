@@ -7,13 +7,14 @@ from .reflection import reflect
 from .transforms import euler_to_matrix
     
 @partial(jax.jit, static_argnames=['source_type', 'sensor_idx'])
-def render(tel, sources, source_type, sensor_idx=0):
+def render(tel, sources, values, source_type, sensor_idx=0):
     """
     Core rendering function - processes ALL sources at once, loops over mirrors.
     
     Args:
         tel: Telescope object
         sources: Batch of source positions/directions (N_sources, 3)
+        values: Flux of the source in ph/m^2 (N_sources, )
         source_type: 'point' or 'infinity'
         sensor_idx: Id of sensor in telescope object
 
@@ -71,7 +72,7 @@ def render(tel, sources, source_type, sensor_idx=0):
 
         # Flatten all sources and samples for this mirror
         pts_flat = pts.reshape(-1, 2)
-        values_flat = (cos_angle[..., 0] / tv_single[..., 0] * shadow_mask).flatten()
+        values_flat = (values[:,None] * cos_angle[..., 0] / tv_single[..., 0] * shadow_mask).flatten()
 
         # Accumulate contribution from this mirror
         img = sensor.accumulate(pts_flat[:, 0], pts_flat[:, 1], values_flat)
@@ -88,7 +89,7 @@ def render(tel, sources, source_type, sensor_idx=0):
     return final_img
 
 @partial(jax.jit, static_argnames=['source_type', 'sensor_idx'])
-def render_debug(tel, sources, source_type, sensor_idx=0):
+def render_debug(tel, sources, values, source_type, sensor_idx=0):
     """
     Renders without accumulating on sensor, instead returns raw hits.
 
@@ -138,7 +139,7 @@ def render_debug(tel, sources, source_type, sensor_idx=0):
                        in_axes=(0,0,None,None))(tp_b, refl, sensor_pos, sensor_rot)
 
         pts_flat = pts.reshape(-1, 2)
-        vals_flat = (cosang[..., 0] / tv_single[..., 0] * shadow_mask).flatten()
+        vals_flat = (values[:,None] * cosang[..., 0] / tv_single[..., 0] * shadow_mask).flatten()
 
         # carry stays the same (None), output is the data
         return carry, (pts_flat, vals_flat)

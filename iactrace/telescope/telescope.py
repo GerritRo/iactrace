@@ -206,12 +206,13 @@ class Telescope(eqx.Module):
             name=telescope_name
         )
     
-    def __call__(self, sources, source_type='point', sensor_idx=0, debug=False, **overrides):
+    def __call__(self, sources, values, source_type='point', sensor_idx=0, debug=False, **overrides):
         """
         Render sources through telescope.
 
         Args:
             sources: Source positions (N, 3) or directions (N, 3)
+            values: Flux of the source in ph/m^2 (N, )
             source_type: 'point' or 'infinity'
             sensor_idx: Which sensor to use (default 0)
             **overrides: Override fields (e.g., mirror_normals=new_normals)
@@ -226,9 +227,9 @@ class Telescope(eqx.Module):
                 telescope = eqx.tree_at(lambda t: getattr(t, key), telescope, value)
 
         if debug == False:
-            return render(telescope, sources, source_type, sensor_idx)
+            return render(telescope, sources, values, source_type, sensor_idx)
         else:
-            return render_debug(telescope, sources, source_type, sensor_idx)
+            return render_debug(telescope, sources, values, source_type, sensor_idx)
     
     def freeze(self, *field_names):
         """Freeze fields (make non-trainable)"""
