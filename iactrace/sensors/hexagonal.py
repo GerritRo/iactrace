@@ -6,7 +6,6 @@ import equinox as eqx
 
 class HexagonalSensor(eqx.Module):
     """Hexagonal sensor using axial coordinate lookup."""
-    
     # Sensor pose
     position: jax.Array  # (3,)
     rotation: jax.Array  # (3,)
@@ -20,7 +19,6 @@ class HexagonalSensor(eqx.Module):
     rotation_angle: float = eqx.field(static=True)  # Rotation to align to pointy-top
     hex_offset_x: float = eqx.field(static=True)
     hex_offset_y: float = eqx.field(static=True)
-    
     
     q_min: int = eqx.field(static=True)
     r_min: int = eqx.field(static=True)
@@ -168,8 +166,8 @@ class HexagonalSensor(eqx.Module):
         return pixel_idx, in_bounds & (pixel_idx >= 0)
 
 
-# Helper functions
 def detect_hex_properties(centers):
+    """Detect properties of hexagonal grid: size, rotation and offset"""
     centers = jnp.asarray(centers)
     N = centers.shape[0]
 

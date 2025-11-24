@@ -1,5 +1,3 @@
-"""Core ray tracing functions."""
-
 from .geometry import intersect_plane, intersect_cylinder, intersect_box, check_occlusions
 from .reflection import reflect, roughen_normals
 from .transforms import look_at_rotation, euler_to_matrix

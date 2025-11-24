@@ -1,5 +1,3 @@
-"""Visualization tools."""
+from .plotting import hexshow, squareshow
 
-from .plotting import hexshow
-
-__all__ = ['hexshow']
+__all__ = ['hexshow', 'squareshow']

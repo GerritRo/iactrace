@@ -1,5 +1,3 @@
-"""Sensor/camera models."""
-
 from .square import SquareSensor
 from .hexagonal import HexagonalSensor
 
