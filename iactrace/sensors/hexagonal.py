@@ -1,6 +1,5 @@
-"""Hexagonal sensor with efficient axial coordinate lookup."""
-
 import jax
+import numpy as np
 import jax.numpy as jnp
 import equinox as eqx
 
@@ -18,8 +17,11 @@ class HexagonalSensor(eqx.Module):
     
     # Pre-computed static parameters
     hex_size: float = eqx.field(static=True)
-    q_offset: float = eqx.field(static=True)
-    r_offset: float = eqx.field(static=True)
+    rotation_angle: float = eqx.field(static=True)  # Rotation to align to pointy-top
+    hex_offset_x: float = eqx.field(static=True)
+    hex_offset_y: float = eqx.field(static=True)
+    
+    
     q_min: int = eqx.field(static=True)
     r_min: int = eqx.field(static=True)
     n_pixels: int = eqx.field(static=True)
@@ -38,24 +40,24 @@ class HexagonalSensor(eqx.Module):
         self.hex_centers = jnp.asarray(hex_centers)
         self.n_pixels = len(hex_centers)
         
-        # Compute hex size from neighbor distances
-        diff = hex_centers[:, None, :] - hex_centers[None, :, :]
-        dists = jnp.sqrt(jnp.sum(diff**2, axis=-1))
-        dists = jnp.where(jnp.eye(len(hex_centers), dtype=bool), jnp.inf, dists)
-        min_dist = jnp.min(dists)
-        self.hex_size = float(min_dist / jnp.sqrt(3))
+        # Detect hex properties
+        hex_size, rotation, offset = detect_hex_properties(hex_centers)
+        self.hex_size = float(hex_size)
+        self.rotation_angle = float(rotation)
+        self.hex_offset_x = float(offset[0])
+        self.hex_offset_y = float(offset[1])
         
-        # Get axial coordinates
-        x, y = hex_centers[:, 0], hex_centers[:, 1]
-        q, r = point_to_axial(x, y, self.hex_size)
+        # Rotate and translate to fit pointy-top centered grid
+        x = hex_centers[:, 0] - self.hex_offset_x
+        y = hex_centers[:, 1] - self.hex_offset_y 
+        x_rot, y_rot = rotate_coords(x, y, -self.rotation_angle)
         
-        # Calculate offsets
-        self.q_offset = float(q[0] - jnp.round(q[0]))
-        self.r_offset = float(r[0] - jnp.round(r[0]))
-        
+        # Get axial coordinates (always using pointy-top)
+        q, r = point_to_axial(x_rot, y_rot, self.hex_size)
+                
         # Grid coordinates
-        q_grid = jnp.round(q - self.q_offset).astype(jnp.int32)
-        r_grid = jnp.round(r - self.r_offset).astype(jnp.int32)
+        q_grid = jnp.round(q).astype(jnp.int32)
+        r_grid = jnp.round(r).astype(jnp.int32)
         
         # Store bounds
         self.q_min = int(q_grid.min())
@@ -90,15 +92,14 @@ class HexagonalSensor(eqx.Module):
         Returns:
             Image array (n_pixels,)
         """
-        # Convert to axial coordinates
-        q, r = point_to_axial(x, y, self.hex_size)
+        # Rotate coordinates to align with pointy-top
+        x_rot, y_rot = rotate_coords(x-self.hex_offset_x, y-self.hex_offset_y, -self.rotation_angle)
         
-        # Apply offsets
-        q_shifted = q - self.q_offset
-        r_shifted = r - self.r_offset
+        # Convert to axial coordinates (always using pointy-top)
+        q, r = point_to_axial(x_rot, y_rot, self.hex_size)
         
         # Round to nearest hex
-        q_grid, r_grid = axial_round(q_shifted, r_shifted)
+        q_grid, r_grid = axial_round(q, r)
         
         # Calculate lookup indices
         q_idx = q_grid.astype(jnp.int32) - self.q_min
@@ -126,11 +127,92 @@ class HexagonalSensor(eqx.Module):
             pixel_idx,
             num_segments=self.n_pixels
         )
+    
+    def accumulate_debug(self, x, y, values):
+        """
+        Accumulate photon hits into hexagonal pixels.
+        
+        Args:
+            x: X coordinates of photons (N,)
+            y: Y coordinates of photons (N,)
+            values: Values to accumulate (N,)
+        
+        Returns:
+            Image array (n_pixels,)
+        """
+        # Rotate coordinates to align with pointy-top
+        x_rot, y_rot = rotate_coords(x-self.hex_offset_x, y-self.hex_offset_y, -self.rotation_angle)
+        
+        # Convert to axial coordinates (always using pointy-top)
+        q, r = point_to_axial(x_rot, y_rot, self.hex_size)
+        
+        # Round to nearest hex
+        q_grid, r_grid = axial_round(q, r)
+        
+        # Calculate lookup indices
+        q_idx = q_grid.astype(jnp.int32) - self.q_min
+        r_idx = r_grid.astype(jnp.int32) - self.r_min
+        
+        # Check bounds
+        in_bounds = (
+            (q_idx >= 0) & (q_idx < self.lookup_table.shape[0]) &
+            (r_idx >= 0) & (r_idx < self.lookup_table.shape[1])
+        )
+        
+        # Safe lookup (clamp indices)
+        q_idx_safe = q_idx.clip(0, self.lookup_table.shape[0] - 1)
+        r_idx_safe = r_idx.clip(0, self.lookup_table.shape[1] - 1)
+        pixel_idx = self.lookup_table[q_idx_safe, r_idx_safe]
+        
+        # Accumulate using segment_sum
+        return pixel_idx, in_bounds & (pixel_idx >= 0)
 
 
 # Helper functions
+def detect_hex_properties(centers):
+    centers = jnp.asarray(centers)
+    N = centers.shape[0]
+
+    # Pairwise differences and distances
+    diff = centers[:, None, :] - centers[None, :, :]
+    sqd = jnp.sum(diff**2, axis=2)
+
+    # mask diagonal
+    diag_mask = jnp.eye(N, dtype=bool)
+    sqd = jnp.where(diag_mask, jnp.inf, sqd)
+
+    # Find the minimum
+    # argmin over flattened array
+    flat_index = jnp.argmin(sqd)
+    i = flat_index // N
+    j = flat_index % N
+
+    # minimal vector
+    vec = diff[i, j]
+    
+    # angle of this vector
+    angle = jnp.arctan2(vec[1], vec[0])
+    
+    # Minimum distance
+    min_dist = jnp.sqrt(jnp.min(sqd))
+    
+    # Calculate offset via smallest distance to center:
+    offset_id = jnp.argmin(jnp.sqrt(jnp.sum(centers**2, axis=1)))
+
+    return min_dist/jnp.sqrt(3), jnp.mod(angle, jnp.pi/3), centers[offset_id]
+
+
+def rotate_coords(x, y, angle):
+    """Rotate coordinates by given angle."""
+    cos_a = jnp.cos(angle)
+    sin_a = jnp.sin(angle)
+    x_rot = cos_a * x - sin_a * y
+    y_rot = sin_a * x + cos_a * y
+    return x_rot, y_rot
+
+
 def point_to_axial(x, y, hex_size):
-    """Convert Cartesian to axial hex coordinates."""
+    """Convert Cartesian to axial hex coordinates (pointy-top)."""
     q = (jnp.sqrt(3)/3 * x - 1/3 * y) / hex_size
     r = (2/3 * y) / hex_size
     return q, r

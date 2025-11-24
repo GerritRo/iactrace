@@ -3,14 +3,43 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import RegularPolygon
 
 
-def hexshow(result, hex_centers, hex_size=None, ax=None, **kwargs):
+def squareshow(result, sensor, ax=None, **kwargs):
+    """
+    Display square pixel data.
+
+    Args:
+        result: Grid for square sensor
+        sensor: square sensor
+        ax: Matplotlib axis (creates new if None)
+        **kwargs: Additional arguments for square plotting (vmin, vmax, cmap, etc.)
+
+    Returns:
+        Matplotlib axis
+    """
+    if ax is None:
+        ax = plt.gca()
+
+    vmin = kwargs.pop('vmin', result.min())
+    vmax = kwargs.pop('vmax', result.max())
+    cmap = kwargs.pop('cmap', plt.cm.viridis)
+
+    x_extent = sensor.x0 + sensor.width * sensor.dx
+    y_extent = sensor.y0 + sensor.height * sensor.dy
+    ax.imshow(result, origin='lower', extent=[sensor.x0, x_extent, sensor.y0, y_extent],
+              vmin=vmin, vmax=vmax, cmap=cmap)
+
+    ax.set_aspect('equal')
+    ax.autoscale_view()
+    return ax
+
+
+def hexshow(result, sensor, ax=None, **kwargs):
     """
     Display hexagonal pixel data.
 
     Args:
         result: Values for each hexagon (N,)
-        hex_centers: Hexagon center positions (N, 2)
-        hex_size: Hex size (auto-computed if None)
+        sensor: Hexagonal sensor
         ax: Matplotlib axis (creates new if None)
         **kwargs: Additional arguments for hexagon plotting (vmin, vmax, cmap, etc.)
 
@@ -20,32 +49,34 @@ def hexshow(result, hex_centers, hex_size=None, ax=None, **kwargs):
     if ax is None:
         ax = plt.gca()
 
-    # Auto-compute hex size if not provided
-    if hex_size is None:
-        diff = hex_centers[:, None, :] - hex_centers[None, :, :]
-        dists = np.sqrt(np.sum(diff**2, axis=-1))
-        np.fill_diagonal(dists, np.inf)
-        min_dist = np.min(dists)
-        hex_size = min_dist / np.sqrt(3)
+    hex_centers = np.array(sensor.hex_centers)
+    
+    # Determine hex size for plotting
+    hex_size = sensor.hex_size
+    
+    # Get the grid rotation (how much the original grid was rotated)
+    # We need to counter-rotate the hexagon orientation
+    grid_rotation = -sensor.rotation_angle  # Negative because we counter-rotate
 
     vmin = kwargs.pop('vmin', result.min())
     vmax = kwargs.pop('vmax', result.max())
     cmap = kwargs.pop('cmap', plt.cm.viridis)
 
     for i, (x, y) in enumerate(hex_centers):
-        value = result[i]
-
-        hexagon = RegularPolygon(
+        value = float(result[i])
+        color = plt.cm.viridis(value / vmax)
+        
+        # Pointy-top base orientation (30 degrees) plus the grid's rotation
+        hex_patch = RegularPolygon(
             (x, y),
             numVertices=6,
             radius=hex_size,
-            orientation=0,  # not flat-top
-            facecolor=cmap((value - vmin) / (vmax - vmin)) if vmax > vmin else 'white',
-            edgecolor='gray',
-            linewidth=0.5,
-            **kwargs
+            orientation=grid_rotation,
+            facecolor=color,
+            edgecolor='black',
+            linewidth=0.5
         )
-        ax.add_patch(hexagon)
+        ax.add_patch(hex_patch)
 
     ax.set_aspect('equal')
     ax.autoscale_view()

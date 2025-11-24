@@ -9,7 +9,7 @@ from .telescope.obstructions import Cylinder, Box
 from .telescope.integrators import MCIntegrator
 from .sensors.square import SquareSensor
 from .sensors.hexagonal import HexagonalSensor
-from .viz.plotting import hexshow
+from .viz.plotting import hexshow, squareshow
 
 __version__ = "0.1.0"
 
@@ -22,4 +22,5 @@ __all__ = [
     'SquareSensor',
     'HexagonalSensor',
     'hexshow',
+    'squareshow',
 ]

@@ -60,8 +60,7 @@ class Telescope(eqx.Module):
             mirror_weights: Cos angle to z axis at sampling
             cyl_p1, cyl_p2, cyl_radius: Cylinder obstructions
             box_p1, box_p2: Box obstructions
-            sensor_positions: Sensor plane positions (L, 3)
-            sensor_rotations: Sensor plane euler angles (L, 3)
+            sensors: Sensor objects
             mirror_templates: List of mirror surface definitions
             mirror_apertures: List of aperture definitions
             sensor_configs: Sensor configuration dict
