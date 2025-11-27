@@ -1,24 +1,29 @@
-"""
-IACTrace: JAX-based optical ray tracing for Imaging Atmospheric Cherenkov Telescopes.
+from .telescope import (
+    Telescope,
+    Mirror,
+    Obstruction,
+    Cylinder,
+    Box,
+    AsphericSurface,
+    DiskAperture,
+    PolygonAperture,
+    MCIntegrator,
+)
+from .sensors import SquareSensor, HexagonalSensor
+from .viz import hexshow, squareshow
 
-This package provides efficient, differentiable simulation of IACT optical systems.
-"""
-
-from .telescope.telescope import Telescope
-from .telescope.obstructions import Cylinder, Box
-from .telescope.integrators import MCIntegrator
-from .sensors.square import SquareSensor
-from .sensors.hexagonal import HexagonalSensor
-from .viz.plotting import hexshow, squareshow
-
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 __all__ = [
     'Telescope',
+    'Mirror',
+    'Obstruction',
     'Cylinder',
     'Box',
+    'AsphericSurface',
+    'DiskAperture',
+    'PolygonAperture',
     'MCIntegrator',
-    'GridIntegrator',
     'SquareSensor',
     'HexagonalSensor',
     'hexshow',

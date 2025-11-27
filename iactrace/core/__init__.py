@@ -1,17 +1,14 @@
-from .geometry import intersect_plane, intersect_cylinder, intersect_box, check_occlusions
+from .geometry import intersect_plane
 from .reflection import reflect, roughen_normals
-from .transforms import look_at_rotation, euler_to_matrix
+from .transforms import euler_to_matrix, look_at_rotation
 from .render import render, render_debug
 
 __all__ = [
     'intersect_plane',
-    'intersect_cylinder',
-    'intersect_box',
-    'check_occlusions',
     'reflect',
     'roughen_normals',
-    'look_at_rotation',
     'euler_to_matrix',
+    'look_at_rotation',
     'render',
-    'render_debug'
+    'render_debug',
 ]

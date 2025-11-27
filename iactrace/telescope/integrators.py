@@ -1,36 +1,47 @@
 import jax
 import jax.numpy as jnp
+import equinox as eqx
+
 from ..core.reflection import roughen_normals
 
 
 class MCIntegrator:
+    """Monte Carlo integrator for sampling mirror surfaces."""
+    
     def __init__(self, n_samples=128, roughness=0.0):
         self.n_samples = n_samples
         self.roughness = roughness
-
-    def sample(self, surfaces, apertures, key):
-        N = len(surfaces)
-        keys = jax.random.split(key, N+1)
+    
+    def sample_mirrors(self, mirrors, key):
+        """
+        Sample all mirrors and return list of updated Mirror objects.
         
-        # Sample all mirrors
-        mirror_points = []
-        mirror_normals = []
-        mirror_areas = []
-        for i in range(N):
-            xy = apertures[i].sample(keys[i], (self.n_samples,))
-            m_points, m_normals = surfaces[i].point_and_normal(xy)
-            mirror_points.append(m_points)
-            mirror_normals.append(m_normals)
-            mirror_areas.append(apertures[i].area())
-
-        mirror_points = jnp.array(mirror_points)
-        mirror_normals = jnp.array(mirror_normals)
-        mirror_areas = jnp.array(mirror_areas)
+        Args:
+            mirrors: List of Mirror objects
+            key: JAX random key
         
+        Returns:
+            List of Mirror objects with sampled points/normals/weights
+        """
+        keys = jax.random.split(key, len(mirrors) + 1)
+        
+        # Sample each mirror
+        sampled = [m.sample(self.n_samples, k) for m, k in zip(mirrors, keys[:-1])]
+        
+        # Apply roughness if needed
         if self.roughness > 0:
-            mirror_normals = roughen_normals(mirror_normals, self.roughness, keys[-1])
-            
-        mirror_weights = jnp.sum(mirror_normals * jnp.array([0,0,1]), axis=-1, keepdims=True)
-        mirror_weights = mirror_weights / mirror_areas[:,None,None] * self.n_samples
-
-        return mirror_points, mirror_normals, mirror_weights
+            sampled = self._apply_roughness(sampled, keys[-1])
+        
+        return sampled
+    
+    def _apply_roughness(self, mirrors, key):
+        """Apply surface roughness to all mirrors."""        
+        # Stack normals for efficient roughening
+        normals_stacked = jnp.stack([m.normals for m in mirrors])  # (N, M, 3)
+        roughened = roughen_normals(normals_stacked, self.roughness, key)
+        
+        # Update each mirror with roughened normals
+        return [
+            eqx.tree_at(lambda m: m.normals, mirror, roughened[i])
+            for i, mirror in enumerate(mirrors)
+        ]

@@ -1,113 +1,56 @@
 import jax
 import jax.numpy as jnp
 import equinox as eqx
-import dataclasses
 import yaml
 
+from .mirrors import Mirror
 from .apertures import DiskAperture, PolygonAperture
 from .surfaces import AsphericSurface
+from .obstructions import Cylinder, Box, CylinderGroup, BoxGroup, group_obstructions
 from ..core import render, render_debug
 from ..sensors import SquareSensor, HexagonalSensor
 
+
 class Telescope(eqx.Module):
     """
-    IACT telescope configuration as an Equinox Module (PyTree).
+    IACT telescope configuration as an Equinox Module.
     
-    All data needed for rendering is stored as fields and can be directly
-    passed to JAX-compiled render functions.
+    Stores mirrors, obstructions, and sensors as object lists for
+    polymorphic dispatch while maintaining JAX compatibility.
     """
     
-    # Mirror geometry
-    mirror_positions: jax.Array  # (N, 3)
-    mirror_rotations: jax.Array  # (N, 3)
-    mirror_points: jax.Array  # (N, M, 3) - sampled surface points
-    mirror_normals: jax.Array  # (N, M, 3) - surface normals
-    mirror_weights: jax.Array # (N, M, 1) - sampling weights
-    mirror_surfaces: list
-    mirror_apertures: list
-    
-    # Obstructions
-    cyl_p1: jax.Array  # (C, 3)
-    cyl_p2: jax.Array  # (C, 3)
-    cyl_r: jax.Array  # (C,)
-    box_p1: jax.Array  # (B, 3)
-    box_p2: jax.Array  # (B, 3)
-    
-    # Sensors
+    mirrors: list
+    obstruction_groups: list  # Grouped by type for fast rendering
     sensors: list
-    
-    # Metadata 
     name: str = eqx.field(static=True)
     
-    # Define which parameters are frozen:
-    _frozen: frozenset = eqx.field(static=True)
-
-    def __init__(self, mirror_positions, mirror_rotations,
-                 mirror_points, mirror_normals, mirror_weights,
-                 mirror_surfaces, mirror_apertures,
-                 sensors,
-                 cyl_p1=None, cyl_p2=None, cyl_r=None,
-                 box_p1=None, box_p2=None,
-                 name="telescope", _frozen=None):
+    def __init__(self, mirrors, obstructions=None, sensors=None, name="telescope"):
         """
-        Initialize Telescope with all required data.
+        Initialize Telescope.
         
         Args:
-            mirror_positions: Mirror center positions (N, 3)
-            mirror_rotations: Mirror rotation euler angles (N, 3)
-            mirror_points: Sampled points on mirror surfaces (N, M, 3)
-            mirror_normals: Normals at sampled points (N, M, 3)
-            mirror_weights: Cos angle to z axis at sampling
-            cyl_p1, cyl_p2, cyl_radius: Cylinder obstructions
-            box_p1, box_p2: Box obstructions
-            sensors: Sensor objects
-            mirror_templates: List of mirror surface definitions
-            mirror_apertures: List of aperture definitions
-            sensor_configs: Sensor configuration dict
+            mirrors: List of Mirror objects
+            obstructions: List of Obstruction objects (Cylinder, Box)
+            sensors: List of sensor objects
             name: Telescope name
         """
-        # Mirror positions and sampled points
-        self.mirror_positions = jnp.array(mirror_positions)
-        self.mirror_rotations = jnp.array(mirror_rotations)
-        self.mirror_points = jnp.array(mirror_points)
-        self.mirror_normals = jnp.array(mirror_normals)
-        self.mirror_weights = jnp.array(mirror_weights)
-        self.mirror_surfaces = mirror_surfaces
-        self.mirror_apertures = mirror_apertures
-        
-        # Obstructions (default to empty)
-        self.cyl_p1 = jnp.array(cyl_p1) if cyl_p1 is not None else jnp.zeros((0, 3))
-        self.cyl_p2 = jnp.array(cyl_p2) if cyl_p2 is not None else jnp.zeros((0, 3))
-        self.cyl_r = jnp.array(cyl_r) if cyl_r is not None else jnp.zeros((0,))
-        self.box_p1 = jnp.array(box_p1) if box_p1 is not None else jnp.zeros((0, 3))
-        self.box_p2 = jnp.array(box_p2) if box_p2 is not None else jnp.zeros((0, 3))
-        
-        # Static metadata
-        self.sensors = sensors
+        self.mirrors = list(mirrors)
+        self.obstruction_groups = group_obstructions(obstructions)
+        self.sensors = list(sensors) if sensors else []
         self.name = name
-        
-        # Standard setting is to freeze all parameters:
-        if _frozen is None:
-            array_fields = frozenset(
-                k for k, v in self.__dict__.items() 
-                if isinstance(v, jax.Array)
-            )
-            self._frozen = array_fields
-        else:
-            self._frozen = _frozen
-
+    
     @classmethod
     def from_yaml(cls, filename, integrator, sampling_key=None):
         """
-        Load and compile telescope from YAML file.
+        Load telescope from YAML configuration file.
         
         Args:
-            filename: Path to YAML configuration file
-            integrator: Integrator object for sampling mirror surfaces
-            sampling_key: JAX random key for sampling
+            filename: Path to YAML file
+            integrator: Integrator for sampling mirror surfaces
+            sampling_key: JAX random key
         
         Returns:
-            Telescope object
+            Telescope object with sampled mirrors
         """
         if sampling_key is None:
             sampling_key = jax.random.key(0)
@@ -116,120 +59,92 @@ class Telescope(eqx.Module):
             config = yaml.safe_load(f)
         
         telescope_name = config.get('telescope', {}).get('name', 'telescope')
-        
-        # Parse mirrors
-        mirrors = config.get('mirrors', [])
         templates = config.get('mirror_templates', {})
         
-        mirror_positions = []
-        mirror_rotations = []
-        mirror_apertures = []
-        mirror_surfaces = []
-        
-        for mirror in mirrors:
-            # Position
-            mirror_positions.append(mirror['position'])
-            mirror_rotations.append(mirror['orientation'])
+        # Parse mirrors
+        mirrors = []
+        for m in config.get('mirrors', []):
             # Aperture
-            if mirror['aperture']['type'] == 'circular':
-                mirror_apertures.append(DiskAperture(mirror['aperture']['radius']))
-            elif mirror['aperture']['type'] == 'polygon':
-                mirror_apertures.append(PolygonAperture(mirror['aperture']['vertices']))
+            if m['aperture']['type'] == 'circular':
+                aperture = DiskAperture(m['aperture']['radius'])
+            elif m['aperture']['type'] == 'polygon':
+                aperture = PolygonAperture(m['aperture']['vertices'])
+            else:
+                raise ValueError(f"Unknown aperture type: {m['aperture']['type']}")
+            
             # Surface
-            mirror_surfaces.append(AsphericSurface.from_template(templates[mirror['template']]))
+            surface = AsphericSurface.from_template(templates[m['template']])
             
-        mirror_positions = jnp.array(mirror_positions)
-        mirror_rotations = jnp.array(mirror_rotations)
+            mirrors.append(Mirror(
+                position=m['position'],
+                rotation=m['orientation'],
+                surface=surface,
+                aperture=aperture
+            ))
         
-        # Sample mirrors:
-        mirror_points, mirror_normals, mirror_weights = integrator.sample(
-            mirror_surfaces, mirror_apertures, sampling_key
-        )
-
+        # Sample mirrors
+        mirrors = integrator.sample_mirrors(mirrors, sampling_key)
+        
         # Parse obstructions
-        cyl_p1_list, cyl_p2_list, cyl_r_list = [], [], []
-        box_p1_list, box_p2_list = [], []
-        
+        obstructions = []
         for obs in config.get('obstructions', []):
-            obs_type = obs['type']
-            
-            if obs_type == 'cylinder':
-                cyl_p1_list.append(obs['p1'])
-                cyl_p2_list.append(obs['p2'])
-                cyl_r_list.append(obs['r'])
-        
-            elif obs_type == 'box':
-                box_p1_list.append(obs['p1'])
-                box_p2_list.append(obs['p2'])
-        
-        cyl_p1 = jnp.array(cyl_p1_list) if cyl_p1_list else None
-        cyl_p2 = jnp.array(cyl_p2_list) if cyl_p2_list else None
-        cyl_r = jnp.array(cyl_r_list) if cyl_r_list else None
-        box_p1 = jnp.array(box_p1_list) if box_p1_list else None
-        box_p2 = jnp.array(box_p2_list) if box_p2_list else None
+            if obs['type'] == 'cylinder':
+                obstructions.append(Cylinder(obs['p1'], obs['p2'], obs['r']))
+            elif obs['type'] == 'box':
+                obstructions.append(Box(obs['p1'], obs['p2']))
+            else:
+                raise ValueError(f"Unknown obstruction type: {obs['type']}")
         
         # Parse sensors
         sensors = []
-        
-        for sensor_data in config.get('sensors', []):
-            sensor_type = sensor_data['type']
-            if sensor_type == 'square':
-                sensor = SquareSensor(position=sensor_data['position'],
-                                      rotation=sensor_data['orientation'],
-                                      width=sensor_data['width'],
-                                      height=sensor_data['height'],
-                                      bounds=tuple(sensor_data['bounds']))
-            elif sensor_type == 'hexagonal':
-                pixel_centers = jnp.array([sensor_data['centers_x'], sensor_data['centers_y']]).T
-                sensor = HexagonalSensor(position=sensor_data['position'],
-                                         rotation=sensor_data['orientation'],
-                                         hex_centers=pixel_centers)
+        for s in config.get('sensors', []):
+            if s['type'] == 'square':
+                sensors.append(SquareSensor(
+                    position=s['position'],
+                    rotation=s['orientation'],
+                    width=s['width'],
+                    height=s['height'],
+                    bounds=tuple(s['bounds'])
+                ))
+            elif s['type'] == 'hexagonal':
+                centers = jnp.array([s['centers_x'], s['centers_y']]).T
+                sensors.append(HexagonalSensor(
+                    position=s['position'],
+                    rotation=s['orientation'],
+                    hex_centers=centers
+                ))
             else:
-                raise ValueError(f"Unknown sensor type: {sensor_type}")
-            sensors.append(sensor)
-
-        # Return Object:
+                raise ValueError(f"Unknown sensor type: {s['type']}")
+        
         return cls(
-            mirror_positions=mirror_positions,
-            mirror_rotations=mirror_rotations,
-            mirror_points=mirror_points,
-            mirror_normals=mirror_normals,
-            mirror_weights=mirror_weights,
-            mirror_surfaces=mirror_surfaces,
-            mirror_apertures=mirror_apertures,
+            mirrors=mirrors,
+            obstructions=obstructions,
             sensors=sensors,
-            cyl_p1=cyl_p1,
-            cyl_p2=cyl_p2,
-            cyl_r=cyl_r,
-            box_p1=box_p1,
-            box_p2=box_p2,
             name=telescope_name
         )
     
-    def __call__(self, sources, values, source_type='point', sensor_idx=0, debug=False, **overrides):
+    def __call__(self, sources, values, source_type='point', sensor_idx=0, debug=False):
         """
         Render sources through telescope.
-
+        
         Args:
             sources: Source positions (N, 3) or directions (N, 3)
-            values: Flux of the source in ph/m^2 (N, )
+            values: Flux values (N,)
             source_type: 'point' or 'infinity'
-            sensor_idx: Which sensor to use (default 0)
-            **overrides: Override fields (e.g., mirror_normals=new_normals)
-
+            sensor_idx: Which sensor to use
+            debug: If True, return raw hits instead of accumulated image
+        
         Returns:
-            Rendered image
+            Rendered image or (pts, values) if debug=True
         """
-        # Apply overrides if provided
-        telescope = self
-        if overrides:
-            for key, value in overrides.items():
-                telescope = eqx.tree_at(lambda t: getattr(t, key), telescope, value)
-
-        if debug == False:
-            return render(telescope, sources, values, source_type, sensor_idx)
-        else:
-            return render_debug(telescope, sources, values, source_type, sensor_idx)
+        if debug:
+            return render_debug(self, sources, values, source_type, sensor_idx)
+        return render(self, sources, values, source_type, sensor_idx)
+    
+    def resample(self, integrator, key):
+        """Return new telescope with resampled mirror surfaces."""
+        new_mirrors = integrator.sample_mirrors(self.mirrors, key)
+        return eqx.tree_at(lambda t: t.mirrors, self, new_mirrors)
     
     def freeze(self, *field_names):
         """Freeze fields (make non-trainable)"""
