@@ -4,6 +4,7 @@ import equinox as eqx
 from abc import abstractmethod
 from jax import vmap
 
+from .geometry import intersect_cylinder, intersect_box
 
 class Obstruction(eqx.Module):
     """Base class for single obstructions."""
@@ -27,52 +28,6 @@ class ObstructionGroup(eqx.Module):
 
 # === Cylinder ===
 
-def _cylinder_intersect(ray_origin, ray_direction, p1, p2, radius):
-    """Single cylinder intersection (for vmapping)."""
-    axis = p2 - p1
-    height = jnp.linalg.norm(axis)
-    axis = axis / height
-    
-    oc = ray_origin - p1
-    oc_axial = jnp.dot(oc, axis)
-    rd_axial = jnp.dot(ray_direction, axis)
-    oc_perp = oc - oc_axial * axis
-    rd_perp = ray_direction - rd_axial * axis
-    
-    a = jnp.dot(rd_perp, rd_perp)
-    b = 2 * jnp.dot(oc_perp, rd_perp)
-    c = jnp.dot(oc_perp, oc_perp) - radius * radius
-    disc = b * b - 4 * a * c
-    
-    eps = 1e-8
-    sqrt_disc = jnp.sqrt(jnp.maximum(disc, 0.0))
-    t1 = (-b - sqrt_disc) / (2 * a + eps)
-    t2 = (-b + sqrt_disc) / (2 * a + eps)
-    
-    y1 = oc_axial + t1 * rd_axial
-    y2 = oc_axial + t2 * rd_axial
-    
-    t1 = jnp.where((t1 > eps) & (y1 >= 0) & (y1 <= height) & (disc >= 0), t1, jnp.inf)
-    t2 = jnp.where((t2 > eps) & (y2 >= 0) & (y2 <= height) & (disc >= 0), t2, jnp.inf)
-    
-    t_bottom = -oc_axial / (rd_axial + eps)
-    t_top = (height - oc_axial) / (rd_axial + eps)
-    
-    perp_bottom = oc_perp + t_bottom * rd_perp
-    perp_top = oc_perp + t_top * rd_perp
-    
-    t_bottom = jnp.where(
-        (t_bottom > eps) & (jnp.dot(perp_bottom, perp_bottom) <= radius**2),
-        t_bottom, jnp.inf
-    )
-    t_top = jnp.where(
-        (t_top > eps) & (jnp.dot(perp_top, perp_top) <= radius**2),
-        t_top, jnp.inf
-    )
-    
-    return jnp.min(jnp.array([t1, t2, t_bottom, t_top]))
-
-
 class Cylinder(Obstruction):
     """Single cylindrical obstruction."""
     
@@ -86,7 +41,7 @@ class Cylinder(Obstruction):
         self.radius = float(radius)
     
     def intersect(self, ray_origin, ray_direction):
-        return _cylinder_intersect(ray_origin, ray_direction, self.p1, self.p2, self.radius)
+        return intersect_cylinder(ray_origin, ray_direction, self.p1, self.p2, self.radius)
 
 
 class CylinderGroup(ObstructionGroup):
@@ -111,36 +66,13 @@ class CylinderGroup(ObstructionGroup):
     
     def intersect(self, ray_origin, ray_direction):
         """Returns min t across all cylinders."""
-        ts = vmap(_cylinder_intersect, in_axes=(None, None, 0, 0, 0))(
+        ts = vmap(intersect_cylinder, in_axes=(None, None, 0, 0, 0))(
             ray_origin, ray_direction, self.p1, self.p2, self.r
         )
         return jnp.min(ts)
 
 
 # === Box ===
-
-def _box_intersect(ray_origin, ray_direction, p1, p2):
-    """Single box intersection (for vmapping)."""
-    eps = 1e-8
-    
-    box_min = jnp.minimum(p1, p2)
-    box_max = jnp.maximum(p1, p2)
-    
-    inv_dir = 1.0 / (ray_direction + eps)
-    t1 = (box_min - ray_origin) * inv_dir
-    t2 = (box_max - ray_origin) * inv_dir
-    
-    t_near = jnp.minimum(t1, t2)
-    t_far = jnp.maximum(t1, t2)
-    
-    t_min = jnp.max(t_near)
-    t_max = jnp.min(t_far)
-    
-    hit = (t_max >= t_min) & (t_max > eps)
-    t_result = jnp.where(t_min > eps, t_min, t_max)
-    
-    return jnp.where(hit, t_result, jnp.inf)
-
 
 class Box(Obstruction):
     """Single axis-aligned box obstruction."""
@@ -153,7 +85,7 @@ class Box(Obstruction):
         self.p2 = jnp.asarray(p2)
     
     def intersect(self, ray_origin, ray_direction):
-        return _box_intersect(ray_origin, ray_direction, self.p1, self.p2)
+        return intersect_box(ray_origin, ray_direction, self.p1, self.p2)
 
 
 class BoxGroup(ObstructionGroup):
@@ -175,7 +107,7 @@ class BoxGroup(ObstructionGroup):
     
     def intersect(self, ray_origin, ray_direction):
         """Returns min t across all boxes."""
-        ts = vmap(_box_intersect, in_axes=(None, None, 0, 0))(
+        ts = vmap(intersect_box, in_axes=(None, None, 0, 0))(
             ray_origin, ray_direction, self.p1, self.p2
         )
         return jnp.min(ts)
