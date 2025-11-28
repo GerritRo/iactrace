@@ -3,10 +3,11 @@ import jax.numpy as jnp
 import equinox as eqx
 import yaml
 
-from .mirrors import Mirror
+from typing import Callable
+from .mirrors import Mirror, group_mirrors
 from .apertures import DiskAperture, PolygonAperture
 from .surfaces import AsphericSurface
-from .obstructions import Cylinder, Box, CylinderGroup, BoxGroup, group_obstructions
+from .obstructions import Cylinder, Box, group_obstructions
 from ..core import render, render_debug
 from ..sensors import SquareSensor, HexagonalSensor
 
@@ -14,31 +15,31 @@ from ..sensors import SquareSensor, HexagonalSensor
 class Telescope(eqx.Module):
     """
     IACT telescope configuration as an Equinox Module.
-    
+
     Stores mirrors, obstructions, and sensors as object lists for
     polymorphic dispatch while maintaining JAX compatibility.
     """
-    
-    mirrors: list
-    obstruction_groups: list  # Grouped by type for fast rendering
+
+    mirror_groups: list             # Grouped by surface/aperture for fast rendering
+    obstruction_groups: list        # Grouped by type for fast rendering
     sensors: list
     name: str = eqx.field(static=True)
-    
-    def __init__(self, mirrors, obstructions=None, sensors=None, name="telescope"):
+
+    def __init__(self, mirror_groups, obstruction_groups=None, sensors=None, name="telescope"):
         """
         Initialize Telescope.
-        
+
         Args:
-            mirrors: List of Mirror objects
-            obstructions: List of Obstruction objects (Cylinder, Box)
+            mirror_groups: List of Mirror groups
+            obstructions: List of Obstruction groups
             sensors: List of sensor objects
             name: Telescope name
         """
-        self.mirrors = list(mirrors)
-        self.obstruction_groups = group_obstructions(obstructions)
+        self.mirror_groups = mirror_groups
+        self.obstruction_groups = obstruction_groups
         self.sensors = list(sensors) if sensors else []
         self.name = name
-    
+        
     @classmethod
     def from_yaml(cls, filename, integrator, sampling_key=None):
         """
@@ -82,8 +83,9 @@ class Telescope(eqx.Module):
                 aperture=aperture
             ))
         
-        # Sample mirrors
-        mirrors = integrator.sample_mirrors(mirrors, sampling_key)
+        # Create and sample mirror groups
+        mirror_groups = group_mirrors(mirrors)
+        mirror_groups = integrator.sample_mirror_groups(mirror_groups, sampling_key)
         
         # Parse obstructions
         obstructions = []
@@ -94,6 +96,9 @@ class Telescope(eqx.Module):
                 obstructions.append(Box(obs['p1'], obs['p2']))
             else:
                 raise ValueError(f"Unknown obstruction type: {obs['type']}")
+        
+        # Create obstruction groups
+        obstruction_groups = group_obstructions(obstructions)
         
         # Parse sensors
         sensors = []
@@ -117,8 +122,8 @@ class Telescope(eqx.Module):
                 raise ValueError(f"Unknown sensor type: {s['type']}")
         
         return cls(
-            mirrors=mirrors,
-            obstructions=obstructions,
+            mirror_groups=mirror_groups,
+            obstruction_groups=obstruction_groups,
             sensors=sensors,
             name=telescope_name
         )
@@ -142,9 +147,13 @@ class Telescope(eqx.Module):
         return render(self, sources, values, source_type, sensor_idx)
     
     def resample(self, integrator, key):
-        """Return new telescope with resampled mirror surfaces."""
-        new_mirrors = integrator.sample_mirrors(self.mirrors, key)
-        return eqx.tree_at(lambda t: t.mirrors, self, new_mirrors)
+        """Return new telescope with resampled mirror groups."""
+        new_mirror_groups = integrator.sample_mirror_groups(self.mirror_groups, key)
+        return eqx.tree_at(
+            lambda t: t.mirror_groups,
+            self,
+            new_mirror_groups
+        )
     
     def freeze(self, *field_names):
         """Freeze fields (make non-trainable)"""

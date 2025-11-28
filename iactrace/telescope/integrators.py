@@ -6,42 +6,48 @@ from ..core.reflection import roughen_normals
 
 
 class MCIntegrator:
-    """Monte Carlo integrator for sampling mirror surfaces."""
-    
+    """Monte Carlo integrator for mirror groups."""
+
     def __init__(self, n_samples=128, roughness=0.0):
         self.n_samples = n_samples
         self.roughness = roughness
-    
-    def sample_mirrors(self, mirrors, key):
+
+    def sample_mirror_groups(self, mirror_groups, key):
         """
-        Sample all mirrors and return list of updated Mirror objects.
-        
+        Sample all mirror groups and return list of updated MirrorGroup objects.
+
         Args:
-            mirrors: List of Mirror objects
+            mirror_groups: List of MirrorGroup objects
             key: JAX random key
-        
+
         Returns:
-            List of Mirror objects with sampled points/normals/weights
+            List of MirrorGroup objects with sampled points/normals/weights
         """
-        keys = jax.random.split(key, len(mirrors) + 1)
-        
-        # Sample each mirror
-        sampled = [m.sample(self.n_samples, k) for m, k in zip(mirrors, keys[:-1])]
-        
+        if not mirror_groups:
+            return []
+
+        keys = jax.random.split(key, len(mirror_groups) + 1)
+
+        # Sample each group
+        sampled = [g.sample(self.n_samples, k) for g, k in zip(mirror_groups, keys[:-1])]
+
         # Apply roughness if needed
         if self.roughness > 0:
-            sampled = self._apply_roughness(sampled, keys[-1])
-        
+            sampled = self._apply_roughness_to_groups(sampled, keys[-1])
+
         return sampled
-    
-    def _apply_roughness(self, mirrors, key):
-        """Apply surface roughness to all mirrors."""        
-        # Stack normals for efficient roughening
-        normals_stacked = jnp.stack([m.normals for m in mirrors])  # (N, M, 3)
-        roughened = roughen_normals(normals_stacked, self.roughness, key)
-        
-        # Update each mirror with roughened normals
-        return [
-            eqx.tree_at(lambda m: m.normals, mirror, roughened[i])
-            for i, mirror in enumerate(mirrors)
-        ]
+
+    def _apply_roughness_to_groups(self, mirror_groups, key):
+        """Apply surface roughness to all mirror groups."""
+        # Process each group independently
+        result = []
+        n_groups = len(mirror_groups)
+        keys = jax.random.split(key, n_groups)
+
+        for group, k in zip(mirror_groups, keys):
+            # group.normals has shape (N_mirrors, M_samples, 3)
+            roughened = roughen_normals(group.normals, self.roughness, k)
+            updated_group = eqx.tree_at(lambda g: g.normals, group, roughened)
+            result.append(updated_group)
+
+        return result

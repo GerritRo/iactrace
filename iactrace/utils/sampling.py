@@ -28,7 +28,7 @@ def sample_disk(key, shape):
 
 
 def sample_polygon(key, vertices, shape):
-    """Sample uniformly over a polygon via fan triangulation.
+    """Sample uniformly over a convex polygon via fan triangulation.
 
     Args:
         key: JAX random key
@@ -37,23 +37,7 @@ def sample_polygon(key, vertices, shape):
 
     Returns:
         points: (..., 2) array of (x, y) coordinates
-
-    Raises:
-        ValueError: if polygon is not convex
     """
-    # Check convexity
-    n = len(vertices)
-    sign = None
-    for i in range(n):
-        v0 = vertices[(i+1) % n] - vertices[i]
-        v1 = vertices[(i+2) % n] - vertices[(i+1) % n]
-        cross = v0[0] * v1[1] - v0[1] * v1[0]
-        if cross != 0:
-            if sign is None:
-                sign = cross > 0
-            elif (cross > 0) != sign:
-                raise ValueError("Polygon must be convex for fan triangulation")
-
     # Fan triangulation from first vertex
     n = len(vertices)
     triangles = jnp.array([[vertices[0], vertices[i], vertices[i+1]]

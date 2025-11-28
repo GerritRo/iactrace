@@ -49,12 +49,21 @@ def render(tel, sources, values, source_type, sensor_idx=0):
     sensor = tel.sensors[sensor_idx]
     sensor_pos = sensor.position
     sensor_rot = euler_to_matrix(sensor.rotation)
-    
-    # Transform all mirrors to world space at trace time
-    world_data = [m.transform_to_world() for m in tel.mirrors]
-    tp_all = jnp.stack([d[0] for d in world_data])  # (N_mirrors, M, 3)
-    tn_all = jnp.stack([d[1] for d in world_data])  # (N_mirrors, M, 3)
-    tw_all = jnp.stack([d[2] for d in world_data])  # (N_mirrors, M, 1)
+
+    # Transform all mirror groups to world space at trace time
+    group_data = [g.transform_to_world() for g in tel.mirror_groups]
+
+    # Concatenate all groups to get (N_mirrors_total, M, 3) arrays
+    if group_data:
+        tp_all = jnp.concatenate([d[0] for d in group_data], axis=0)  # (N_mirrors, M, 3)
+        tn_all = jnp.concatenate([d[1] for d in group_data], axis=0)  # (N_mirrors, M, 3)
+        tw_all = jnp.concatenate([d[2] for d in group_data], axis=0)  # (N_mirrors, M, 1)
+    else:
+        # Fallback to individual mirrors if no groups
+        world_data = [m.transform_to_world() for m in tel.mirrors]
+        tp_all = jnp.stack([d[0] for d in world_data])  # (N_mirrors, M, 3)
+        tn_all = jnp.stack([d[1] for d in world_data])  # (N_mirrors, M, 3)
+        tw_all = jnp.stack([d[2] for d in world_data])  # (N_mirrors, M, 1)
     
     def render_single_mirror(acc, mirror_idx):
         tp_single = tp_all[mirror_idx]
@@ -97,7 +106,7 @@ def render(tel, sources, values, source_type, sensor_idx=0):
         return acc + img, None
     
     acc0 = jnp.zeros(sensor.get_accumulator_shape())
-    n_mirrors = len(tel.mirrors)
+    n_mirrors = tp_all.shape[0]  # Total number of mirrors across all groups
     final_img, _ = jax.lax.scan(render_single_mirror, acc0, jnp.arange(n_mirrors))
     
     return final_img
@@ -115,11 +124,21 @@ def render_debug(tel, sources, values, source_type, sensor_idx=0):
     sensor = tel.sensors[sensor_idx]
     sensor_pos = sensor.position
     sensor_rot = euler_to_matrix(sensor.rotation)
-    
-    world_data = [m.transform_to_world() for m in tel.mirrors]
-    tp_all = jnp.stack([d[0] for d in world_data])
-    tn_all = jnp.stack([d[1] for d in world_data])
-    tw_all = jnp.stack([d[2] for d in world_data])
+
+    # Transform all mirror groups to world space at trace time
+    group_data = [g.transform_to_world() for g in tel.mirror_groups]
+
+    # Concatenate all groups to get (N_mirrors_total, M, 3) arrays
+    if group_data:
+        tp_all = jnp.concatenate([d[0] for d in group_data], axis=0)
+        tn_all = jnp.concatenate([d[1] for d in group_data], axis=0)
+        tw_all = jnp.concatenate([d[2] for d in group_data], axis=0)
+    else:
+        # Fallback to individual mirrors if no groups
+        world_data = [m.transform_to_world() for m in tel.mirrors]
+        tp_all = jnp.stack([d[0] for d in world_data])
+        tn_all = jnp.stack([d[1] for d in world_data])
+        tw_all = jnp.stack([d[2] for d in world_data])
     
     def render_single_mirror(carry, mirror_idx):
         tp_single = tp_all[mirror_idx]
@@ -136,7 +155,7 @@ def render_debug(tel, sources, values, source_type, sensor_idx=0):
             )
         
         tp_broadcast = jnp.broadcast_to(tp_single[None, :, :], dirs.shape)
-        shadow_mask = check_occlusions(tp_broadcast, -dirs, tel.obstructions)
+        shadow_mask = check_occlusions(tp_broadcast, -dirs, tel.obstruction_groups)
         
         tn_broadcast = jnp.broadcast_to(tn_single[None, :, :], dirs.shape)
         reflected, cos_angle = jax.vmap(jax.vmap(reflect))(dirs, tn_broadcast)
@@ -156,7 +175,7 @@ def render_debug(tel, sources, values, source_type, sensor_idx=0):
     _, per_mirror = jax.lax.scan(
         render_single_mirror,
         None,
-        jnp.arange(len(tel.mirrors))
+        jnp.arange(tp_all.shape[0])
     )
     
     pts_all = jnp.concatenate(per_mirror[0], axis=0)
