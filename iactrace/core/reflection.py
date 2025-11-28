@@ -38,7 +38,14 @@ def roughen_normals(n, roughness, key):
     perturb1 = jax.random.normal(key1, shape) * roughness_rad
     perturb2 = jax.random.normal(key2, shape) * roughness_rad
 
-    ref = jnp.array([0., 0., 1.])
+    # Use reference that avoids degeneracy
+    ref_z = jnp.array([0., 0., 1.])
+    ref_x = jnp.array([1., 0., 0.])
+    
+    # Check alignment with z-axis
+    dot_z = jnp.abs(jnp.sum(n * ref_z, axis=-1, keepdims=True))
+    ref = jnp.where(dot_z > 0.9, ref_x, ref_z)
+    
     tangent1 = jnp.cross(n, ref)
     tangent1 = tangent1 / jnp.linalg.norm(tangent1, axis=-1, keepdims=True)
     tangent2 = jnp.cross(n, tangent1)

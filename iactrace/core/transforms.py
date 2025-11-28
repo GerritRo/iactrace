@@ -1,3 +1,4 @@
+import jax
 import jax.numpy as jnp
 
 def look_at_rotation(mirror_pos, target_pos=jnp.array([0., 0., 0.]), up=jnp.array([0., 1., 0.])):

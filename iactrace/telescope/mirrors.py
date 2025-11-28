@@ -3,9 +3,9 @@ import jax.numpy as jnp
 import equinox as eqx
 from abc import abstractmethod
 
-from ..core.transforms import euler_to_matrix
-from .surfaces import AsphericSurface
-from .apertures import DiskAperture, PolygonAperture
+from ..core import euler_to_matrix
+from ..core import AsphericSurface
+from ..core import DiskAperture, PolygonAperture
 
 class Mirror(eqx.Module):
     """Single mirror element with surface, aperture, and sampled geometry."""
