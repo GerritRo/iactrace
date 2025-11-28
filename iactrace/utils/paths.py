@@ -28,7 +28,7 @@ def match_path(path_str, pattern):
     path_parts = path_str.split('.')
     pattern_parts = pattern.split('.')
     
-    return _match_parts(path_parts, pattern_parts)
+    return match_parts(path_parts, pattern_parts)
 
 
 def match_parts(path_parts, pattern_parts):
@@ -45,12 +45,12 @@ def match_parts(path_parts, pattern_parts):
         if len(pattern_parts) == 1:
             return True
         for i in range(len(path_parts) + 1):
-            if _match_parts(path_parts[i:], pattern_parts[1:]):
+            if match_parts(path_parts[i:], pattern_parts[1:]):
                 return True
         return False
     elif p == '*':
         # Match exactly one component
-        return _match_parts(path_parts[1:], pattern_parts[1:])
+        return match_parts(path_parts[1:], pattern_parts[1:])
     else:
         # Exact match
         return path_parts[0] == p and _match_parts(path_parts[1:], pattern_parts[1:])

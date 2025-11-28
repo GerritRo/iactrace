@@ -64,7 +64,7 @@ def hexshow(result, sensor, ax=None, **kwargs):
 
     for i, (x, y) in enumerate(hex_centers):
         value = float(result[i])
-        color = plt.cm.viridis(value / vmax)
+        color = cmap(np.clip(value, vmin, np.inf) / vmax)
         
         # Pointy-top base orientation (30 degrees) plus the grid's rotation
         hex_patch = RegularPolygon(
