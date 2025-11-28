@@ -4,18 +4,16 @@ from jax import vmap
 
 def intersect_plane(ray_origin, ray_direction, plane_center, plane_rotation):
     """
-    Intersect rays with a plane defined by center and rotation matrix.
+    Intersect ray with a plane defined by center and rotation matrix.
     
     Args:
-        ray_origin: Ray origins (..., 3)
-        ray_direction: Ray directions (..., 3)
+        ray_origin: Ray origin (3,)
+        ray_direction: Ray direction (3,)
         plane_center: Plane center (3,)
-        plane_rotation: Plane rotation matrix (3, 3)
-            The Z-axis of this rotation defines the normal
-            The X and Y axes define the plane coordinate system
+        plane_rotation: Rotation matrix (3, 3) - Z-axis is normal
     
     Returns:
-        2D coordinates on plane (..., 2)
+        2D coordinates on plane (2,)
     """
     # Extract normal and basis vectors from rotation matrix
     u1 = plane_rotation[:, 0]  # X-axis in plane coordinates

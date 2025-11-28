@@ -4,7 +4,7 @@ import equinox as eqx
 
 
 class SquareSensor(eqx.Module):
-    """Square sensor"""
+    """Square pixel sensor."""
     
     position: jax.Array
     rotation: jax.Array
@@ -17,7 +17,6 @@ class SquareSensor(eqx.Module):
     dy: float = eqx.field(static=True)
     
     def __init__(self, position, rotation, width, height, bounds):
-        """Simplified constructor for analytic mode only."""
         self.position = jnp.asarray(position)
         self.rotation = jnp.asarray(rotation)
         self.width = int(width)
@@ -33,7 +32,7 @@ class SquareSensor(eqx.Module):
         return (self.height, self.width)
     
     def accumulate(self, x, y, values):
-        """Fast analytic accumulation."""
+        """Accumulate photon hits into pixels."""
         xi = jnp.floor((x - self.x0) / self.dx).astype(jnp.int32)
         yi = jnp.floor((y - self.y0) / self.dy).astype(jnp.int32)
         

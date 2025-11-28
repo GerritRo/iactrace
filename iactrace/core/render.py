@@ -1,118 +1,150 @@
 import jax
 import jax.numpy as jnp
-
 from functools import partial
-from .geometry import intersect_plane, check_occlusions
+
+from .geometry import intersect_plane
 from .reflection import reflect
 from .transforms import euler_to_matrix
+
+
+def check_occlusions(ray_origins, ray_directions, obstruction_groups):
+    """
+    Check ray occlusions against obstruction groups.
     
+    Args:
+        ray_origins: Ray origins (..., 3)
+        ray_directions: Ray directions (..., 3)
+        obstruction_groups: List of ObstructionGroup objects
+    
+    Returns:
+        Shadow mask (...) - 1.0 if not occluded, 0.0 if occluded
+    """
+    shadow_mask = jnp.ones(ray_origins.shape[:-1])
+    
+    # Loop over obstruction groups
+    for group in obstruction_groups:
+        t = jax.vmap(jax.vmap(group.intersect, in_axes=(0, 0)), in_axes=(0, 0))(
+            ray_origins, ray_directions
+        )
+        shadow_mask = shadow_mask * jnp.where(t < 1e10, 0.0, 1.0)
+    
+    return shadow_mask
+
+
 @partial(jax.jit, static_argnames=['source_type', 'sensor_idx'])
 def render(tel, sources, values, source_type, sensor_idx=0):
     """
-    Core rendering function - processes ALL sources at once, loops over mirrors.
+    Core rendering function.
     
     Args:
         tel: Telescope object
-        sources: Batch of source positions/directions (N_sources, 3)
-        values: Flux of the source in ph/m^2 (N_sources, )
+        sources: Source positions/directions (N_sources, 3)
+        values: Flux values (N_sources,)
         source_type: 'point' or 'infinity'
-        sensor_idx: Id of sensor in telescope object
-
+        sensor_idx: Sensor index
+    
     Returns:
-        Rendered image with all sources accumulated
+        Rendered image
     """
-    # Get sensor for this index
     sensor = tel.sensors[sensor_idx]
     sensor_pos = sensor.position
     sensor_rot = euler_to_matrix(sensor.rotation)
-    
-    # Get mirror rotation matrices:
-    mirror_pos = tel.mirror_positions
-    mirror_rot = jax.vmap(euler_to_matrix)(tel.mirror_rotations)
-    
-    # Pre-transform all mirror points and normals to world space
-    tp_all = jnp.einsum('mij,mnj->mni', mirror_rot, tel.mirror_points) + mirror_pos[:, None, :]
-    tn_all = jnp.einsum('mij,mnj->mni', mirror_rot, tel.mirror_normals)
 
-    # Function to render contribution from one mirror for ALL sources
+    # Transform all mirror groups to world space at trace time
+    group_data = [g.transform_to_world() for g in tel.mirror_groups]
+
+    # Concatenate all groups to get (N_mirrors_total, M, 3) arrays
+    if group_data:
+        tp_all = jnp.concatenate([d[0] for d in group_data], axis=0)  # (N_mirrors, M, 3)
+        tn_all = jnp.concatenate([d[1] for d in group_data], axis=0)  # (N_mirrors, M, 3)
+        tw_all = jnp.concatenate([d[2] for d in group_data], axis=0)  # (N_mirrors, M, 1)
+    else:
+        # Fallback to individual mirrors if no groups
+        world_data = [m.transform_to_world() for m in tel.mirrors]
+        tp_all = jnp.stack([d[0] for d in world_data])  # (N_mirrors, M, 3)
+        tn_all = jnp.stack([d[1] for d in world_data])  # (N_mirrors, M, 3)
+        tw_all = jnp.stack([d[2] for d in world_data])  # (N_mirrors, M, 1)
+    
     def render_single_mirror(acc, mirror_idx):
-        tp_single = tp_all[mirror_idx]  # (n_samples, 3)
-        tn_single = tn_all[mirror_idx]  # (n_samples, 3)
-        tv_single = tel.mirror_weights[mirror_idx]  # (n_samples, 1)
-
-        # Compute directions for ALL sources at once
+        tp_single = tp_all[mirror_idx]
+        tn_single = tn_all[mirror_idx]
+        tw_single = tw_all[mirror_idx]
+        
+        # Compute ray directions
         if source_type == 'point':
-            # dirs: (N_sources, n_samples, 3)
             dirs = tp_single[None, :, :] - sources[:, None, :]
             dirs = dirs / jnp.linalg.norm(dirs, axis=-1, keepdims=True)
         elif source_type == 'infinity':
-            # Broadcast directions to all samples
-            dirs = jnp.broadcast_to(sources[:, None, :],
-                                   (sources.shape[0], tp_single.shape[0], 3))
+            dirs = jnp.broadcast_to(
+                sources[:, None, :],
+                (sources.shape[0], tp_single.shape[0], 3)
+            )
         else:
             raise ValueError(f"Unknown source type: {source_type}")
-
-        # tp_single is (n_samples, 3), broadcast to (N_sources, n_samples, 3)
+        
+        # Check occlusions
         tp_broadcast = jnp.broadcast_to(tp_single[None, :, :], dirs.shape)
-        shadow_mask = check_occlusions(tp_broadcast, -dirs,
-                                       tel.cyl_p1, tel.cyl_p2, tel.cyl_r,
-                                       tel.box_p1, tel.box_p2)
-
-        # Reflect rays off mirror (vmap over sources, then over samples)
+        shadow_mask = check_occlusions(tp_broadcast, -dirs, tel.obstruction_groups)
+        
+        # Reflect off mirror
         tn_broadcast = jnp.broadcast_to(tn_single[None, :, :], dirs.shape)
-        reflected, cos_angle = jax.vmap(jax.vmap(reflect, in_axes=(0, 0)),
-                                       in_axes=(0, 0))(dirs, tn_broadcast)
-
+        reflected, cos_angle = jax.vmap(jax.vmap(reflect))(dirs, tn_broadcast)
+        
         # Intersect with sensor plane
-        tp_broadcast = jnp.broadcast_to(tp_single[None, :, :], dirs.shape)
-        pts = jax.vmap(jax.vmap(intersect_plane, in_axes=(0, 0, None, None)),
-                      in_axes=(0, 0, None, None))(
-            tp_broadcast, reflected, sensor_pos, sensor_rot
-        )
-
-        # Flatten all sources and samples for this mirror
+        pts = jax.vmap(
+            jax.vmap(intersect_plane, in_axes=(0, 0, None, None)),
+            in_axes=(0, 0, None, None)
+        )(tp_broadcast, reflected, sensor_pos, sensor_rot)
+        
+        # Accumulate
         pts_flat = pts.reshape(-1, 2)
-        values_flat = (values[:,None] * cos_angle[..., 0] / tv_single[..., 0] * shadow_mask).flatten()
-
-        # Accumulate contribution from this mirror
+        values_flat = (
+            values[:, None] * cos_angle[..., 0] / tw_single[..., 0] * shadow_mask
+        ).flatten()
+        
         img = sensor.accumulate(pts_flat[:, 0], pts_flat[:, 1], values_flat)
-
         return acc + img, None
-
-    # Get initial accumulator based on sensor type
+    
     acc0 = jnp.zeros(sensor.get_accumulator_shape())
-
-    # Scan over all mirrors, accumulating contributions
-    n_mirrors = tel.mirror_points.shape[0]
+    n_mirrors = tp_all.shape[0]  # Total number of mirrors across all groups
     final_img, _ = jax.lax.scan(render_single_mirror, acc0, jnp.arange(n_mirrors))
-
+    
     return final_img
+
 
 @partial(jax.jit, static_argnames=['source_type', 'sensor_idx'])
 def render_debug(tel, sources, values, source_type, sensor_idx=0):
     """
-    Renders without accumulating on sensor, instead returns raw hits.
-
+    Render without accumulating - returns raw hit points and values.
+    
     Returns:
-        pts_all : (N_total, 2)
+        pts_all: (N_total, 2)
         vals_all: (N_total,)
     """
     sensor = tel.sensors[sensor_idx]
     sensor_pos = sensor.position
     sensor_rot = euler_to_matrix(sensor.rotation)
 
-    mirror_pos = tel.mirror_positions
-    mirror_rot = jax.vmap(euler_to_matrix)(tel.mirror_rotations)
+    # Transform all mirror groups to world space at trace time
+    group_data = [g.transform_to_world() for g in tel.mirror_groups]
 
-    tp_all = jnp.einsum('mij,mnj->mni', mirror_rot, tel.mirror_points) + mirror_pos[:, None, :]
-    tn_all = jnp.einsum('mij,mnj->mni', mirror_rot, tel.mirror_normals)
-
+    # Concatenate all groups to get (N_mirrors_total, M, 3) arrays
+    if group_data:
+        tp_all = jnp.concatenate([d[0] for d in group_data], axis=0)
+        tn_all = jnp.concatenate([d[1] for d in group_data], axis=0)
+        tw_all = jnp.concatenate([d[2] for d in group_data], axis=0)
+    else:
+        # Fallback to individual mirrors if no groups
+        world_data = [m.transform_to_world() for m in tel.mirrors]
+        tp_all = jnp.stack([d[0] for d in world_data])
+        tn_all = jnp.stack([d[1] for d in world_data])
+        tw_all = jnp.stack([d[2] for d in world_data])
+    
     def render_single_mirror(carry, mirror_idx):
         tp_single = tp_all[mirror_idx]
         tn_single = tn_all[mirror_idx]
-        tv_single = tel.mirror_weights[mirror_idx]  # (n_samples, 1)
-
-        # directions
+        tw_single = tw_all[mirror_idx]
+        
         if source_type == 'point':
             dirs = tp_single[None, :, :] - sources[:, None, :]
             dirs = dirs / jnp.linalg.norm(dirs, axis=-1, keepdims=True)
@@ -121,38 +153,32 @@ def render_debug(tel, sources, values, source_type, sensor_idx=0):
                 sources[:, None, :],
                 (sources.shape[0], tp_single.shape[0], 3)
             )
-
-        # occlusion
-        tp_b = jnp.broadcast_to(tp_single[None, :, :], dirs.shape)
-        shadow_mask = check_occlusions(
-            tp_b, -dirs,
-            tel.cyl_p1, tel.cyl_p2, tel.cyl_r,
-            tel.box_p1, tel.box_p2
-        )
-
-        # reflect
-        tn_b = jnp.broadcast_to(tn_single[None, :, :], dirs.shape)
-        refl, cosang = jax.vmap(jax.vmap(reflect))(dirs, tn_b)
-
-        # intersect
-        pts = jax.vmap(jax.vmap(intersect_plane, in_axes=(0,0,None,None)),
-                       in_axes=(0,0,None,None))(tp_b, refl, sensor_pos, sensor_rot)
-
+        
+        tp_broadcast = jnp.broadcast_to(tp_single[None, :, :], dirs.shape)
+        shadow_mask = check_occlusions(tp_broadcast, -dirs, tel.obstruction_groups)
+        
+        tn_broadcast = jnp.broadcast_to(tn_single[None, :, :], dirs.shape)
+        reflected, cos_angle = jax.vmap(jax.vmap(reflect))(dirs, tn_broadcast)
+        
+        pts = jax.vmap(
+            jax.vmap(intersect_plane, in_axes=(0, 0, None, None)),
+            in_axes=(0, 0, None, None)
+        )(tp_broadcast, reflected, sensor_pos, sensor_rot)
+        
         pts_flat = pts.reshape(-1, 2)
-        vals_flat = (values[:,None] * cosang[..., 0] / tv_single[..., 0] * shadow_mask).flatten()
-
-        # carry stays the same (None), output is the data
+        vals_flat = (
+            values[:, None] * cos_angle[..., 0] / tw_single[..., 0] * shadow_mask
+        ).flatten()
+        
         return carry, (pts_flat, vals_flat)
-
-    # run scan
+    
     _, per_mirror = jax.lax.scan(
         render_single_mirror,
         None,
-        jnp.arange(tel.mirror_points.shape[0])
+        jnp.arange(tp_all.shape[0])
     )
-
-    # per_mirror = (pts_list, vals_list)
+    
     pts_all = jnp.concatenate(per_mirror[0], axis=0)
     vals_all = jnp.concatenate(per_mirror[1], axis=0)
-
+    
     return pts_all, vals_all
