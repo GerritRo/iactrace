@@ -26,7 +26,12 @@ def intersect_plane(ray_origin, ray_direction, plane_center, plane_rotation):
     ndotd = jnp.sum(ray_direction * plane_normal, axis=-1)
     ndoto = jnp.sum(ray_origin * plane_normal, axis=-1)
     ndotp = jnp.sum(plane_normal * plane_center)
-    t = (ndotp - ndoto) / ndotd
+    
+    # Safe operation to avoid issues with parallel rays
+    parallel = jnp.abs(ndotd) < 1e-10
+    safe_ndotd = jnp.where(parallel, 1.0, ndotd)
+    t = (ndotp - ndoto) / safe_ndotd
+    t = jnp.where(parallel, 1e10, t) 
     
     # Intersection point
     intersection = ray_origin + t[..., None] * ray_direction

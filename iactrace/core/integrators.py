@@ -2,8 +2,6 @@ import jax
 import jax.numpy as jnp
 import equinox as eqx
 
-from .reflection import roughen_normals
-
 
 class MCIntegrator:
     """Monte Carlo integrator for mirror groups."""

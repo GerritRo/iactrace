@@ -29,10 +29,9 @@ class AsphericSurface(eqx.Module):
         denom = 1 + jnp.sqrt(1 - (1 + k) * c * c * r2)
         z = r2 * c / denom
 
-        if self.aspheric.size > 0:
-            powers = jnp.arange(2, 2 + 2 * len(self.aspheric), 2)
-            z += jnp.sum(self.aspheric * r2 ** powers)
-
+        powers = jnp.arange(2, 2 + 2 * self.aspheric.shape[0], 2)
+        z = z + jnp.sum(self.aspheric * r2 ** powers)
+        
         return z
 
     def point(self, x, y):

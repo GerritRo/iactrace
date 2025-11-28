@@ -54,16 +54,9 @@ def render(tel, sources, values, source_type, sensor_idx=0):
     group_data = [g.transform_to_world() for g in tel.mirror_groups]
 
     # Concatenate all groups to get (N_mirrors_total, M, 3) arrays
-    if group_data:
-        tp_all = jnp.concatenate([d[0] for d in group_data], axis=0)  # (N_mirrors, M, 3)
-        tn_all = jnp.concatenate([d[1] for d in group_data], axis=0)  # (N_mirrors, M, 3)
-        tw_all = jnp.concatenate([d[2] for d in group_data], axis=0)  # (N_mirrors, M, 1)
-    else:
-        # Fallback to individual mirrors if no groups
-        world_data = [m.transform_to_world() for m in tel.mirrors]
-        tp_all = jnp.stack([d[0] for d in world_data])  # (N_mirrors, M, 3)
-        tn_all = jnp.stack([d[1] for d in world_data])  # (N_mirrors, M, 3)
-        tw_all = jnp.stack([d[2] for d in world_data])  # (N_mirrors, M, 1)
+    tp_all = jnp.concatenate([d[0] for d in group_data], axis=0)  # (N_mirrors, M, 3)
+    tn_all = jnp.concatenate([d[1] for d in group_data], axis=0)  # (N_mirrors, M, 3)
+    tw_all = jnp.concatenate([d[2] for d in group_data], axis=0)  # (N_mirrors, M, 1)
     
     def render_single_mirror(acc, mirror_idx):
         tp_single = tp_all[mirror_idx]
@@ -129,16 +122,9 @@ def render_debug(tel, sources, values, source_type, sensor_idx=0):
     group_data = [g.transform_to_world() for g in tel.mirror_groups]
 
     # Concatenate all groups to get (N_mirrors_total, M, 3) arrays
-    if group_data:
-        tp_all = jnp.concatenate([d[0] for d in group_data], axis=0)
-        tn_all = jnp.concatenate([d[1] for d in group_data], axis=0)
-        tw_all = jnp.concatenate([d[2] for d in group_data], axis=0)
-    else:
-        # Fallback to individual mirrors if no groups
-        world_data = [m.transform_to_world() for m in tel.mirrors]
-        tp_all = jnp.stack([d[0] for d in world_data])
-        tn_all = jnp.stack([d[1] for d in world_data])
-        tw_all = jnp.stack([d[2] for d in world_data])
+    tp_all = jnp.concatenate([d[0] for d in group_data], axis=0)
+    tn_all = jnp.concatenate([d[1] for d in group_data], axis=0)
+    tw_all = jnp.concatenate([d[2] for d in group_data], axis=0)
     
     def render_single_mirror(carry, mirror_idx):
         tp_single = tp_all[mirror_idx]
