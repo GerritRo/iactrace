@@ -31,6 +31,7 @@ setup(
         "numpy>=1.20.0",
         "matplotlib>=3.3.0",
         "pandas>=1.2.0",
+        "trimesh>=3.15.0",
     ],
     extras_require={
         "dev": [
