@@ -113,6 +113,122 @@ def intersect_box(ray_origin, ray_direction, p1, p2):
     return jnp.where(hit, t_result, jnp.inf)
 
 
+def intersect_oriented_box(ray_origin, ray_direction, center, half_extents, rotation):
+    """
+    Intersect ray with oriented bounding box.
+    
+    Args:
+        ray_origin: Ray origin (3,)
+        ray_direction: Ray direction (3,)
+        center: Box center (3,)
+        half_extents: Half-sizes along local axes (3,)
+        rotation: Rotation matrix (3, 3) transforming local to world coords
+    
+    Returns:
+        t parameter of nearest intersection, jnp.inf if no hit
+    """
+    eps = 1e-8
+    
+    # Transform ray to box's local coordinate system
+    rot_inv = rotation.T
+    local_origin = rot_inv @ (ray_origin - center)
+    local_direction = rot_inv @ ray_direction
+    
+    # Standard AABB test in local coords
+    inv_dir = 1.0 / (local_direction + eps * jnp.sign(local_direction + eps))
+    
+    t1 = (-half_extents - local_origin) * inv_dir
+    t2 = (half_extents - local_origin) * inv_dir
+    
+    t_near = jnp.minimum(t1, t2)
+    t_far = jnp.maximum(t1, t2)
+    
+    t_min = jnp.max(t_near)
+    t_max = jnp.min(t_far)
+    
+    hit = (t_max >= t_min) & (t_max > eps)
+    t_result = jnp.where(t_min > eps, t_min, t_max)
+    
+    return jnp.where(hit & (t_result > eps), t_result, jnp.inf)
+
+
+def intersect_triangle(ray_origin, ray_direction, v0, v1, v2):
+    """
+    Intersect ray with triangle using Möller-Trumbore algorithm.
+    
+    Args:
+        ray_origin: Ray origin (3,)
+        ray_direction: Ray direction (3,)
+        v0, v1, v2: Triangle vertices (3,) each
+    
+    Returns:
+        t parameter of intersection, jnp.inf if no hit
+    """
+    eps = 1e-8
+    
+    edge1 = v1 - v0
+    edge2 = v2 - v0
+    
+    h = jnp.cross(ray_direction, edge2)
+    a = jnp.dot(edge1, h)
+    
+    # Ray parallel to triangle
+    parallel = jnp.abs(a) < eps
+    
+    f = 1.0 / (a + eps * jnp.sign(a + eps))
+    s = ray_origin - v0
+    u = f * jnp.dot(s, h)
+    
+    q = jnp.cross(s, edge1)
+    v = f * jnp.dot(ray_direction, q)
+    
+    t = f * jnp.dot(edge2, q)
+    
+    # Check validity: not parallel, barycentric coords valid, t > 0
+    valid = (
+        ~parallel &
+        (u >= 0.0) & (u <= 1.0) &
+        (v >= 0.0) & (u + v <= 1.0) &
+        (t > eps)
+    )
+    
+    return jnp.where(valid, t, jnp.inf)
+
+
+def intersect_sphere(ray_origin, ray_direction, center, radius):
+    """
+    Intersect ray with sphere.
+    
+    Args:
+        ray_origin: Ray origin (3,)
+        ray_direction: Ray direction (3,), assumed normalized
+        center: Sphere center (3,)
+        radius: Sphere radius (scalar)
+    
+    Returns:
+        t parameter of nearest intersection, jnp.inf if no hit
+    """
+    eps = 1e-8
+    oc = ray_origin - center
+    
+    # Quadratic coefficients: |O + t*D - C|^2 = r^2
+    a = jnp.dot(ray_direction, ray_direction)
+    b = 2.0 * jnp.dot(oc, ray_direction)
+    c = jnp.dot(oc, oc) - radius * radius
+    
+    disc = b * b - 4.0 * a * c
+    
+    sqrt_disc = jnp.sqrt(jnp.maximum(disc, 0.0))
+    t1 = (-b - sqrt_disc) / (2.0 * a + eps)
+    t2 = (-b + sqrt_disc) / (2.0 * a + eps)
+    
+    # Return nearest positive intersection
+    t1_valid = jnp.where((t1 > eps) & (disc >= 0), t1, jnp.inf)
+    t2_valid = jnp.where((t2 > eps) & (disc >= 0), t2, jnp.inf)
+    
+    return jnp.minimum(t1_valid, t2_valid)
+
+
 ### Normals manipulation
 
 def perturb_normals(normals, sigma_rad, key):
