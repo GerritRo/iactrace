@@ -9,6 +9,9 @@ from ..core import (
     PolygonAperture,
     Cylinder,
     Box,
+    Sphere,
+    OrientedBox,
+    Triangle,
     group_obstructions,
 )
 from ..sensors import SquareSensor, HexagonalSensor
@@ -100,6 +103,16 @@ def _parse_obstruction(config):
         return Cylinder(config['p1'], config['p2'], config['r'])
     elif otype == 'box':
         return Box(config['p1'], config['p2'])
+    elif otype == 'sphere':
+        return Sphere(config['center'], config['r'])
+    elif otype == 'oriented_box':
+        return OrientedBox(
+            config['center'],
+            config['half_extents'],
+            jnp.array(config['rotation']),
+        )
+    elif otype == 'triangle':
+        return Triangle(config['v0'], config['v1'], config['v2'])
     else:
         raise ValueError(f"Unknown obstruction type: {otype}")
 

@@ -15,12 +15,18 @@ from .transforms import euler_to_matrix, look_at_rotation
 from .render import render, render_debug
 from .obstructions import (
     Obstruction,
-    Cylinder,
-    Box,
     ObstructionGroup,
+    Cylinder,
     CylinderGroup,
+    Box,
     BoxGroup,
-    group_obstructions
+    Sphere,
+    SphereGroup,
+    OrientedBox,
+    OrientedBoxGroup,
+    Triangle,
+    TriangleGroup,
+    group_obstructions,
 )
 
 __all__ = [
@@ -41,4 +47,18 @@ __all__ = [
     # Rendering
     'render',
     'render_debug',
+    # Obstructions
+    'Obstruction',
+    'ObstructionGroup',
+    'Cylinder',
+    'CylinderGroup',
+    'Box',
+    'BoxGroup',
+    'Sphere',
+    'SphereGroup',
+    'OrientedBox',
+    'OrientedBoxGroup',
+    'Triangle',
+    'TriangleGroup',
+    'group_obstructions',
 ]
