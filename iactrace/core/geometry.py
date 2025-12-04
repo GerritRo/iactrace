@@ -15,34 +15,31 @@ def intersect_plane(ray_origin, ray_direction, plane_center, plane_rotation):
         plane_rotation: Rotation matrix (3, 3) - Z-axis is normal
     
     Returns:
-        Tuple of (2D coordinates on plane (2,), t parameter (scalar))
-        t < 0 indicates backward intersection (ray points away from plane)
+        2D coordinates on plane (2,)
     """
-    # Extract normal and basis vectors from rotation matrix
-    u1 = plane_rotation[:, 0]  # X-axis in plane coordinates
-    u2 = plane_rotation[:, 1]  # Y-axis in plane coordinates
-    plane_normal = plane_rotation[:, 2]  # Z-axis = normal
+    u1 = plane_rotation[:, 0]
+    u2 = plane_rotation[:, 1]
+    plane_normal = plane_rotation[:, 2]
     
-    # Find t parameter for intersection
     ndotd = jnp.sum(ray_direction * plane_normal, axis=-1)
     ndoto = jnp.sum(ray_origin * plane_normal, axis=-1)
     ndotp = jnp.sum(plane_normal * plane_center)
     
-    # Safe operation to avoid issues with parallel rays
     parallel = jnp.abs(ndotd) < 1e-10
     safe_ndotd = jnp.where(parallel, 1.0, ndotd)
     t = (ndotp - ndoto) / safe_ndotd
-    t = jnp.where(parallel, 1e10, t) 
     
-    # Intersection point
     intersection = ray_origin + t[..., None] * ray_direction
     
-    # Project onto plane coordinate system
     op = intersection - plane_center
     x = jnp.sum(op * u1, axis=-1)
     y = jnp.sum(op * u2, axis=-1)
     
-    return jnp.stack([x, y], axis=-1), t
+    invalid = parallel | (t <= 0)
+    x = jnp.where(invalid, 1e10, x)
+    y = jnp.where(invalid, 1e10, y)
+    
+    return jnp.stack([x, y], axis=-1)
 
 
 def intersect_cylinder(ray_origin, ray_direction, p1, p2, radius):

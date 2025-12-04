@@ -16,41 +16,65 @@ def _get_stages(mirror_groups):
     return dict(sorted(by_stage.items()))
 
 
-def _check_occlusions(origins, directions, obstruction_groups):
-    """Check occlusions for batch of rays (N, 3)."""
-    shadow = jnp.ones(origins.shape[0])
-    for group in obstruction_groups:
-        t = jax.vmap(group.intersect)(origins, directions)
-        shadow = shadow * jnp.where(t < 1e10, 0.0, 1.0)
-    return shadow
-
-
-def _reflect_at_stage(ray_origins, ray_directions, values, stage_groups, obstruction_groups):
-    """Intersect rays with stage mirrors, reflect, apply occlusion mask."""
-    n_rays = ray_origins.shape[0]
+def _check_occlusions(ray_origins, ray_directions, obstruction_groups):
+    """
+    Check ray occlusions against obstruction groups.
     
-    best_t = jnp.full((n_rays,), jnp.inf)
-    best_points = jnp.zeros((n_rays, 3))
-    best_normals = jnp.zeros((n_rays, 3))
+    Args:
+        ray_origins: Ray origins (n_sources, n_samples, 3)
+        ray_directions: Ray directions (n_sources, n_samples, 3)
+        obstruction_groups: List of ObstructionGroup objects
+    
+    Returns:
+        Shadow mask (n_sources, n_samples) - 1.0 if not occluded, 0.0 if occluded
+    """
+    shadow_mask = jnp.ones(ray_origins.shape[:-1])
+    for group in obstruction_groups:
+        t = jax.vmap(jax.vmap(group.intersect))(ray_origins, ray_directions)
+        shadow_mask = shadow_mask * jnp.where(t < 1e10, 0.0, 1.0)
+    return shadow_mask
+
+
+def _reflect_at_stage(origins, directions, values, stage_groups, obstruction_groups):
+    """
+    Reflect 2D batch of rays off stage mirrors.
+    
+    Args:
+        origins: (n_sources, n_samples, 3)
+        directions: (n_sources, n_samples, 3)
+        values: (n_sources, n_samples)
+    
+    Returns:
+        new_origins, new_directions, new_values (same shapes)
+    """
+    n_sources, n_samples = origins.shape[:2]
+    
+    best_t = jnp.full((n_sources, n_samples), jnp.inf)
+    best_points = jnp.zeros((n_sources, n_samples, 3))
+    best_normals = jnp.zeros((n_sources, n_samples, 3))
     
     for group in stage_groups:
-        t, points, normals = _intersect_group(ray_origins, ray_directions, group)
+        # vmap _intersect_group over source dimension
+        t, points, normals = jax.vmap(
+            lambda o, d: _intersect_group(o, d, group)
+        )(origins, directions)
+        
         closer = t < best_t
         best_t = jnp.where(closer, t, best_t)
-        best_points = jnp.where(closer[:, None], points, best_points)
-        best_normals = jnp.where(closer[:, None], normals, best_normals)
+        best_points = jnp.where(closer[..., None], points, best_points)
+        best_normals = jnp.where(closer[..., None], normals, best_normals)
     
-    reflected, cos_angle = jax.vmap(reflect)(ray_directions, best_normals)
+    reflected, cos_angle = jax.vmap(jax.vmap(reflect))(directions, best_normals)
     
     hit_mask = best_t < 1e10
-    shadow = _check_occlusions(ray_origins, ray_directions, obstruction_groups)
-    new_values = values * hit_mask * shadow * jnp.abs(cos_angle[:, 0])
+    shadow = _check_occlusions(origins, directions, obstruction_groups)
+    new_values = values * hit_mask * shadow * jnp.abs(cos_angle[..., 0])
     
     return best_points, reflected, new_values
 
 
 def _intersect_group(ray_origins, ray_directions, group):
-    """Intersect rays with all mirrors in group, return closest hit."""
+    """Intersect flat rays (N, 3) with all mirrors in group, return closest hit."""
     surface = group.get_surface()
     n_rays = ray_origins.shape[0]
     
@@ -60,20 +84,16 @@ def _intersect_group(ray_origins, ray_directions, group):
         rot_inv = rot.T
         offset = group.offsets[mirror_idx]
         
-        # To local frame
         o_local = jnp.einsum('ij,nj->ni', rot_inv, ray_origins - pos)
         d_local = jnp.einsum('ij,nj->ni', rot_inv, ray_directions)
         
-        # Intersect
         def intersect_one(o, d):
             return surface.intersect(o, d, offset)
         ts, pts_local, norms_local = jax.vmap(intersect_one)(o_local, d_local)
         
-        # Aperture check
         in_aperture = group.check_aperture(pts_local[:, 0], pts_local[:, 1], mirror_idx)
         ts = jnp.where(in_aperture, ts, jnp.inf)
         
-        # To world frame
         pts_world = jnp.einsum('ij,nj->ni', rot, pts_local) + pos
         norms_world = jnp.einsum('ij,nj->ni', rot, norms_local)
         
@@ -102,7 +122,6 @@ def render(tel, sources, values, source_type, sensor_idx=0):
     if not stage_indices or 0 not in stages:
         return jnp.zeros(sensor.get_accumulator_shape())
     
-    # Get stage 0 data
     group_data = [g.transform_to_world() for g in stages[0]]
     tp_all = jnp.concatenate([d[0] for d in group_data], axis=0)
     tn_all = jnp.concatenate([d[1] for d in group_data], axis=0)
@@ -117,47 +136,39 @@ def render(tel, sources, values, source_type, sensor_idx=0):
         tn_single = tn_all[mirror_idx]
         tw_single = tw_all[mirror_idx]
         
-        # Compute directions to primary
         if source_type == 'point':
             dirs = tp_single[None, :, :] - sources[:, None, :]
             dirs = dirs / jnp.linalg.norm(dirs, axis=-1, keepdims=True)
         else:
             dirs = jnp.broadcast_to(sources[:, None, :], (n_sources, n_samples, 3))
         
+        origins = jnp.broadcast_to(tp_single[None, :, :], dirs.shape)
+        normals = jnp.broadcast_to(tn_single[None, :, :], dirs.shape)
+        
         # Check occlusions before primary
-        tp_bc = jnp.broadcast_to(tp_single[None, :, :], dirs.shape)
-        shadow = _check_occlusions(
-            tp_bc.reshape(-1, 3), 
-            -dirs.reshape(-1, 3), 
-            tel.obstruction_groups
-        ).reshape(dirs.shape[:-1])
+        shadow = _check_occlusions(origins, -dirs, tel.obstruction_groups)
         
         # Reflect off primary
-        tn_bc = jnp.broadcast_to(tn_single[None, :, :], dirs.shape)
-        reflected, cos_angle = jax.vmap(jax.vmap(reflect))(dirs, tn_bc)
+        reflected, cos_angle = jax.vmap(jax.vmap(reflect))(dirs, normals)
         ray_vals = values[:, None] * cos_angle[..., 0] / tw_single[None, :, 0] * shadow
-        
-        # Flatten for subsequent stages
-        flat_origins = tp_bc.reshape(-1, 3)
-        flat_dirs = reflected.reshape(-1, 3)
-        flat_values = ray_vals.reshape(-1)
         
         # Process through stages 1+
         for stage_idx in stage_indices[1:]:
-            flat_origins, flat_dirs, flat_values = _reflect_at_stage(
-                flat_origins, flat_dirs, flat_values,
+            origins, reflected, ray_vals = _reflect_at_stage(
+                origins, reflected, ray_vals,
                 stages[stage_idx], tel.obstruction_groups
             )
         
         # Intersect with sensor
-        pts, t = jax.vmap(intersect_plane, in_axes=(0, 0, None, None))(
-            flat_origins, flat_dirs, sensor_pos, sensor_rot
-        )
-        
-        forward_mask = jnp.where(t > 0, 1.0, 0.0)
+        pts = jax.vmap(
+            jax.vmap(intersect_plane, in_axes=(0, 0, None, None)),
+            in_axes=(0, 0, None, None)
+        )(origins, reflected, sensor_pos, sensor_rot)
         
         # Accumulate
-        img = sensor.accumulate(pts[:, 0], pts[:, 1], flat_values*forward_mask)
+        pts_flat = pts.reshape(-1, 2)
+        vals_flat = ray_vals.reshape(-1)
+        img = sensor.accumulate(pts_flat[:, 0], pts_flat[:, 1], vals_flat)
         return acc + img, None
     
     acc0 = jnp.zeros(sensor.get_accumulator_shape())
@@ -199,33 +210,26 @@ def render_debug(tel, sources, values, source_type, sensor_idx=0):
         else:
             dirs = jnp.broadcast_to(sources[:, None, :], (n_sources, n_samples, 3))
         
-        tp_bc = jnp.broadcast_to(tp_single[None, :, :], dirs.shape)
-        shadow = _check_occlusions(
-            tp_bc.reshape(-1, 3), 
-            -dirs.reshape(-1, 3), 
-            tel.obstruction_groups
-        ).reshape(dirs.shape[:-1])
+        origins = jnp.broadcast_to(tp_single[None, :, :], dirs.shape)
+        normals = jnp.broadcast_to(tn_single[None, :, :], dirs.shape)
         
-        tn_bc = jnp.broadcast_to(tn_single[None, :, :], dirs.shape)
-        reflected, cos_angle = jax.vmap(jax.vmap(reflect))(dirs, tn_bc)
+        shadow = _check_occlusions(origins, -dirs, tel.obstruction_groups)
+        
+        reflected, cos_angle = jax.vmap(jax.vmap(reflect))(dirs, normals)
         ray_vals = values[:, None] * cos_angle[..., 0] / tw_single[None, :, 0] * shadow
         
-        flat_origins = tp_bc.reshape(-1, 3)
-        flat_dirs = reflected.reshape(-1, 3)
-        flat_values = ray_vals.reshape(-1)
-        
         for stage_idx in stage_indices[1:]:
-            flat_origins, flat_dirs, flat_values = _reflect_at_stage(
-                flat_origins, flat_dirs, flat_values,
+            origins, reflected, ray_vals = _reflect_at_stage(
+                origins, reflected, ray_vals,
                 stages[stage_idx], tel.obstruction_groups
             )
         
-        pts, t = jax.vmap(intersect_plane, in_axes=(0, 0, None, None))(
-            flat_origins, flat_dirs, sensor_pos, sensor_rot
-        )
-        forward_mask = jnp.where(t > 0, 1.0, 0.0)
+        pts = jax.vmap(
+            jax.vmap(intersect_plane, in_axes=(0, 0, None, None)),
+            in_axes=(0, 0, None, None)
+        )(origins, reflected, sensor_pos, sensor_rot)
         
-        return carry, (pts, flat_values*forward_mask)
+        return carry, (pts.reshape(-1, 2), ray_vals.reshape(-1))
     
     _, per_mirror = jax.lax.scan(process_mirror, None, jnp.arange(n_mirrors))
     
