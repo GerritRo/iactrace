@@ -150,9 +150,9 @@ def render(tel, sources, values, source_type, sensor_idx=0):
             )
         
         # Intersect with sensor
-        pts, t = jax.vmap(
-            lambda o, d: intersect_plane(o, d, sensor_pos, sensor_rot)
-        )(flat_origins, flat_dirs)
+        pts, t = jax.vmap(intersect_plane, in_axes=(0, 0, None, None))(
+            flat_origins, flat_dirs, sensor_pos, sensor_rot
+        )
         
         forward_mask = jnp.where(t > 0, 1.0, 0.0)
         
@@ -220,9 +220,9 @@ def render_debug(tel, sources, values, source_type, sensor_idx=0):
                 stages[stage_idx], tel.obstruction_groups
             )
         
-        pts, t = jax.vmap(
-            lambda o, d: intersect_plane(o, d, sensor_pos, sensor_rot)
-        )(flat_origins, flat_dirs)
+        pts, t = jax.vmap(intersect_plane, in_axes=(0, 0, None, None))(
+            flat_origins, flat_dirs, sensor_pos, sensor_rot
+        )
         forward_mask = jnp.where(t > 0, 1.0, 0.0)
         
         return carry, (pts, flat_values*forward_mask)
