@@ -15,7 +15,8 @@ def intersect_plane(ray_origin, ray_direction, plane_center, plane_rotation):
         plane_rotation: Rotation matrix (3, 3) - Z-axis is normal
     
     Returns:
-        2D coordinates on plane (2,)
+        Tuple of (2D coordinates on plane (2,), t parameter (scalar))
+        t < 0 indicates backward intersection (ray points away from plane)
     """
     # Extract normal and basis vectors from rotation matrix
     u1 = plane_rotation[:, 0]  # X-axis in plane coordinates
@@ -41,7 +42,7 @@ def intersect_plane(ray_origin, ray_direction, plane_center, plane_rotation):
     x = jnp.sum(op * u1, axis=-1)
     y = jnp.sum(op * u2, axis=-1)
     
-    return jnp.stack([x, y], axis=-1)
+    return jnp.stack([x, y], axis=-1), t
 
 
 def intersect_cylinder(ray_origin, ray_direction, p1, p2, radius):

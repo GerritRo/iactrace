@@ -55,7 +55,16 @@ def build_telescope(config, integrator, key):
     
     mirrors = [_parse_mirror(m, templates) for m in config.get('mirrors', [])]
     mirror_groups = group_mirrors(mirrors)
-    mirror_groups = integrator.sample_mirror_groups(mirror_groups, key)
+    
+    # Only sample stage 0 (primary) mirrors
+    sampled_groups = []
+    for group in mirror_groups:
+        if group.optical_stage == 0:
+            key, subkey = jax.random.split(key)
+            sampled_groups.append(group.sample(integrator.n_samples, subkey))
+        else:
+            # Stage 1+ mirrors don't need sampling, keep as-is
+            sampled_groups.append(group)
     
     obstructions = [_parse_obstruction(o) for o in config.get('obstructions', [])]
     obstruction_groups = group_obstructions(obstructions)
@@ -63,7 +72,7 @@ def build_telescope(config, integrator, key):
     sensors = [_parse_sensor(s) for s in config.get('sensors', [])]
     
     return Telescope(
-        mirror_groups=mirror_groups,
+        mirror_groups=sampled_groups,
         obstruction_groups=obstruction_groups,
         sensors=sensors,
         name=name,
@@ -75,11 +84,18 @@ def _parse_mirror(m, templates):
     aperture = _parse_aperture(m['aperture'])
     surface = AsphericSurface.from_template(templates[m['template']])
     
+    # Default optical_stage to 0 if not specified
+    optical_stage = m.get('stage', 0)
+    # Default offset to [0, 0] if not specified
+    offset = m.get('offset', [0.0, 0.0])
+    
     return Mirror(
         position=m['position'],
         rotation=m['orientation'],
         surface=surface,
         aperture=aperture,
+        optical_stage=optical_stage,
+        offset=offset,
     )
 
 

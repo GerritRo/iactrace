@@ -78,20 +78,21 @@ def _get_mirror_meshes(group):
     surface = AsphericSurface(group.curvature, group.conic, group.aspheric)
     
     meshes = []
+    offsets = np.asarray(group.offsets)
     if isinstance(group, AsphericDiskMirrorGroup):
         radii = np.asarray(group.radii)
         for i in range(len(group)):
-            mesh = _create_disk_mesh(positions[i], rotations[i], radii[i], surface)
+            mesh = _create_disk_mesh(positions[i], rotations[i], radii[i], surface, offsets[i])
             if mesh is not None:
                 meshes.append(mesh)
     
     elif isinstance(group, AsphericPolygonMirrorGroup):
         vertices = np.asarray(group.vertices)
         for i in range(len(group)):
-            mesh = _create_polygon_mesh(positions[i], rotations[i], vertices[i], surface)
+            mesh = _create_polygon_mesh(positions[i], rotations[i], vertices[i], surface, offsets[i])
             if mesh is not None:
                 meshes.append(mesh)
-    
+       
     return meshes
 
 
@@ -153,7 +154,7 @@ def _convex_hull_2d(points):
         return None
 
 
-def _create_disk_mesh(position, rotation_euler, radius, surface,
+def _create_disk_mesh(position, rotation_euler, radius, surface, offset=None,
                       resolution=32, radial_resolution=8):
     """Create disk mesh with surface curvature."""
     theta = np.linspace(0, 2 * np.pi, resolution, endpoint=False)
@@ -171,7 +172,9 @@ def _create_disk_mesh(position, rotation_euler, radius, surface,
     # Compute z for all points at once using vmap
     x_all = np.concatenate([[0.0], x_ring])
     y_all = np.concatenate([[0.0], y_ring])
-    z_all = np.asarray(jax.vmap(surface.sag)(x_all, y_all))
+    if offset is None:
+        offset = np.zeros(2)
+    z_all = np.asarray(jax.vmap(lambda x, y: surface.sag(x, y, offset))(x_all, y_all))
     
     vertices = np.column_stack([x_all, y_all, z_all])
     
@@ -207,7 +210,7 @@ def _create_disk_mesh(position, rotation_euler, radius, surface,
     return trimesh.Trimesh(vertices=world_vertices, faces=faces)
 
 
-def _create_polygon_mesh(position, rotation_euler, vertices_2d, surface,
+def _create_polygon_mesh(position, rotation_euler, vertices_2d, surface, offset=None,
                          grid_resolution=8):
     """Create polygon mesh with optional surface curvature."""
     vertices_2d = np.asarray(vertices_2d)
@@ -238,7 +241,9 @@ def _create_polygon_mesh(position, rotation_euler, vertices_2d, surface,
         all_points_2d = np.vstack([vertices_2d, interior_points])
         
         # Compute z from surface - vectorized with vmap
-        z = np.asarray(jax.vmap(surface.sag)(all_points_2d[:, 0], all_points_2d[:, 1]))
+        if offset is None:
+            offset = np.zeros(2)
+        z = np.asarray(jax.vmap(lambda x, y: surface.sag(x, y, offset))(all_points_2d[:, 0], all_points_2d[:, 1]))
         local_verts = np.column_stack([all_points_2d, z])
         
         # Delaunay triangulation
@@ -250,11 +255,12 @@ def _create_polygon_mesh(position, rotation_euler, vertices_2d, surface,
             centroids = all_points_2d[tri.simplices].mean(axis=1)
             inside_mask = _points_in_polygon(centroids, vertices_2d)
             faces = tri.simplices[inside_mask]
+            
         except ImportError:
             # Fallback: fan triangulation on boundary only
             local_verts = np.zeros((n_verts, 3))
             local_verts[:, :2] = vertices_2d
-            local_verts[:, 2] = np.asarray(jax.vmap(surface.sag)(vertices_2d[:, 0], vertices_2d[:, 1]))
+            local_verts[:, 2] = np.asarray(jax.vmap(lambda x, y: surface.sag(x, y, offset))(vertices_2d[:, 0], vertices_2d[:, 1]))
             faces = np.array([[0, i, i + 1] for i in range(1, n_verts - 1)])
     
     if len(faces) == 0:
