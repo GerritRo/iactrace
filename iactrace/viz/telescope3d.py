@@ -68,6 +68,13 @@ def export_mesh(telescope, filename):
     scene = show_telescope(telescope)
     scene.export(filename)
 
+def _make_double_sided(mesh):
+    """Make mesh visible from both sides by duplicating faces with reversed winding."""
+    if mesh is None:
+        return None
+    faces_reversed = mesh.faces[:, ::-1]
+    mesh.faces = np.vstack([mesh.faces, faces_reversed])
+    return mesh
 
 def _get_mirror_meshes(group):
     """Get list of mirror meshes from group."""
@@ -83,6 +90,7 @@ def _get_mirror_meshes(group):
         radii = np.asarray(group.radii)
         for i in range(len(group)):
             mesh = _create_disk_mesh(positions[i], rotations[i], radii[i], surface, offsets[i])
+            mesh = _make_double_sided(mesh)
             if mesh is not None:
                 meshes.append(mesh)
     
@@ -90,6 +98,7 @@ def _get_mirror_meshes(group):
         vertices = np.asarray(group.vertices)
         for i in range(len(group)):
             mesh = _create_polygon_mesh(positions[i], rotations[i], vertices[i], surface, offsets[i])
+            mesh = _make_double_sided(mesh)
             if mesh is not None:
                 meshes.append(mesh)
        
@@ -133,14 +142,16 @@ def _get_sensor_mesh(sensor):
         x1 = x0 + sensor.width * sensor.dx
         y1 = y0 + sensor.height * sensor.dy
         vertices = np.array([[x0, y0], [x1, y0], [x1, y1], [x0, y1]])
-        return _create_polygon_mesh(position, rotation, vertices, surface=None)
+        mesh = _create_polygon_mesh(position, rotation, vertices, surface=None)
+        return _make_double_sided(mesh)
     
     elif isinstance(sensor, HexagonalSensor):
         centers = np.asarray(sensor.hex_centers)
         boundary = _convex_hull_2d(centers)
         if boundary is not None:
-            return _create_polygon_mesh(position, rotation, boundary, surface=None)
-    
+            mesh = _create_polygon_mesh(position, rotation, boundary, surface=None)
+            return _make_double_sided(mesh)
+        
     return None
 
 
