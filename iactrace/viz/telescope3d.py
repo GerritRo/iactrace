@@ -68,6 +68,13 @@ def export_mesh(telescope, filename):
     scene = show_telescope(telescope)
     scene.export(filename)
 
+def _make_double_sided(mesh):
+    """Make mesh visible from both sides by duplicating faces with reversed winding."""
+    if mesh is None:
+        return None
+    faces_reversed = mesh.faces[:, ::-1]
+    mesh.faces = np.vstack([mesh.faces, faces_reversed])
+    return mesh
 
 def _get_mirror_meshes(group):
     """Get list of mirror meshes from group."""
@@ -78,20 +85,23 @@ def _get_mirror_meshes(group):
     surface = AsphericSurface(group.curvature, group.conic, group.aspheric)
     
     meshes = []
+    offsets = np.asarray(group.offsets)
     if isinstance(group, AsphericDiskMirrorGroup):
         radii = np.asarray(group.radii)
         for i in range(len(group)):
-            mesh = _create_disk_mesh(positions[i], rotations[i], radii[i], surface)
+            mesh = _create_disk_mesh(positions[i], rotations[i], radii[i], surface, offsets[i])
+            mesh = _make_double_sided(mesh)
             if mesh is not None:
                 meshes.append(mesh)
     
     elif isinstance(group, AsphericPolygonMirrorGroup):
         vertices = np.asarray(group.vertices)
         for i in range(len(group)):
-            mesh = _create_polygon_mesh(positions[i], rotations[i], vertices[i], surface)
+            mesh = _create_polygon_mesh(positions[i], rotations[i], vertices[i], surface, offsets[i])
+            mesh = _make_double_sided(mesh)
             if mesh is not None:
                 meshes.append(mesh)
-    
+       
     return meshes
 
 
@@ -132,14 +142,16 @@ def _get_sensor_mesh(sensor):
         x1 = x0 + sensor.width * sensor.dx
         y1 = y0 + sensor.height * sensor.dy
         vertices = np.array([[x0, y0], [x1, y0], [x1, y1], [x0, y1]])
-        return _create_polygon_mesh(position, rotation, vertices, surface=None)
+        mesh = _create_polygon_mesh(position, rotation, vertices, surface=None)
+        return _make_double_sided(mesh)
     
     elif isinstance(sensor, HexagonalSensor):
         centers = np.asarray(sensor.hex_centers)
         boundary = _convex_hull_2d(centers)
         if boundary is not None:
-            return _create_polygon_mesh(position, rotation, boundary, surface=None)
-    
+            mesh = _create_polygon_mesh(position, rotation, boundary, surface=None)
+            return _make_double_sided(mesh)
+        
     return None
 
 
@@ -153,7 +165,7 @@ def _convex_hull_2d(points):
         return None
 
 
-def _create_disk_mesh(position, rotation_euler, radius, surface,
+def _create_disk_mesh(position, rotation_euler, radius, surface, offset=None,
                       resolution=32, radial_resolution=8):
     """Create disk mesh with surface curvature."""
     theta = np.linspace(0, 2 * np.pi, resolution, endpoint=False)
@@ -171,7 +183,9 @@ def _create_disk_mesh(position, rotation_euler, radius, surface,
     # Compute z for all points at once using vmap
     x_all = np.concatenate([[0.0], x_ring])
     y_all = np.concatenate([[0.0], y_ring])
-    z_all = np.asarray(jax.vmap(surface.sag)(x_all, y_all))
+    if offset is None:
+        offset = np.zeros(2)
+    z_all = np.asarray(jax.vmap(lambda x, y: surface.sag(x, y, offset))(x_all, y_all))
     
     vertices = np.column_stack([x_all, y_all, z_all])
     
@@ -207,7 +221,7 @@ def _create_disk_mesh(position, rotation_euler, radius, surface,
     return trimesh.Trimesh(vertices=world_vertices, faces=faces)
 
 
-def _create_polygon_mesh(position, rotation_euler, vertices_2d, surface,
+def _create_polygon_mesh(position, rotation_euler, vertices_2d, surface, offset=None,
                          grid_resolution=8):
     """Create polygon mesh with optional surface curvature."""
     vertices_2d = np.asarray(vertices_2d)
@@ -238,7 +252,9 @@ def _create_polygon_mesh(position, rotation_euler, vertices_2d, surface,
         all_points_2d = np.vstack([vertices_2d, interior_points])
         
         # Compute z from surface - vectorized with vmap
-        z = np.asarray(jax.vmap(surface.sag)(all_points_2d[:, 0], all_points_2d[:, 1]))
+        if offset is None:
+            offset = np.zeros(2)
+        z = np.asarray(jax.vmap(lambda x, y: surface.sag(x, y, offset))(all_points_2d[:, 0], all_points_2d[:, 1]))
         local_verts = np.column_stack([all_points_2d, z])
         
         # Delaunay triangulation
@@ -250,11 +266,12 @@ def _create_polygon_mesh(position, rotation_euler, vertices_2d, surface,
             centroids = all_points_2d[tri.simplices].mean(axis=1)
             inside_mask = _points_in_polygon(centroids, vertices_2d)
             faces = tri.simplices[inside_mask]
+            
         except ImportError:
             # Fallback: fan triangulation on boundary only
             local_verts = np.zeros((n_verts, 3))
             local_verts[:, :2] = vertices_2d
-            local_verts[:, 2] = np.asarray(jax.vmap(surface.sag)(vertices_2d[:, 0], vertices_2d[:, 1]))
+            local_verts[:, 2] = np.asarray(jax.vmap(lambda x, y: surface.sag(x, y, offset))(vertices_2d[:, 0], vertices_2d[:, 1]))
             faces = np.array([[0, i, i + 1] for i in range(1, n_verts - 1)])
     
     if len(faces) == 0:
