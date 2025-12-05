@@ -2,7 +2,7 @@ import jax
 import jax.numpy as jnp
 from jax import vmap
 
-### Intersection tests
+### Primitive intersections
 
 def intersect_plane(ray_origin, ray_direction, plane_center, plane_rotation):
     """
@@ -227,36 +227,142 @@ def intersect_sphere(ray_origin, ray_direction, center, radius):
     return jnp.minimum(t1_valid, t2_valid)
 
 
-### Normals manipulation
+def intersect_conic(ray_origin, ray_direction, curvature, conic):
+    """
+    Compute closed-form ray-conic intersection parameter.
 
-def perturb_normals(normals, sigma_rad, key):
-    """
-    Perturb normals by random angles.
-    
+    The conic surface is defined by the implicit equation:
+        c*(x² + y²) + (1+k)*c*z² - 2*z = 0
+
+    where c is curvature and k is the conic constant.
+
     Args:
-        normals: Surface normals (..., 3), assumed unit length
-        sigma_rad: RMS perturbation angle in radians
-        key: JAX random key
-    
+        ray_origin: Ray origin (3,)
+        ray_direction: Ray direction (3,), assumed normalized
+        curvature: Surface curvature (1/radius)
+        conic: Conic constant (0=sphere, -1=paraboloid, <-1=hyperboloid, >-1=ellipsoid)
+
     Returns:
-        Perturbed unit normals (..., 3)
+        t: Ray parameter at intersection (smallest positive root), inf if no intersection
     """
-    shape = normals.shape[:-1]
-    
-    key1, key2 = jax.random.split(key)
-    theta1 = jax.random.normal(key1, shape) * sigma_rad
-    theta2 = jax.random.normal(key2, shape) * sigma_rad
-    
-    # Build tangent basis, avoiding degeneracy
-    ref_z = jnp.array([0., 0., 1.])
-    ref_x = jnp.array([1., 0., 0.])
-    
-    dot_z = jnp.abs(jnp.sum(normals * ref_z, axis=-1, keepdims=True))
-    ref = jnp.where(dot_z > 0.9, ref_x, ref_z)
-    
-    tangent1 = jnp.cross(normals, ref)
-    tangent1 = tangent1 / jnp.linalg.norm(tangent1, axis=-1, keepdims=True)
-    tangent2 = jnp.cross(normals, tangent1)
-    
-    perturbed = normals + theta1[..., None] * tangent1 + theta2[..., None] * tangent2
-    return perturbed / jnp.linalg.norm(perturbed, axis=-1, keepdims=True)
+    ox, oy, oz = ray_origin[0], ray_origin[1], ray_origin[2]
+    dx, dy, dz = ray_direction[0], ray_direction[1], ray_direction[2]
+    c = curvature
+    k = conic
+
+    # Quadratic coefficients: A*t² + B*t + C = 0
+    # From substituting ray into: c*(x² + y²) + (1+k)*c*z² - 2*z = 0
+    A = c * (dx * dx + dy * dy + (1 + k) * dz * dz)
+    B = 2 * (c * (ox * dx + oy * dy + (1 + k) * oz * dz) - dz)
+    C = c * (ox * ox + oy * oy + (1 + k) * oz * oz) - 2 * oz
+
+    # Handle near-zero curvature (plane)
+    is_plane = jnp.abs(c) < 1e-12
+    t_plane = jnp.where(jnp.abs(dz) > 1e-10, -oz / dz, jnp.inf)
+
+    # Solve quadratic
+    discriminant = B * B - 4 * A * C
+
+    # No real roots
+    no_intersection = discriminant < 0
+
+    sqrt_disc = jnp.sqrt(jnp.maximum(discriminant, 0.0))
+
+    # Two roots
+    t1 = (-B - sqrt_disc) / (2 * A + 1e-30)
+    t2 = (-B + sqrt_disc) / (2 * A + 1e-30)
+
+    # Select smallest positive root
+    t1_valid = t1 > 1e-8
+    t2_valid = t2 > 1e-8
+
+    t_conic = jnp.where(
+        t1_valid & t2_valid,
+        jnp.minimum(t1, t2),
+        jnp.where(t1_valid, t1, jnp.where(t2_valid, t2, jnp.inf))
+    )
+    t_conic = jnp.where(no_intersection, jnp.inf, t_conic)
+
+    return jnp.where(is_plane, t_plane, t_conic)
+
+
+### Newton-Raphson method
+
+def newton_raphson_intersect(sag_fn, ray_origin, ray_direction, t_init=None, max_iter=10, tol=1e-8):
+    """
+    Find ray-surface intersection using Newton-Raphson iteration.
+
+    This is a generic intersection routine for any surface defined by a sag function z = f(x, y).
+
+    Args:
+        sag_fn: Callable (x, y) -> z giving surface height
+        ray_origin: Ray origin in local coordinates (3,)
+        ray_direction: Ray direction in local coordinates (3,), assumed normalized
+        t_init: Initial guess for ray parameter. If None, uses z=0 plane intersection.
+        max_iter: Maximum Newton-Raphson iterations
+        tol: Convergence tolerance
+
+    Returns:
+        t: Parameter along ray (scalar), inf if no intersection
+        hit_xy: (x, y) coordinates at intersection (2,)
+        valid: Boolean indicating if intersection is valid
+    """
+    ox, oy, oz = ray_origin[0], ray_origin[1], ray_origin[2]
+    dx, dy, dz = ray_direction[0], ray_direction[1], ray_direction[2]
+
+    # Initial guess: use provided value or intersect with z=0 plane
+    if t_init is None:
+        t_init = jnp.where(
+            jnp.abs(dz) > 1e-10,
+            -oz / dz,
+            0.0
+        )
+        t_init = jnp.maximum(t_init, 0.0)
+
+    def g(t):
+        """Implicit function: g(t) = 0 at intersection."""
+        x = ox + t * dx
+        y = oy + t * dy
+        z = oz + t * dz
+        return z - sag_fn(x, y)
+
+    def g_deriv(t):
+        """Derivative dg/dt using autodiff."""
+        return jax.grad(g)(t)
+
+    def newton_step(carry, _):
+        t, converged = carry
+        g_val = g(t)
+        g_prime = g_deriv(t)
+
+        # Avoid division by zero
+        g_prime_safe = jnp.where(jnp.abs(g_prime) > 1e-12, g_prime, 1e-12)
+        t_new = t - g_val / g_prime_safe
+
+        # Check convergence
+        new_converged = converged | (jnp.abs(g_val) < tol)
+
+        # Only update if not converged
+        t_out = jnp.where(converged, t, t_new)
+
+        return (t_out, new_converged), None
+
+    (t_final, _), _ = jax.lax.scan(
+        newton_step,
+        (t_init, False),
+        None,
+        length=max_iter
+    )
+
+    # Compute hit coordinates
+    x_hit = ox + t_final * dx
+    y_hit = oy + t_final * dy
+    hit_xy = jnp.array([x_hit, y_hit])
+
+    # Check validity: t should be positive and residual small
+    residual = jnp.abs(g(t_final))
+    valid = (t_final > 1e-8) & (residual < tol * 100)
+
+    t_out = jnp.where(valid, t_final, jnp.inf)
+
+    return t_out, hit_xy, valid

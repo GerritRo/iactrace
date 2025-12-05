@@ -26,7 +26,7 @@ def add_obstruction(telescope, obstruction):
 
 def apply_roughness(telescope, roughness, key):
     """Apply surface roughness to mirror normals."""
-    from ..core.geometry import perturb_normals
+    from ..core import perturb_normals
     
     sigma_rad = roughness * jnp.pi / (180.0 * 3600.0)
     keys = jax.random.split(key, len(telescope.mirror_groups))
