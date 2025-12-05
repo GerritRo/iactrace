@@ -34,22 +34,7 @@ class Mirror(eqx.Module):
         self.normals = normals if normals is not None else jnp.zeros((0, 3))
         self.weights = weights if weights is not None else jnp.zeros((0, 1))
         self.optical_stage = int(optical_stage)
-    
-    def sample(self, n_samples, key):
-        """Return new Mirror with sampled surface points and normals."""
-        xy = self.aperture.sample(key, (n_samples,))
-        points, normals = self.surface.point_and_normal(xy, self.offset)
-        
-        # Weight = cos(angle to z-axis) normalized by area
-        cos_z = jnp.sum(normals * jnp.array([0., 0., 1.]), axis=-1, keepdims=True)
-        weights = cos_z / self.aperture.area() * n_samples
-        
-        return eqx.tree_at(
-            lambda m: (m.points, m.normals, m.weights),
-            self,
-            (points, normals, weights)
-        )
-    
+
     def transform_to_world(self):
         """Return world-space points, normals, and weights."""
         rot = euler_to_matrix(self.rotation)
@@ -69,19 +54,14 @@ class MirrorGroup(eqx.Module):
     points: jax.Array         # (N, M, 3) - N mirrors, M samples each
     normals: jax.Array        # (N, M, 3)
     weights: jax.Array        # (N, M, 1)
-    
-    optical_stage: int = eqx.field(static=True)  # 0=primary, 1=secondary, etc.
 
-    @abstractmethod
-    def sample(self, n_samples_per_mirror, key):
-        """Sample all mirrors in group with batched operations."""
-        pass
+    optical_stage: int = eqx.field(static=True)  # 0=primary, 1=secondary, etc.
 
     @abstractmethod
     def transform_to_world(self):
         """Batch transform all mirrors to world coordinates."""
         pass
-    
+
     @abstractmethod
     def get_surface(self):
         """Return the surface object for intersection calculations."""
@@ -140,40 +120,6 @@ class AsphericDiskMirrorGroup(MirrorGroup):
     def get_surface(self):
         """Return the surface object for intersection calculations."""
         return AsphericSurface(self.curvature, self.conic, self.aspheric)
-
-    def sample(self, n_samples_per_mirror, key):
-        """Sample all mirrors in group with batched operations."""
-        from ..utils.sampling import sample_disk
-
-        n_mirrors = len(self)
-        surface = self.get_surface()
-
-        # Split key for each mirror
-        keys = jax.random.split(key, n_mirrors)
-
-        def sample_single_mirror(key, radius, offset):
-            # Sample aperture
-            pts = sample_disk(key, (n_samples_per_mirror,))
-            xy = pts * radius
-
-            # Get surface geometry with offset
-            points, normals = surface.point_and_normal(xy, offset)
-
-            # Compute weights
-            cos_z = jnp.sum(normals * jnp.array([0., 0., 1.]), axis=-1, keepdims=True)
-            area = jnp.pi * radius**2
-            weights = cos_z / area * n_samples_per_mirror
-
-            return points, normals, weights
-
-        # Vmap over all mirrors
-        points, normals, weights = jax.vmap(sample_single_mirror)(keys, self.radii, self.offsets)
-
-        return eqx.tree_at(
-            lambda g: (g.points, g.normals, g.weights),
-            self,
-            (points, normals, weights)
-        )
 
     def transform_to_world(self):
         """Batch transform all mirrors to world coordinates."""
@@ -239,42 +185,6 @@ class AsphericPolygonMirrorGroup(MirrorGroup):
     def get_surface(self):
         """Return the surface object for intersection calculations."""
         return AsphericSurface(self.curvature, self.conic, self.aspheric)
-
-    def sample(self, n_samples_per_mirror, key):
-        """Sample all mirrors in group with batched operations."""
-        from ..utils.sampling import sample_polygon
-
-        n_mirrors = len(self)
-        surface = self.get_surface()
-
-        # Split key for each mirror
-        keys = jax.random.split(key, n_mirrors)
-
-        def sample_single_mirror(key, vertices, offset):
-            # Sample aperture
-            xy = sample_polygon(key, vertices, (n_samples_per_mirror,))
-
-            # Get surface geometry with offset
-            points, normals = surface.point_and_normal(xy, offset)
-
-            # Compute weights
-            cos_z = jnp.sum(normals * jnp.array([0., 0., 1.]), axis=-1, keepdims=True)
-            # Polygon area using shoelace formula
-            x = vertices[:, 0]
-            y = vertices[:, 1]
-            area = 0.5 * jnp.abs(jnp.sum(x * jnp.roll(y, -1) - jnp.roll(x, -1) * y))
-            weights = cos_z / area * n_samples_per_mirror
-
-            return points, normals, weights
-
-        # Vmap over all mirrors
-        points, normals, weights = jax.vmap(sample_single_mirror)(keys, self.vertices, self.offsets)
-
-        return eqx.tree_at(
-            lambda g: (g.points, g.normals, g.weights),
-            self,
-            (points, normals, weights)
-        )
 
     def transform_to_world(self):
         """Batch transform all mirrors to world coordinates."""

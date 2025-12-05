@@ -2,7 +2,7 @@ import jax
 import jax.numpy as jnp
 from functools import partial
 
-from .geometry import intersect_plane
+from .intersections import intersect_plane
 from .reflection import reflect
 from .transforms import euler_to_matrix
 

@@ -2,6 +2,8 @@ import jax
 import jax.numpy as jnp
 import equinox as eqx
 
+from .intersections import intersect_conic, newton_raphson_intersect
+
 
 class AsphericSurface(eqx.Module):
     """Aspheric surface defined by curvature, conic constant, and polynomial terms."""
@@ -65,75 +67,42 @@ class AsphericSurface(eqx.Module):
     def intersect(self, ray_origin, ray_direction, offset, max_iter=10, tol=1e-8):
         """
         Find ray-surface intersection using Newton-Raphson iteration.
-        
+
+        Uses closed-form conic intersection as initial guess, then refines
+        with Newton-Raphson to account for aspheric terms.
+
         Args:
             ray_origin: Ray origin in local coordinates (3,)
             ray_direction: Ray direction in local coordinates (3,), assumed normalized
             offset: (x0, y0) offset on parent surface (2,)
             max_iter: Maximum Newton-Raphson iterations
             tol: Convergence tolerance
-        
+
         Returns:
             t: Parameter along ray (scalar), inf if no intersection
             point: Intersection point (3,)
             normal: Surface normal at intersection (3,)
         """
-        ox, oy, oz = ray_origin[0], ray_origin[1], ray_origin[2]
-        dx, dy, dz = ray_direction[0], ray_direction[1], ray_direction[2]
-        
-        # Initial guess: intersect with z=0 plane
-        t_init = jnp.where(
-            jnp.abs(dz) > 1e-10,
-            -oz / dz,
-            0.0
+        # Translate ray origin to raw surface coordinates for conic intersection
+        z0 = self._sag_raw(offset[0], offset[1])
+        ray_origin_raw = jnp.array([
+            ray_origin[0] + offset[0],
+            ray_origin[1] + offset[1],
+            ray_origin[2] + z0
+        ])
+
+        # Get initial guess from closed-form conic intersection
+        t_init = intersect_conic(ray_origin_raw, ray_direction, self.curvature, self.conic)
+
+        # Refine with Newton-Raphson
+        sag_fn = lambda x, y: self.sag(x, y, offset)
+
+        t, hit_xy, _ = newton_raphson_intersect(
+            sag_fn, ray_origin, ray_direction, t_init, max_iter, tol
         )
-        t_init = jnp.maximum(t_init, 0.0)
-        
-        def g(t):
-            """Implicit function: g(t) = 0 at intersection."""
-            x = ox + t * dx
-            y = oy + t * dy
-            z = oz + t * dz
-            return z - self.sag(x, y, offset)
-        
-        def g_deriv(t):
-            """Derivative dg/dt using autodiff."""
-            return jax.grad(g)(t)
-        
-        def newton_step(carry, _):
-            t, converged = carry
-            g_val = g(t)
-            g_prime = g_deriv(t)
-            
-            # Avoid division by zero
-            g_prime_safe = jnp.where(jnp.abs(g_prime) > 1e-12, g_prime, 1e-12)
-            t_new = t - g_val / g_prime_safe
-            
-            # Check convergence
-            new_converged = converged | (jnp.abs(g_val) < tol)
-            
-            # Only update if not converged
-            t_out = jnp.where(converged, t, t_new)
-            
-            return (t_out, new_converged), None
-        
-        (t_final, _), _ = jax.lax.scan(
-            newton_step, 
-            (t_init, False), 
-            None, 
-            length=max_iter
-        )
-        
-        # Compute intersection point and normal
-        x_hit = ox + t_final * dx
-        y_hit = oy + t_final * dy
+
+        x_hit, y_hit = hit_xy[0], hit_xy[1]
         point = self.point(x_hit, y_hit, offset)
         normal = self.normal(x_hit, y_hit, offset)
-        
-        # Check validity: t should be positive and residual small
-        residual = jnp.abs(g(t_final))
-        valid = (t_final > 1e-8) & (residual < tol * 100)
-        
-        t_out = jnp.where(valid, t_final, jnp.inf)
-        
-        return t_out, point, normal
+
+        return t, point, normal

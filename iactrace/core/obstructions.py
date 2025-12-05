@@ -4,7 +4,7 @@ import equinox as eqx
 from abc import abstractmethod
 from jax import vmap
 
-from .geometry import (
+from .intersections import (
     intersect_cylinder,
     intersect_box,
     intersect_sphere,

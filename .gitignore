@@ -30,6 +30,8 @@ wheels/
 *.swo
 *~
 
+#Numpy
+*.npy
 # OS
 .DS_Store
 Thumbs.db

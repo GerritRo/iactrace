@@ -1,16 +1,17 @@
-from .geometry import (
+from .intersections import (
     intersect_plane,
     intersect_cylinder,
     intersect_box,
     intersect_sphere,
     intersect_oriented_box,
     intersect_triangle,
-    perturb_normals,
+    intersect_conic,
+    newton_raphson_intersect,
 )
 from .surfaces import AsphericSurface
 from .apertures import Aperture, DiskAperture, PolygonAperture
-from .integrators import MCIntegrator
-from .reflection import reflect
+from .integrators import Integrator, MCIntegrator
+from .reflection import reflect, perturb_normals
 from .transforms import euler_to_matrix, look_at_rotation
 from .render import render, render_debug
 from .obstructions import (
