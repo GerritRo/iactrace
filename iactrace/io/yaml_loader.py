@@ -61,7 +61,7 @@ def build_telescope(config, integrator, key):
     for group in mirror_groups:
         if group.optical_stage == 0:
             key, subkey = jax.random.split(key)
-            sampled_groups.append(group.sample(integrator.n_samples, subkey))
+            sampled_groups.append(integrator.sample_group(group, subkey))
         else:
             # Stage 1+ mirrors don't need sampling, keep as-is
             sampled_groups.append(group)

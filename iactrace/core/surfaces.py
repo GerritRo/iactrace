@@ -96,14 +96,12 @@ class AsphericSurface(eqx.Module):
             z = oz + t * dz
             return z - self.sag(x, y, offset)
         
-        def g_deriv(t):
-            """Derivative dg/dt using autodiff."""
-            return jax.grad(g)(t)
+        g_grad = jax.grad(g)
         
         def newton_step(carry, _):
             t, converged = carry
             g_val = g(t)
-            g_prime = g_deriv(t)
+            g_prime = g_grad(t)
             
             # Avoid division by zero
             g_prime_safe = jnp.where(jnp.abs(g_prime) > 1e-12, g_prime, 1e-12)

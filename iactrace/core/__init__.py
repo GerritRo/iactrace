@@ -9,7 +9,7 @@ from .geometry import (
 )
 from .surfaces import AsphericSurface
 from .apertures import Aperture, DiskAperture, PolygonAperture
-from .integrators import MCIntegrator
+from .integrators import Integrator, MCIntegrator
 from .reflection import reflect
 from .transforms import euler_to_matrix, look_at_rotation
 from .render import render, render_debug

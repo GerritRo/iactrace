@@ -5,13 +5,13 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="iactrace",
-    version="0.1.0",
+    version="0.3.0",
     author="Gerrit Roellinghoff",
     author_email="gerrit.roellinghoff@fau.de",
     description="JAX-based optical ray tracing for Imaging Atmospheric Cherenkov Telescopes",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/yourusername/iactrace",
+    url="https://github.com/GerritRo/iactrace",
     packages=find_packages(),
     classifiers=[
         "Development Status :: 3 - Alpha",
@@ -32,6 +32,7 @@ setup(
         "matplotlib>=3.3.0",
         "pandas>=1.2.0",
         "trimesh>=3.15.0",
+        "equinox>=0.13.2",
     ],
     extras_require={
         "dev": [
