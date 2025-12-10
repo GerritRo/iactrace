@@ -72,6 +72,11 @@ class MirrorGroup(eqx.Module):
         """Check if points (x, y) are within aperture of specified mirror."""
         pass
 
+    @abstractmethod
+    def get_sampling_params(self):
+        """Return structured dict with geometry parameters for sampling."""
+        pass
+
     def __len__(self):
         """Return number of mirrors in group."""
         return self.positions.shape[0]
@@ -139,6 +144,15 @@ class AsphericDiskMirrorGroup(MirrorGroup):
         """Check if points (x, y) are within mirror aperture."""
         return x**2 + y**2 <= self.radii[mirror_idx]**2
 
+    def get_sampling_params(self):
+        """Return structured dict with geometry parameters for sampling."""
+        return {
+            'type': 'disk',
+            'radii': self.radii,
+            'offsets': self.offsets,
+            'surface': self.get_surface()
+        }
+
 
 class AsphericPolygonMirrorGroup(MirrorGroup):
     """Group of mirrors with aspheric surfaces and polygon apertures (same vertex count)."""
@@ -204,14 +218,23 @@ class AsphericPolygonMirrorGroup(MirrorGroup):
         """Check if points (x, y) are within mirror aperture (convex polygon)."""
         verts = self.vertices[mirror_idx]
         n = self.n_vertices
-        
+
         def edge_check(carry, i):
             v1, v2 = verts[i], verts[(i + 1) % n]
             cross = (v2[0] - v1[0]) * (y - v1[1]) - (v2[1] - v1[1]) * (x - v1[0])
             return carry & (cross >= 0), None
-        
+
         inside, _ = jax.lax.scan(edge_check, jnp.ones_like(x, dtype=bool), jnp.arange(n))
         return inside
+
+    def get_sampling_params(self):
+        """Return structured dict with geometry parameters for sampling."""
+        return {
+            'type': 'polygon',
+            'vertices': self.vertices,
+            'offsets': self.offsets,
+            'surface': self.get_surface()
+        }
 
 
 def group_mirrors(mirrors):
