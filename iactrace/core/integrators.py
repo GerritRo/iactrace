@@ -7,17 +7,8 @@ from ..utils.sampling import sample_disk, sample_polygon
 
 
 class Integrator(ABC):
-    """Abstract base class for mirror sampling integrators.
-
-    Different integrators implement different sampling strategies:
-    - MCIntegrator: Monte Carlo random sampling
-    - Future: GridIntegrator, StratifiedIntegrator, etc.
-
-    Integrators are responsible for ALL sampling logic including:
-    - Generating 2D aperture sample points
-    - Mapping to 3D surface points
-    - Computing surface normals
-    - Computing importance weights
+    """
+    Abstract base class for mirror sampling integrators.
     """
 
     @abstractmethod
@@ -54,14 +45,8 @@ class Integrator(ABC):
 
 
 class MCIntegrator(Integrator):
-    """Monte Carlo integrator for mirror groups.
-
-    Uses uniform random sampling over apertures to generate sample points
-    on mirror surfaces. Appropriate for most ray tracing applications.
-
-    This integrator owns all sampling logic:
-    - For disk apertures: uniform random sampling in polar coordinates
-    - For polygon apertures: uniform random sampling via fan triangulation
+    """
+    Monte Carlo integrator for mirror groups.
     """
 
     def __init__(self, n_samples=128):
@@ -84,19 +69,25 @@ class MCIntegrator(Integrator):
         Returns:
             MirrorGroup with sampled points, normals, and weights
         """
-        # Detect group type and delegate to appropriate sampling method
-        if hasattr(group, 'radii'):
-            return self._sample_disk_group(group, key)
-        elif hasattr(group, 'vertices'):
-            return self._sample_polygon_group(group, key)
-        else:
-            raise TypeError(f"Unknown MirrorGroup type: {type(group)}")
+        # Get sampling parameters from group
+        params = group.get_sampling_params()
+        group_type = params['type']
 
-    def _sample_disk_group(self, group, key):
+        # Delegate to appropriate sampling method
+        if group_type == 'disk':
+            return self._sample_disk_group(group, key, params)
+        elif group_type == 'polygon':
+            return self._sample_polygon_group(group, key, params)
+        else:
+            raise TypeError(f"Unknown MirrorGroup type: {group_type}")
+
+    def _sample_disk_group(self, group, key, params):
         """Sample a group of mirrors with circular disk apertures."""
         n_mirrors = len(group)
         n_samples = self.n_samples
-        surface = group.get_surface()
+        surface = params['surface']
+        radii = params['radii']
+        offsets = params['offsets']
 
         # Split key for each mirror
         keys = jax.random.split(key, n_mirrors)
@@ -118,7 +109,7 @@ class MCIntegrator(Integrator):
 
         # Vmap over all mirrors
         points, normals, weights = jax.vmap(sample_single_mirror)(
-            keys, group.radii, group.offsets
+            keys, radii, offsets
         )
 
         return eqx.tree_at(
@@ -127,11 +118,13 @@ class MCIntegrator(Integrator):
             (points, normals, weights)
         )
 
-    def _sample_polygon_group(self, group, key):
+    def _sample_polygon_group(self, group, key, params):
         """Sample a group of mirrors with convex polygon apertures."""
         n_mirrors = len(group)
         n_samples = self.n_samples
-        surface = group.get_surface()
+        surface = params['surface']
+        vertices = params['vertices']
+        offsets = params['offsets']
 
         # Split key for each mirror
         keys = jax.random.split(key, n_mirrors)
@@ -155,7 +148,7 @@ class MCIntegrator(Integrator):
 
         # Vmap over all mirrors
         points, normals, weights = jax.vmap(sample_single_mirror)(
-            keys, group.vertices, group.offsets
+            keys, vertices, offsets
         )
 
         return eqx.tree_at(
