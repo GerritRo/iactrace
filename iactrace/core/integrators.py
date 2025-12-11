@@ -4,6 +4,7 @@ import equinox as eqx
 from abc import ABC, abstractmethod
 
 from ..utils.sampling import sample_disk, sample_polygon
+from .reflection import compute_perturbation_delta
 
 
 class Integrator(ABC):
@@ -92,30 +93,34 @@ class MCIntegrator(Integrator):
         # Split key for each mirror
         keys = jax.random.split(key, n_mirrors)
 
-        def sample_single_mirror(key, radius, offset):
+        def sample_single_mirror(keys, radius, offset):
+            key_sample, key_perturb = jax.random.split(key)
             # Generate uniform random samples in unit disk, scale by radius
-            pts = sample_disk(key, (n_samples,))
+            pts = sample_disk(key_sample, (n_samples,))
             xy = pts * radius
 
             # Map 2D to 3D surface points and normals
             points, normals = surface.point_and_normal(xy, offset)
+
+            # Compute perturbation delta (unit sigma)
+            delta = compute_perturbation_delta(normals, key_perturb)
 
             # Compute weights: cos(angle to z-axis) / area * n_samples
             cos_z = jnp.sum(normals * jnp.array([0., 0., 1.]), axis=-1, keepdims=True)
             area = jnp.pi * radius**2
             weights = cos_z / area * n_samples
 
-            return points, normals, weights
+            return points, normals, delta, weights
 
         # Vmap over all mirrors
-        points, normals, weights = jax.vmap(sample_single_mirror)(
+        points, normals, delta, weights = jax.vmap(sample_single_mirror)(
             keys, radii, offsets
         )
 
         return eqx.tree_at(
-            lambda g: (g.points, g.normals, g.weights),
+            lambda g: (g.points, g.normals, g.perturbation_delta, g.weights),
             group,
-            (points, normals, weights)
+            (points, normals, delta, weights)
         )
 
     def _sample_polygon_group(self, group, key, params):
@@ -129,12 +134,16 @@ class MCIntegrator(Integrator):
         # Split key for each mirror
         keys = jax.random.split(key, n_mirrors)
 
-        def sample_single_mirror(key, vertices, offset):
+        def sample_single_mirror(keys, vertices, offset):
+            key_sample, key_perturb = jax.random.split(key)
             # Generate uniform random samples within polygon
-            xy = sample_polygon(key, vertices, (n_samples,))
+            xy = sample_polygon(key_sample, vertices, (n_samples,))
 
             # Map 2D to 3D surface points and normals
             points, normals = surface.point_and_normal(xy, offset)
+
+            # Compute perturbation delta (unit sigma)
+            delta = compute_perturbation_delta(normals, key_perturb)
 
             # Compute weights: cos(angle to z-axis) / area * n_samples
             cos_z = jnp.sum(normals * jnp.array([0., 0., 1.]), axis=-1, keepdims=True)
@@ -144,15 +153,15 @@ class MCIntegrator(Integrator):
             area = 0.5 * jnp.abs(jnp.sum(x * jnp.roll(y, -1) - jnp.roll(x, -1) * y))
             weights = cos_z / area * n_samples
 
-            return points, normals, weights
+            return points, normals, delta, weights
 
         # Vmap over all mirrors
-        points, normals, weights = jax.vmap(sample_single_mirror)(
+        points, normals, delta, weights = jax.vmap(sample_single_mirror)(
             keys, vertices, offsets
         )
 
         return eqx.tree_at(
-            lambda g: (g.points, g.normals, g.weights),
+            lambda g: (g.points, g.normals, g.perturbation_delta, g.weights),
             group,
-            (points, normals, weights)
+            (points, normals, delta, weights)
         )

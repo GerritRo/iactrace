@@ -68,6 +68,6 @@ class Telescope(eqx.Module):
         from .operations import resample
         return resample(self, integrator, key)
     
-    def apply_roughness(self, roughness_arcsec, key):
+    def apply_roughness(self, roughness_arcsec):
         from .operations import apply_roughness
-        return apply_roughness(self, roughness_arcsec, key)
+        return apply_roughness(self, roughness_arcsec)

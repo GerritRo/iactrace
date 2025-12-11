@@ -55,13 +55,29 @@ class MirrorGroup(eqx.Module):
     normals: jax.Array        # (N, M, 3)
     weights: jax.Array        # (N, M, 1)
 
+    # Perturbation (pre-computed delta, per-mirror scale)
+    perturbation_delta: jax.Array  # (N, M, 3) - local-space offset vectors
+    perturbation_scale: jax.Array  # (N,) - per-mirror scale factor (radians)
+
     optical_stage: int = eqx.field(static=True)  # 0=primary, 1=secondary, etc.
 
-    @abstractmethod
     def transform_to_world(self):
-        """Batch transform all mirrors to world coordinates."""
-        pass
+        """Batch transform all mirrors to world coordinates, applying perturbation."""
+        def transform_single(points, normals, delta, weights, position, rotation, scale):
+            rot = euler_to_matrix(rotation)
+            points_world = jnp.einsum('ij,nj->ni', rot, points) + position
+            normals_world = jnp.einsum('ij,nj->ni', rot, normals)
+            delta_world = jnp.einsum('ij,nj->ni', rot, delta)
+            # Apply scaled perturbation and renormalize
+            perturbed = normals_world + scale * delta_world
+            perturbed = perturbed / jnp.linalg.norm(perturbed, axis=-1, keepdims=True)
+            return points_world, perturbed, weights
 
+        return jax.vmap(transform_single)(
+            self.points, self.normals, self.perturbation_delta, self.weights,
+            self.positions, self.rotations, self.perturbation_scale
+        )
+    
     @abstractmethod
     def get_surface(self):
         """Return the surface object for intersection calculations."""
@@ -113,7 +129,7 @@ class AsphericDiskMirrorGroup(MirrorGroup):
         self.aspheric = surface.aspheric
         self.radii = jnp.asarray(radii)
         self.optical_stage = int(optical_stage)
-        
+
         n_mirrors = self.positions.shape[0]
         self.offsets = jnp.asarray(offsets) if offsets is not None else jnp.zeros((n_mirrors, 2))
 
@@ -121,24 +137,12 @@ class AsphericDiskMirrorGroup(MirrorGroup):
         self.points = jnp.zeros((n_mirrors, 0, 3))
         self.normals = jnp.zeros((n_mirrors, 0, 3))
         self.weights = jnp.zeros((n_mirrors, 0, 1))
+        self.perturbation_delta = jnp.zeros((n_mirrors, 0, 3))
+        self.perturbation_scale = jnp.zeros(n_mirrors)
 
     def get_surface(self):
         """Return the surface object for intersection calculations."""
         return AsphericSurface(self.curvature, self.conic, self.aspheric)
-
-    def transform_to_world(self):
-        """Batch transform all mirrors to world coordinates."""
-        def transform_single(points, normals, weights, position, rotation):
-            rot = euler_to_matrix(rotation)
-            points_world = jnp.einsum('ij,nj->ni', rot, points) + position
-            normals_world = jnp.einsum('ij,nj->ni', rot, normals)
-            return points_world, normals_world, weights
-
-        # Vmap over all mirrors
-        return jax.vmap(transform_single)(
-            self.points, self.normals, self.weights,
-            self.positions, self.rotations
-        )
 
     def check_aperture(self, x, y, mirror_idx):
         """Check if points (x, y) are within mirror aperture."""
@@ -187,7 +191,7 @@ class AsphericPolygonMirrorGroup(MirrorGroup):
         self.vertices = jnp.asarray(vertices_list)
         self.n_vertices = self.vertices.shape[1]
         self.optical_stage = int(optical_stage)
-        
+
         n_mirrors = self.positions.shape[0]
         self.offsets = jnp.asarray(offsets) if offsets is not None else jnp.zeros((n_mirrors, 2))
 
@@ -195,24 +199,12 @@ class AsphericPolygonMirrorGroup(MirrorGroup):
         self.points = jnp.zeros((n_mirrors, 0, 3))
         self.normals = jnp.zeros((n_mirrors, 0, 3))
         self.weights = jnp.zeros((n_mirrors, 0, 1))
+        self.perturbation_delta = jnp.zeros((n_mirrors, 0, 3))
+        self.perturbation_scale = jnp.zeros(n_mirrors)
 
     def get_surface(self):
         """Return the surface object for intersection calculations."""
         return AsphericSurface(self.curvature, self.conic, self.aspheric)
-
-    def transform_to_world(self):
-        """Batch transform all mirrors to world coordinates."""
-        def transform_single(points, normals, weights, position, rotation):
-            rot = euler_to_matrix(rotation)
-            points_world = jnp.einsum('ij,nj->ni', rot, points) + position
-            normals_world = jnp.einsum('ij,nj->ni', rot, normals)
-            return points_world, normals_world, weights
-
-        # Vmap over all mirrors
-        return jax.vmap(transform_single)(
-            self.points, self.normals, self.weights,
-            self.positions, self.rotations
-        )
 
     def check_aperture(self, x, y, mirror_idx):
         """Check if points (x, y) are within mirror aperture (convex polygon)."""
