@@ -1,6 +1,5 @@
 import jax
 import jax.numpy as jnp
-from jax import vmap
 
 ### Primitive intersections
 

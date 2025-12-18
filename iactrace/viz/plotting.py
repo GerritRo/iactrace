@@ -56,7 +56,7 @@ def hexshow(result, sensor, ax=None, **kwargs):
     
     # Get the grid rotation (how much the original grid was rotated)
     # We need to counter-rotate the hexagon orientation
-    grid_rotation = -sensor.rotation_angle  # Negative because we counter-rotate
+    grid_rotation = -sensor.grid_rotation  # Negative because we counter-rotate
 
     vmin = kwargs.pop('vmin', result.min())
     vmax = kwargs.pop('vmax', result.max())

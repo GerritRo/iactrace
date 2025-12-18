@@ -38,7 +38,7 @@ class PolygonAperture(Aperture):
     """Convex polygonal aperture."""
 
     vertices: jax.Array
-    n_vertices: float
+    n_vertices: int
 
     def __init__(self, vertices):
         self.vertices = jnp.asarray(vertices)

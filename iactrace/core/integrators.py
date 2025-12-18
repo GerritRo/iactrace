@@ -93,8 +93,8 @@ class MCIntegrator(Integrator):
         # Split key for each mirror
         keys = jax.random.split(key, n_mirrors)
 
-        def sample_single_mirror(keys, radius, offset):
-            key_sample, key_perturb = jax.random.split(key)
+        def sample_single_mirror(mkey, radius, offset):
+            key_sample, key_perturb = jax.random.split(mkey)
             # Generate uniform random samples in unit disk, scale by radius
             pts = sample_disk(key_sample, (n_samples,))
             xy = pts * radius
@@ -134,8 +134,8 @@ class MCIntegrator(Integrator):
         # Split key for each mirror
         keys = jax.random.split(key, n_mirrors)
 
-        def sample_single_mirror(keys, vertices, offset):
-            key_sample, key_perturb = jax.random.split(key)
+        def sample_single_mirror(mkey, vertices, offset):
+            key_sample, key_perturb = jax.random.split(mkey)
             # Generate uniform random samples within polygon
             xy = sample_polygon(key_sample, vertices, (n_samples,))
 
