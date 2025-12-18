@@ -11,7 +11,7 @@ from .intersections import (
 from .surfaces import AsphericSurface
 from .apertures import Aperture, DiskAperture, PolygonAperture
 from .integrators import Integrator, MCIntegrator
-from .reflection import reflect, perturb_normals
+from .reflection import reflect, perturb_normals, compute_perturbation_delta
 from .transforms import euler_to_matrix, look_at_rotation
 from .render import render, render_debug
 from .obstructions import (
@@ -32,34 +32,54 @@ from .obstructions import (
 
 __all__ = [
     # Intersections
-    'intersect_plane',
-    'intersect_cylinder',
-    'intersect_box',
-    'intersect_sphere',
-    'intersect_oriented_box',
-    'intersect_triangle',
-    # Normals
-    'perturb_normals',
+    "intersect_plane",
+    "intersect_cylinder",
+    "intersect_box",
+    "intersect_sphere",
+    "intersect_oriented_box",
+    "intersect_triangle",
+    "intersect_conic",
+    "newton_raphson_intersect",
+
+    # Surfaces
+    "AsphericSurface",
+
+    # Apertures
+    "Aperture",
+    "DiskAperture",
+    "PolygonAperture",
+
+    # Integrators
+    "Integrator",
+    "MCIntegrator",
+
+    # Normals / perturbations
+    "perturb_normals",
+    "compute_perturbation_delta",
+
     # Reflection
-    'reflect',
+    "reflect",
+
     # Transforms
-    'euler_to_matrix',
-    'look_at_rotation',
+    "euler_to_matrix",
+    "look_at_rotation",
+
     # Rendering
-    'render',
-    'render_debug',
+    "render",
+    "render_debug",
+
     # Obstructions
-    'Obstruction',
-    'ObstructionGroup',
-    'Cylinder',
-    'CylinderGroup',
-    'Box',
-    'BoxGroup',
-    'Sphere',
-    'SphereGroup',
-    'OrientedBox',
-    'OrientedBoxGroup',
-    'Triangle',
-    'TriangleGroup',
-    'group_obstructions',
+    "Obstruction",
+    "ObstructionGroup",
+    "Cylinder",
+    "CylinderGroup",
+    "Box",
+    "BoxGroup",
+    "Sphere",
+    "SphereGroup",
+    "OrientedBox",
+    "OrientedBoxGroup",
+    "Triangle",
+    "TriangleGroup",
+    "group_obstructions",
 ]

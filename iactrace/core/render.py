@@ -35,7 +35,7 @@ def _check_occlusions(ray_origins, ray_directions, obstruction_groups):
     return shadow_mask
 
 
-def _reflect_at_stage(origins, directions, values, stage_groups, obstruction_groups):
+def _reflect_at_stage(origins, directions, values, stage_groups, obstruction_groups, include_shadowing):
     """
     Reflect 2D batch of rays off stage mirrors.
     
@@ -67,7 +67,7 @@ def _reflect_at_stage(origins, directions, values, stage_groups, obstruction_gro
     reflected, cos_angle = jax.vmap(jax.vmap(reflect))(directions, best_normals)
     
     hit_mask = best_t < 1e10
-    shadow = _check_occlusions(origins, directions, obstruction_groups)
+    shadow = _check_occlusions(origins, directions, obstruction_groups) if include_shadowing else 1.0
     new_values = values * hit_mask * shadow * jnp.abs(cos_angle[..., 0])
     
     return best_points, reflected, new_values
@@ -109,8 +109,8 @@ def _intersect_group(ray_origins, ray_directions, group):
     return best_t, best_pts, best_norms
 
 
-@partial(jax.jit, static_argnames=['source_type', 'sensor_idx', 'return_debug'])
-def _render_core(tel, sources, values, source_type, sensor_idx=0, return_debug=False):
+@partial(jax.jit, static_argnames=['source_type', 'sensor_idx', 'return_debug', 'include_shadowing'])
+def _render_core(tel, sources, values, source_type, sensor_idx=0, return_debug=False, include_shadowing=True):
     """Core rendering logic shared by render() and render_debug().
 
     Args:
@@ -161,7 +161,7 @@ def _render_core(tel, sources, values, source_type, sensor_idx=0, return_debug=F
         origins = jnp.broadcast_to(tp_single[None, :, :], dirs.shape)
         normals = jnp.broadcast_to(tn_single[None, :, :], dirs.shape)
 
-        shadow = _check_occlusions(origins, -dirs, tel.obstruction_groups)
+        shadow = _check_occlusions(origins, -dirs, tel.obstruction_groups) if include_shadowing else 1.0
 
         reflected, cos_angle = jax.vmap(jax.vmap(reflect))(dirs, normals)
         ray_vals = values[:, None] * cos_angle[..., 0] / tw_single[None, :, 0] * shadow
@@ -169,7 +169,7 @@ def _render_core(tel, sources, values, source_type, sensor_idx=0, return_debug=F
         for stage_idx in stage_indices[1:]:
             origins, reflected, ray_vals = _reflect_at_stage(
                 origins, reflected, ray_vals,
-                stages[stage_idx], tel.obstruction_groups
+                stages[stage_idx], tel.obstruction_groups, include_shadowing
             )
 
         pts = jax.vmap(
@@ -197,13 +197,13 @@ def _render_core(tel, sources, values, source_type, sensor_idx=0, return_debug=F
         return final_img
 
 
-@partial(jax.jit, static_argnames=['source_type', 'sensor_idx'])
-def render(tel, sources, values, source_type, sensor_idx=0):
+@partial(jax.jit, static_argnames=['source_type', 'sensor_idx', 'include_shadowing'])
+def render(tel, sources, values, source_type, sensor_idx=0, include_shadowing=True):
     """Render sources through telescope onto sensor."""
-    return _render_core(tel, sources, values, source_type, sensor_idx, return_debug=False)
+    return _render_core(tel, sources, values, source_type, sensor_idx, False, include_shadowing)
 
 
-@partial(jax.jit, static_argnames=['source_type', 'sensor_idx'])
-def render_debug(tel, sources, values, source_type, sensor_idx=0):
+@partial(jax.jit, static_argnames=['source_type', 'sensor_idx', 'include_shadowing'])
+def render_debug(tel, sources, values, source_type, sensor_idx=0, include_shadowing=True):
     """Render without accumulation - returns raw hits."""
-    return _render_core(tel, sources, values, source_type, sensor_idx, return_debug=True)
+    return _render_core(tel, sources, values, source_type, sensor_idx, True, include_shadowing)

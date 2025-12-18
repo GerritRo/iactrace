@@ -151,19 +151,6 @@ mirrors:
 - aperture:
     radius: 0.3
     type: circular
-  id: M_11
-  orientation:
-  - 5.357783317565918
-  - 0.0
-  - 0.0
-  position:
-  - 0.0
-  - 2.789
-  - 0.2616
-  template: spherical_30m
-- aperture:
-    radius: 0.3
-    type: circular
   id: M_12
   orientation:
   - 5.358953475952148
@@ -223,19 +210,6 @@ mirrors:
   - 0.0
   position:
   - -0.31
-  - 3.326
-  - 0.3767
-  template: spherical_30m
-- aperture:
-    radius: 0.3
-    type: circular
-  id: M_17
-  orientation:
-  - 6.405792236328125
-  - -0.5995632410049438
-  - -0.0
-  position:
-  - 0.31
   - 3.326
   - 0.3767
   template: spherical_30m
@@ -7269,11 +7243,11 @@ sensors:
   - 15.028
   type: hexagonal
 - bounds:
-  - -0.8
-  - 0.8
-  - -0.8
-  - 0.8
-  height: 1000
+  - -0.768
+  - 0.768
+  - -0.512
+  - 0.512
+  height: 1024
   id: camera_lid
   orientation:
   - 0.0
@@ -7284,7 +7258,7 @@ sensors:
   - 0.0
   - 15.0
   type: square
-  width: 1000
+  width: 1536
 telescope:
   name: CT1
   units: m

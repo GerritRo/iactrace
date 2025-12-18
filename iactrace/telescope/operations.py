@@ -24,15 +24,11 @@ def add_obstruction(telescope, obstruction):
     return eqx.tree_at(lambda t: t.obstruction_groups, telescope, new_groups)
 
 
-def apply_roughness(telescope, roughness, key):
-    """Apply surface roughness to mirror normals."""
-    from ..core import perturb_normals
-    
+def apply_roughness(telescope, roughness):
+    """Set perturbation scale for all mirrors (roughness in arcsec)."""
     sigma_rad = roughness * jnp.pi / (180.0 * 3600.0)
-    keys = jax.random.split(key, len(telescope.mirror_groups))
     new_groups = []
-    for group, k in zip(telescope.mirror_groups, keys):
-        new_normals = perturb_normals(group.normals, sigma_rad, k)
-        new_groups.append(eqx.tree_at(lambda g: g.normals, group, new_normals))
-    
+    for group in telescope.mirror_groups:
+        new_scale = jnp.full(len(group), sigma_rad)
+        new_groups.append(eqx.tree_at(lambda g: g.perturbation_scale, group, new_scale))
     return eqx.tree_at(lambda t: t.mirror_groups, telescope, new_groups)

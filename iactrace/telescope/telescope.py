@@ -40,23 +40,24 @@ class Telescope(eqx.Module):
         self.sensors = list(sensors) if sensors else []
         self.name = name
         
-    def __call__(self, sources, values, source_type='point', sensor_idx=0, debug=False):
+    def __call__(self, sources, values, source_type='point', sensor_idx=0, debug=False, include_shadowing=True):
         """
         Render sources through telescope.
-        
+
         Args:
             sources: Source positions (N, 3) or directions (N, 3)
             values: Flux values (N,)
-            source_type: 'point' or 'infinity'
+            source_type: 'point' or 'parallel'
             sensor_idx: Which sensor to use
             debug: If True, return raw hits instead of accumulated image
-        
+            include_shadows: If False, disable obstruction shadowing
+
         Returns:
             Rendered image or (pts, values) if debug=True
         """
         if debug:
-            return render_debug(self, sources, values, source_type, sensor_idx)
-        return render(self, sources, values, source_type, sensor_idx)        
+            return render_debug(self, sources, values, source_type, sensor_idx, include_shadowing)
+        return render(self, sources, values, source_type, sensor_idx, include_shadowing)        
 
     @classmethod
     def from_yaml(cls, filename, integrator, key=None):
@@ -68,6 +69,6 @@ class Telescope(eqx.Module):
         from .operations import resample
         return resample(self, integrator, key)
     
-    def apply_roughness(self, roughness_arcsec, key):
+    def apply_roughness(self, roughness_arcsec):
         from .operations import apply_roughness
-        return apply_roughness(self, roughness_arcsec, key)
+        return apply_roughness(self, roughness_arcsec)
