@@ -136,6 +136,7 @@ def _parse_obstruction(config):
 def _parse_sensor(config):
     """Parse sensor config."""
     stype = config['type']
+    edge_width = config.get('edge_width', 0.0)
     
     if stype == 'square':
         return SquareSensor(
@@ -151,6 +152,7 @@ def _parse_sensor(config):
             position=config['position'],
             rotation=config['orientation'],
             hex_centers=centers,
+            edge_width=edge_width,
         )
     else:
         raise ValueError(f"Unknown sensor type: {stype}")

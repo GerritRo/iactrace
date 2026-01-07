@@ -7242,6 +7242,7 @@ sensors:
   - 0.0
   - 15.028
   type: hexagonal
+  edge_width: 0.0004
 - bounds:
   - -0.768
   - 0.768

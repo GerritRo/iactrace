@@ -103,21 +103,25 @@ class HexagonalSensor(eqx.Module):
     lookup_table: jax.Array
 
     hex_size: float = eqx.field(static=True)
+    hex_inradius: float = eqx.field(static=True)
     grid_rotation: float = eqx.field(static=True)
     grid_offset: tuple = eqx.field(static=True)
     q_min: int = eqx.field(static=True)
     r_min: int = eqx.field(static=True)
     n_pixels: int = eqx.field(static=True)
+    edge_width: float = eqx.field(static=True)
 
-    def __init__(self, position, rotation, hex_centers):
+    def __init__(self, position, rotation, hex_centers, edge_width=0.0):
         self.position = jnp.asarray(position)
         self.rotation = jnp.asarray(rotation)
         self.hex_centers = jnp.asarray(hex_centers)
         self.n_pixels = len(hex_centers)
+        self.edge_width = float(edge_width)
 
         # Detect grid properties
         size, rot, offset = _detect_hex_grid(hex_centers)
         self.hex_size = float(size)
+        self.hex_inradius = float(size * SQRT3_2)
         self.grid_rotation = float(rot)
         self.grid_offset = (float(offset[0]), float(offset[1]))
 
@@ -155,6 +159,15 @@ class HexagonalSensor(eqx.Module):
         qi, ri = _axial_round(q, r)
 
         pixel_idx, valid = self._lookup_pixels(qi.astype(jnp.int32), ri.astype(jnp.int32))
+        
+        if self.edge_width > 0:
+            hex_center_x, hex_center_y = _axial_to_cartesian(qi, ri, self.hex_size)
+            hex_dist = _hex_norm(x_grid - hex_center_x, y_grid - hex_center_y, self.hex_inradius)
+            edge_threshold = 1.0 - self.edge_width / self.hex_inradius
+            on_edge = hex_dist > edge_threshold
+            valid = valid & ~on_edge
+        
+        
         return jax.ops.segment_sum(
             jnp.where(valid, values, 0.0), pixel_idx, num_segments=self.n_pixels
         )
@@ -179,8 +192,9 @@ class DifferentiableHexagonalSensor(eqx.Module):
     r_min: int = eqx.field(static=True)
     n_pixels: int = eqx.field(static=True)
     sigma: float = eqx.field(static=True)
+    edge_width: float = eqx.field(static=True)
 
-    def __init__(self, position, rotation, hex_centers, sigma=0.5, kernel_size=2):
+    def __init__(self, position, rotation, hex_centers, sigma=0.5, edge_width=0.0):
         """Initialize differentiable hexagonal sensor.
 
         Args:
@@ -189,12 +203,14 @@ class DifferentiableHexagonalSensor(eqx.Module):
             hex_centers: Array of hexagon center positions (N, 2)
             sigma: Gaussian width in units of hex inradius (1.0 = boundary at 1 std dev)
             kernel_size: Number of neighbor rings for splatting
+            edge_width: Dead zone width at pixel edges in physical units (default 0.0)
         """
         self.position = jnp.asarray(position)
         self.rotation = jnp.asarray(rotation)
         self.hex_centers = jnp.asarray(hex_centers)
         self.n_pixels = len(hex_centers)
         self.sigma = float(sigma)
+        self.edge_width = float(edge_width)
 
         # Detect grid properties
         size, rot, offset = _detect_hex_grid(hex_centers)
@@ -231,6 +247,14 @@ class DifferentiableHexagonalSensor(eqx.Module):
         # Position relative to base hex center
         dx = x_grid - base_x
         dy = y_grid - base_y
+        
+        # Check for edge hits if edge_width > 0 (using distance to primary pixel)
+        if self.edge_width > 0:
+            base_hex_dist = _hex_norm(dx, dy, self.hex_inradius)
+            edge_threshold = 1.0 - self.edge_width / self.hex_inradius
+            on_edge = base_hex_dist > edge_threshold
+            # Zero out values for rays hitting edges
+            values = jnp.where(on_edge, 0.0, values)
 
         # Broadcast to all neighbors: (n_points, n_neighbors)
         qi = q_base[:, None].astype(jnp.int32) + self.neighbor_offsets_q
