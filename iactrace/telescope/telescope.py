@@ -1,7 +1,6 @@
 import jax
 import jax.numpy as jnp
 import equinox as eqx
-import yaml
 
 from typing import Callable
 from .mirrors import Mirror, group_mirrors
@@ -50,7 +49,7 @@ class Telescope(eqx.Module):
             source_type: 'point' or 'parallel'
             sensor_idx: Which sensor to use
             debug: If True, return raw hits instead of accumulated image
-            include_shadows: If False, disable obstruction shadowing
+            include_shadowing: If False, disable obstruction shadowing
 
         Returns:
             Rendered image or (pts, values) if debug=True
