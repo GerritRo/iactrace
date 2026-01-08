@@ -13,7 +13,7 @@ from .apertures import Aperture, DiskAperture, PolygonAperture
 from .integrators import Integrator, MCIntegrator
 from .reflection import reflect, compute_perturbation_delta
 from .transforms import euler_to_matrix, look_at_rotation
-from .render import render, render_debug
+from .render import render, render_debug, render_response_matrix
 from .obstructions import (
     Obstruction,
     ObstructionGroup,
@@ -66,6 +66,7 @@ __all__ = [
     # Rendering
     "render",
     "render_debug",
+    "render_response_matrix",
 
     # Obstructions
     "Obstruction",
