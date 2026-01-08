@@ -41,7 +41,7 @@ def _hex_norm(x, y, inradius):
 
     The "infinity norm" for hexagonal geometry.
     """
-    return jnp.maximum(jnp.abs(y), SQRT3_2 * jnp.abs(x) + 0.5 * jnp.abs(y)) / inradius
+    return jnp.maximum(jnp.abs(x), 0.5 * jnp.abs(x) + SQRT3_2 * jnp.abs(y)) / inradius
 
 
 def _hex_neighbor_offsets(rings):
