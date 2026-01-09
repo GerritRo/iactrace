@@ -1,0 +1,109 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "iactrace"
+dynamic = ["version"]
+description = "JAX-based optical ray tracing for Imaging Atmospheric Cherenkov Telescopes"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "Gerrit Roellinghoff", email = "gerrit.roellinghoff@fau.de"}
+]
+maintainers = [
+    {name = "Gerrit Roellinghoff", email = "gerrit.roellinghoff@fau.de"}
+]
+keywords = [
+    "ray-tracing",
+    "optics",
+    "cherenkov",
+    "telescope",
+    "jax",
+    "differentiable",
+    "iact",
+    "astronomy",
+    "astrophysics"
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Physics",
+    "Topic :: Scientific/Engineering :: Astronomy",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Operating System :: OS Independent",
+    "Typing :: Typed",
+]
+requires-python = ">=3.11"
+dependencies = [
+    "jax>=0.4.20",
+    "jaxlib>=0.4.20",
+    "numpy>=1.22.0",
+    "matplotlib>=3.5.0",
+    "pandas>=1.4.0",
+    "trimesh>=3.15.0",
+    "equinox>=0.11.0",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "jupyter>=1.0",
+    "mypy>=1.0",
+    "types-PyYAML>=6.0",
+    "ruff>=0.1.0",
+]
+gpu = [
+    "jax[cuda12]",
+]
+docs = [
+    "sphinx>=6.0",
+    "sphinx-rtd-theme>=1.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/GerritRo/iactrace"
+Documentation = "https://github.com/GerritRo/iactrace#readme"
+Repository = "https://github.com/GerritRo/iactrace.git"
+Issues = "https://github.com/GerritRo/iactrace/issues"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["iactrace*"]
+exclude = ["tests*", "examples*", "configs*"]
+
+[tool.setuptools.package-data]
+iactrace = ["py.typed"]
+
+[tool.setuptools.dynamic]
+version = {attr = "iactrace.__version__"}
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = false  # Disabled due to equinox tree operations returning Any
+warn_unused_configs = true
+disallow_untyped_defs = false
+check_untyped_defs = true
+ignore_missing_imports = true
+packages = ["iactrace"]
+follow_imports = "silent"  # Use type info from imports but don't check them
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-v --tb=short"
