@@ -25,11 +25,15 @@ def _check_occlusions(ray_origins, ray_directions, obstruction_groups):
     Args:
         ray_origins: Ray origins (n_sources, n_samples, 3)
         ray_directions: Ray directions (n_sources, n_samples, 3)
-        obstruction_groups: List of ObstructionGroup objects
+        obstruction_groups: List of ObstructionGroup objects (can be empty or None)
 
     Returns:
         Shadow mask (n_sources, n_samples) - 1.0 if not occluded, 0.0 if occluded
     """
+    # Handle empty or None obstruction_groups
+    if not obstruction_groups:
+        return jnp.ones(ray_origins.shape[:-1])
+    
     shadow_mask = jnp.ones(ray_origins.shape[:-1])
     for group in obstruction_groups:
         t = jax.vmap(jax.vmap(group.intersect))(ray_origins, ray_directions)
@@ -37,7 +41,7 @@ def _check_occlusions(ray_origins, ray_directions, obstruction_groups):
     return shadow_mask
 
 
-def _reflect_at_stage(origins, directions, values, stage_groups, obstruction_groups, include_shadowing):
+def _reflect_at_stage(origins, directions, values, stage_groups, obstruction_groups):
     """
     Reflect 2D batch of rays off stage mirrors.
 
@@ -69,7 +73,7 @@ def _reflect_at_stage(origins, directions, values, stage_groups, obstruction_gro
     reflected, cos_angle = jax.vmap(jax.vmap(reflect))(directions, best_normals)
 
     hit_mask = best_t < 1e10
-    shadow = _check_occlusions(origins, directions, obstruction_groups) if include_shadowing else 1.0
+    shadow = _check_occlusions(origins, directions, obstruction_groups)
     new_values = values * hit_mask * shadow * jnp.abs(cos_angle[..., 0])
 
     return best_points, reflected, new_values
@@ -113,7 +117,7 @@ def _intersect_group(ray_origins, ray_directions, group):
 
 def _trace_single_mirror(mirror_idx, tp_all, tn_all, tw_all, sources, values,
                          source_type, n_sources, n_samples, stage_indices, stages,
-                         obstruction_groups, include_shadowing, sensor_pos, sensor_rot):
+                         obstruction_groups, sensor_pos, sensor_rot):
     """Trace rays through one primary mirror. Returns (pts, ray_vals).
 
     This is the common ray tracing logic extracted for reuse.
@@ -131,7 +135,7 @@ def _trace_single_mirror(mirror_idx, tp_all, tn_all, tw_all, sources, values,
     origins = jnp.broadcast_to(tp_single[None, :, :], dirs.shape)
     normals = jnp.broadcast_to(tn_single[None, :, :], dirs.shape)
 
-    shadow = _check_occlusions(origins, -dirs, obstruction_groups) if include_shadowing else 1.0
+    shadow = _check_occlusions(origins, -dirs, obstruction_groups)
 
     reflected, cos_angle = jax.vmap(jax.vmap(reflect))(dirs, normals)
     ray_vals = values[:, None] * cos_angle[..., 0] / tw_single[None, :, 0] * shadow
@@ -141,7 +145,7 @@ def _trace_single_mirror(mirror_idx, tp_all, tn_all, tw_all, sources, values,
     for stage_idx in stage_indices[1:]:
         origins_cur, reflected_cur, ray_vals_cur = _reflect_at_stage(
             origins_cur, reflected_cur, ray_vals_cur,
-            stages[stage_idx], obstruction_groups, include_shadowing
+            stages[stage_idx], obstruction_groups
         )
 
     # Intersect with sensor plane
@@ -167,8 +171,8 @@ def _accumulate_per_source(pts, ray_vals, sensor):
     )(pts, ray_vals)
 
 
-@partial(jax.jit, static_argnames=['source_type', 'sensor_idx', 'include_shadowing'])
-def render(tel, sources, values, source_type, sensor_idx=0, include_shadowing=True):
+@partial(jax.jit, static_argnames=['source_type', 'sensor_idx'])
+def render(tel, sources, values, source_type, sensor_idx=0):
     """Render sources through telescope onto sensor.
 
     Args:
@@ -177,7 +181,6 @@ def render(tel, sources, values, source_type, sensor_idx=0, include_shadowing=Tr
         values: Source intensities (n_sources,)
         source_type: 'point' or 'parallel'
         sensor_idx: Index of sensor to use
-        include_shadowing: Whether to include shadow/occlusion calculations
 
     Returns:
         Accumulated image with sensor shape.
@@ -208,7 +211,7 @@ def render(tel, sources, values, source_type, sensor_idx=0, include_shadowing=Tr
         pts, ray_vals = _trace_single_mirror(
             mirror_idx, tp_all, tn_all, tw_all, sources, values,
             source_type, n_sources, n_samples, stage_indices, stages,
-            tel.obstruction_groups, include_shadowing, sensor_pos, sensor_rot
+            tel.obstruction_groups, sensor_pos, sensor_rot
         )
         return acc + _accumulate_image(pts, ray_vals, sensor), None
 
@@ -217,8 +220,8 @@ def render(tel, sources, values, source_type, sensor_idx=0, include_shadowing=Tr
     return result
 
 
-@partial(jax.jit, static_argnames=['source_type', 'sensor_idx', 'include_shadowing'])
-def render_debug(tel, sources, values, source_type, sensor_idx=0, include_shadowing=True):
+@partial(jax.jit, static_argnames=['source_type', 'sensor_idx'])
+def render_debug(tel, sources, values, source_type, sensor_idx=0):
     """Render without accumulation - returns raw hits.
 
     Args:
@@ -227,7 +230,6 @@ def render_debug(tel, sources, values, source_type, sensor_idx=0, include_shadow
         values: Source intensities (n_sources,)
         source_type: 'point' or 'parallel'
         sensor_idx: Index of sensor to use
-        include_shadowing: Whether to include shadow/occlusion calculations
 
     Returns:
         Tuple of (points, values) arrays with all ray intersections.
@@ -258,7 +260,7 @@ def render_debug(tel, sources, values, source_type, sensor_idx=0, include_shadow
         pts, ray_vals = _trace_single_mirror(
             mirror_idx, tp_all, tn_all, tw_all, sources, values,
             source_type, n_sources, n_samples, stage_indices, stages,
-            tel.obstruction_groups, include_shadowing, sensor_pos, sensor_rot
+            tel.obstruction_groups, sensor_pos, sensor_rot
         )
         return carry, (pts.reshape(-1, 2), ray_vals.reshape(-1))
 
@@ -266,8 +268,8 @@ def render_debug(tel, sources, values, source_type, sensor_idx=0, include_shadow
     return per_mirror[0].reshape(-1, 2), per_mirror[1].reshape(-1)
 
 
-@partial(jax.jit, static_argnames=['source_type', 'sensor_idx', 'include_shadowing'])
-def render_response_matrix(tel, sources, values, source_type, sensor_idx=0, include_shadowing=True):
+@partial(jax.jit, static_argnames=['source_type', 'sensor_idx'])
+def render_response_matrix(tel, sources, values, source_type, sensor_idx=0):
     """Render multiple sources and return the source-to-pixel response matrix.
 
     This function traces N sources through the telescope and returns an N×M matrix
@@ -280,7 +282,6 @@ def render_response_matrix(tel, sources, values, source_type, sensor_idx=0, incl
         values: Source intensities (n_sources,)
         source_type: 'point' or 'parallel'
         sensor_idx: Index of sensor to use
-        include_shadowing: Whether to include shadow/occlusion calculations
 
     Returns:
         Array of shape (n_sources, n_pixels) where n_pixels is the flattened sensor size.
@@ -314,7 +315,7 @@ def render_response_matrix(tel, sources, values, source_type, sensor_idx=0, incl
         pts, ray_vals = _trace_single_mirror(
             mirror_idx, tp_all, tn_all, tw_all, sources, values,
             source_type, n_sources, n_samples, stage_indices, stages,
-            tel.obstruction_groups, include_shadowing, sensor_pos, sensor_rot
+            tel.obstruction_groups, sensor_pos, sensor_rot
         )
         return acc + _accumulate_per_source(pts, ray_vals, sensor), None
 

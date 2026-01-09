@@ -7235,7 +7235,7 @@ sensors:
   id: science_camera
   orientation:
   - 0.0
-  - 180.0
+  - 0.0
   - 0.0
   position:
   - 0.0
@@ -7252,7 +7252,7 @@ sensors:
   id: camera_lid
   orientation:
   - 0.0
-  - 180.0
+  - 0.0
   - 0.0
   position:
   - 0.0

@@ -1,14 +1,6 @@
-import jax
-import jax.numpy as jnp
 import equinox as eqx
 
-from typing import Callable
-from .mirrors import Mirror, group_mirrors
-from ..core import DiskAperture, PolygonAperture
-from ..core import AsphericSurface
-from ..core import Cylinder, Box, group_obstructions
 from ..core import render, render_debug
-from ..sensors import SquareSensor, HexagonalSensor
 
 
 class Telescope(eqx.Module):
@@ -39,7 +31,7 @@ class Telescope(eqx.Module):
         self.sensors = list(sensors) if sensors else []
         self.name = name
         
-    def __call__(self, sources, values, source_type='point', sensor_idx=0, debug=False, include_shadowing=True):
+    def __call__(self, sources, values, source_type='point', sensor_idx=0, debug=False):
         """
         Render sources through telescope.
 
@@ -49,14 +41,17 @@ class Telescope(eqx.Module):
             source_type: 'point' or 'parallel'
             sensor_idx: Which sensor to use
             debug: If True, return raw hits instead of accumulated image
-            include_shadowing: If False, disable obstruction shadowing
 
         Returns:
             Rendered image or (pts, values) if debug=True
+
+        Note:
+            Shadowing is automatically applied if obstruction_groups is non-empty.
+            Use telescope.clear_obstructions() to render without shadowing.
         """
         if debug:
-            return render_debug(self, sources, values, source_type, sensor_idx, include_shadowing)
-        return render(self, sources, values, source_type, sensor_idx, include_shadowing)        
+            return render_debug(self, sources, values, source_type, sensor_idx)
+        return render(self, sources, values, source_type, sensor_idx)
 
     @classmethod
     def from_yaml(cls, filename, integrator, key=None):
@@ -64,10 +59,119 @@ class Telescope(eqx.Module):
         from ..io.yaml_loader import load_telescope
         return load_telescope(filename, integrator, key)
     
-    def resample(self, integrator, key):
-        from .operations import resample
-        return resample(self, integrator, key)
+    # Convenience methods
+    
+    def resample_mirrors(self, integrator, key):
+        """Resample all mirrors with specified integrator."""
+        from .operations import resample_mirrors
+        return resample_mirrors(self, integrator, key)
+    
+    def remove_mirror_group(self, group_idx):
+        """Remove a mirror group by index."""
+        from .operations import remove_mirror_group
+        return remove_mirror_group(self, group_idx)
+
+    def set_mirror_positions(self, group_idx, positions):
+        """Set positions for all mirrors in a group."""
+        from .operations import set_mirror_positions
+        return set_mirror_positions(self, group_idx, positions)
+
+    def set_mirror_rotations(self, group_idx, rotations):
+        """Set rotations for all mirrors in a group."""
+        from .operations import set_mirror_rotations
+        return set_mirror_rotations(self, group_idx, rotations)
+
+    def scale_mirror_weights(self, group_idx, scale_factors):
+        """Scale reflectivity weights for mirrors in a group."""
+        from .operations import scale_mirror_weights
+        return scale_mirror_weights(self, group_idx, scale_factors)
     
     def apply_roughness(self, roughness_arcsec):
+        """Apply mirror roughness in arcsec to all mirrors."""
         from .operations import apply_roughness
         return apply_roughness(self, roughness_arcsec)
+
+    def apply_roughness_to_group(self, group_idx, roughness):
+        """Apply roughness to a specific mirror group."""
+        from .operations import apply_roughness_to_group
+        return apply_roughness_to_group(self, group_idx, roughness)
+
+    def get_mirrors_by_stage(self, stage):
+        """Get indices of mirror groups at a specific optical stage."""
+        from .operations import get_mirrors_by_stage
+        return get_mirrors_by_stage(self, stage)
+
+    def get_mirror_count(self):
+        """Get total number of mirrors across all groups."""
+        from .operations import get_mirror_count
+        return get_mirror_count(self)
+    
+    def add_sensor(self, sensor):
+        """Add a new sensor to the telescope."""
+        from .operations import add_sensor
+        return add_sensor(self, sensor)
+    
+    def replace_sensor(self, sensor, idx=0):
+        """Remove a sensor by index."""
+        from .operations import replace_sensor
+        return replace_sensor(self, sensor, idx)
+
+    def remove_sensor(self, idx=0):
+        """Remove a sensor by index."""
+        from .operations import remove_sensor
+        return remove_sensor(self, idx)
+
+    def set_sensor(self, sensor, idx=0):
+        """Replace a sensor at given index."""
+        from .operations import set_sensor
+        return set_sensor(self, sensor, idx)
+
+    def set_sensor_position(self, idx, position):
+        """Set position of a sensor."""
+        from .operations import set_sensor_position
+        return set_sensor_position(self, idx, position)
+
+    def set_sensor_rotation(self, idx, rotation):
+        """Set rotation of a sensor."""
+        from .operations import set_sensor_rotation
+        return set_sensor_rotation(self, idx, rotation)
+
+    def focus(self, delta_z, sensor_idx=0):
+        """Adjust sensor position along optical axis for focus."""
+        from .operations import focus
+        return focus(self, delta_z, sensor_idx)
+    
+    def get_sensor_count(self):
+        """Get number of sensors."""
+        from .operations import get_sensor_count
+        return get_sensor_count(self)
+
+    def add_obstruction(self, obstruction):
+        """Add an obstruction group to the telescope."""
+        from .operations import add_obstruction
+        return add_obstruction(self, obstruction)
+
+    def remove_obstruction(self, group_idx):
+        """Remove an obstruction group by index."""
+        from .operations import remove_obstruction
+        return remove_obstruction(self, group_idx)
+
+    def clear_obstructions(self):
+        """Remove all obstructions from telescope."""
+        from .operations import clear_obstructions
+        return clear_obstructions(self)
+    
+    def get_obstruction_count(self):
+        """Get number of obstructions."""
+        from .operations import get_obstruction_count
+        return get_obstruction_count(self)
+    
+    def clone(self):
+        """Create a deep copy of the telescope."""
+        from .operations import clone
+        return clone(self)
+    
+    def get_info(self):
+        """Get summary information about telescope configuration."""
+        from .operations import get_info
+        return get_info(self)
