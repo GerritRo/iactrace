@@ -11,9 +11,9 @@ from .intersections import (
 from .surfaces import AsphericSurface
 from .apertures import Aperture, DiskAperture, PolygonAperture
 from .integrators import Integrator, MCIntegrator
-from .reflection import reflect, perturb_normals, compute_perturbation_delta
+from .reflection import reflect, compute_perturbation_delta
 from .transforms import euler_to_matrix, look_at_rotation
-from .render import render, render_debug
+from .render import render, render_debug, render_response_matrix
 from .obstructions import (
     Obstruction,
     ObstructionGroup,
@@ -54,7 +54,6 @@ __all__ = [
     "MCIntegrator",
 
     # Normals / perturbations
-    "perturb_normals",
     "compute_perturbation_delta",
 
     # Reflection
@@ -67,6 +66,7 @@ __all__ = [
     # Rendering
     "render",
     "render_debug",
+    "render_response_matrix",
 
     # Obstructions
     "Obstruction",

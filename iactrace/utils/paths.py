@@ -53,4 +53,4 @@ def match_parts(path_parts, pattern_parts):
         return match_parts(path_parts[1:], pattern_parts[1:])
     else:
         # Exact match
-        return path_parts[0] == p and _match_parts(path_parts[1:], pattern_parts[1:])
+        return path_parts[0] == p and match_parts(path_parts[1:], pattern_parts[1:])

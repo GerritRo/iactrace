@@ -147,6 +147,7 @@ class MCIntegrator(Integrator):
 
             # Compute weights: cos(angle to z-axis) / area * n_samples
             cos_z = jnp.sum(normals * jnp.array([0., 0., 1.]), axis=-1, keepdims=True)
+            
             # Polygon area using shoelace formula
             x = vertices[:, 0]
             y = vertices[:, 1]

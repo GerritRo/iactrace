@@ -60,12 +60,11 @@ class SquareSensor(eqx.Module):
 
         valid = (xi >= 0) & (xi < self.width) & (yi >= 0) & (yi < self.height)
         
-        if self.edge_width > 0:
-            x_frac = x_cont - xi
-            y_frac = y_cont - yi
-            dist_to_edge = _square_edge_distance(x_frac, y_frac, self.dx, self.dy)
-            on_edge = dist_to_edge < self.edge_width
-            valid = valid & ~on_edge
+        x_frac = x_cont - xi
+        y_frac = y_cont - yi
+        dist_to_edge = _square_edge_distance(x_frac, y_frac, self.dx, self.dy)
+        on_edge = dist_to_edge < self.edge_width
+        valid = valid & ~on_edge
         
         xi = jnp.clip(xi, 0, self.width - 1)
         yi = jnp.clip(yi, 0, self.height - 1)
@@ -95,10 +94,9 @@ class DifferentiableSquareSensor(eqx.Module):
     dy: float = eqx.field(static=True)
     sigma: float = eqx.field(static=True)
     kernel_size: int = eqx.field(static=True)
-    edge_width: float = eqx.field(static=True)
     
     def __init__(self, position, rotation, width, height,
-                 bounds=(-1, 1, -1, 1), sigma=0.1, kernel_size=2, edge_width=0.0):
+                 bounds=(-1, 1, -1, 1), sigma=0.1, kernel_size=2):
         """Simplified constructor for differentiable mode only."""
         self.position = jnp.asarray(position)
         self.rotation = jnp.asarray(rotation)
@@ -106,7 +104,6 @@ class DifferentiableSquareSensor(eqx.Module):
         self.height = int(height)
         self.sigma = float(sigma)
         self.kernel_size = int(kernel_size)
-        self.edge_width = float(edge_width)
         
         xmin, xmax, ymin, ymax = bounds
         self.x0 = float(xmin)
@@ -133,12 +130,6 @@ class DifferentiableSquareSensor(eqx.Module):
         
         x_frac = x_pix - xi_base
         y_frac = y_pix - yi_base
-        
-        if self.edge_width > 0:
-            dist_to_edge = _square_edge_distance(x_frac, y_frac, self.dx, self.dy)
-            on_edge = dist_to_edge < self.edge_width
-            # Zero out values for rays hitting edges
-            values = jnp.where(on_edge, 0.0, values)
         
         xi = xi_base[:, None] + self.offset_x[None, :]
         yi = yi_base[:, None] + self.offset_y[None, :]

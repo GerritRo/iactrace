@@ -145,6 +145,7 @@ def _parse_sensor(config):
             width=config['width'],
             height=config['height'],
             bounds=tuple(config['bounds']),
+            edge_width=edge_width,
         )
     elif stype == 'hexagonal':
         centers = jnp.array([config['centers_x'], config['centers_y']]).T
