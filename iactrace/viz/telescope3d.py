@@ -158,7 +158,7 @@ def _get_sensor_mesh(sensor):
 def _convex_hull_2d(points):
     """Compute convex hull of 2D points."""
     try:
-        from scipy.spatial import ConvexHull
+        from scipy.spatial import ConvexHull # type: ignore[import-untyped]
         hull = ConvexHull(points)
         return points[hull.vertices]
     except (ImportError, Exception):
@@ -259,7 +259,7 @@ def _create_polygon_mesh(position, rotation_euler, vertices_2d, surface, offset=
         
         # Delaunay triangulation
         try:
-            from scipy.spatial import Delaunay
+            from scipy.spatial import Delaunay # type: ignore[import-untyped]
             tri = Delaunay(all_points_2d)
             
             # Filter triangles to those inside polygon

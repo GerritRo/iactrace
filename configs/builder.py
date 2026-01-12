@@ -1,4 +1,4 @@
-import yaml
+import yaml # type: ignore[import-untyped]
 import pathlib
 import numpy as np
 

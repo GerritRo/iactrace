@@ -1,32 +1,35 @@
-"""Hexagonal sensor implementations with hard and differentiable accumulation."""
+from __future__ import annotations
 
+from typing import Sequence
+
+import equinox as eqx
 import jax
 import jax.numpy as jnp
-import equinox as eqx
+from jax import Array
 
 # Constants for hexagonal geometry
-SQRT3 = 1.7320508075688772
-SQRT3_2 = 0.8660254037844386  # sqrt(3)/2
-SQRT3_3 = 0.5773502691896257  # sqrt(3)/3 = 1/sqrt(3)
+SQRT3: float = 1.7320508075688772
+SQRT3_2: float = 0.8660254037844386  # sqrt(3)/2
+SQRT3_3: float = 0.5773502691896257  # sqrt(3)/3 = 1/sqrt(3)
 
 
-def _rotate(x, y, angle):
+def _rotate(x: Array, y: Array, angle: float | Array) -> tuple[Array, Array]:
     """Rotate 2D coordinates by angle."""
     c, s = jnp.cos(angle), jnp.sin(angle)
     return c * x - s * y, s * x + c * y
 
 
-def _cartesian_to_axial(x, y, size):
+def _cartesian_to_axial(x: Array, y: Array, size: float) -> tuple[Array, Array]:
     """Cartesian to axial hex coordinates (pointy-top)."""
     return (SQRT3_3 * x - y / 3) / size, (2 * y / 3) / size
 
 
-def _axial_to_cartesian(q, r, size):
+def _axial_to_cartesian(q: Array, r: Array, size: float) -> tuple[Array, Array]:
     """Axial to Cartesian hex coordinates (pointy-top)."""
     return size * SQRT3 * (q + r / 2), size * 1.5 * r
 
 
-def _axial_round(q, r):
+def _axial_round(q: Array, r: Array) -> tuple[Array, Array]:
     """Round fractional axial coordinates to nearest hex center."""
     s = -q - r
     qi, ri, si = jnp.round(q), jnp.round(r), jnp.round(s)
@@ -36,7 +39,7 @@ def _axial_round(q, r):
     return qi, ri
 
 
-def _hex_norm(x, y, inradius):
+def _hex_norm(x: Array, y: Array, inradius: float) -> Array:
     """Hexagonal norm: 0 at center, 1 at boundary (pointy-top).
 
     The "infinity norm" for hexagonal geometry.
@@ -44,22 +47,25 @@ def _hex_norm(x, y, inradius):
     return jnp.maximum(jnp.abs(x), 0.5 * jnp.abs(x) + SQRT3_2 * jnp.abs(y)) / inradius
 
 
-def _hex_neighbor_offsets(rings):
+def _hex_neighbor_offsets(rings: int) -> tuple[Array, Array]:
     """Generate axial offsets for all hexagons within `rings` distance."""
-    offsets = [(q, r) for q in range(-rings, rings + 1)
-                      for r in range(-rings, rings + 1)
-                      if max(abs(q), abs(r), abs(-q - r)) <= rings]
+    offsets = [
+        (q, r)
+        for q in range(-rings, rings + 1)
+        for r in range(-rings, rings + 1)
+        if max(abs(q), abs(r), abs(-q - r)) <= rings
+    ]
     return jnp.array([o[0] for o in offsets]), jnp.array([o[1] for o in offsets])
 
 
-def _detect_hex_grid(centers):
+def _detect_hex_grid(centers: Array) -> tuple[Array, Array, Array]:
     """Detect hex size, rotation, and offset from center positions."""
     centers = jnp.asarray(centers)
     n = len(centers)
 
     # Find nearest neighbor distance
     diff = centers[:, None] - centers[None, :]
-    dist_sq = jnp.sum(diff ** 2, axis=2)
+    dist_sq = jnp.sum(diff**2, axis=2)
     dist_sq = jnp.where(jnp.eye(n, dtype=bool), jnp.inf, dist_sq)
     min_dist = jnp.sqrt(jnp.min(dist_sq))
 
@@ -69,12 +75,14 @@ def _detect_hex_grid(centers):
     angle = jnp.mod(jnp.arctan2(vec[1], vec[0]), jnp.pi / 3)
 
     # Find offset (hex center closest to origin)
-    offset = centers[jnp.argmin(jnp.sum(centers ** 2, axis=1))]
+    offset = centers[jnp.argmin(jnp.sum(centers**2, axis=1))]
 
     return min_dist / SQRT3, angle, offset
 
 
-def _build_lookup_table(centers, hex_size, rotation, offset):
+def _build_lookup_table(
+    centers: Array, hex_size: float, rotation: float, offset: Array
+) -> tuple[Array, int, int]:
     """Build axial coordinate lookup table from hex centers."""
     x = centers[:, 0] - offset[0]
     y = centers[:, 1] - offset[1]
@@ -93,25 +101,30 @@ def _build_lookup_table(centers, hex_size, rotation, offset):
     return table, q_min, r_min
 
 
-
 class HexagonalSensor(eqx.Module):
     """Hexagonal pixel sensor with hard (non-differentiable) accumulation."""
 
-    position: jax.Array
-    rotation: jax.Array
-    hex_centers: jax.Array
-    lookup_table: jax.Array
+    position: Array
+    rotation: Array
+    hex_centers: Array
+    lookup_table: Array
 
     hex_size: float = eqx.field(static=True)
     hex_inradius: float = eqx.field(static=True)
     grid_rotation: float = eqx.field(static=True)
-    grid_offset: tuple = eqx.field(static=True)
+    grid_offset: tuple[float, float] = eqx.field(static=True)
     q_min: int = eqx.field(static=True)
     r_min: int = eqx.field(static=True)
     n_pixels: int = eqx.field(static=True)
     edge_width: float = eqx.field(static=True)
 
-    def __init__(self, position, rotation, hex_centers, edge_width=0.0):
+    def __init__(
+        self,
+        position: Sequence[float] | Array,
+        rotation: Sequence[float] | Array,
+        hex_centers: Sequence[Sequence[float]] | Array,
+        edge_width: float = 0.0,
+    ) -> None:
         self.position = jnp.asarray(position)
         self.rotation = jnp.asarray(rotation)
         self.hex_centers = jnp.asarray(hex_centers)
@@ -119,7 +132,7 @@ class HexagonalSensor(eqx.Module):
         self.edge_width = float(edge_width)
 
         # Detect grid properties
-        size, rot, offset = _detect_hex_grid(hex_centers)
+        size, rot, offset = _detect_hex_grid(self.hex_centers)
         self.hex_size = float(size)
         self.hex_inradius = float(size * SQRT3_2)
         self.grid_rotation = float(rot)
@@ -127,23 +140,29 @@ class HexagonalSensor(eqx.Module):
 
         # Build lookup table
         self.lookup_table, self.q_min, self.r_min = _build_lookup_table(
-            hex_centers, self.hex_size, self.grid_rotation, offset
+            self.hex_centers, self.hex_size, self.grid_rotation, offset
         )
 
-    def get_accumulator_shape(self):
+    def get_accumulator_shape(self) -> tuple[int]:
         return (self.n_pixels,)
 
-    def _to_grid_coords(self, x, y):
+    def _to_grid_coords(self, x: Array, y: Array) -> tuple[Array, Array]:
         """Transform world coordinates to grid-aligned coordinates."""
-        return _rotate(x - self.grid_offset[0], y - self.grid_offset[1], -self.grid_rotation)
+        return _rotate(
+            x - self.grid_offset[0], y - self.grid_offset[1], -self.grid_rotation
+        )
 
-    def _lookup_pixels(self, qi, ri):
+    def _lookup_pixels(self, qi: Array, ri: Array) -> tuple[Array, Array]:
         """Look up pixel indices from axial coordinates, handling bounds."""
         q_idx = qi - self.q_min
         r_idx = ri - self.r_min
 
-        in_bounds = ((q_idx >= 0) & (q_idx < self.lookup_table.shape[0]) &
-                     (r_idx >= 0) & (r_idx < self.lookup_table.shape[1]))
+        in_bounds = (
+            (q_idx >= 0)
+            & (q_idx < self.lookup_table.shape[0])
+            & (r_idx >= 0)
+            & (r_idx < self.lookup_table.shape[1])
+        )
 
         q_safe = jnp.clip(q_idx, 0, self.lookup_table.shape[0] - 1)
         r_safe = jnp.clip(r_idx, 0, self.lookup_table.shape[1] - 1)
@@ -152,20 +171,24 @@ class HexagonalSensor(eqx.Module):
         valid = in_bounds & (pixel_idx >= 0)
         return jnp.where(valid, pixel_idx, 0), valid
 
-    def accumulate(self, x, y, values):
+    def accumulate(self, x: Array, y: Array, values: Array) -> Array:
         """Accumulate values into hexagonal pixels (hard assignment)."""
         x_grid, y_grid = self._to_grid_coords(x, y)
         q, r = _cartesian_to_axial(x_grid, y_grid, self.hex_size)
         qi, ri = _axial_round(q, r)
 
-        pixel_idx, valid = self._lookup_pixels(qi.astype(jnp.int32), ri.astype(jnp.int32))
-        
+        pixel_idx, valid = self._lookup_pixels(
+            qi.astype(jnp.int32), ri.astype(jnp.int32)
+        )
+
         hex_center_x, hex_center_y = _axial_to_cartesian(qi, ri, self.hex_size)
-        hex_dist = _hex_norm(x_grid - hex_center_x, y_grid - hex_center_y, self.hex_inradius)
+        hex_dist = _hex_norm(
+            x_grid - hex_center_x, y_grid - hex_center_y, self.hex_inradius
+        )
         edge_threshold = 1.0 - self.edge_width / self.hex_inradius
         on_edge = hex_dist > edge_threshold
         valid = valid & ~on_edge
-        
+
         return jax.ops.segment_sum(
             jnp.where(valid, values, 0.0), pixel_idx, num_segments=self.n_pixels
         )
@@ -174,29 +197,36 @@ class HexagonalSensor(eqx.Module):
 class DifferentiableHexagonalSensor(eqx.Module):
     """Hexagonal sensor with differentiable Gaussian splatting."""
 
-    position: jax.Array
-    rotation: jax.Array
-    hex_centers: jax.Array
-    lookup_table: jax.Array
-    neighbor_offsets_q: jax.Array
-    neighbor_offsets_r: jax.Array
-    neighbor_offsets_xy: jax.Array  # Pre-computed Cartesian offsets
+    position: Array
+    rotation: Array
+    hex_centers: Array
+    lookup_table: Array
+    neighbor_offsets_q: Array
+    neighbor_offsets_r: Array
+    neighbor_offsets_xy: Array  # Pre-computed Cartesian offsets
 
     hex_size: float = eqx.field(static=True)
     hex_inradius: float = eqx.field(static=True)
     grid_rotation: float = eqx.field(static=True)
-    grid_offset: tuple = eqx.field(static=True)
+    grid_offset: tuple[float, float] = eqx.field(static=True)
     q_min: int = eqx.field(static=True)
     r_min: int = eqx.field(static=True)
     n_pixels: int = eqx.field(static=True)
     sigma: float = eqx.field(static=True)
 
-    def __init__(self, position, rotation, hex_centers, sigma=0.5, kernel_size=1):
+    def __init__(
+        self,
+        position: Sequence[float] | Array,
+        rotation: Sequence[float] | Array,
+        hex_centers: Sequence[Sequence[float]] | Array,
+        sigma: float = 0.5,
+        kernel_size: int = 1,
+    ) -> None:
         """Initialize differentiable hexagonal sensor.
 
         Args:
             position: Sensor position in 3D space
-            rotation: Sensor rotation quaternion
+            rotation: Sensor rotation (Euler angles)
             hex_centers: Array of hexagon center positions (N, 2)
             sigma: Gaussian width in units of hex inradius (1.0 = boundary at 1 std dev)
             kernel_size: Number of neighbor rings for splatting
@@ -208,7 +238,7 @@ class DifferentiableHexagonalSensor(eqx.Module):
         self.sigma = float(sigma)
 
         # Detect grid properties
-        size, rot, offset = _detect_hex_grid(hex_centers)
+        size, rot, offset = _detect_hex_grid(self.hex_centers)
         self.hex_size = float(size)
         self.hex_inradius = float(size * SQRT3_2)
         self.grid_rotation = float(rot)
@@ -216,18 +246,22 @@ class DifferentiableHexagonalSensor(eqx.Module):
 
         # Build lookup table
         self.lookup_table, self.q_min, self.r_min = _build_lookup_table(
-            hex_centers, self.hex_size, self.grid_rotation, offset
+            self.hex_centers, self.hex_size, self.grid_rotation, offset
         )
 
         # Pre-compute neighbor offsets (axial and Cartesian)
-        self.neighbor_offsets_q, self.neighbor_offsets_r = _hex_neighbor_offsets(kernel_size)
-        ox, oy = _axial_to_cartesian(self.neighbor_offsets_q, self.neighbor_offsets_r, self.hex_size)
+        self.neighbor_offsets_q, self.neighbor_offsets_r = _hex_neighbor_offsets(
+            kernel_size
+        )
+        ox, oy = _axial_to_cartesian(
+            self.neighbor_offsets_q, self.neighbor_offsets_r, self.hex_size
+        )
         self.neighbor_offsets_xy = jnp.stack([ox, oy], axis=1)
 
-    def get_accumulator_shape(self):
+    def get_accumulator_shape(self) -> tuple[int]:
         return (self.n_pixels,)
 
-    def accumulate(self, x, y, values):
+    def accumulate(self, x: Array, y: Array, values: Array) -> Array:
         """Accumulate values with differentiable Gaussian splatting."""
         # Transform to grid coordinates
         x_grid, y_grid = _rotate(
@@ -242,7 +276,7 @@ class DifferentiableHexagonalSensor(eqx.Module):
         # Position relative to base hex center
         dx = x_grid - base_x
         dy = y_grid - base_y
-        
+
         # Broadcast to all neighbors: (n_points, n_neighbors)
         qi = q_base[:, None].astype(jnp.int32) + self.neighbor_offsets_q
         ri = r_base[:, None].astype(jnp.int32) + self.neighbor_offsets_r
@@ -260,8 +294,12 @@ class DifferentiableHexagonalSensor(eqx.Module):
         q_idx = qi - self.q_min
         r_idx = ri - self.r_min
 
-        in_bounds = ((q_idx >= 0) & (q_idx < self.lookup_table.shape[0]) &
-                     (r_idx >= 0) & (r_idx < self.lookup_table.shape[1]))
+        in_bounds = (
+            (q_idx >= 0)
+            & (q_idx < self.lookup_table.shape[0])
+            & (r_idx >= 0)
+            & (r_idx < self.lookup_table.shape[1])
+        )
 
         q_safe = jnp.clip(q_idx, 0, self.lookup_table.shape[0] - 1)
         r_safe = jnp.clip(r_idx, 0, self.lookup_table.shape[1] - 1)
@@ -272,4 +310,6 @@ class DifferentiableHexagonalSensor(eqx.Module):
 
         # Splat weighted values
         splatted = values[:, None] * weights * valid
-        return jax.ops.segment_sum(splatted.flatten(), pixel_idx.flatten(), num_segments=self.n_pixels)
+        return jax.ops.segment_sum(
+            splatted.flatten(), pixel_idx.flatten(), num_segments=self.n_pixels
+        )

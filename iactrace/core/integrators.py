@@ -1,10 +1,18 @@
+from __future__ import annotations
+
+from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING, Any
+
+import equinox as eqx
 import jax
 import jax.numpy as jnp
-import equinox as eqx
-from abc import ABC, abstractmethod
+from jax import Array
 
 from ..utils.sampling import sample_disk, sample_polygon
 from .reflection import compute_perturbation_delta
+
+if TYPE_CHECKING:
+    from ..telescope.mirrors import MirrorGroup
 
 
 class Integrator(ABC):
@@ -13,7 +21,7 @@ class Integrator(ABC):
     """
 
     @abstractmethod
-    def sample_group(self, group, key):
+    def sample_group(self, group: MirrorGroup, key: Array) -> MirrorGroup:
         """
         Sample a single mirror group and return updated MirrorGroup object.
 
@@ -26,7 +34,9 @@ class Integrator(ABC):
         """
         pass
 
-    def sample_mirror_groups(self, mirror_groups, key):
+    def sample_mirror_groups(
+        self, mirror_groups: list[MirrorGroup], key: Array
+    ) -> list[MirrorGroup]:
         """
         Sample all mirror groups and return list of updated MirrorGroup objects.
 
@@ -50,10 +60,12 @@ class MCIntegrator(Integrator):
     Monte Carlo integrator for mirror groups.
     """
 
-    def __init__(self, n_samples=128):
+    n_samples: int
+
+    def __init__(self, n_samples: int = 128) -> None:
         self.n_samples = n_samples
 
-    def sample_group(self, group, key):
+    def sample_group(self, group: MirrorGroup, key: Array) -> MirrorGroup:
         """
         Sample a single mirror group using Monte Carlo sampling.
 
@@ -72,28 +84,32 @@ class MCIntegrator(Integrator):
         """
         # Get sampling parameters from group
         params = group.get_sampling_params()
-        group_type = params['type']
+        group_type = params["type"]
 
         # Delegate to appropriate sampling method
-        if group_type == 'disk':
+        if group_type == "disk":
             return self._sample_disk_group(group, key, params)
-        elif group_type == 'polygon':
+        elif group_type == "polygon":
             return self._sample_polygon_group(group, key, params)
         else:
             raise TypeError(f"Unknown MirrorGroup type: {group_type}")
 
-    def _sample_disk_group(self, group, key, params):
+    def _sample_disk_group(
+        self, group: MirrorGroup, key: Array, params: dict[str, Any]
+    ) -> MirrorGroup:
         """Sample a group of mirrors with circular disk apertures."""
         n_mirrors = len(group)
         n_samples = self.n_samples
-        surface = params['surface']
-        radii = params['radii']
-        offsets = params['offsets']
+        surface = params["surface"]
+        radii = params["radii"]
+        offsets = params["offsets"]
 
         # Split key for each mirror
         keys = jax.random.split(key, n_mirrors)
 
-        def sample_single_mirror(mkey, radius, offset):
+        def sample_single_mirror(
+            mkey: Array, radius: Array, offset: Array
+        ) -> tuple[Array, Array, Array, Array]:
             key_sample, key_perturb = jax.random.split(mkey)
             # Generate uniform random samples in unit disk, scale by radius
             pts = sample_disk(key_sample, (n_samples,))
@@ -106,7 +122,7 @@ class MCIntegrator(Integrator):
             delta = compute_perturbation_delta(normals, key_perturb)
 
             # Compute weights: cos(angle to z-axis) / area * n_samples
-            cos_z = jnp.sum(normals * jnp.array([0., 0., 1.]), axis=-1, keepdims=True)
+            cos_z = jnp.sum(normals * jnp.array([0.0, 0.0, 1.0]), axis=-1, keepdims=True)
             area = jnp.pi * radius**2
             weights = cos_z / area * n_samples
 
@@ -120,21 +136,25 @@ class MCIntegrator(Integrator):
         return eqx.tree_at(
             lambda g: (g.points, g.normals, g.perturbation_delta, g.weights),
             group,
-            (points, normals, delta, weights)
+            (points, normals, delta, weights),
         )
 
-    def _sample_polygon_group(self, group, key, params):
+    def _sample_polygon_group(
+        self, group: MirrorGroup, key: Array, params: dict[str, Any]
+    ) -> MirrorGroup:
         """Sample a group of mirrors with convex polygon apertures."""
         n_mirrors = len(group)
         n_samples = self.n_samples
-        surface = params['surface']
-        vertices = params['vertices']
-        offsets = params['offsets']
+        surface = params["surface"]
+        vertices = params["vertices"]
+        offsets = params["offsets"]
 
         # Split key for each mirror
         keys = jax.random.split(key, n_mirrors)
 
-        def sample_single_mirror(mkey, vertices, offset):
+        def sample_single_mirror(
+            mkey: Array, vertices: Array, offset: Array
+        ) -> tuple[Array, Array, Array, Array]:
             key_sample, key_perturb = jax.random.split(mkey)
             # Generate uniform random samples within polygon
             xy = sample_polygon(key_sample, vertices, (n_samples,))
@@ -146,8 +166,8 @@ class MCIntegrator(Integrator):
             delta = compute_perturbation_delta(normals, key_perturb)
 
             # Compute weights: cos(angle to z-axis) / area * n_samples
-            cos_z = jnp.sum(normals * jnp.array([0., 0., 1.]), axis=-1, keepdims=True)
-            
+            cos_z = jnp.sum(normals * jnp.array([0.0, 0.0, 1.0]), axis=-1, keepdims=True)
+
             # Polygon area using shoelace formula
             x = vertices[:, 0]
             y = vertices[:, 1]
@@ -164,5 +184,5 @@ class MCIntegrator(Integrator):
         return eqx.tree_at(
             lambda g: (g.points, g.normals, g.perturbation_delta, g.weights),
             group,
-            (points, normals, delta, weights)
+            (points, normals, delta, weights),
         )
