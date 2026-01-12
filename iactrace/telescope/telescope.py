@@ -133,6 +133,18 @@ class Telescope(eqx.Module):
         from .operations import apply_roughness_to_group
 
         return apply_roughness_to_group(self, group_idx, roughness)
+    
+    def apply_misalignment_to_group(self, group_idx: int, sigma_h: float, sigma_v: float, key: Array) -> Telescope:
+        """Apply angular misalignment in horizontal and vertical direction drawn from gaussian to a specific mirror group."""
+        from .operations import apply_misalignment_to_group
+        
+        return apply_misalignment_to_group(self, group_idx, sigma_h, sigma_v, key)
+    
+    def apply_displacement_to_group(self, group_idx: int, sigma_z: float, key: Array) -> Telescope:
+        """Apply random Gaussian distance adjustment to mirrors along the z-axis to a specific mirror group."""
+        from .operations import apply_displacement_to_group
+        
+        return apply_displacement_to_group(self, group_idx, sigma_z, key)
 
     def get_mirrors_by_stage(self, stage: int) -> list[int]:
         """Get indices of mirror groups at a specific optical stage."""

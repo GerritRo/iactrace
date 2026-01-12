@@ -158,6 +158,77 @@ def apply_roughness_to_group(
     return eqx.tree_at(lambda t: t.mirror_groups, telescope, new_groups)
 
 
+def apply_misalignment_to_group(telescope, group_idx: int, sigma_h: float, sigma_v: float, key: Array) -> Telescope:
+    """Apply random Gaussian misalignment to mirror orientations.
+
+    Adds random perturbations to the tip (horizontal) and tilt (vertical) angles
+    of each mirror in the specified group, drawn from independent Gaussian
+    distributions.
+
+    Args:
+        telescope: Telescope instance
+        group_idx: Index of mirror group to modify
+        sigma_h: Standard deviation of horizontal (tip) misalignment in arcseconds
+        sigma_v: Standard deviation of vertical (tilt) misalignment in arcseconds
+        key: JAX random key for reproducibility
+
+    Returns:
+        New Telescope with randomly misaligned mirrors
+    """
+    group = telescope.mirror_groups[group_idx]
+    n_mirrors = len(group)
+
+    # Convert arcseconds to degrees (rotations are stored in degrees)
+    sigma_h_deg = sigma_h / 3600.0
+    sigma_v_deg = sigma_v / 3600.0
+
+    # Generate random misalignments
+    key1, key2 = jax.random.split(key)
+    delta_h = jax.random.normal(key1, shape=(n_mirrors,)) * sigma_h_deg
+    delta_v = jax.random.normal(key2, shape=(n_mirrors,)) * sigma_v_deg
+
+    # Apply to rotations: [tip, tilt, rotation] - tip is horizontal, tilt is vertical
+    current_rotations = group.rotations
+    new_rotations = current_rotations.at[:, 0].add(delta_h)
+    new_rotations = new_rotations.at[:, 1].add(delta_v)
+
+    new_group = eqx.tree_at(lambda g: g.rotations, group, new_rotations)
+    new_groups = list(telescope.mirror_groups)
+    new_groups[group_idx] = new_group
+    return eqx.tree_at(lambda t: t.mirror_groups, telescope, new_groups)
+
+
+def apply_displacement_to_group(telescope, group_idx: int, sigma_z: float, key: Array) -> Telescope:
+    """Apply random Gaussian distance adjustment to mirrors along the z-axis.
+
+    Adds random perturbations to the z-coordinate of each mirror position
+    in the specified group, drawn from a Gaussian distribution.
+
+    Args:
+        telescope: Telescope instance
+        group_idx: Index of mirror group to modify
+        sigma_z: Standard deviation of z-axis displacement (same units as positions)
+        key: JAX random key for reproducibility
+
+    Returns:
+        New Telescope with randomly displaced mirrors
+    """
+    group = telescope.mirror_groups[group_idx]
+    n_mirrors = len(group)
+
+    # Generate random z displacements
+    delta_z = jax.random.normal(key, shape=(n_mirrors,)) * sigma_z
+
+    # Apply to z-component of positions
+    current_positions = group.positions
+    new_positions = current_positions.at[:, 2].add(delta_z)
+
+    new_group = eqx.tree_at(lambda g: g.positions, group, new_positions)
+    new_groups = list(telescope.mirror_groups)
+    new_groups[group_idx] = new_group
+    return eqx.tree_at(lambda t: t.mirror_groups, telescope, new_groups)
+
+
 def get_mirrors_by_stage(telescope: Telescope, stage: int) -> list[int]:
     """Get indices of mirror groups at a specific optical stage.
 
