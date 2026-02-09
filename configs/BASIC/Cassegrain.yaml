@@ -1,0 +1,117 @@
+telescope:
+  name: test_cassegrain
+  units: m
+mirror_templates:
+  template_0:
+    surface:
+      curvature: 1.250000
+      conic: -1.000000
+      aspheric: []
+  template_1:
+    surface:
+      curvature: -4.444444
+      conic: -2.250000
+      aspheric: []
+mirrors:
+- position:
+  - 0.000000
+  - 0.000000
+  - 0.000000
+  orientation:
+  - 0.000000
+  - 0.000000
+  - 0.000000
+  aperture:
+    type: circular
+    radius: 0.100000
+    inner_radius: 0.03
+  id: M_0
+  template: template_0
+- position:
+  - 0.000000
+  - 0.000000
+  - 0.310000
+  orientation:
+  - 180.000000
+  - 0.000000
+  - 0.000000
+  aperture:
+    type: circular
+    radius: 0.032000
+  stage: 1
+  id: M_1
+  template: template_1
+obstructions:
+- type: cylinder
+  p1:
+  - 0.000000
+  - 0.000000
+  - 0.315000
+  p2:
+  - 0.000000
+  - 0.000000
+  - 0.330000
+  r: 0.032000
+  id: obs_0
+- type: cylinder
+  p1:
+  - 0.000000
+  - 0.031000
+  - 0.325000
+  p2:
+  - 0.000000
+  - 0.110000
+  - 0.000000
+  r: 0.002000
+  id: obs_1
+- type: cylinder
+  p1:
+  - 0.000000
+  - -0.031000
+  - 0.325000
+  p2:
+  - 0.000000
+  - -0.110000
+  - 0.000000
+  r: 0.002000
+  id: obs_2
+- type: cylinder
+  p1:
+  - 0.031000
+  - 0.000000
+  - 0.325000
+  p2:
+  - 0.110000
+  - 0.000000
+  - 0.000000
+  r: 0.002000
+  id: obs_3
+- type: cylinder
+  p1:
+  - -0.031000
+  - 0.000000
+  - 0.325000
+  p2:
+  - -0.110000
+  - 0.000000
+  - 0.000000
+  r: 0.002000
+  id: obs_4
+sensors:
+- type: square
+  position:
+  - 0.000000
+  - 0.000000
+  - -0.140000
+  orientation:
+  - 0.000000
+  - 0.000000
+  - 0.000000
+  width: 256
+  height: 256
+  bounds:
+  - -0.018000
+  - 0.018000
+  - -0.018000
+  - 0.018000
+  id: sensor_0

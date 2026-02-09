@@ -1,0 +1,88 @@
+telescope:
+  name: simple_parabolic
+  units: m
+
+mirror_templates:
+  primary:
+    surface:
+      curvature: 1.250000
+      conic: -1.000000
+      aspheric: []
+mirrors:
+- position:
+  - 0.000000
+  - 0.000000
+  - 0.000000
+  orientation:
+  - 0.000000
+  - 0.000000
+  - 0.000000
+  aperture:
+    type: circular
+    radius: 0.100000
+  id: M_primary
+  template: primary
+
+obstructions:
+- type: cylinder
+  p1:
+  - 0.000000
+  - 0.000000
+  - 0.401000
+  p2:
+  - 0.000000
+  - 0.000000
+  - 0.420000
+  r: 0.030000
+  id: sensor_housing
+- type: cylinder
+  p1:
+  - 0.000000
+  - 0.020000
+  - 0.410000
+  p2:
+  - 0.000000
+  - 0.100000
+  - 0.000000
+  r: 0.002000
+  id: spider_vane_1
+- type: cylinder
+  p1:
+  - -0.017321
+  - -0.010000
+  - 0.410000
+  p2:
+  - -0.086603
+  - -0.050000
+  - 0.000000
+  r: 0.002000
+  id: spider_vane_2
+- type: cylinder
+  p1:
+  - 0.017321
+  - -0.010000
+  - 0.410000
+  p2:
+  - 0.086603
+  - -0.050000
+  - 0.000000
+  r: 0.002000
+  id: spider_vane_3
+sensors:
+- type: square
+  position:
+  - 0.000000
+  - 0.000000
+  - 0.400000
+  orientation:
+  - 0.000000
+  - 0.000000
+  - 0.000000
+  width: 256
+  height: 256
+  bounds:
+  - -0.020000
+  - 0.020000
+  - -0.020000
+  - 0.020000
+  id: sensor_0

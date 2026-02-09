@@ -1,0 +1,15 @@
+import jax
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def set_jax_precision():
+    """Enable 64-bit precision for more accurate tests."""
+    jax.config.update("jax_enable_x64", True)
+    yield
+
+
+@pytest.fixture
+def random_key():
+    """Provide a fresh random key for tests that need randomness."""
+    return jax.random.key(42)
