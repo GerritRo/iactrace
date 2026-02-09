@@ -1,0 +1,26 @@
+{
+    "version": 1,
+    "project": "iactrace",
+    "project_url": "https://github.com/GerritRo/iactrace",
+    "repo": ".",
+    "branches": ["dev"],
+    "dvcs": "git",
+    "environment_type": "virtualenv",
+    "install_timeout": 600,
+    "show_commit_url": "https://github.com/GerritRo/iactrace/commit/",
+    "pythons": ["3.11"],
+    "matrix": {
+        "jax": [""],
+        "jaxlib": [""],
+        "numpy": [""],
+        "equinox": [""]
+    },
+    "install_command": ["python -m pip install {wheel_file}[dev]"],
+    "build_command": ["python -m pip wheel --no-build-isolation --no-deps -w {build_cache_dir} {build_dir}"],
+    "benchmark_dir": "benchmarks",
+    "env_dir": ".asv/env",
+    "results_dir": ".asv/results",
+    "html_dir": ".asv/html",
+    "attribute_repetitions": 0,
+    "default_benchmark_timeout": 300
+}
