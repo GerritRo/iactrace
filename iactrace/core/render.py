@@ -30,28 +30,27 @@ def _get_stages(optical_groups):
 
 
 def _check_occlusions(ray_origins, ray_directions, obstruction_groups, max_t=None):
-    """
-    Check ray occlusions against obstruction groups.
+    """Check ray occlusions against obstruction groups.
 
     Args:
-        ray_origins: Ray origins (n_sources, n_samples, 3)
-        ray_directions: Ray directions (n_sources, n_samples, 3)
+        ray_origins: (n_rays, 3) ray origins
+        ray_directions: (n_rays, 3) ray directions
         obstruction_groups: List of ObstructionGroup objects (can be empty or None)
-        max_t: Optional maximum t value - obstructions at t >= max_t are ignored.
-               Shape must broadcast with (n_sources, n_samples). If None, uses 1e10.
+        max_t: Optional (n_rays,) maximum t value. Obstructions at t >= max_t
+               are ignored. If None, uses 1e10.
 
     Returns:
-        Shadow mask (n_sources, n_samples) - 1.0 if not occluded, 0.0 if occluded
+        (n_rays,) shadow mask - 1.0 if not occluded, 0.0 if occluded
     """
     if not obstruction_groups:
-        return jnp.ones(ray_origins.shape[:-1])
+        return jnp.ones(ray_origins.shape[0])
 
     if max_t is None:
         max_t = 1e10
 
-    shadow_mask = jnp.ones(ray_origins.shape[:-1])
+    shadow_mask = jnp.ones(ray_origins.shape[0])
     for group in obstruction_groups:
-        t = jax.vmap(jax.vmap(group.intersect))(ray_origins, ray_directions)
+        t = jax.vmap(group.intersect)(ray_origins, ray_directions)
         shadow_mask = shadow_mask * jnp.where(t < max_t, 0.0, 1.0)
     return shadow_mask
 
@@ -254,14 +253,10 @@ def _interact_at_stage_rays(origins, directions, values, stage_groups, obstructi
     )
 
     hit_mask = best_t < 1e10
-    shadow = _check_occlusions(
-        origins[None, :, :], directions[None, :, :], obstruction_groups, best_t[None, :]
-    )[0]
+    shadow = _check_occlusions(origins, directions, obstruction_groups, best_t)
     new_values = values * hit_mask * shadow * coeffs
 
     return new_origins, new_dirs, new_values
-
-
 
 
 def _trace_rays(ray_origins, ray_directions, values, stages, stage_indices,
@@ -301,117 +296,200 @@ def _trace_rays(ray_origins, ray_directions, values, stages, stage_indices,
 
 
 def _get_stage0_data(stages):
-    """Extract stage 0 sample points, normals, and weights."""
-    group_data = [g.transform_to_world() for g in stages[0]]
-    return {
-        'points': jnp.concatenate([d[0] for d in group_data], axis=0),
-        'normals': jnp.concatenate([d[1] for d in group_data], axis=0),
-        'weights': jnp.concatenate([d[2] for d in group_data], axis=0),
-    }
+    """Extract stage 0 sample points, normals, and weights.
 
-
-def _trace_single_element(element_idx, data, sources, values, source_type,
-                          n_sources, n_samples, stage_indices, stages,
-                          obstruction_groups, sensor_group):
-    """Trace rays from one primary element. Returns flat (pts, sensor_idx, ray_vals).
-
-    Stage 0 uses pre-sampled points (skips intersection). Stages 1+ use
-    uniform ray tracing via _interact_at_stage_rays.
+    Returns:
+        points: (n_elements, n_samples, 3)
+        normals: (n_elements, n_samples, 3)
+        weights: (n_elements, n_samples, 1)
     """
-    points = data['points'][element_idx]   # (n_samples, 3)
-    normals = data['normals'][element_idx]  # (n_samples, 3)
-    weights = data['weights'][element_idx]  # (n_samples, 1)
+    group_data = [g.transform_to_world() for g in stages[0]]
+    return (
+        jnp.concatenate([d[0] for d in group_data], axis=0),
+        jnp.concatenate([d[1] for d in group_data], axis=0),
+        jnp.concatenate([d[2] for d in group_data], axis=0),
+    )
 
-    # Compute ray directions based on source type
+
+def _trace_element_source(points, normals, weights, source, value,
+                          source_type, element_idx, stages, stage_indices,
+                          obstruction_groups, sensor_group):
+    """Trace rays for one primary element and one source.
+
+    Stage 0 uses pre-sampled points (no intersection). Stages 1+ use
+    uniform ray tracing via _interact_at_stage_rays.
+
+    Args:
+        points: (n_samples, 3) pre-sampled surface points
+        normals: (n_samples, 3) surface normals
+        weights: (n_samples, 1) integration weights
+        source: (3,) source position or direction
+        value: scalar source intensity
+        source_type: 'point' or 'parallel'
+        element_idx: scalar index of this element in stage 0
+        stages: dict of optical stages
+        stage_indices: sorted stage index list
+        obstruction_groups: list of obstruction groups
+        sensor_group: sensor group for final intersection
+
+    Returns:
+        pts: (n_samples, 2) sensor coordinates
+        sensor_idx: (n_samples,) sensor indices
+        vals: (n_samples,) ray values
+    """
+    n_samples = points.shape[0]
+
+    # Compute ray directions for single source
     if source_type == 'point':
-        # (n_sources, n_samples, 3)
-        dirs = points[None, :, :] - sources[:, None, :]
+        dirs = points - source[None, :]  # (n_samples, 3)
         dirs = dirs / jnp.linalg.norm(dirs, axis=-1, keepdims=True)
     else:
-        dirs = jnp.broadcast_to(sources[:, None, :], (n_sources, n_samples, 3))
-
-    # Flatten immediately to 1D rays
-    n_rays = n_sources * n_samples
-    dirs_flat = dirs.reshape(n_rays, 3)
-    origins_flat = jnp.tile(points, (n_sources, 1))
-    normals_flat = jnp.tile(normals, (n_sources, 1))
+        dirs = jnp.broadcast_to(source[None, :], (n_samples, 3))
 
     # Shadow check on incoming rays
-    shadow = _check_occlusions(
-        origins_flat[None], -dirs_flat[None], obstruction_groups
-    )[0]
+    shadow = _check_occlusions(points, -dirs, obstruction_groups)
 
     # Initial values: source intensity / integration weight
-    weights_flat = jnp.tile(weights[:, 0], n_sources)
-    vals_flat = jnp.repeat(values, n_samples) / weights_flat * shadow
+    vals = value / weights[:, 0] * shadow
 
-    # Stage 0 physics: use pre-sampled points (skip intersection)
+    # Stage 0 physics (pre-sampled, skip intersection)
     group = stages[0][0]
     interaction = group.interaction
-    element_indices = jnp.full((n_rays,), element_idx, dtype=jnp.int32)
+    element_indices = jnp.full((n_samples,), element_idx, dtype=jnp.int32)
 
     new_dirs, new_origins, coeffs = _apply_interaction(
-        dirs_flat, normals_flat, origins_flat, group, element_indices, interaction
+        dirs, normals, points, group, element_indices, interaction
     )
 
     # For REFLECT: use cos_angle (rendering equation) instead of reflectivity
     # Note: reflectivity is already incorporated in the integration weights
     if interaction == InteractionType.REFLECT:
-        cos_angle = jnp.abs(jnp.sum(dirs_flat * normals_flat, axis=-1))
+        cos_angle = jnp.abs(jnp.sum(dirs * normals, axis=-1))
         coeffs = cos_angle
 
-    vals_flat = vals_flat * coeffs
+    vals = vals * coeffs
 
     # Stages 1+: uniform ray tracing
     for stage_idx in stage_indices[1:]:
-        new_origins, new_dirs, vals_flat = _interact_at_stage_rays(
-            new_origins, new_dirs, vals_flat,
+        new_origins, new_dirs, vals = _interact_at_stage_rays(
+            new_origins, new_dirs, vals,
             stages[stage_idx], obstruction_groups
         )
 
-    # Intersect with sensor group (all sensors)
+    # Intersect with sensor group
     pts, sensor_idx, _ = _intersect_sensor_group(new_origins, new_dirs, sensor_group)
-
-    return pts, sensor_idx, vals_flat
-
-
-def _accumulate_image(pts, sensor_idx, ray_vals, sensor, n_sources, n_samples):
-    """Accumulate all rays into sensor group (for render)."""
-    return sensor.accumulate(sensor_idx, pts[:, 0], pts[:, 1], ray_vals)
+    return pts, sensor_idx, vals
 
 
-def _accumulate_per_source(pts, sensor_idx, ray_vals, sensor, n_sources, n_samples):
-    """Accumulate rays per-source into response matrix row.
+def _trace_all_sources(points, normals, weights, sources, values, source_type,
+                       stages, stage_indices, obstruction_groups, sensor):
+    """Trace all sources through all primary elements.
+
+    Vmaps over elements (inner) and sources (outer) for GPU-parallel execution.
+
+    Args:
+        points: (n_elements, n_samples, 3) pre-sampled surface points
+        normals: (n_elements, n_samples, 3) surface normals
+        weights: (n_elements, n_samples, 1) integration weights
+        sources: (n_sources, 3) source positions or directions
+        values: (n_sources,) source intensities
+        source_type: 'point' or 'parallel'
+        stages, stage_indices, obstruction_groups, sensor: optical system config
 
     Returns:
-        (n_sources, n_sensors * n_pixels) response matrix rows
+        pts: (n_sources, n_elements, n_samples, 2) sensor coordinates
+        sidx: (n_sources, n_elements, n_samples) sensor indices
+        vals: (n_sources, n_elements, n_samples) ray values
     """
-    # Reshape flat arrays to (n_sources, n_samples) for per-source accumulation
-    pts_2d = pts.reshape(n_sources, n_samples, 2)
-    sensor_idx_2d = sensor_idx.reshape(n_sources, n_samples)
-    vals_2d = ray_vals.reshape(n_sources, n_samples)
+    n_elements = points.shape[0]
 
-    def accumulate_one_source(p, s_idx, v):
-        # Accumulate for one source, returns (n_sensors, *per_sensor_shape)
-        result = sensor.accumulate(s_idx, p[:, 0], p[:, 1], v)
-        return result.reshape(-1)  # Flatten to (n_sensors * n_pixels,)
+    def trace_all_elements(source, value):
+        def trace_one(eidx):
+            return _trace_element_source(
+                points[eidx], normals[eidx], weights[eidx],
+                source, value, source_type, eidx,
+                stages, stage_indices, obstruction_groups, sensor
+            )
+        return jax.vmap(trace_one)(jnp.arange(n_elements))
 
-    return jax.vmap(accumulate_one_source)(pts_2d, sensor_idx_2d, vals_2d)
+    return jax.vmap(trace_all_elements)(sources, values)
 
 
-def _render_generic(tel, sources, values, source_type, sensor_idx, accumulate_fn):
-    """Generic render function that works for all interaction types.
+def _accumulate_image(sensor, pts, sidx, vals):
+    """Flatten all rays and accumulate into a single image."""
+    flat_pts = pts.reshape(-1, 2)
+    return sensor.accumulate(
+        sidx.reshape(-1), flat_pts[:, 0], flat_pts[:, 1], vals.reshape(-1)
+    )
+
+
+def _accumulate_per_source(sensor, pts, sidx, vals):
+    """Accumulate rays per source into response matrix rows.
+
+    Args:
+        pts: (n_sources, ..., 2) sensor coordinates
+        sidx: (n_sources, ...) sensor indices
+        vals: (n_sources, ...) ray values
+
+    Returns:
+        (n_sources, n_sensors * n_pixels) response matrix
+    """
+    n_sources = pts.shape[0]
+
+    def acc_one(p, s, v):
+        return sensor.accumulate(s, p[:, 0], p[:, 1], v).reshape(-1)
+
+    return jax.vmap(acc_one)(
+        pts.reshape(n_sources, -1, 2),
+        sidx.reshape(n_sources, -1),
+        vals.reshape(n_sources, -1),
+    )
+
+
+def _pad_sources(sources, values, source_chunk_size):
+    """Pad and reshape sources into chunks for scan processing.
+
+    Returns:
+        src_chunks: (n_chunks, chunk_size, 3)
+        val_chunks: (n_chunks, chunk_size)
+        padded_size: total padded source count
+    """
+    n_sources = sources.shape[0]
+    n_chunks = -(-n_sources // source_chunk_size)
+    padded_size = n_chunks * source_chunk_size
+    pad_n = padded_size - n_sources
+
+    if pad_n > 0:
+        # Repeat last source (valid geometry) with zero values (no contribution)
+        sources = jnp.concatenate([
+            sources,
+            jnp.broadcast_to(sources[-1:], (pad_n, sources.shape[1]))
+        ], axis=0)
+        values = jnp.concatenate([values, jnp.zeros(pad_n)], axis=0)
+
+    return (
+        sources.reshape(n_chunks, source_chunk_size, -1),
+        values.reshape(n_chunks, source_chunk_size),
+        padded_size,
+    )
+
+
+def _render_generic(tel, sources, values, source_type, sensor_idx, per_source,
+                    source_chunk_size=None):
+    """Generic render using vmap over elements and chunked vmap over sources.
 
     Args:
         tel: Telescope object
-        sources: Source positions or directions
-        values: Source intensities
+        sources: (n_sources, 3) source positions or directions
+        values: (n_sources,) source intensities
         source_type: 'point' or 'parallel'
         sensor_idx: Index of sensor group to use
-        accumulate_fn: Function (pts, sensor_idx, ray_vals, sensor, n_sources, n_samples) -> result
+        per_source: If True, return per-source response matrix
+        source_chunk_size: Process sources in chunks of this size for memory control.
 
     Returns:
-        Accumulated result based on accumulate_fn
+        If per_source=False: Accumulated image (n_sensors, *sensor_shape)
+        If per_source=True: Response matrix (n_sources, n_sensors * n_pixels)
     """
     sensor = tel.sensors[sensor_idx]
     n_sources = sources.shape[0]
@@ -420,42 +498,57 @@ def _render_generic(tel, sources, values, source_type, sensor_idx, accumulate_fn
     stage_indices = sorted(stages.keys())
 
     if not stage_indices or 0 not in stages:
-        # Return appropriate empty result based on accumulator
-        dummy_pts = jnp.zeros((1, 2))
-        dummy_sensor_idx = jnp.zeros((1,), dtype=jnp.int32)
-        dummy_vals = jnp.zeros((1,))
-        return accumulate_fn(dummy_pts, dummy_sensor_idx, dummy_vals, sensor, 1, 1) * 0
-
-    data = _get_stage0_data(stages)
-    n_elements = data['points'].shape[0]
-    n_samples = data['points'].shape[1]
-
-    def process_element(acc, element_idx):
-        pts, s_idx, ray_vals = _trace_single_element(
-            element_idx, data, sources, values, source_type,
-            n_sources, n_samples, stage_indices, stages,
-            tel.obstruction_groups, sensor
-        )
-        return acc + accumulate_fn(pts, s_idx, ray_vals, sensor, n_sources, n_samples), None
-
-    # Initialize accumulator based on accumulate_fn
-    # For _accumulate_image: (n_sensors, *sensor_shape)
-    # For _accumulate_per_source: (n_sources, n_sensors * n_pixels)
-    if accumulate_fn == _accumulate_image:
+        if per_source:
+            n_pixels = math.prod(sensor.get_accumulator_shape())
+            return jnp.zeros((n_sources, sensor.n_sensors * n_pixels))
         acc_shape = (sensor.n_sensors,) + sensor.get_accumulator_shape()
-        acc0 = jnp.zeros(acc_shape)
-    else:
-        n_pixels = math.prod(sensor.get_accumulator_shape())
-        acc0 = jnp.zeros((n_sources, sensor.n_sensors * n_pixels))
+        return jnp.zeros(acc_shape)
 
-    result, _ = jax.lax.scan(process_element, acc0, jnp.arange(n_elements))
-    return result
+    points, normals, weights = _get_stage0_data(stages)
+    trace_args = (points, normals, weights, source_type,
+                  stages, stage_indices, tel.obstruction_groups, sensor)
+
+    # No chunking: vmap over all sources at once
+    if source_chunk_size is None or source_chunk_size >= n_sources:
+        pts, sidx, vals = _trace_all_sources(*trace_args[:3], sources, values, *trace_args[3:])
+        if per_source:
+            return _accumulate_per_source(sensor, pts, sidx, vals)
+        return _accumulate_image(sensor, pts, sidx, vals)
+
+    # Chunked: scan over source chunks, vmap within each chunk
+    src_chunks, val_chunks, padded_size = _pad_sources(
+        sources, values, source_chunk_size
+    )
+
+    if not per_source:
+        acc_shape = (sensor.n_sensors,) + sensor.get_accumulator_shape()
+
+        def process_chunk(acc, chunk_data):
+            pts, sidx, vals = _trace_all_sources(
+                *trace_args[:3], chunk_data[0], chunk_data[1], *trace_args[3:]
+            )
+            return acc + _accumulate_image(sensor, pts, sidx, vals), None
+
+        result, _ = jax.lax.scan(
+            process_chunk, jnp.zeros(acc_shape), (src_chunks, val_chunks)
+        )
+        return result
+
+    def process_chunk(carry, chunk_data):
+        pts, sidx, vals = _trace_all_sources(
+            *trace_args[:3], chunk_data[0], chunk_data[1], *trace_args[3:]
+        )
+        return carry, _accumulate_per_source(sensor, pts, sidx, vals)
+
+    _, all_results = jax.lax.scan(
+        process_chunk, None, (src_chunks, val_chunks)
+    )
+    return all_results.reshape(padded_size, -1)[:n_sources]
 
 
 def _render_debug_generic(tel, sources, values, source_type, sensor_idx):
-    """Generic debug render that returns raw hits for all interaction types."""
+    """Debug render returning raw hits. Vmaps over elements and sources."""
     sensor = tel.sensors[sensor_idx]
-    n_sources = sources.shape[0]
 
     stages = _get_stages(tel.optical_groups)
     stage_indices = sorted(stages.keys())
@@ -463,33 +556,23 @@ def _render_debug_generic(tel, sources, values, source_type, sensor_idx):
     if not stage_indices or 0 not in stages:
         return jnp.zeros((0, 2)), jnp.zeros((0,), dtype=jnp.int32), jnp.zeros((0,))
 
-    data = _get_stage0_data(stages)
-    n_elements = data['points'].shape[0]
-    n_samples = data['points'].shape[1]
-
-    def process_element(carry, element_idx):
-        pts, s_idx, ray_vals = _trace_single_element(
-            element_idx, data, sources, values, source_type,
-            n_sources, n_samples, stage_indices, stages,
-            tel.obstruction_groups, sensor
-        )
-        return carry, (pts, s_idx, ray_vals)
-
-    _, per_element = jax.lax.scan(process_element, None, jnp.arange(n_elements))
-    # Concatenate results from all elements
-    return (
-        per_element[0].reshape(-1, 2),
-        per_element[1].reshape(-1),
-        per_element[2].reshape(-1)
+    points, normals, weights = _get_stage0_data(stages)
+    pts, sidx, vals = _trace_all_sources(
+        points, normals, weights, sources, values, source_type,
+        stages, stage_indices, tel.obstruction_groups, sensor
     )
+    return pts.reshape(-1, 2), sidx.reshape(-1), vals.reshape(-1)
 
 
-@partial(jax.jit, static_argnames=['source_type', 'sensor_idx'])
-def render(tel, sources, values, source_type, sensor_idx=0):
+@partial(jax.jit, static_argnames=['source_type', 'sensor_idx', 'source_chunk_size'])
+def render(tel, sources, values, source_type, sensor_idx=0, source_chunk_size=100):
     """Render sources through telescope onto sensor group.
 
     Supports mixed reflective/refractive optical systems. Stage 0 can be
     mirrors, lenses, or slabs. Stages 1+ can be any interaction type.
+
+    Uses vmap over primary elements for GPU-efficient parallel computation.
+    Sources can optionally be processed in chunks to control memory usage.
 
     Args:
         tel: Telescope object
@@ -497,13 +580,16 @@ def render(tel, sources, values, source_type, sensor_idx=0):
         values: Source intensities (n_sources,)
         source_type: 'point' or 'parallel'
         sensor_idx: Index of sensor group to use
+        source_chunk_size: Process sources in chunks of this size for memory control.
+            If None, all sources are processed at once.
 
     Returns:
         Accumulated image with shape (n_sensors, *per_sensor_shape).
         For square sensors: (n_sensors, height, width)
         For hexagonal sensors: (n_sensors, n_pixels)
     """
-    return _render_generic(tel, sources, values, source_type, sensor_idx, _accumulate_image)
+    return _render_generic(tel, sources, values, source_type, sensor_idx,
+                           per_source=False, source_chunk_size=source_chunk_size)
 
 
 @partial(jax.jit, static_argnames=['source_type', 'sensor_idx'])
@@ -528,13 +614,13 @@ def render_debug(tel, sources, values, source_type, sensor_idx=0):
     return _render_debug_generic(tel, sources, values, source_type, sensor_idx)
 
 
-@partial(jax.jit, static_argnames=['source_type', 'sensor_idx'])
-def render_response_matrix(tel, sources, values, source_type, sensor_idx=0):
+@partial(jax.jit, static_argnames=['source_type', 'sensor_idx', 'source_chunk_size'])
+def render_response_matrix(tel, sources, values, source_type, sensor_idx=0,
+                           source_chunk_size=100):
     """Render multiple sources and return the source-to-pixel response matrix.
 
     This function traces N sources through the telescope and returns an N×M matrix
     where each row contains one source's contribution to all M pixels across all sensors.
-    Uses incremental accumulation for memory efficiency.
 
     Supports mixed reflective/refractive optical systems.
 
@@ -544,12 +630,15 @@ def render_response_matrix(tel, sources, values, source_type, sensor_idx=0):
         values: Source intensities (n_sources,)
         source_type: 'point' or 'parallel'
         sensor_idx: Index of sensor group to use
+        source_chunk_size: Process sources in chunks of this size for memory control.
+            If None, all sources are processed at once.
 
     Returns:
         Array of shape (n_sources, n_sensors * n_pixels) where n_pixels is the
         flattened per-sensor size.
     """
-    return _render_generic(tel, sources, values, source_type, sensor_idx, _accumulate_per_source)
+    return _render_generic(tel, sources, values, source_type, sensor_idx,
+                           per_source=True, source_chunk_size=source_chunk_size)
 
 
 @partial(jax.jit, static_argnames=['sensor_idx'])

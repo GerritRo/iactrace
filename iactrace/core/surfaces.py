@@ -83,17 +83,18 @@ def compute_sag_and_normal(x, y, offset, curvature, conic, aspheric):
     return point, normal
 
 
+
 class AsphericSurface(eqx.Module):
     """Aspheric surface defined by curvature, conic constant, and polynomial terms.
 
-    This class stores surface parameters and provides intersection functionality.
-    For computing sag/normals in differentiable pipelines, use the standalone
-    functions which enable full gradient flow.
+    When is_pure_conic is True, the intersection uses the exact closed-form
+    conic solution and skips Newton-Raphson refinement entirely.
     """
 
     curvature: jax.Array | float
     conic: jax.Array | float
     aspheric: jax.Array  # (K,)
+    is_pure_conic: bool = eqx.field(static=True, default=False)
 
     def sag(self, x, y, offset):
         """Compute surface sag z(x,y) in local mirror coordinates.
@@ -111,17 +112,18 @@ class AsphericSurface(eqx.Module):
         return sag(x, y, offset, self.curvature, self.conic, self.aspheric)
 
     def intersect(self, ray_origin, ray_direction, offset, max_iter=10, tol=1e-8):
-        """Find ray-surface intersection using Newton-Raphson iteration.
+        """Find ray-surface intersection.
 
-        Uses closed-form conic intersection as initial guess, then refines
-        with Newton-Raphson to account for aspheric terms.
+        For pure conics (is_pure_conic=True), uses the exact closed-form solution.
+        For aspheric surfaces, uses Newton-Raphson refinement on top of the
+        conic initial guess.
 
         Args:
             ray_origin: Ray origin in local coordinates (3,)
             ray_direction: Ray direction (3,)
             offset: Surface offset (x0, y0) (2,)
-            max_iter: Maximum Newton-Raphson iterations
-            tol: Convergence tolerance
+            max_iter: Maximum Newton-Raphson iterations (aspheric only)
+            tol: Convergence tolerance (aspheric only)
 
         Returns:
             t: Intersection distance
@@ -136,18 +138,21 @@ class AsphericSurface(eqx.Module):
             ray_origin[2] + z0
         ])
 
-        # Get initial guess from closed-form conic intersection
-        t_init = intersect_conic(ray_origin_raw, ray_direction, self.curvature, self.conic)
+        # Get closed-form conic intersection
+        t = intersect_conic(ray_origin_raw, ray_direction, self.curvature, self.conic)
 
-        # Refine with Newton-Raphson
-        def sag_fn(x, y):
-            return sag(x, y, offset, self.curvature, self.conic, self.aspheric)
+        if not self.is_pure_conic:
+            # Refine with Newton-Raphson for aspheric terms
+            def sag_fn(x, y):
+                return sag(x, y, offset, self.curvature, self.conic, self.aspheric)
 
-        t, hit_xy, _ = newton_raphson_intersect(
-            sag_fn, ray_origin, ray_direction, t_init, max_iter, tol
-        )
-
-        x_hit, y_hit = hit_xy[0], hit_xy[1]
+            t, hit_xy, _ = newton_raphson_intersect(
+                sag_fn, ray_origin, ray_direction, t, max_iter, tol
+            )
+            x_hit, y_hit = hit_xy[0], hit_xy[1]
+        else:
+            x_hit = ray_origin[0] + t * ray_direction[0]
+            y_hit = ray_origin[1] + t * ray_direction[1]
 
         # Compute point and normal using standalone functions
         point, normal = compute_sag_and_normal(
