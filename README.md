@@ -73,7 +73,7 @@ cd docs && make html
 
 ## License
 
-BSD-3-Clause License - see [LICENSE](licenses/LICENSE.rst) for details.
+BSD-3-Clause License - see [LICENSE](LICENSE) for details.
 
 ## Citation
 
