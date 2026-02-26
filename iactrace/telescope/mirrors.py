@@ -230,6 +230,8 @@ class AsphericDiskMirrorGroup(MirrorGroup):
     inner_radii: jax.Array    # (N,) - inner radius (hole) for each mirror, 0 for solid disk
     offsets: jax.Array        # (N, 2) - x0, y0 offset for each mirror
 
+    is_pure_conic: bool = eqx.field(static=True)  # True if all aspherics are zero
+
     def __init__(self, positions, rotations, curvatures, conics, aspherics, radii,
                  optical_stage=0, offsets=None, inner_radii=None):
         """
@@ -247,6 +249,9 @@ class AsphericDiskMirrorGroup(MirrorGroup):
         self.offsets = jnp.asarray(offsets) if offsets is not None else jnp.zeros((n_mirrors, 2))
         self.inner_radii = jnp.asarray(inner_radii) if inner_radii is not None else jnp.zeros(n_mirrors)
 
+        # Determine if all mirrors are pure conics (no aspheric terms)
+        self.is_pure_conic = bool(np.all(np.asarray(aspherics) == 0))
+
         # Initialize empty - will be set by integrator
         self.aperture_samples = jnp.zeros((n_mirrors, 0, 2))
         self.perturbation_angles = jnp.zeros((n_mirrors, 0, 2))
@@ -260,7 +265,8 @@ class AsphericDiskMirrorGroup(MirrorGroup):
         return AsphericSurface(
             self.curvatures[mirror_idx],
             self.conics[mirror_idx],
-            self.aspherics[mirror_idx]
+            self.aspherics[mirror_idx],
+            is_pure_conic=self.is_pure_conic,
         )
 
     def check_aperture(self, x, y, mirror_idx):
@@ -385,6 +391,8 @@ class AsphericPolygonMirrorGroup(MirrorGroup):
     n_vertices: int = eqx.field(static=True)  # Number of vertices (3, 4, 6, etc.)
     offsets: jax.Array        # (N, 2) - x0, y0 offset for each mirror
 
+    is_pure_conic: bool = eqx.field(static=True)  # True if all aspherics are zero
+
     def __init__(self, positions, rotations, curvatures, conics, aspherics, vertices_list,
                  optical_stage=0, offsets=None):
         """
@@ -402,6 +410,9 @@ class AsphericPolygonMirrorGroup(MirrorGroup):
         n_mirrors = self.positions.shape[0]
         self.offsets = jnp.asarray(offsets) if offsets is not None else jnp.zeros((n_mirrors, 2))
 
+        # Determine if all mirrors are pure conics (no aspheric terms)
+        self.is_pure_conic = bool(np.all(np.asarray(aspherics) == 0))
+
         # Initialize empty - will be set by integrator
         self.aperture_samples = jnp.zeros((n_mirrors, 0, 2))
         self.perturbation_angles = jnp.zeros((n_mirrors, 0, 2))
@@ -415,7 +426,8 @@ class AsphericPolygonMirrorGroup(MirrorGroup):
         return AsphericSurface(
             self.curvatures[mirror_idx],
             self.conics[mirror_idx],
-            self.aspherics[mirror_idx]
+            self.aspherics[mirror_idx],
+            is_pure_conic=self.is_pure_conic,
         )
 
     def check_aperture(self, x, y, mirror_idx):

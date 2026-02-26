@@ -174,6 +174,7 @@ class AsphericDiskLensGroup(LensGroup):
 
     n_outside: float
     optical_stage: int = eqx.field(static=True)
+    is_pure_conic: bool = eqx.field(static=True)  # True if all aspherics are zero
 
     def __init__(self, positions, rotations, curvatures, conics, aspherics, radii,
                  n_inside, optical_stage=0, n_outside=1.0, transmittance=None,
@@ -212,6 +213,9 @@ class AsphericDiskLensGroup(LensGroup):
         self.offsets = jnp.asarray(offsets) if offsets is not None else jnp.zeros((n_elements, 2))
         self.transmittance = jnp.asarray(transmittance) if transmittance is not None else jnp.ones(n_elements)
 
+        # Determine if all elements are pure conics (no aspheric terms)
+        self.is_pure_conic = bool(np.all(np.asarray(aspherics) == 0))
+
         self.aperture_samples = jnp.zeros((n_elements, 0, 2))
         self.perturbation_angles = jnp.zeros((n_elements, 0, 2))
         self.perturbation_scale = jnp.zeros(n_elements)
@@ -226,7 +230,8 @@ class AsphericDiskLensGroup(LensGroup):
         return AsphericSurface(
             self.curvatures[element_idx],
             self.conics[element_idx],
-            self.aspherics[element_idx]
+            self.aspherics[element_idx],
+            is_pure_conic=self.is_pure_conic,
         )
 
     def check_aperture(self, x, y, element_idx):
@@ -340,6 +345,7 @@ class PlanoSlabGroup(LensGroup):
 
     n_outside: float
     optical_stage: int = eqx.field(static=True)
+    is_pure_conic: bool = eqx.field(static=True)  # Always True for plano slabs
 
     def __init__(self, positions, rotations, radii, thickness, n_inside,
                  optical_stage=0, n_outside=1.0, transmittance=None):
@@ -366,6 +372,9 @@ class PlanoSlabGroup(LensGroup):
         self.conics = jnp.zeros(n_elements)
         self.aspherics = jnp.zeros((n_elements, 1))
         self.offsets = jnp.zeros((n_elements, 2))
+
+        # Plano slabs are always pure conics (flat surfaces)
+        self.is_pure_conic = True
 
         thickness_arr = jnp.asarray(thickness)
         if thickness_arr.ndim == 0:
@@ -394,7 +403,8 @@ class PlanoSlabGroup(LensGroup):
         return AsphericSurface(
             self.curvatures[element_idx],
             self.conics[element_idx],
-            self.aspherics[element_idx]
+            self.aspherics[element_idx],
+            is_pure_conic=self.is_pure_conic,
         )
 
     def check_aperture(self, x, y, element_idx):
