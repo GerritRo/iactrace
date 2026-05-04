@@ -170,6 +170,7 @@ class TestRandomPerturbations:
         assert not jnp.allclose(
             modified_tel.mirror_groups[0].positions[:, 2],
             simple_telescope.mirror_groups[0].positions[:, 2]
+        )
         
     def test_conic_error_preserves_mean(self, simple_telescope, random_key):
         """Conic error with zero sigma should preserve original values."""
