@@ -12,7 +12,7 @@ from .sensors import (
 from .telescope import Telescope
 from .viz import hexshow, show_telescope, squareshow
 
-__version__ = "0.6.0"
+__version__ = "0.6.1"
 
 jax.config.update("jax_default_matmul_precision", "highest")
 
