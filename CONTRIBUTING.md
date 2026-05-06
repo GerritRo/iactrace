@@ -86,8 +86,7 @@ This walks you through an interactive prompt:
 
 Result: `fix(core): handle NaN in aspheric surface intersection`
 
-You can also write commit messages manually -- the pre-commit hook validates
-the format on every commit. The format is:
+You can also write commit messages manually. The format is:
 
 ```
 <type>(<scope>): <description>
@@ -147,7 +146,6 @@ cd docs && make html
 # Open docs/_build/html/index.html
 ```
 
-- **Docstrings** use [NumPy style](https://numpydoc.readthedocs.io/en/latest/format.html)
 - **Example notebooks** go in `docs/examples/` and must be added to `docs/examples/index.rst`
 
 ---
