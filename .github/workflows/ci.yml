@@ -49,7 +49,7 @@ jobs:
         run: pytest --cov=iactrace --cov-report=term-missing --cov-report=xml
       - name: Upload coverage to Codecov
         if: always()
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v6
         with:
           token: ${{ secrets.CODECOV_TOKEN }} 
           files: coverage.xml
@@ -80,7 +80,7 @@ jobs:
       - name: Build docs
         run: cd docs && make html
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v4
+        uses: actions/upload-pages-artifact@v5
         with:
           path: docs/_build/html
 
@@ -94,4 +94,4 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
