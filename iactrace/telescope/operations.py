@@ -221,7 +221,7 @@ def apply_misalignment_to_group(telescope, group_idx: int, sigma_h: float, sigma
 
 
 def apply_displacement_to_group(telescope, group_idx: int, sigma_z: float, key: Array) -> Telescope:
-    """Apply random Gaussian distance adjustment to mirrors along the z-axis.
+    """Apply random Gaussian distance adjustment to mirrors along each mirror's local z-axis.
 
     Adds random perturbations to the z-coordinate of each mirror position
     in the specified group, drawn from a Gaussian distribution.
@@ -235,15 +235,19 @@ def apply_displacement_to_group(telescope, group_idx: int, sigma_z: float, key: 
     Returns:
         New Telescope with randomly displaced mirrors
     """
+    from ..core.transforms import euler_to_matrix
     group = telescope.mirror_groups[group_idx]
     n_mirrors = len(group)
 
-    # Generate random z displacements
+    # Generate random z displacements along each mirrors's local z-axis
     delta_z = jax.random.normal(key, shape=(n_mirrors,)) * sigma_z
 
-    # Apply to z-component of positions
-    current_positions = group.positions
-    new_positions = current_positions.at[:, 2].add(delta_z)
+    # Transform local z-axis of each mirror to world coordinates
+    rot = jax.vmap(euler_to_matrix)(group.rotations)
+    local_z_world = rot[:, :, 2]
+
+    # Apply displacement
+    new_positions = group.positions + delta_z[:, None] * local_z_world
 
     return _update_mirror_group_attr(
         telescope, group_idx, lambda g: g.positions, new_positions

@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.colors import Normalize
 from matplotlib.patches import RegularPolygon
 
 
@@ -100,30 +101,23 @@ def hexshow(result, sensor, sensor_idx=None, ax=None, **kwargs):
         ax = plt.gca()
 
     hex_centers = np.array(sensor.hex_centers)
-
-    # Determine hex size for plotting
     hex_size = sensor.hex_size
-
-    # Get the grid rotation (how much the original grid was rotated)
     grid_rotation = sensor.grid_rotation
 
     vmin = kwargs.pop('vmin', data.min())
     vmax = kwargs.pop('vmax', data.max())
     cmap = plt.get_cmap(kwargs.pop('cmap', 'viridis'))
+    norm = Normalize(vmin=vmin, vmax=vmax)
 
     for i, (x, y) in enumerate(hex_centers):
-        value = float(data[i])
-        color = cmap(np.clip(value, vmin, np.inf) / vmax)
-
-        # Pointy-top base orientation (30 degrees) plus the grid's rotation
         hex_patch = RegularPolygon(
             (x, y),
             numVertices=6,
             radius=hex_size,
             orientation=grid_rotation,
-            facecolor=color,
+            facecolor=cmap(norm(float(data[i]))),
             edgecolor='black',
-            linewidth=0.5
+            linewidth=0.5,
         )
         ax.add_patch(hex_patch)
 

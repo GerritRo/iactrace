@@ -150,15 +150,18 @@ class TestRandomPerturbations:
         assert jnp.isclose(jnp.std(delta_h), expected_sigma_h_deg, rtol=0.1)
         assert jnp.isclose(jnp.std(delta_v), expected_sigma_v_deg, rtol=0.1)
 
-    def test_displacement_affects_only_z(self, simple_telescope, random_key):
-        """Z-axis displacement should only affect z coordinates."""
+    def test_displacement_along_local_z_for_untilted_mirrors(
+        self, simple_telescope, random_key
+    ):
+        """For mirrors with zero rotation, local z == global z, so displacement
+        should only affect the world-frame z coordinate."""
         original_xy = simple_telescope.mirror_groups[0].positions[:, :2].copy()
 
         modified_tel = ops.apply_displacement_to_group(
             simple_telescope, 0, sigma_z=1.0, key=random_key
         )
 
-        # X and Y unchanged
+        # X and Y unchanged (mirrors have zero rotation in the fixture)
         assert jnp.allclose(
             modified_tel.mirror_groups[0].positions[:, :2],
             original_xy

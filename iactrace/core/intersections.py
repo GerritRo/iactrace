@@ -43,7 +43,19 @@ def intersect_plane(ray_origin, ray_direction, plane_center, plane_rotation):
 
 
 def intersect_cylinder(ray_origin, ray_direction, p1, p2, radius):
-    """Single cylinder intersection (for vmapping)."""
+    """
+    Intersect ray with finite cylinder with end caps.
+
+    Args:
+        ray_origin: Ray origin (3,)
+        ray_direction: Ray direction (3,), assumed normalized
+        p1: Center of the bottom end cap of the cylinder (3,)
+        p2: Center of the top end cap of the cylinder (3,)
+        radius: Cylinder radius (scalar)
+
+    Returns:
+        t parameter of nearest intersection, jnp.inf if no hit
+    """
     axis = p2 - p1
     height = jnp.linalg.norm(axis)
     axis = axis / height
@@ -172,7 +184,7 @@ def intersect_oriented_box(ray_origin, ray_direction, center, half_extents, rota
     """
     eps = 1e-8
 
-    # Transform ray to box's local coordinate system
+    # Transform ray to box local coordinate system
     rot_inv = rotation.T
     local_origin = rot_inv @ (ray_origin - center)
     local_direction = rot_inv @ ray_direction
@@ -288,15 +300,15 @@ def intersect_conic(ray_origin, ray_direction, curvature, conic):
         conic: Conic constant (0=sphere, -1=paraboloid, <-1=hyperboloid, >-1=ellipsoid)
 
     Returns:
-        t: Ray parameter at intersection (smallest positive root), inf if no intersection
+        t: Ray parameter at intersection (vertex-side positive root), inf if no intersection
     """
     ox, oy, oz = ray_origin[0], ray_origin[1], ray_origin[2]
     dx, dy, dz = ray_direction[0], ray_direction[1], ray_direction[2]
     c = curvature
     k = conic
 
-    # Quadratic coefficients: A*t² + B*t + C = 0
-    # From substituting ray into: c*(x² + y²) + (1+k)*c*z² - 2*z = 0
+    # Quadratic coefficients: A*t^2 + B*t + C = 0 from subbing
+    # ray into conic equation
     A = c * (dx * dx + dy * dy + (1 + k) * dz * dz)
     B = 2 * (c * (ox * dx + oy * dy + (1 + k) * oz * dz) - dz)
     C = c * (ox * ox + oy * oy + (1 + k) * oz * oz) - 2 * oz
@@ -306,7 +318,7 @@ def intersect_conic(ray_origin, ray_direction, curvature, conic):
     t_plane = jnp.where(jnp.abs(dz) > 1e-10, -oz / dz, jnp.inf)
     t_plane = jnp.where(t_plane > 1e-8, t_plane, jnp.inf)
 
-    # Handle linear case (A ≈ 0, e.g., paraboloid on-axis)
+    # Handle linear case
     is_linear = jnp.abs(A) < 1e-12
     t_linear = jnp.where(jnp.abs(B) > 1e-12, -C / B, jnp.inf)
     t_linear = jnp.where(t_linear > 1e-8, t_linear, jnp.inf)
@@ -320,17 +332,21 @@ def intersect_conic(ray_origin, ray_direction, curvature, conic):
     t1 = (-B - sqrt_disc) / (2 * A + 1e-30)
     t2 = (-B + sqrt_disc) / (2 * A + 1e-30)
 
-    # Select smallest positive root
+    # Select the positive root closest to the vertex (z=0).
+    z1 = oz + t1 * dz
+    z2 = oz + t2 * dz
     t1_valid = t1 > 1e-8
     t2_valid = t2 > 1e-8
+    prefer_t1 = jnp.abs(z1) <= jnp.abs(z2)
+    t_both_valid = jnp.where(prefer_t1, t1, t2)
     t_conic = jnp.where(
         t1_valid & t2_valid,
-        jnp.minimum(t1, t2),
+        t_both_valid,
         jnp.where(t1_valid, t1, jnp.where(t2_valid, t2, jnp.inf))
     )
     t_conic = jnp.where(no_intersection, jnp.inf, t_conic)
 
-    # Select: plane → linear → quadratic
+    # Select: plane/linear/quadratic
     t_conic = jnp.where(is_linear, t_linear, t_conic)
     return jnp.where(is_plane, t_plane, t_conic)
 
