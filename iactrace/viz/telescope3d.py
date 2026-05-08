@@ -102,7 +102,8 @@ def _get_mirror_meshes(group):
         radii = np.asarray(group.aperture.radii)
         inner_radii = np.asarray(group.aperture.inner_radii)
         for i in range(len(group)):
-            sag_fn = lambda x, y, _i=i: group.surface.sag_at(_i, x, y)
+            def sag_fn(x, y, _i=i):
+                return group.surface.sag_at(_i, x, y)
             mesh = _create_disk_mesh(positions[i], rotations[i], radii[i], sag_fn,
                                      inner_radius=inner_radii[i])
             mesh = _make_double_sided(mesh)
@@ -112,7 +113,8 @@ def _get_mirror_meshes(group):
     elif isinstance(group.aperture, PolygonAperture):
         vertices = np.asarray(group.aperture.vertices)
         for i in range(len(group)):
-            sag_fn = lambda x, y, _i=i: group.surface.sag_at(_i, x, y)
+            def sag_fn(x, y, _i=i):
+                return group.surface.sag_at(_i, x, y)
             mesh = _create_polygon_mesh(positions[i], rotations[i], vertices[i], sag_fn)
             mesh = _make_double_sided(mesh)
             if mesh is not None:
@@ -139,7 +141,8 @@ def _get_lens_meshes(group):
         radii = np.asarray(group.aperture.radii)
 
         for i in range(len(group)):
-            sag_fn = lambda x, y, _i=i: group.surface.sag_at(_i, x, y)
+            def sag_fn(x, y, _i=i):
+                return group.surface.sag_at(_i, x, y)
             mesh = _create_disk_mesh(positions[i], rotations[i], radii[i], sag_fn)
             mesh = _make_double_sided(mesh)
             if mesh is not None:

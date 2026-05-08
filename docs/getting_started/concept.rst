@@ -1,38 +1,20 @@
 Concepts
 ========
 
-This page explains the core concepts and terminology used in IACTrace.
-
-Coordinate System
------------------
-
-IACTrace uses a right-handed Cartesian coordinate system:
-
-- **X-axis**: Vertical, along the alt axis
-- **Y-axis**: Horizontal, along the az axis
-- **Z-axis**: Along the optical axis, pointing from the primary mirror toward
-  the sky (positive Z is "up" toward incoming light)
-
-.. note::
-
-   The coordinate origin is typically at the center of the primary mirror dish.
-
-All positions are specified in the units defined in the telescope configuration
-(currently only supporting meters).
-
-Angles are specified in **degrees** for orientations (Euler angles) and
-**arcseconds** for small perturbations like surface roughness and misalignment.
+This page introduces the moving parts. For the precise contract —
+coordinates, units, photometry, differentiability — see
+:doc:`conventions`.
 
 Light Sources
 -------------
 
-IACTrace supports two types of light sources:
+IACTrace's ``render`` path supports two source types:
 
 **Parallel sources** (``source_type='parallel'``)
 
-Represent light from astronomical sources at effectively infinite distance.
-The input is a direction vector ``[dx, dy, dz]`` pointing *toward* the source.
-For on-axis light coming straight down onto the telescope:
+Light from astronomical sources at effectively infinite distance. The
+input is a direction vector ``[dx, dy, dz]`` pointing *toward* the
+source. For on-axis light coming straight down onto the telescope:
 
 .. code-block:: python
 
@@ -47,47 +29,41 @@ For an off-axis source at 1 degree in X:
 
 **Point sources** (``source_type='point'``)
 
-Represent light from finite-distance calibration sources (LEDs, flashers).
-The input is a position ``[x, y, z]`` in the telescope coordinate system:
+Light from finite-distance calibration sources (LEDs, flashers). The
+input is a position ``[x, y, z]`` in the telescope coordinate system:
 
 .. code-block:: python
 
    # LED at 200m distance, slightly off-axis
    position = jnp.array([[0.5, 0.3, 200.0]])
 
-The telescope traces rays from this position to each mirror facet.
+For anything else — extended sources, Cherenkov shower input, custom
+calibration ray patterns — sample the rays yourself and use
+:meth:`Telescope.trace` (see :doc:`conventions`).
 
 Monte Carlo Integration
 -----------------------
 
-For computational efficiency, IACTrace uses Monte-Carlo sampling for the primary
-optical group when sampling rays. This removes the need for expensive intersection
-computations on the first layer, at the cost of having to 'weight' rays with effective
-ray apertures.
+For computational efficiency, IACTrace uses Monte-Carlo sampling for
+the primary optical group. This avoids expensive intersection
+computations on the first surface, at the cost of having to weight
+rays by an effective ray aperture.
 
-The ``MCIntegrator`` controls this sampling:
-
-.. code-block:: python
-
-   from iactrace import MCIntegrator
-
-   integrator = MCIntegrator(n_samples=1024)
-
-**n_samples**: Number of ray samples per mirror facet. Higher values give more
-accurate results but increase computation time and memory usage. Recommended
-values:
-
-- Quick testing: 64-256
-- Standard simulation: 1024-4096
-- High precision: 8192+
-
-The samples are drawn using JAX's PRNG system. Provide a random key when
-loading the telescope to ensure reproducibility:
+The number of samples per mirror facet is set at load time via the
+``n_samples`` argument to :meth:`Telescope.from_yaml`:
 
 .. code-block:: python
+
+   import jax
+   from iactrace import Telescope
 
    key = jax.random.key(42)  # Fixed seed for reproducibility
-   telescope = load_telescope("config.yaml", integrator, key)
+   telescope = Telescope.from_yaml(
+       "telescope.yaml", n_samples=1024, key=key,
+   )
+
+Higher values give more accurate results but increase compute and
+memory. Pass a deterministic ``key`` to make the sampling reproducible.
 
 Telescope Structure
 -------------------
@@ -97,92 +73,78 @@ A telescope in IACTrace consists of:
 **Mirror groups**
 
 Collections of mirror facets at the same optical stage. A single-mirror
-telescope has one group (the primary). A Cassegrain has two groups (primary
-and secondary).
+telescope has one group (the primary). A Cassegrain has two groups
+(primary and secondary). Each facet in a group has:
 
-Each facet in a group has:
-
-- Position: ``[x, y, z]`` center location
+- Position: ``[x, y, z]`` centre location
 - Orientation: ``[rx, ry, rz]`` Euler angles (degrees)
-- Aperture: Shape and size (circular, hexagonal)
-- Surface: Curvature, conic constant, aspheric terms
-
-**Sensors**
-
-Detector arrays at the focal plane. Each sensor has:
-
-- Position and orientation in telescope coordinates
-- Pixel geometry (square or hexagonal)
-- Physical bounds or pixel size
+- Aperture: shape and size (circular, hexagonal)
+- Surface: curvature, conic constant, aspheric terms
 
 **Obstructions**
 
-Mechanical structures that block rays (support struts, camera housing).
-Currently supports cylinders, boxes, and spheres.
+Mechanical structures that block rays (support struts, camera
+housing). Currently supports cylinders, boxes, and spheres.
 
-Functional Operations
----------------------
+**Camera frame**
 
-IACTrace uses a functional programming style: operations return new telescope
-instances rather than modifying in place. This design:
+Each telescope carries the position and Euler-angle orientation of the
+camera (the ``camera_position`` / ``camera_rotation`` fields in the
+telescope YAML). After tracing, rays are transformed into this local
+camera frame so that the :class:`~iactrace.Camera` works in its own
+coordinate system. Sensors, pixel layout and the photosensor model
+live on the :class:`~iactrace.Camera` (loaded from a separate camera
+YAML), not on the telescope.
 
-- Enables JAX's transformation system (``jit``, ``grad``, ``vmap``)
-- Makes it easy to compare before/after states
-- Avoids subtle mutation bugs
-
-.. code-block:: python
-
-   # Original telescope is unchanged
-   original = load_telescope("config.yaml", integrator, key)
-
-   # Operations return new instances
-   with_roughness = original.apply_roughness(30.0)
-   with_misalignment = with_roughness.apply_misalignment_to_group(0, 10.0, 10.0, key)
-
-   # Can still use original
-   image_perfect = original.render(sources, values, source_type='parallel')
-   image_degraded = with_misalignment.render(sources, values, source_type='parallel')
+Operations on a :class:`~iactrace.Telescope` return new instances
+rather than mutating in place; see :doc:`telescope_operations` for the
+full set and the rationale.
 
 Rendering vs Tracing
 --------------------
 
-IACTrace provides two main interfaces for simulation:
+Both methods return a :class:`~iactrace.RayBundle` (or
+:class:`~iactrace.LazyRayBundle`) in the camera-local frame; pass to
+:meth:`Camera.image` for a binned pixel image, or
+:meth:`Camera.collect` for per-ray output.
 
-**render()**
-
-High-level interface for simulating images from astronomical sources. Handles
-the source-to-ray conversion internally:
-
-.. code-block:: python
-
-   image = telescope.render(sources, values, source_type='parallel')
-
-**trace()**
-
-Low-level interface for tracing explicit rays. You provide ray origins and
-directions directly:
+**render()** — high-level path for point and parallel sources. Handles
+source-to-ray sampling internally and fuses the per-mirror-element
+scan downstream:
 
 .. code-block:: python
 
-   image = telescope.trace(ray_origins, ray_directions, ray_values)
+   ray_bundle = telescope.render(sources, values, source_type='parallel')
+   image = camera.image(ray_bundle)
 
-Use ``trace()`` when you need precise control over ray geometry, such as
-simulating LED calibration systems with known emission patterns. This also leads
-to rays not having 'effective ray aperture' weighting.
-
-Debug
------
-
-For debugging and analysis, both **trace()** and **render()** can use a debug flag
-to pass ray coordinates without binning into pixels:
+**trace()** — general path. You provide ray origins and directions
+directly. Use this for any custom ray distribution that ``render``
+doesn't cover (extended sources, Cherenkov shower output, calibration
+patterns):
 
 .. code-block:: python
 
-   # Returns (positions, sensor_id, values) instead of binned image
-   points, sensor_id, weights = telescope.trace(..., debug=True)
+   ray_bundle = telescope.trace(ray_origins, ray_directions, ray_values)
+   image = camera.image(ray_bundle)
 
-This is useful for:
+``trace`` does not apply effective-aperture weighting because *you*
+supplied the rays; it just propagates them.
 
-- Visualizing the raw spot diagram
-- Computing custom statistics on ray distributions
-- Debugging optical alignment
+Raw ray output
+--------------
+
+For debugging and custom analysis, call :meth:`Camera.collect` instead
+of :meth:`Camera.image` to get raw per-ray output without pixel
+binning:
+
+.. code-block:: python
+
+   ray_bundle = telescope.render(sources, values, source_type='parallel')
+   pe_vals, pe_times, pix_id, hit_mask = camera.collect(ray_bundle)
+
+``hit_mask`` flags rays that intersected a sensor (vs missed every
+sensor in the camera). This is useful for:
+
+- visualising the raw spot diagram
+- computing custom statistics on ray distributions
+- debugging optical alignment

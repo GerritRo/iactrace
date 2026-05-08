@@ -17,11 +17,11 @@ Core Classes
    :widths: 30 70
 
    * - :class:`~iactrace.telescope.Telescope`
-     - Main telescope class for ray tracing simulations
-   * - :class:`~iactrace.core.MCIntegrator`
-     - Monte Carlo integrator for sampling rays on surfaces
-   * - :class:`~iactrace.core.Integrator`
-     - Base integrator class
+     - Optical system: mirrors, lenses, obstructions, camera frame
+   * - :class:`~iactrace.camera.Camera`
+     - Detection system: sensor groups, concentrator, photosensor
+   * - :class:`~iactrace.core.RayBundle`
+     - Ray positions/directions/values exchanged between the two
 
 Sensor Classes
 ^^^^^^^^^^^^^^
@@ -29,14 +29,10 @@ Sensor Classes
 .. list-table::
    :widths: 30 70
 
-   * - :class:`~iactrace.sensors.SquareSensorGroup`
+   * - :class:`~iactrace.camera.SquareSensorGroup`
      - Rectangular pixel grid sensor
-   * - :class:`~iactrace.sensors.HexagonalSensorGroup`
+   * - :class:`~iactrace.camera.HexagonalSensorGroup`
      - Hexagonally-packed pixel sensor
-   * - :class:`~iactrace.sensors.StraightThroughSquareSensorGroup`
-     - Square sensor returning raw ray coordinates
-   * - :class:`~iactrace.sensors.StraightThroughHexagonalSensorGroup`
-     - Hexagonal sensor returning raw ray coordinates
 
 I/O Functions
 ^^^^^^^^^^^^^
@@ -44,12 +40,14 @@ I/O Functions
 .. list-table::
    :widths: 30 70
 
-   * - :func:`~iactrace.io.load_telescope`
-     - Load telescope from YAML configuration file
+   * - :meth:`Telescope.from_yaml <iactrace.telescope.Telescope.from_yaml>`
+     - Load a telescope from a standalone telescope YAML file
+   * - :meth:`Camera.from_yaml <iactrace.camera.Camera.from_yaml>`
+     - Load a camera from a standalone camera YAML file
    * - :func:`~iactrace.io.save_telescope`
-     - Save telescope to YAML configuration file
-   * - :func:`~iactrace.io.build_telescope`
-     - Build telescope from configuration dictionary
+     - Save a telescope to a standalone YAML file
+   * - :func:`~iactrace.io.save_camera`
+     - Save a camera to a standalone YAML file
 
 Visualization Functions
 ^^^^^^^^^^^^^^^^^^^^^^^

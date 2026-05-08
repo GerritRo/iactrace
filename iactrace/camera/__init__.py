@@ -1,4 +1,3 @@
-from . import operations
 from .camera import Camera
 from .concentrator import Concentrator
 from .layout import HexagonalSensorGroup, SensorGroup, SquareSensorGroup

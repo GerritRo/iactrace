@@ -11,7 +11,7 @@ What is IACTrace?
 IACTrace provides a computational framework for:
 
 - **IACT optical simulation**: Trace light rays through complex telescope geometries
-  including segmented primary mirrors, secondary mirrors, and obstructiong geometry.
+  including segmented primary mirrors, secondary mirrors, and obstruction geometry.
 
 - **Differentiable simulation**: Compute gradients through the entire simulation
   pipeline, enabling gradient-based optimization of telescope parameters.

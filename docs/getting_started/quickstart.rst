@@ -4,24 +4,29 @@ Quick Start
 This guide walks through the basic IACTrace workflow: loading a telescope,
 simulating observations, and visualizing results.
 
-Loading a Telescope
--------------------
+Loading a Telescope and Camera
+------------------------------
 
-The simplest way to get started is loading a pre-configured telescope:
+Telescope and camera configurations live in separate YAML files. Load
+each one independently — this lets you pair a single shared camera
+(for example ``configs/CTAO/LSTCam.yaml``, used by all four LSTs)
+with multiple telescopes.
 
 .. code-block:: python
 
    import jax
-   from iactrace import MCIntegrator, load_telescope
+   from iactrace import Telescope, Camera
 
-   # Random key for Monte Carlo sampling
+   # Random key for Monte Carlo sampling.
    key = jax.random.key(0)
 
-   # Integrator controls ray sampling density
-   integrator = MCIntegrator(n_samples=256)
+   # Load the telescope (optics + camera frame).
+   telescope = Telescope.from_yaml(
+       "configs/HESS/CT3.yaml", n_samples=256, key=key,
+   )
 
-   # Load telescope from YAML configuration
-   telescope = load_telescope("configs/HESS/CT3.yaml", integrator, key)
+   # Load the camera (sensor layout in the camera-local frame).
+   camera = Camera.from_yaml("configs/HESS/HESS1U.yaml")
 
 The ``n_samples`` parameter sets the number of rays traced per mirror facet.
 Start with lower values (64-512) for quick iteration, increase for final
@@ -30,8 +35,7 @@ results.
 Simulating Parallel Light
 -------------------------
 
-For astronomical sources (stars, gamma-ray showers), use parallel light with
-direction vectors:
+For astronomical sources, use parallel light with direction vectors:
 
 .. code-block:: python
 
@@ -41,8 +45,9 @@ direction vectors:
    directions = jnp.array([[0.0, 0.0, -1.0]])
    values = jnp.array([1.0])
 
-   # Render image
-   image = telescope.render(directions, values, source_type='parallel')
+   # Trace through optics, then form a pixel image.
+   ray_bundle = telescope.render(directions, values, source_type='parallel')
+   image = camera.image(ray_bundle)
 
 For off-axis sources, compute the direction vector from the angular offset:
 
@@ -65,7 +70,8 @@ For finite-distance calibration sources, use point source mode with positions:
    positions = jnp.array([[-0.5, 0.3, 500.0]])
    values = jnp.array([1.0])
 
-   image = telescope.render(positions, values, source_type='point')
+   ray_bundle = telescope.render(positions, values, source_type='point')
+   image = camera.image(ray_bundle)
 
 Multiple Sources
 ----------------
@@ -90,7 +96,8 @@ Render multiple sources simultaneously by stacking them:
    # Random intensities
    intensities = jax.random.uniform(key, (n_stars,))
 
-   image = telescope.render(directions, intensities, source_type='parallel')
+   ray_bundle = telescope.render(directions, intensities, source_type='parallel')
+   image = camera.image(ray_bundle)
 
 Visualizing Results
 -------------------
@@ -105,7 +112,7 @@ IACTrace provides visualization functions for both sensor types:
    from iactrace import hexshow
 
    fig, ax = plt.subplots(figsize=(8, 8))
-   hexshow(image, telescope.sensors[0], ax=ax)
+   hexshow(image, camera.sensor_groups[0], ax=ax)
    plt.colorbar(ax.collections[0], label='Intensity')
    plt.show()
 
@@ -116,7 +123,7 @@ IACTrace provides visualization functions for both sensor types:
    from iactrace import squareshow
 
    fig, ax = plt.subplots(figsize=(8, 8))
-   squareshow(image, telescope.sensors[0], ax=ax)
+   squareshow(image, camera.sensor_groups[0], ax=ax)
    plt.colorbar(ax.images[0], label='Intensity')
    plt.show()
 
@@ -145,31 +152,31 @@ Real telescopes have manufacturing tolerances and alignment errors:
 
 .. code-block:: python
 
-   # Surface roughness (broadens PSF)
-   telescope = telescope.apply_roughness(24.0)  # 24 arcseconds RMS
+   # Surface roughness (broadens PSF), 12 arcsec on the primary
+   telescope = telescope.apply_roughness(stage=0, sigma=12.0)
 
    # Mirror misalignment
    key = jax.random.key(42)
-   telescope = telescope.apply_misalignment_to_group(
-       group_idx=0,      # Primary mirror group
-       sigma_h=10.0,     # Horizontal misalignment (arcsec)
-       sigma_v=10.0,     # Vertical misalignment (arcsec)
-       key=key
+   telescope = telescope.apply_misalignment(
+       stage=0,          # primary
+       sigma_h=10.0,     # horizontal tip (arcsec)
+       sigma_v=10.0,     # vertical tilt (arcsec)
+       key=key,
    )
 
-Multiple Sensors
-----------------
+Multiple Sensor Groups
+----------------------
 
-Some telescopes have multiple sensors (science camera + lid camera). Select
-which sensor to render:
+Some cameras have more than one sensor group. The telescope renders rays
+once; the camera selects which sensor group accumulates the image
+via ``sensor_idx``:
 
 .. code-block:: python
 
-   # Render to science camera (index 0)
-   image_science = telescope.render(sources, values, source_type='parallel', sensor_idx=0)
+   ray_bundle = telescope.render(sources, values, source_type='parallel')
 
-   # Render to monitoring camera (index 1)
-   image_monitor = telescope.render(sources, values, source_type='parallel', sensor_idx=1)
+   image_sensor1 = camera.image(ray_bundle, sensor_idx=0)
+   image_sensor2 = camera.image(ray_bundle, sensor_idx=1)
 
 Next Steps
 ----------

@@ -1,42 +1,75 @@
 Custom Telescopes
 =================
 
-This guide explains how to create telescope configurations for your own
-optical systems.
+This guide explains how to create telescope and camera configurations for
+your own optical systems.
 
-YAML Configuration Structure
-----------------------------
+Two YAML files
+--------------
 
-Telescope configurations are defined in YAML files with the following sections:
+A telescope and its camera are described in **two separate YAML files**.
+The telescope file owns the optics and the camera frame; the camera file
+owns the sensor layout and the photosensor model. This split lets a single
+shared camera file be paired with several telescope files (for example
+``configs/CTAO/LST_camera.yaml`` is reused by all four LSTs).
+
+.. code-block:: text
+
+   my_telescope.yaml   <- mirrors, lenses, obstructions, camera frame
+   my_camera.yaml      <- sensors, quantum efficiency, concentrator
+
+Telescope YAML structure
+------------------------
 
 .. code-block:: yaml
 
    telescope:
      name: my_telescope
-     units: m           # Length units
+     units: m              # Length units (currently only "m")
+     camera_position:      # Camera origin in world coordinates
+       - 0.0
+       - 0.0
+       - 15.0
+     camera_rotation:      # Camera orientation as Euler angles (degrees)
+       - 0.0
+       - 0.0
+       - 0.0
 
    mirror_templates:
-     # Surface parameter templates (optional)
+     # Surface parameter templates referenced by mirrors
 
    mirrors:
      # List of mirror facets
 
-   sensors:
-     # List of detector arrays
+   lenses:
+     # Optional list of refractive elements
 
    obstructions:
-     # List of shadow-casting structures (optional)
+     # Optional list of shadow-casting structures
+
+``camera_position`` and ``camera_rotation`` are required: rays are
+transformed into this frame after tracing so that the camera works in its
+own coordinate system.
 
 Basic Example
 -------------
 
-A simple single-mirror telescope with a hexagonal sensor:
+A simple single-mirror telescope:
 
 .. code-block:: yaml
 
    telescope:
      name: simple_parabolic
      units: m
+     camera_position: [0.0, 0.0, 15.0]
+     camera_rotation: [0.0, 0.0, 0.0]
+
+   mirror_templates:
+     primary:
+       surface:
+         curvature: 0.0333    # 1/(2*focal_length) for parabola
+         conic: -1.0          # Parabolic
+         aspheric: []
 
    mirrors:
      - position: [0, 0, 0]
@@ -44,18 +77,7 @@ A simple single-mirror telescope with a hexagonal sensor:
        aperture:
          type: circular
          radius: 6.0
-       surface:
-         curvature: 0.0333    # 1/(2*focal_length) for parabola
-         conic: -1.0          # Parabolic
-         aspheric: []
-
-   sensors:
-     - type: square
-       position: [0, 0, 15.0]
-       orientation: [0, 0, 0]
-       width: 256            # Pixels in X
-       height: 256           # Pixels in Y
-       bounds: [-0.5, 0.5, -0.5, 0.5]  # [xmin, xmax, ymin, ymax]
+       template: primary
 
 Mirror Definitions
 ------------------
@@ -89,31 +111,23 @@ Each mirror entry specifies:
         type: polygon
         vertices: [[x1,y1],[x2,y2],[x3,y3],...,[xN,yN]]
 
-**surface** (required unless using template)
-   Optical surface parameters:
-
-   .. code-block:: yaml
-
-      surface:
-        curvature: 0.0333     # 1/radius of curvature
-        conic: -1.0           # Conic constant (0=sphere, -1=parabola)
-        aspheric: [0, 0]      # Higher-order coefficients [A4, A6, ...]
+**template** (required)
+   Reference to a ``mirror_templates`` entry that supplies the surface
+   parameters. Every mirror must reference a defined template.
 
 **stage** (optional)
-   Optical stage index. Default is 0 (primary). Set to 1 for secondary mirrors,
-   2 for tertiary, etc.
+   Optical stage index. Default is 0 (primary). Set to 1 for secondary
+   mirrors, 2 for tertiary, etc. Each optical stage may contain at most
+   one mirror or lens group.
 
 **id** (optional)
    Unique identifier for the facet.
 
-**template** (optional)
-   Reference to a mirror template for surface parameters.
+Mirror Templates
+----------------
 
-Using Mirror Templates
-----------------------
-
-For segmented mirrors where many facets share surface parameters, use
-templates to avoid repetition:
+For segmented mirrors where many facets share surface parameters, define
+the surface in a template and reference it from each facet:
 
 .. code-block:: yaml
 
@@ -141,42 +155,41 @@ templates to avoid repetition:
 
      # ... more facets with same template
 
-Sensor Definitions
-------------------
+Lens Definitions (optional)
+---------------------------
 
-Sensor pixels have to be on a regular grid. Each sensor entry specifies:
+Refractive elements live under the top-level ``lenses:`` key. Two lens
+types are supported:
 
-**type** (required)
-   Either ``square`` or ``hexagonal``.
-
-**position** (required)
-   ``[x, y, z]`` coordinates of the sensor center.
-
-**orientation** (optional)
-   ``[rx, ry, rz]`` Euler angles in degrees. Default ``[0, 0, 0]``.
-
-For **square sensors**:
+**Aspheric disk** (curved refractive surface):
 
 .. code-block:: yaml
 
-   sensors:
-     - type: square
-       position: [0, 0, 15.0]
+   lenses:
+     - type: aspheric_disk
+       position: [0, 0, 14.5]
        orientation: [0, 0, 0]
-       width: 256            # Pixels in X
-       height: 256           # Pixels in Y
-       bounds: [-0.5, 0.5, -0.5, 0.5]  # [xmin, xmax, ymin, ymax]
+       radius: 0.5
+       curvature: 0.05
+       conic: 0.0
+       n_inside: 1.5
+       n_outside: 1.0       # default; vacuum on the outside
+       transmittance: 0.95  # default 1.0
+       optical_stage: 1
 
-For **hexagonal sensors**:
+**Plano slab** (parallel-faced window):
 
 .. code-block:: yaml
 
-   sensors:
-     - type: hexagonal
-       position: [0, 0, 15.0]
+   lenses:
+     - type: plano_slab
+       position: [0, 0, 14.0]
        orientation: [0, 0, 0]
-       centers_x: [x1,x2,x3,...,xN] # Hexagon centers in X
-       centers_y: [y1,y2,y3,...,yN] # Hexagon centers in Y
+       radius: 0.5
+       thickness: 0.005
+       n_inside: 1.5
+       transmittance: 0.98
+       optical_stage: 2
 
 Obstruction Definitions
 -----------------------
@@ -199,8 +212,8 @@ Obstructions model mechanical structures that block light:
 
    obstructions:
      - type: box
-       center: [0, 0, 14.5]
-       size: [1.0, 1.0, 0.5]  # [width, height, depth]
+       p1: [-0.5, -0.5, 14.0]   # min corner
+       p2: [ 0.5,  0.5, 14.5]   # max corner
 
 **Spheres** (actuator mechanisms):
 
@@ -209,23 +222,56 @@ Obstructions model mechanical structures that block light:
    obstructions:
      - type: sphere
        center: [0, 0, 0.5]
-       radius: 0.1
+       r: 0.1
+
+Other available obstruction types are ``open_cylinder`` (open-ended
+cylinder), ``oriented_box`` (rotated box; ``center`` + ``half_extents``
++ ``rotation``), and ``triangle`` (``v0``/``v1``/``v2`` vertices).
+
+Camera YAML structure
+---------------------
+
+The camera file describes sensors in the **camera-local frame** (the
+camera origin sits at the telescope's ``camera_position``):
+
+.. code-block:: yaml
+
+   camera:
+     quantum_efficiency: 1.0
+     # concentrator:           # optional
+     #   type: hexagonal_cpc
+     #   exit_inradius: 0.012
+     #   acceptance_angle: 25.0
+
+   sensors:
+     - type: square
+       position: [0, 0, 0]
+       orientation: [0, 0, 0]
+       width: 256              # pixels in X
+       height: 256             # pixels in Y
+       bounds: [-0.5, 0.5, -0.5, 0.5]   # [xmin, xmax, ymin, ymax]
+       id: main_sensor
+
+Sensor types are ``square`` (``width`` / ``height`` / ``bounds``) and
+``hexagonal`` (``centers_x`` / ``centers_y`` lists of pixel centers).
 
 Loading Custom Configurations
 -----------------------------
 
-Load your configuration like any other:
+Load the two halves with the public ``from_yaml`` constructors and pair
+them at runtime:
 
 .. code-block:: python
 
-   from iactrace import MCIntegrator, load_telescope
    import jax
+   from iactrace import Telescope, Camera
 
-   telescope = load_telescope(
-       "my_telescope.yaml",
-       MCIntegrator(n_samples=1024),
-       jax.random.key(0)
+   key = jax.random.key(0)
+
+   telescope = Telescope.from_yaml(
+       "my_telescope.yaml", n_samples=1024, key=key,
    )
+   camera = Camera.from_yaml("my_camera.yaml")
 
 Validating Configurations
 -------------------------
@@ -234,12 +280,10 @@ After loading, inspect the telescope to verify it parsed correctly:
 
 .. code-block:: python
 
-   from iactrace.telescope.operations import get_info
-
-   info = get_info(telescope)
+   info = telescope.get_info()
    print(f"Mirrors: {info['n_mirrors']}")
-   print(f"Sensors: {info['n_sensors']}")
    print(f"Optical stages: {info['optical_stages']}")
+   print(f"Obstructions: {info['n_obstructions']}")
 
    # Visualize to check geometry
    from iactrace.viz import show_telescope

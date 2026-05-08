@@ -9,7 +9,7 @@ from .camera import (
     SquareSensorGroup,
     UniformQE,
 )
-from .core import RayBundle, LazyRayBundle
+from .core import LazyRayBundle, RayBundle
 from .io import save_camera, save_telescope
 from .telescope import Telescope
 from .viz import hexshow, show_telescope, squareshow

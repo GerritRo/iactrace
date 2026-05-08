@@ -53,7 +53,7 @@ used within the CTA collaboration.
 
 **Advantages of ROBAST:**
 
-- Established in the CTA community
+- Established in the CTAO community
 - Handles complex segmented mirrors and aspherical lenses
 - Integrates with ROOT analysis ecosystem
 - Supports Winston cone / light concentrator simulations

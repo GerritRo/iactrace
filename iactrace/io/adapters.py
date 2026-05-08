@@ -8,6 +8,7 @@ import jax.numpy as jnp
 import numpy as np
 from jax import Array
 
+from ..camera.layout import HexagonalSensorGroup, SquareSensorGroup
 from ..core.apertures import Aperture, DiskAperture, PolygonAperture
 from ..core.bsdf import GaussianBSDF
 from ..core.interactions import (
@@ -25,11 +26,10 @@ from ..core.obstructions import (
 )
 from ..core.optics import OpticalElementGroup
 from ..core.transforms import euler_to_matrix
-from ..camera.layout import HexagonalSensorGroup, SquareSensorGroup
 from .schemas import (
     AsphericDiskLensSchema,
-    BSDFSchema,
     BoxObstructionSchema,
+    BSDFSchema,
     CameraConfigSchema,
     CameraFileSchema,
     CircularApertureSchema,
@@ -51,7 +51,6 @@ from .schemas import (
 
 if TYPE_CHECKING:
     from ..camera import Camera
-    from ..camera.concentrator import Concentrator
     from ..camera.layout import SensorGroup
     from ..telescope import Telescope
 
@@ -318,21 +317,21 @@ def _build_aspheric_disk_lens_group(
 
     n_elements = len(lenses)
     aperture = DiskAperture(
-        radii=jnp.asarray([l.radius for l in lenses]),
+        radii=jnp.asarray([lens.radius for lens in lenses]),
         inner_radii=jnp.zeros(n_elements),
     )
 
     return refractive_group(
-        positions=jnp.asarray([l.position for l in lenses]),
-        rotations=jnp.asarray([l.orientation for l in lenses]),
-        curvatures=jnp.asarray([l.curvature for l in lenses]),
-        conics=jnp.asarray([l.conic for l in lenses]),
-        aspherics=_pad_aspherics([l.aspheric for l in lenses]),
-        offsets=jnp.asarray([l.offset for l in lenses]),
+        positions=jnp.asarray([lens.position for lens in lenses]),
+        rotations=jnp.asarray([lens.orientation for lens in lenses]),
+        curvatures=jnp.asarray([lens.curvature for lens in lenses]),
+        conics=jnp.asarray([lens.conic for lens in lenses]),
+        aspherics=_pad_aspherics([lens.aspheric for lens in lenses]),
+        offsets=jnp.asarray([lens.offset for lens in lenses]),
         aperture=aperture,
-        n_inside=jnp.asarray([l.n_inside for l in lenses]),
+        n_inside=jnp.asarray([lens.n_inside for lens in lenses]),
         n_outside=float(lenses[0].n_outside),
-        transmittance=jnp.asarray([l.transmittance for l in lenses]),
+        transmittance=jnp.asarray([lens.transmittance for lens in lenses]),
         sample_key=sample_key,
         optical_stage=stage,
     )
@@ -350,18 +349,18 @@ def _build_plano_slab_group(
 
     n_elements = len(lenses)
     aperture = DiskAperture(
-        radii=jnp.asarray([l.radius for l in lenses]),
+        radii=jnp.asarray([lens.radius for lens in lenses]),
         inner_radii=jnp.zeros(n_elements),
     )
 
     return slab_group(
-        positions=jnp.asarray([l.position for l in lenses]),
-        rotations=jnp.asarray([l.orientation for l in lenses]),
+        positions=jnp.asarray([lens.position for lens in lenses]),
+        rotations=jnp.asarray([lens.orientation for lens in lenses]),
         aperture=aperture,
-        n_inside=jnp.asarray([l.n_inside for l in lenses]),
+        n_inside=jnp.asarray([lens.n_inside for lens in lenses]),
         n_outside=float(lenses[0].n_outside),
-        thickness=jnp.asarray([l.thickness for l in lenses]),
-        transmittance=jnp.asarray([l.transmittance for l in lenses]),
+        thickness=jnp.asarray([lens.thickness for lens in lenses]),
+        transmittance=jnp.asarray([lens.transmittance for lens in lenses]),
         sample_key=sample_key,
         optical_stage=stage,
     )

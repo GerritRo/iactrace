@@ -2,12 +2,16 @@ import jax
 import jax.numpy as jnp
 import pytest
 
-from iactrace.core.apertures import _point_in_convex_polygon, _polygon_area
-from iactrace.core.apertures import DiskAperture, PolygonAperture
+from iactrace.core.apertures import (
+    DiskAperture,
+    PolygonAperture,
+    _point_in_convex_polygon,
+    _polygon_area,
+)
 from iactrace.core.interactions import ReflectInteraction
 from iactrace.core.optics import OpticalElementGroup
-from iactrace.core.surfaces import AsphericSurfaceGroup
 from iactrace.core.sampling import sample_annulus
+from iactrace.core.surfaces import AsphericSurfaceGroup
 
 
 class TestSampleAnnulus:
