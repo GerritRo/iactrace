@@ -1,6 +1,6 @@
 import jax.numpy as jnp
 
-from iactrace.core.optics import fresnel_unpolarized, refract, refract_slab
+from iactrace.core.interactions import fresnel_unpolarized, refract, refract_slab
 
 
 class TestRefract:
@@ -291,7 +291,7 @@ class TestReflect:
 
     def test_normal_incidence_reverses_direction(self):
         """Ray normal to surface reflects back along same line."""
-        from iactrace.core.optics import reflect
+        from iactrace.core.interactions import reflect
 
         direction = jnp.array([0.0, 0.0, -1.0])
         normal = jnp.array([0.0, 0.0, 1.0])
@@ -304,7 +304,7 @@ class TestReflect:
 
     def test_45_degree_reflection(self):
         """45 degree incidence on horizontal surface."""
-        from iactrace.core.optics import reflect
+        from iactrace.core.interactions import reflect
 
         # Ray coming from upper left, hitting horizontal surface
         direction = jnp.array([1.0, 0.0, -1.0]) / jnp.sqrt(2)
@@ -319,7 +319,7 @@ class TestReflect:
 
     def test_reflected_direction_is_unit_length(self):
         """Reflected direction should be unit vector."""
-        from iactrace.core.optics import reflect
+        from iactrace.core.interactions import reflect
 
         direction = jnp.array([0.3, 0.4, -0.866])
         direction = direction / jnp.linalg.norm(direction)

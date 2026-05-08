@@ -2,10 +2,11 @@ import jax
 import numpy as np
 import trimesh
 
-from ..core import AsphericSurface, euler_to_matrix
+from ..core import euler_to_matrix
+from ._utils import convex_hull_2d as _convex_hull_2d
 
 
-def show_telescope(telescope, **kwargs):
+def show_telescope(telescope, camera=None, **kwargs):
     """
     Visualize telescope in 3D.
 
@@ -14,6 +15,7 @@ def show_telescope(telescope, **kwargs):
 
     Args:
         telescope: Telescope object
+        camera: Optional Camera object (for rendering sensors)
         **kwargs: Additional options:
             - mirror_color: RGBA color for mirrors (default: light blue)
             - obstruction_color: RGBA color for obstructions (default: gray)
@@ -39,29 +41,28 @@ def show_telescope(telescope, **kwargs):
             scene.add_geometry(combined)
 
     # Add lens groups
-    if telescope.lens_groups:
-        for group in telescope.lens_groups:
-            meshes = _get_lens_meshes(group)
-            if meshes:
-                combined = trimesh.util.concatenate(meshes)
-                combined.visual.face_colors = lens_color
-                scene.add_geometry(combined)
+    for group in telescope.lens_groups:
+        meshes = _get_lens_meshes(group)
+        if meshes:
+            combined = trimesh.util.concatenate(meshes)
+            combined.visual.face_colors = lens_color
+            scene.add_geometry(combined)
 
     # Add obstruction groups
-    if telescope.obstruction_groups:
-        for group in telescope.obstruction_groups:
-            meshes = _get_obstruction_meshes(group)
-            if meshes:
-                combined = trimesh.util.concatenate(meshes)
-                combined.visual.face_colors = obstruction_color
-                scene.add_geometry(combined)
+    for group in telescope.obstruction_groups:
+        meshes = _get_obstruction_meshes(group)
+        if meshes:
+            combined = trimesh.util.concatenate(meshes)
+            combined.visual.face_colors = obstruction_color
+            scene.add_geometry(combined)
 
-    # Add sensors (each sensor group may contain multiple sensors)
-    for sensor_group in telescope.sensors:
-        meshes = _get_sensor_meshes(sensor_group)
-        for mesh in meshes:
-            mesh.visual.face_colors = sensor_color
-            scene.add_geometry(mesh)
+    # Add sensors from camera
+    if camera is not None:
+        for sensor_group in camera.sensor_groups:
+            meshes = _get_sensor_meshes(sensor_group)
+            for mesh in meshes:
+                mesh.visual.face_colors = sensor_color
+                scene.add_geometry(mesh)
 
     return scene
 
@@ -90,32 +91,29 @@ def _get_mirror_meshes(group):
 
     Each mirror has its own surface parameters (curvature, conic, aspherics).
     """
-    from ..telescope.mirrors import AsphericDiskMirrorGroup, AsphericPolygonMirrorGroup
+    from ..core.apertures import DiskAperture, PolygonAperture
 
     positions = np.asarray(group.positions)
     rotations = np.asarray(group.rotations)
-    offsets = np.asarray(group.offsets)
-    curvatures = np.asarray(group.curvatures)
-    conics = np.asarray(group.conics)
-    aspherics = np.asarray(group.aspherics)
 
     meshes = []
-    if isinstance(group, AsphericDiskMirrorGroup):
-        radii = np.asarray(group.radii)
-        inner_radii = np.asarray(group.inner_radii)
+
+    if isinstance(group.aperture, DiskAperture):
+        radii = np.asarray(group.aperture.radii)
+        inner_radii = np.asarray(group.aperture.inner_radii)
         for i in range(len(group)):
-            surface = AsphericSurface(curvatures[i], conics[i], aspherics[i])
-            mesh = _create_disk_mesh(positions[i], rotations[i], radii[i], surface, offsets[i],
+            sag_fn = lambda x, y, _i=i: group.surface.sag_at(_i, x, y)
+            mesh = _create_disk_mesh(positions[i], rotations[i], radii[i], sag_fn,
                                      inner_radius=inner_radii[i])
             mesh = _make_double_sided(mesh)
             if mesh is not None:
                 meshes.append(mesh)
 
-    elif isinstance(group, AsphericPolygonMirrorGroup):
-        vertices = np.asarray(group.vertices)
+    elif isinstance(group.aperture, PolygonAperture):
+        vertices = np.asarray(group.aperture.vertices)
         for i in range(len(group)):
-            surface = AsphericSurface(curvatures[i], conics[i], aspherics[i])
-            mesh = _create_polygon_mesh(positions[i], rotations[i], vertices[i], surface, offsets[i])
+            sag_fn = lambda x, y, _i=i: group.surface.sag_at(_i, x, y)
+            mesh = _create_polygon_mesh(positions[i], rotations[i], vertices[i], sag_fn)
             mesh = _make_double_sided(mesh)
             if mesh is not None:
                 meshes.append(mesh)
@@ -127,33 +125,29 @@ def _get_lens_meshes(group):
     """Get list of lens meshes from group.
 
     Lenses are rendered similarly to mirrors, as curved surfaces.
-    For AsphericDiskLensGroup, creates disk meshes with the surface curvature.
-    For PlanoSlabGroup, creates flat disk meshes (or optionally cylindrical slabs).
+    For refract interactions, creates disk meshes with the surface curvature.
+    For slab interactions, creates flat disk meshes (or optionally cylindrical slabs).
     """
-    from ..telescope.lenses import AsphericDiskLensGroup, PlanoSlabGroup
+    from ..core.interactions import RefractInteraction, SlabInteraction
 
     positions = np.asarray(group.positions)
     rotations = np.asarray(group.rotations)
 
     meshes = []
 
-    if isinstance(group, AsphericDiskLensGroup):
-        curvatures = np.asarray(group.curvatures)
-        conics = np.asarray(group.conics)
-        aspherics = np.asarray(group.aspherics)
-        offsets = np.asarray(group.offsets)
-        radii = np.asarray(group.radii)
+    if isinstance(group.interaction_module, RefractInteraction):
+        radii = np.asarray(group.aperture.radii)
 
         for i in range(len(group)):
-            surface = AsphericSurface(curvatures[i], conics[i], aspherics[i])
-            mesh = _create_disk_mesh(positions[i], rotations[i], radii[i], surface, offsets[i])
+            sag_fn = lambda x, y, _i=i: group.surface.sag_at(_i, x, y)
+            mesh = _create_disk_mesh(positions[i], rotations[i], radii[i], sag_fn)
             mesh = _make_double_sided(mesh)
             if mesh is not None:
                 meshes.append(mesh)
 
-    elif isinstance(group, PlanoSlabGroup):
-        radii = np.asarray(group.radii)
-        thickness = np.asarray(group.thickness)
+    elif isinstance(group.interaction_module, SlabInteraction):
+        radii = np.asarray(group.aperture.radii)
+        thickness = np.asarray(group.interaction_module.thickness)
 
         for i in range(len(group)):
             # Create a slab (short cylinder) representation
@@ -236,7 +230,7 @@ def _get_sensor_meshes(sensor_group):
 
     Each sensor in the group gets its own mesh, rendered at its position/rotation.
     """
-    from ..sensors import HexagonalSensorGroup, SquareSensorGroup
+    from ..camera import HexagonalSensorGroup, SquareSensorGroup
 
     positions = np.asarray(sensor_group.positions)
     rotations = np.asarray(sensor_group.rotations)
@@ -252,7 +246,7 @@ def _get_sensor_meshes(sensor_group):
         vertices = np.array([[x0, y0], [x1, y0], [x1, y1], [x0, y1]])
 
         for i in range(n_sensors):
-            mesh = _create_polygon_mesh(positions[i], rotations[i], vertices, surface=None)
+            mesh = _create_polygon_mesh(positions[i], rotations[i], vertices, sag_fn=None)
             mesh = _make_double_sided(mesh)
             if mesh is not None:
                 meshes.append(mesh)
@@ -264,7 +258,7 @@ def _get_sensor_meshes(sensor_group):
 
         if boundary is not None:
             for i in range(n_sensors):
-                mesh = _create_polygon_mesh(positions[i], rotations[i], boundary, surface=None)
+                mesh = _create_polygon_mesh(positions[i], rotations[i], boundary, sag_fn=None)
                 mesh = _make_double_sided(mesh)
                 if mesh is not None:
                     meshes.append(mesh)
@@ -272,19 +266,12 @@ def _get_sensor_meshes(sensor_group):
     return meshes
 
 
-def _convex_hull_2d(points):
-    """Compute convex hull of 2D points."""
-    try:
-        from scipy.spatial import ConvexHull  # type: ignore[import-untyped]
-        hull = ConvexHull(points)
-        return points[hull.vertices]
-    except (ImportError, Exception):
-        return None
-
-
-def _create_disk_mesh(position, rotation_euler, radius, surface, offset=None,
+def _create_disk_mesh(position, rotation_euler, radius, sag_fn=None,
                       inner_radius=0.0, resolution=32, radial_resolution=8):
     """Create disk mesh with surface curvature.
+
+    Args:
+        sag_fn: Callable (x, y) -> z for surface height, or None for flat.
 
     For annulus shapes (inner_radius > 0), creates a ring mesh with a center hole.
     """
@@ -302,9 +289,7 @@ def _create_disk_mesh(position, rotation_euler, radius, surface, offset=None,
         x_all = (r_grid * np.cos(t_grid)).ravel()
         y_all = (r_grid * np.sin(t_grid)).ravel()
 
-        if offset is None:
-            offset = np.zeros(2)
-        z_all = np.asarray(jax.vmap(lambda x, y: surface.sag(x, y, offset))(x_all, y_all))
+        z_all = np.asarray(jax.vmap(sag_fn)(x_all, y_all)) if sag_fn else np.zeros_like(x_all)
 
         vertices = np.column_stack([x_all, y_all, z_all])
 
@@ -336,9 +321,7 @@ def _create_disk_mesh(position, rotation_euler, radius, surface, offset=None,
         # Compute z for all points at once using vmap
         x_all = np.concatenate([[0.0], x_ring])
         y_all = np.concatenate([[0.0], y_ring])
-        if offset is None:
-            offset = np.zeros(2)
-        z_all = np.asarray(jax.vmap(lambda x, y: surface.sag(x, y, offset))(x_all, y_all))
+        z_all = np.asarray(jax.vmap(sag_fn)(x_all, y_all)) if sag_fn else np.zeros_like(x_all)
 
         vertices = np.column_stack([x_all, y_all, z_all])
 
@@ -372,13 +355,17 @@ def _create_disk_mesh(position, rotation_euler, radius, surface, offset=None,
     return trimesh.Trimesh(vertices=world_vertices, faces=faces)
 
 
-def _create_polygon_mesh(position, rotation_euler, vertices_2d, surface, offset=None,
+def _create_polygon_mesh(position, rotation_euler, vertices_2d, sag_fn=None,
                          grid_resolution=8):
-    """Create polygon mesh with optional surface curvature."""
+    """Create polygon mesh with optional surface curvature.
+
+    Args:
+        sag_fn: Callable (x, y) -> z for surface height, or None for flat.
+    """
     vertices_2d = np.asarray(vertices_2d)
     n_verts = len(vertices_2d)
 
-    if surface is None:
+    if sag_fn is None:
         # Flat polygon: use fan triangulation
         local_verts = np.zeros((n_verts, 3))
         local_verts[:, :2] = vertices_2d
@@ -403,9 +390,7 @@ def _create_polygon_mesh(position, rotation_euler, vertices_2d, surface, offset=
         all_points_2d = np.vstack([vertices_2d, interior_points])
 
         # Compute z from surface - vectorized with vmap
-        if offset is None:
-            offset = np.zeros(2)
-        z = np.asarray(jax.vmap(lambda x, y: surface.sag(x, y, offset))(all_points_2d[:, 0], all_points_2d[:, 1]))
+        z = np.asarray(jax.vmap(sag_fn)(all_points_2d[:, 0], all_points_2d[:, 1]))
         local_verts = np.column_stack([all_points_2d, z])
 
         # Delaunay triangulation
@@ -422,7 +407,7 @@ def _create_polygon_mesh(position, rotation_euler, vertices_2d, surface, offset=
             # Fallback: fan triangulation on boundary only
             local_verts = np.zeros((n_verts, 3))
             local_verts[:, :2] = vertices_2d
-            local_verts[:, 2] = np.asarray(jax.vmap(lambda x, y: surface.sag(x, y, offset))(vertices_2d[:, 0], vertices_2d[:, 1]))
+            local_verts[:, 2] = np.asarray(jax.vmap(sag_fn)(vertices_2d[:, 0], vertices_2d[:, 1]))
             faces = np.array([[0, i, i + 1] for i in range(1, n_verts - 1)])
 
     if len(faces) == 0:

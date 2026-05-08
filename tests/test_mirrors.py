@@ -2,14 +2,12 @@ import jax
 import jax.numpy as jnp
 import pytest
 
-from iactrace import MCIntegrator
-from iactrace.telescope.mirrors import (
-    AsphericDiskMirrorGroup,
-    AsphericPolygonMirrorGroup,
-    _point_in_convex_polygon,
-    _polygon_area,
-)
-from iactrace.utils.sampling import sample_annulus, sample_disk
+from iactrace.core.apertures import _point_in_convex_polygon, _polygon_area
+from iactrace.core.apertures import DiskAperture, PolygonAperture
+from iactrace.core.interactions import ReflectInteraction
+from iactrace.core.optics import OpticalElementGroup
+from iactrace.core.surfaces import AsphericSurfaceGroup
+from iactrace.core.sampling import sample_annulus
 
 
 class TestSampleAnnulus:
@@ -34,7 +32,7 @@ class TestSampleAnnulus:
         samples = sample_annulus(random_key, inner_r, outer_r, (n_samples,))
         radii = jnp.sqrt(samples[:, 0]**2 + samples[:, 1]**2)
 
-        # For uniform area distribution, P(r < R) = (R² - inner²) / (outer² - inner²)
+        # For uniform area distribution, P(r < R) = (R^2 - inner^2) / (outer^2 - inner^2)
         # Split annulus into inner and outer halves by area
         mid_r_sq = (inner_r**2 + outer_r**2) / 2
         mid_r = jnp.sqrt(mid_r_sq)
@@ -63,24 +61,17 @@ class TestSampleAnnulus:
             assert 0.23 < q < 0.27, f"Angular distribution not uniform in {name}: {q:.3f}"
 
     def test_zero_inner_radius_matches_disk(self, random_key):
-        """With inner_radius=0, sample_annulus should match sample_disk distribution."""
+        """With inner_radius=0, sample_annulus should produce a uniform disk distribution."""
         outer_r = 1.0
         n_samples = 10000
 
-        # Same key for both
-        key1, key2 = jax.random.split(random_key)
+        annulus_samples = sample_annulus(random_key, 0.0, outer_r, (n_samples,))
 
-        annulus_samples = sample_annulus(key1, 0.0, outer_r, (n_samples,))
-        disk_samples = sample_disk(key1, (n_samples,)) * outer_r
-
-        # Both should have same statistical properties
         annulus_radii = jnp.sqrt(annulus_samples[:, 0]**2 + annulus_samples[:, 1]**2)
-        disk_radii = jnp.sqrt(disk_samples[:, 0]**2 + disk_samples[:, 1]**2)
 
         # Mean radius for uniform disk: 2/3 * R
         expected_mean = 2/3 * outer_r
         assert jnp.isclose(jnp.mean(annulus_radii), expected_mean, rtol=0.05)
-        assert jnp.isclose(jnp.mean(disk_radii), expected_mean, rtol=0.05)
 
 
 class TestAnnularAperture:
@@ -89,14 +80,27 @@ class TestAnnularAperture:
     @pytest.fixture
     def annular_mirror_group(self):
         """Create a mirror group with a center hole."""
-        return AsphericDiskMirrorGroup(
-            positions=jnp.array([[0.0, 0.0, 0.0]]),
-            rotations=jnp.array([[0.0, 0.0, 0.0]]),
+        N = 1
+        surface = AsphericSurfaceGroup(
             curvatures=jnp.array([0.1]),
             conics=jnp.array([-1.0]),
-            aspherics=jnp.zeros((1, 1)),
-            radii=jnp.array([1.0]),           # outer radius
-            inner_radii=jnp.array([0.3]),     # center hole
+            aspherics=jnp.zeros((N, 1)),
+            offsets=jnp.zeros((N, 2)),
+        )
+        aperture = DiskAperture(
+            radii=jnp.array([1.0]),
+            inner_radii=jnp.array([0.3]),
+        )
+        interaction = ReflectInteraction(reflectivity=jnp.ones(N))
+        return OpticalElementGroup(
+            positions=jnp.array([[0.0, 0.0, 0.0]]),
+            rotations=jnp.array([[0.0, 0.0, 0.0]]),
+            surface=surface,
+            aperture=aperture,
+            interaction_module=interaction,
+            sample_key=jax.random.key(0),
+            optical_stage=0,
+            n_samples=100,
         )
 
     def test_point_in_annulus_accepted(self, annular_mirror_group):
@@ -153,31 +157,58 @@ class TestAnnularAperture:
 
 
 class TestMirrorGroupWithHole:
-    """Test AsphericDiskMirrorGroup with inner_radii parameter."""
+    """Test OpticalElementGroup with DiskAperture including inner_radii."""
 
     def test_inner_radii_defaults_to_zero(self):
-        """inner_radii should default to zeros (solid disk)."""
-        group = AsphericDiskMirrorGroup(
-            positions=jnp.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]]),
-            rotations=jnp.zeros((2, 3)),
+        """inner_radii should be zeros when constructed as solid disks."""
+        N = 2
+        surface = AsphericSurfaceGroup(
             curvatures=jnp.array([0.1, 0.1]),
             conics=jnp.array([-1.0, -1.0]),
-            aspherics=jnp.zeros((2, 1)),
+            aspherics=jnp.zeros((N, 1)),
+            offsets=jnp.zeros((N, 2)),
+        )
+        aperture = DiskAperture(
             radii=jnp.array([1.0, 0.5]),
+            inner_radii=jnp.zeros(N),
+        )
+        interaction = ReflectInteraction(reflectivity=jnp.ones(N))
+        group = OpticalElementGroup(
+            positions=jnp.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]]),
+            rotations=jnp.zeros((N, 3)),
+            surface=surface,
+            aperture=aperture,
+            interaction_module=interaction,
+            sample_key=jax.random.key(0),
+            optical_stage=0,
+            n_samples=100,
         )
 
-        assert jnp.allclose(group.inner_radii, jnp.array([0.0, 0.0]))
+        assert jnp.allclose(group.aperture.inner_radii, jnp.array([0.0, 0.0]))
 
     def test_mixed_solid_and_annular(self):
         """Group can have mix of solid and annular mirrors."""
-        group = AsphericDiskMirrorGroup(
-            positions=jnp.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]]),
-            rotations=jnp.zeros((2, 3)),
+        N = 2
+        surface = AsphericSurfaceGroup(
             curvatures=jnp.array([0.1, 0.1]),
             conics=jnp.array([-1.0, -1.0]),
-            aspherics=jnp.zeros((2, 1)),
+            aspherics=jnp.zeros((N, 1)),
+            offsets=jnp.zeros((N, 2)),
+        )
+        aperture = DiskAperture(
             radii=jnp.array([1.0, 0.5]),
             inner_radii=jnp.array([0.2, 0.0]),  # First has hole, second is solid
+        )
+        interaction = ReflectInteraction(reflectivity=jnp.ones(N))
+        group = OpticalElementGroup(
+            positions=jnp.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]]),
+            rotations=jnp.zeros((N, 3)),
+            surface=surface,
+            aperture=aperture,
+            interaction_module=interaction,
+            sample_key=jax.random.key(0),
+            optical_stage=0,
+            n_samples=100,
         )
 
         # First mirror: point at origin rejected (in hole)
@@ -188,41 +219,61 @@ class TestMirrorGroupWithHole:
         # Second mirror: point at origin accepted (solid disk)
         assert group.check_aperture(0.0, 0.0, 1)
 
-    def test_sampling_params_include_inner_radii(self):
-        """get_sampling_params should include inner_radii."""
-        group = AsphericDiskMirrorGroup(
-            positions=jnp.array([[0.0, 0.0, 0.0]]),
-            rotations=jnp.zeros((1, 3)),
+    def test_aperture_preserves_inner_radii(self):
+        """Aperture module should preserve inner_radii."""
+        N = 1
+        surface = AsphericSurfaceGroup(
             curvatures=jnp.array([0.1]),
             conics=jnp.array([-1.0]),
-            aspherics=jnp.zeros((1, 1)),
+            aspherics=jnp.zeros((N, 1)),
+            offsets=jnp.zeros((N, 2)),
+        )
+        aperture = DiskAperture(
             radii=jnp.array([1.0]),
             inner_radii=jnp.array([0.3]),
         )
+        interaction = ReflectInteraction(reflectivity=jnp.ones(N))
+        group = OpticalElementGroup(
+            positions=jnp.array([[0.0, 0.0, 0.0]]),
+            rotations=jnp.zeros((N, 3)),
+            surface=surface,
+            aperture=aperture,
+            interaction_module=interaction,
+            sample_key=jax.random.key(0),
+            optical_stage=0,
+            n_samples=100,
+        )
 
-        params = group.get_sampling_params()
-
-        assert 'inner_radii' in params
-        assert jnp.allclose(params['inner_radii'], jnp.array([0.3]))
-        assert params['type'] == 'disk'
+        assert jnp.allclose(group.aperture.inner_radii, jnp.array([0.3]))
+        assert jnp.allclose(group.aperture.radii, jnp.array([1.0]))
 
     def test_area_calculation_annular(self, random_key):
-        """Area should be π*(outer² - inner²) for annular aperture."""
+        """Area should be pi*(outer^2 - inner^2) for annular aperture."""
         inner_r, outer_r = 0.3, 1.0
         expected_area = jnp.pi * (outer_r**2 - inner_r**2)
 
-        group = AsphericDiskMirrorGroup(
-            positions=jnp.array([[0.0, 0.0, 0.0]]),
-            rotations=jnp.zeros((1, 3)),
+        N = 1
+        surface = AsphericSurfaceGroup(
             curvatures=jnp.array([0.0]),  # Flat mirror for simple area check
             conics=jnp.array([0.0]),
-            aspherics=jnp.zeros((1, 1)),
+            aspherics=jnp.zeros((N, 1)),
+            offsets=jnp.zeros((N, 2)),
+        )
+        aperture = DiskAperture(
             radii=jnp.array([outer_r]),
             inner_radii=jnp.array([inner_r]),
         )
-
-        integrator = MCIntegrator(n_samples=1000)
-        group = integrator.sample_group(group, random_key)
+        interaction = ReflectInteraction(reflectivity=jnp.ones(N))
+        group = OpticalElementGroup(
+            positions=jnp.array([[0.0, 0.0, 0.0]]),
+            rotations=jnp.zeros((N, 3)),
+            surface=surface,
+            aperture=aperture,
+            interaction_module=interaction,
+            sample_key=jax.random.key(0),
+            optical_stage=0,
+            n_samples=1000,
+        )
 
         _, _, weights = group.transform_to_world()
 
@@ -301,19 +352,33 @@ class TestAsphericPolygonMirrorGroup:
         angles = jnp.linspace(0, 2 * jnp.pi, 7)[:-1]
         vertices = jnp.stack([jnp.cos(angles) * s, jnp.sin(angles) * s], axis=1)
 
-        return AsphericPolygonMirrorGroup(
-            positions=jnp.array([[0.0, 0.0, 0.0]]),
-            rotations=jnp.zeros((1, 3)),
+        N = 1
+        surface = AsphericSurfaceGroup(
             curvatures=jnp.array([0.1]),
             conics=jnp.array([-1.0]),
-            aspherics=jnp.zeros((1, 1)),
-            vertices_list=vertices[None, :, :],
+            aspherics=jnp.zeros((N, 1)),
+            offsets=jnp.zeros((N, 2)),
+        )
+        aperture = PolygonAperture(
+            vertices=vertices[None, :, :],
+            n_vertices=6,
+        )
+        interaction = ReflectInteraction(reflectivity=jnp.ones(N))
+        return OpticalElementGroup(
+            positions=jnp.array([[0.0, 0.0, 0.0]]),
+            rotations=jnp.zeros((N, 3)),
+            surface=surface,
+            aperture=aperture,
+            interaction_module=interaction,
+            sample_key=jax.random.key(0),
+            optical_stage=0,
+            n_samples=100,
         )
 
     def test_basic_creation(self, hexagon_mirror):
         """Polygon mirror group can be created."""
         assert len(hexagon_mirror) == 1
-        assert hexagon_mirror.n_vertices == 6
+        assert hexagon_mirror.aperture.n_vertices == 6
 
     def test_check_aperture(self, hexagon_mirror):
         """Aperture checking works for polygon."""
@@ -324,53 +389,40 @@ class TestAsphericPolygonMirrorGroup:
         # Point outside
         assert not hexagon_mirror.check_aperture(1.0, 0.0, 0)
 
-    def test_from_config_roundtrip(self):
-        """from_config creates equivalent group."""
-        templates = {
-            "hex_surface": {
-                "surface": {"curvature": 0.05, "conic": -1.0, "aspheric": []}
-            }
-        }
-
-        configs = [
-            {
-                "template": "hex_surface",
-                "position": [0.0, 0.0, 0.0],
-                "orientation": [0.0, 0.0, 0.0],
-                "aperture": {
-                    "type": "polygon",
-                    "vertices": [[0.0, 0.5], [0.43, 0.25], [0.43, -0.25],
-                                 [0.0, -0.5], [-0.43, -0.25], [-0.43, 0.25]],
-                },
-            }
-        ]
-
-        group = AsphericPolygonMirrorGroup.from_config(configs, templates)
-
-        assert len(group) == 1
-        assert group.n_vertices == 6
-        assert float(group.curvatures[0]) == pytest.approx(0.05)
-
 
 class TestMultipleMirrorsInGroup:
     """Test groups with multiple mirrors."""
 
     def test_disk_group_different_parameters(self):
         """Disk group with per-mirror surface parameters."""
-        group = AsphericDiskMirrorGroup(
-            positions=jnp.array([[0.0, 0.0, 0.0], [2.0, 0.0, 0.0]]),
-            rotations=jnp.zeros((2, 3)),
+        N = 2
+        surface = AsphericSurfaceGroup(
             curvatures=jnp.array([0.05, 0.1]),  # Different curvatures
             conics=jnp.array([-1.0, 0.0]),  # Different conics
-            aspherics=jnp.zeros((2, 1)),
+            aspherics=jnp.zeros((N, 1)),
+            offsets=jnp.zeros((N, 2)),
+        )
+        aperture = DiskAperture(
             radii=jnp.array([0.5, 0.3]),  # Different radii
+            inner_radii=jnp.zeros(N),
+        )
+        interaction = ReflectInteraction(reflectivity=jnp.ones(N))
+        group = OpticalElementGroup(
+            positions=jnp.array([[0.0, 0.0, 0.0], [2.0, 0.0, 0.0]]),
+            rotations=jnp.zeros((N, 3)),
+            surface=surface,
+            aperture=aperture,
+            interaction_module=interaction,
+            sample_key=jax.random.key(0),
+            optical_stage=0,
+            n_samples=100,
         )
 
         assert len(group) == 2
-        assert float(group.curvatures[0]) == pytest.approx(0.05)
-        assert float(group.curvatures[1]) == pytest.approx(0.1)
-        assert float(group.radii[0]) == pytest.approx(0.5)
-        assert float(group.radii[1]) == pytest.approx(0.3)
+        assert float(group.surface.curvatures[0]) == pytest.approx(0.05)
+        assert float(group.surface.curvatures[1]) == pytest.approx(0.1)
+        assert float(group.aperture.radii[0]) == pytest.approx(0.5)
+        assert float(group.aperture.radii[1]) == pytest.approx(0.3)
 
     def test_polygon_group_multiple_mirrors(self):
         """Polygon group with multiple mirrors."""
@@ -380,13 +432,27 @@ class TestMultipleMirrorsInGroup:
             [[-0.3, -0.3], [0.3, -0.3], [0.3, 0.3], [-0.3, 0.3]],
         ])
 
-        group = AsphericPolygonMirrorGroup(
-            positions=jnp.array([[0.0, 0.0, 0.0], [2.0, 0.0, 0.0]]),
-            rotations=jnp.zeros((2, 3)),
+        N = 2
+        surface = AsphericSurfaceGroup(
             curvatures=jnp.array([0.05, 0.1]),
             conics=jnp.array([-1.0, -1.0]),
-            aspherics=jnp.zeros((2, 1)),
-            vertices_list=vertices,
+            aspherics=jnp.zeros((N, 1)),
+            offsets=jnp.zeros((N, 2)),
+        )
+        aperture = PolygonAperture(
+            vertices=vertices,
+            n_vertices=4,
+        )
+        interaction = ReflectInteraction(reflectivity=jnp.ones(N))
+        group = OpticalElementGroup(
+            positions=jnp.array([[0.0, 0.0, 0.0], [2.0, 0.0, 0.0]]),
+            rotations=jnp.zeros((N, 3)),
+            surface=surface,
+            aperture=aperture,
+            interaction_module=interaction,
+            sample_key=jax.random.key(0),
+            optical_stage=0,
+            n_samples=100,
         )
 
         assert len(group) == 2

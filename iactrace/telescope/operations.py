@@ -1,7 +1,19 @@
+"""Functional operations on a :class:`~iactrace.Telescope`.
+
+All operations are addressed by ``stage`` — the integer ``optical_stage``
+of the target :class:`OpticalElementGroup`. The split between
+``mirror_groups`` and ``lens_groups`` on the Telescope is purely a
+storage / YAML detail; users only ever talk in stages.
+
+Generic operations work on any kind of stage (mirror, lens, or slab).
+Kind-specific operations validate at runtime and raise ``ValueError``
+when called on the wrong kind.
+"""
+
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 import equinox as eqx
 import jax
@@ -9,781 +21,347 @@ import jax.numpy as jnp
 from jax import Array
 
 if TYPE_CHECKING:
-    from ..core import Integrator, ObstructionGroup
-    from ..sensors import SensorGroup
+    from ..core import ObstructionGroup
     from .telescope import Telescope
 
 
-def _update_mirror_group_attr(
+# Internal helpers
+
+
+def _stage_to_list_and_idx(
+    telescope: Telescope, stage: int
+) -> tuple[Literal["mirror_groups", "lens_groups"], int]:
+    """Locate which list a stage lives in and at what index."""
+    for i, g in enumerate(telescope.mirror_groups):
+        if g.optical_stage == stage:
+            return ("mirror_groups", i)
+    for i, g in enumerate(telescope.lens_groups):
+        if g.optical_stage == stage:
+            return ("lens_groups", i)
+    available = sorted(g.optical_stage for g in telescope.optical_groups)
+    raise IndexError(f"no stage {stage}; available: {available}")
+
+
+def _update_at_stage(
     telescope: Telescope,
-    group_idx: int,
-    attr_getter: Callable,
+    stage: int,
+    getter: Callable,
     new_value: Any,
 ) -> Telescope:
-    """Update a single attribute on a mirror group.
-
-    Args:
-        telescope: Telescope instance
-        group_idx: Index of mirror group to modify
-        attr_getter: Lambda to get the attribute (e.g., lambda g: g.positions)
-        new_value: New value for the attribute
-
-    Returns:
-        New Telescope with updated mirror group
-    """
-    new_group = eqx.tree_at(attr_getter, telescope.mirror_groups[group_idx], new_value)
-    new_groups = list(telescope.mirror_groups)
-    new_groups[group_idx] = new_group
-    return eqx.tree_at(lambda t: t.mirror_groups, telescope, new_groups)
+    """Update a single attribute on the group at ``stage``."""
+    list_name, idx = _stage_to_list_and_idx(telescope, stage)
+    groups = getattr(telescope, list_name)
+    new_group = eqx.tree_at(getter, groups[idx], new_value)
+    new_groups = list(groups)
+    new_groups[idx] = new_group
+    return eqx.tree_at(lambda t: getattr(t, list_name), telescope, new_groups)
 
 
-def _update_sensor_attr(
+def _require_kind(
+    telescope: Telescope, stage: int, allowed: set[str]
+) -> str:
+    """Validate the kind of the group at ``stage`` and return it."""
+    kind = telescope.stage(stage).kind
+    if kind not in allowed:
+        raise ValueError(
+            f"stage {stage} is {kind}; expected one of {sorted(allowed)}"
+        )
+    return kind
+
+
+# Generic operations (any kind)
+
+
+def set_positions(telescope: Telescope, stage: int, positions: Array) -> Telescope:
+    """Set element positions for the group at ``stage``."""
+    return _update_at_stage(
+        telescope, stage, lambda g: g.positions, jnp.asarray(positions)
+    )
+
+
+def set_rotations(telescope: Telescope, stage: int, rotations: Array) -> Telescope:
+    """Set element rotations (Euler XYZ degrees) for the group at ``stage``."""
+    return _update_at_stage(
+        telescope, stage, lambda g: g.rotations, jnp.asarray(rotations)
+    )
+
+
+def apply_displacement(
+    telescope: Telescope, stage: int, sigma_z: float, key: Array
+) -> Telescope:
+    """Apply random Gaussian z-displacement to elements in the group at ``stage``."""
+    group = telescope.stage(stage)
+    delta_z = jax.random.normal(key, shape=(len(group),)) * sigma_z
+    new_positions = group.positions.at[:, 2].add(delta_z)
+    return _update_at_stage(telescope, stage, lambda g: g.positions, new_positions)
+
+
+def apply_misalignment(
     telescope: Telescope,
-    sensor_idx: int,
-    attr_getter: Callable,
-    new_value: Any,
+    stage: int,
+    sigma_h: float,
+    sigma_v: float,
+    key: Array,
 ) -> Telescope:
-    """Update a single attribute on a sensor group.
+    """Apply random Gaussian tip/tilt to element orientations.
 
-    Args:
-        telescope: Telescope instance
-        sensor_idx: Index of sensor group to modify
-        attr_getter: Lambda to get the attribute (e.g., lambda s: s.positions)
-        new_value: New value for the attribute
-
-    Returns:
-        New Telescope with updated sensor group
+    ``sigma_h`` / ``sigma_v`` are in arcseconds.
     """
-    new_sensor = eqx.tree_at(attr_getter, telescope.sensors[sensor_idx], new_value)
-    new_sensors = list(telescope.sensors)
-    new_sensors[sensor_idx] = new_sensor
-    return eqx.tree_at(lambda t: t.sensors, telescope, new_sensors)
-
-
-def resample_mirrors(telescope: Telescope, integrator: Integrator, key: Array) -> Telescope:
-    """Resample all mirrors with specified integrator
-
-    Args:
-        telescope: Telescope instance
-        integrator: Integrator object
-        key: jax.random.key
-
-    Returns:
-        New telescope with resampled mirrors
-    """
-    keys = jax.random.split(key, len(telescope.mirror_groups))
-    new_groups = [
-        integrator.sample_group(g, k) for g, k in zip(telescope.mirror_groups, keys, strict=False)
-    ]
-    return eqx.tree_at(lambda t: t.mirror_groups, telescope, new_groups)
-
-
-def set_mirror_positions(
-    telescope: Telescope, group_idx: int, positions: Array
-) -> Telescope:
-    """Set positions for all mirrors in a group.
-
-    Args:
-        telescope: Telescope instance
-        group_idx: Index of mirror group
-        positions: New positions array (N, 3)
-
-    Returns:
-        New Telescope with updated mirror positions
-    """
-    return _update_mirror_group_attr(
-        telescope, group_idx, lambda g: g.positions, jnp.asarray(positions)
-    )
-
-
-def set_mirror_rotations(
-    telescope: Telescope, group_idx: int, rotations: Array
-) -> Telescope:
-    """Set rotations for all mirrors in a group.
-
-    Args:
-        telescope: Telescope instance
-        group_idx: Index of mirror group
-        rotations: New rotations array (N, 3) in degrees (Euler angles)
-
-    Returns:
-        New Telescope with updated mirror rotations
-    """
-    return _update_mirror_group_attr(
-        telescope, group_idx, lambda g: g.rotations, jnp.asarray(rotations)
-    )
-
-
-def scale_mirror_weights(
-    telescope: Telescope, group_idx: int, scale_factors: Array | float
-) -> Telescope:
-    """Scale reflectivity for mirrors in a group.
-
-    Args:
-        telescope: Telescope instance
-        group_idx: Index of mirror group
-        scale_factors: Scale factors per mirror (N,) or single value
-
-    Returns:
-        New Telescope with scaled mirror reflectivity
-    """
-    scale_factors = jnp.asarray(scale_factors)
-    if scale_factors.ndim == 0:
-        scale_factors = jnp.full(
-            len(telescope.mirror_groups[group_idx]), scale_factors
-        )
-
-    current_reflectivity = telescope.mirror_groups[group_idx].reflectivity
-    new_reflectivity = current_reflectivity * scale_factors
-
-    return _update_mirror_group_attr(
-        telescope, group_idx, lambda g: g.reflectivity, new_reflectivity
-    )
-
-
-def apply_roughness(telescope: Telescope, roughness: float) -> Telescope:
-    """Apply roughness to all telescope mirrors
-
-    Args:
-        telescope: Telescope instance
-        roughness: Surface roughness in arcseconds
-
-    Returns:
-        New Telescope with updated roughness for mirrors
-    """
-    sigma_rad = roughness * jnp.pi / (180.0 * 3600.0)
-    new_groups = []
-    for group in telescope.mirror_groups:
-        new_scale = jnp.full(len(group), sigma_rad)
-        new_groups.append(
-            eqx.tree_at(lambda g: g.perturbation_scale, group, new_scale)
-        )
-    return eqx.tree_at(lambda t: t.mirror_groups, telescope, new_groups)
-
-
-def apply_roughness_to_group(
-    telescope: Telescope, group_idx: int, roughness: float
-) -> Telescope:
-    """Apply roughness to a specific mirror group.
-
-    Args:
-        telescope: Telescope instance
-        group_idx: Index of mirror group
-        roughness: Surface roughness in arcseconds
-
-    Returns:
-        New Telescope with updated roughness for specified group
-    """
-    sigma_rad = roughness * jnp.pi / (180.0 * 3600.0)
-    new_scale = jnp.full(len(telescope.mirror_groups[group_idx]), sigma_rad)
-    return _update_mirror_group_attr(
-        telescope, group_idx, lambda g: g.perturbation_scale, new_scale
-    )
-
-
-def apply_misalignment_to_group(telescope, group_idx: int, sigma_h: float, sigma_v: float, key: Array) -> Telescope:
-    """Apply random Gaussian misalignment to mirror orientations.
-
-    Adds random perturbations to the horizontal and vertical
-    angles of each mirror in the specified group, drawn from independent
-    Gaussian distributions.
-
-    Args:
-        telescope: Telescope instance
-        group_idx: Index of mirror group to modify
-        sigma_h: Standard deviation of horizontal misalignment in arcseconds
-        sigma_v: Standard deviation of vertical misalignment in arcseconds
-        key: JAX random key for reproducibility
-
-    Returns:
-        New Telescope with randomly misaligned mirrors
-    """
-    group = telescope.mirror_groups[group_idx]
-    n_mirrors = len(group)
-
-    # Convert arcseconds to degrees (rotations are stored in degrees)
+    group = telescope.stage(stage)
+    n = len(group)
     sigma_h_deg = sigma_h / 3600.0
     sigma_v_deg = sigma_v / 3600.0
-
-    # Generate random misalignments
     key1, key2 = jax.random.split(key)
-    delta_h = jax.random.normal(key1, shape=(n_mirrors,)) * sigma_h_deg
-    delta_v = jax.random.normal(key2, shape=(n_mirrors,)) * sigma_v_deg
+    delta_h = jax.random.normal(key1, shape=(n,)) * sigma_h_deg
+    delta_v = jax.random.normal(key2, shape=(n,)) * sigma_v_deg
+    new_rotations = group.rotations.at[:, 0].add(delta_v).at[:, 1].add(delta_h)
+    return _update_at_stage(telescope, stage, lambda g: g.rotations, new_rotations)
 
-    # Apply to rotations:
-    current_rotations = group.rotations
-    new_rotations = current_rotations.at[:, 0].add(delta_v)
-    new_rotations = new_rotations.at[:, 1].add(delta_h)
 
-    return _update_mirror_group_attr(
-        telescope, group_idx, lambda g: g.rotations, new_rotations
+def apply_roughness(telescope: Telescope, stage: int, sigma: float) -> Telescope:
+    """Apply Gaussian BSDF roughness (arcseconds RMS) to the group at ``stage``."""
+    from ..core.bsdf import GaussianBSDF
+
+    n = len(telescope.stage(stage))
+    new_bsdf = GaussianBSDF(scale=jnp.full(n, sigma))
+    return _update_at_stage(telescope, stage, lambda g: g.bsdf, new_bsdf)
+
+
+def set_curvatures(telescope: Telescope, stage: int, curvatures: Array) -> Telescope:
+    """Set surface curvatures (1/R) for the group at ``stage``."""
+    return _update_at_stage(
+        telescope, stage, lambda g: g.surface.curvatures, jnp.asarray(curvatures)
     )
 
 
-def apply_displacement_to_group(telescope, group_idx: int, sigma_z: float, key: Array) -> Telescope:
-    """Apply random Gaussian distance adjustment to mirrors along each mirror's local z-axis.
-
-    Adds random perturbations to the z-coordinate of each mirror position
-    in the specified group, drawn from a Gaussian distribution.
-
-    Args:
-        telescope: Telescope instance
-        group_idx: Index of mirror group to modify
-        sigma_z: Standard deviation of z-axis displacement (same units as positions)
-        key: JAX random key for reproducibility
-
-    Returns:
-        New Telescope with randomly displaced mirrors
-    """
-    from ..core.transforms import euler_to_matrix
-    group = telescope.mirror_groups[group_idx]
-    n_mirrors = len(group)
-
-    # Generate random z displacements along each mirrors's local z-axis
-    delta_z = jax.random.normal(key, shape=(n_mirrors,)) * sigma_z
-
-    # Transform local z-axis of each mirror to world coordinates
-    rot = jax.vmap(euler_to_matrix)(group.rotations)
-    local_z_world = rot[:, :, 2]
-
-    # Apply displacement
-    new_positions = group.positions + delta_z[:, None] * local_z_world
-
-    return _update_mirror_group_attr(
-        telescope, group_idx, lambda g: g.positions, new_positions
+def set_conics(telescope: Telescope, stage: int, conics: Array) -> Telescope:
+    """Set surface conic constants for the group at ``stage``."""
+    return _update_at_stage(
+        telescope, stage, lambda g: g.surface.conics, jnp.asarray(conics)
     )
 
 
-def set_mirror_curvatures(
-    telescope,
-    group_idx: int,
-    curvatures: Array,
+def set_aspherics(telescope: Telescope, stage: int, aspherics: Array) -> Telescope:
+    """Set surface aspheric coefficients for the group at ``stage``."""
+    return _update_at_stage(
+        telescope, stage, lambda g: g.surface.aspherics, jnp.asarray(aspherics)
+    )
+
+
+def scale_curvatures(
+    telescope: Telescope, stage: int, factor: Array | float
 ) -> Telescope:
-    """Set curvatures for all mirrors in a group.
-
-    Args:
-        telescope: Telescope instance
-        group_idx: Index of mirror group
-        curvatures: New curvatures array (N,)
-
-    Returns:
-        New Telescope with updated mirror curvatures
-    """
-    return _update_mirror_group_attr(
-        telescope, group_idx, lambda g: g.curvatures, jnp.asarray(curvatures)
-    )
+    """Multiply curvatures by ``factor`` (scalar or per-element)."""
+    new = telescope.stage(stage).surface.curvatures * jnp.asarray(factor)
+    return _update_at_stage(telescope, stage, lambda g: g.surface.curvatures, new)
 
 
-def set_mirror_conics(
-    telescope,
-    group_idx: int,
-    conics: Array,
+def offset_curvatures(
+    telescope: Telescope, stage: int, offset: Array | float
 ) -> Telescope:
-    """Set conic constants for all mirrors in a group.
-
-    Args:
-        telescope: Telescope instance
-        group_idx: Index of mirror group
-        conics: New conic constants array (N,)
-
-    Returns:
-        New Telescope with updated mirror conic constants
-    """
-    return _update_mirror_group_attr(
-        telescope, group_idx, lambda g: g.conics, jnp.asarray(conics)
-    )
+    """Add ``offset`` to curvatures (scalar or per-element)."""
+    new = telescope.stage(stage).surface.curvatures + jnp.asarray(offset)
+    return _update_at_stage(telescope, stage, lambda g: g.surface.curvatures, new)
 
 
-def set_mirror_aspherics(
-    telescope,
-    group_idx: int,
-    aspherics: Array,
+def apply_conic_error(
+    telescope: Telescope, stage: int, sigma: float, key: Array
 ) -> Telescope:
-    """Set aspheric coefficients for all mirrors in a group.
-
-    Args:
-        telescope: Telescope instance
-        group_idx: Index of mirror group
-        aspherics: New aspheric coefficients array (N, K) where K is number of terms
-
-    Returns:
-        New Telescope with updated mirror aspheric coefficients
-    """
-    return _update_mirror_group_attr(
-        telescope, group_idx, lambda g: g.aspherics, jnp.asarray(aspherics)
-    )
-
-
-def scale_mirror_curvatures(
-    telescope,
-    group_idx: int,
-    scale_factors: Array | float,
-) -> Telescope:
-    """Scale curvatures for mirrors in a group.
-
-    Args:
-        telescope: Telescope instance
-        group_idx: Index of mirror group
-        scale_factors: Scale factors per mirror (N,) or single value
-
-    Returns:
-        New Telescope with scaled mirror curvatures
-    """
-    new_curvatures = telescope.mirror_groups[group_idx].curvatures * jnp.asarray(scale_factors)
-    return _update_mirror_group_attr(
-        telescope, group_idx, lambda g: g.curvatures, new_curvatures
-    )
-
-
-def offset_mirror_curvatures(
-    telescope,
-    group_idx: int,
-    offsets: Array | float,
-) -> Telescope:
-    """Add offset to curvatures for mirrors in a group.
-
-    Args:
-        telescope: Telescope instance
-        group_idx: Index of mirror group
-        offsets: Offsets per mirror (N,) or single value to add
-
-    Returns:
-        New Telescope with offset mirror curvatures
-    """
-    new_curvatures = telescope.mirror_groups[group_idx].curvatures + jnp.asarray(offsets)
-    return _update_mirror_group_attr(
-        telescope, group_idx, lambda g: g.curvatures, new_curvatures
-    )
-
-
-def set_focal_lengths(
-    telescope,
-    group_idx: int,
-    focal_lengths: Array,
-) -> Telescope:
-    """Set mirror curvatures to achieve target focal lengths.
-
-    For spherical/parabolic mirrors: c = 1/(2f).
-
-    Args:
-        telescope: Telescope instance
-        group_idx: Index of mirror group
-        focal_lengths: Target focal lengths array (N,)
-
-    Returns:
-        New Telescope with curvatures set for target focal lengths
-    """
-    focal_lengths = jnp.asarray(focal_lengths)
-    # c = 1/(2f), handle infinite focal length (flat mirror) as zero curvature
-    new_curvatures = jnp.where(
-        jnp.isinf(focal_lengths),
-        0.0,
-        1.0 / (2.0 * focal_lengths)
-    )
-    return set_mirror_curvatures(telescope, group_idx, new_curvatures)
-
-
-def apply_conic_error_to_group(
-    telescope,
-    group_idx: int,
-    sigma: float,
-    key: Array,
-) -> Telescope:
-    """Apply random Gaussian error to mirror conic constants.
-
-    Args:
-        telescope: Telescope instance
-        group_idx: Index of mirror group to modify
-        sigma: Standard deviation of conic constant error
-        key: JAX random key for reproducibility
-
-    Returns:
-        New Telescope with perturbed mirror conic constants
-    """
-    group = telescope.mirror_groups[group_idx]
+    """Apply random Gaussian error to conic constants."""
+    group = telescope.stage(stage)
     noise = jax.random.normal(key, shape=(len(group),))
-    new_conics = group.conics + noise * sigma
-    return _update_mirror_group_attr(
-        telescope, group_idx, lambda g: g.conics, new_conics
-    )
+    new = group.surface.conics + noise * sigma
+    return _update_at_stage(telescope, stage, lambda g: g.surface.conics, new)
 
 
-def apply_aspheric_error_to_group(
-    telescope,
-    group_idx: int,
-    sigmas: Array,
-    key: Array,
+def apply_aspheric_error(
+    telescope: Telescope, stage: int, sigmas: Array, key: Array
 ) -> Telescope:
-    """Apply random Gaussian errors to mirror aspheric coefficients.
-
-    Each aspheric term can have its own sigma value.
-
-    Args:
-        telescope: Telescope instance
-        group_idx: Index of mirror group to modify
-        sigmas: Standard deviations per aspheric term (K,) where K is number of terms.
-                If fewer sigmas than terms, remaining terms get zero error.
-                If more sigmas than terms, extra sigmas are ignored.
-        key: JAX random key for reproducibility
-
-    Returns:
-        New Telescope with perturbed mirror aspheric coefficients
-    """
-    group = telescope.mirror_groups[group_idx]
-    n_mirrors = len(group)
-    n_terms = group.aspherics.shape[1]
-
+    """Apply random Gaussian errors to aspheric coefficients."""
+    group = telescope.stage(stage)
+    n = len(group)
+    n_terms = group.surface.aspherics.shape[1]
     sigmas = jnp.asarray(sigmas)
-    # Pad or truncate sigmas to match number of terms
     if sigmas.size < n_terms:
         sigmas = jnp.concatenate([sigmas, jnp.zeros(n_terms - sigmas.size)])
     else:
         sigmas = sigmas[:n_terms]
+    noise = jax.random.normal(key, shape=(n, n_terms))
+    new = group.surface.aspherics + noise * sigmas[None, :]
+    return _update_at_stage(telescope, stage, lambda g: g.surface.aspherics, new)
 
-    # Generate noise for each mirror and each term: (N, K)
-    noise = jax.random.normal(key, shape=(n_mirrors, n_terms))
-    # Scale by per-term sigmas
-    perturbations = noise * sigmas[None, :]
 
-    new_aspherics = group.aspherics + perturbations
-    return _update_mirror_group_attr(
-        telescope, group_idx, lambda g: g.aspherics, new_aspherics
+def resample(telescope: Telescope, stage: int, key: Array) -> Telescope:
+    """Refresh the Monte-Carlo sampling key on the group at ``stage``."""
+    return _update_at_stage(telescope, stage, lambda g: g.sample_key, key)
+
+
+# Kind-specific operations
+
+
+def set_reflectivity(
+    telescope: Telescope, stage: int, reflectivity: Array | float
+) -> Telescope:
+    """Set per-element mirror reflectivity. Mirror stages only."""
+    _require_kind(telescope, stage, {"mirror"})
+    n = len(telescope.stage(stage))
+    r = jnp.asarray(reflectivity)
+    if r.ndim == 0:
+        r = jnp.full(n, r)
+    return _update_at_stage(
+        telescope, stage, lambda g: g.interaction_module.reflectivity, r
     )
 
 
-def apply_focal_error_to_group(
-    telescope,
-    group_idx: int,
+def scale_reflectivity(
+    telescope: Telescope, stage: int, factor: Array | float
+) -> Telescope:
+    """Multiply mirror reflectivity by ``factor``. Mirror stages only."""
+    _require_kind(telescope, stage, {"mirror"})
+    group = telescope.stage(stage)
+    factor = jnp.asarray(factor)
+    if factor.ndim == 0:
+        factor = jnp.full(len(group), factor)
+    new = group.interaction_module.reflectivity * factor
+    return _update_at_stage(
+        telescope, stage, lambda g: g.interaction_module.reflectivity, new
+    )
+
+
+def set_transmittance(
+    telescope: Telescope, stage: int, transmittance: Array | float
+) -> Telescope:
+    """Set per-element bulk transmittance. Lens or slab stages only."""
+    _require_kind(telescope, stage, {"lens", "slab"})
+    n = len(telescope.stage(stage))
+    t = jnp.asarray(transmittance)
+    if t.ndim == 0:
+        t = jnp.full(n, t)
+    return _update_at_stage(
+        telescope, stage, lambda g: g.interaction_module.transmittance,
+        jnp.clip(t, 0.0, 1.0),
+    )
+
+
+def scale_transmittance(
+    telescope: Telescope, stage: int, factor: Array | float
+) -> Telescope:
+    """Multiply bulk transmittance by ``factor``. Lens or slab stages only."""
+    _require_kind(telescope, stage, {"lens", "slab"})
+    group = telescope.stage(stage)
+    factor = jnp.asarray(factor)
+    if factor.ndim == 0:
+        factor = jnp.full(len(group), factor)
+    new = jnp.clip(group.interaction_module.transmittance * factor, 0.0, 1.0)
+    return _update_at_stage(
+        telescope, stage, lambda g: g.interaction_module.transmittance, new
+    )
+
+
+def set_refractive_index(
+    telescope: Telescope, stage: int, n_inside: Array | float
+) -> Telescope:
+    """Set per-element refractive index. Lens or slab stages only."""
+    _require_kind(telescope, stage, {"lens", "slab"})
+    n_elements = len(telescope.stage(stage))
+    n = jnp.asarray(n_inside)
+    if n.ndim == 0:
+        n = jnp.full(n_elements, n)
+    return _update_at_stage(
+        telescope, stage, lambda g: g.interaction_module.n_inside, n
+    )
+
+
+def set_thickness(
+    telescope: Telescope, stage: int, thickness: Array | float
+) -> Telescope:
+    """Set slab thickness in metres. Slab stages only."""
+    _require_kind(telescope, stage, {"slab"})
+    n = len(telescope.stage(stage))
+    t = jnp.asarray(thickness)
+    if t.ndim == 0:
+        t = jnp.full(n, t)
+    return _update_at_stage(
+        telescope, stage, lambda g: g.interaction_module.thickness, t
+    )
+
+
+def set_focal_lengths(
+    telescope: Telescope, stage: int, focal_lengths: Array
+) -> Telescope:
+    """Set focal lengths via curvature.
+
+    Mirror stages: ``c = 1 / (2 f)``.
+    Lens stages (single refracting surface): ``c = 1 / ((n - 1) f)``.
+    Slab stages: not meaningful — raises ``ValueError``.
+    """
+    kind = _require_kind(telescope, stage, {"mirror", "lens"})
+    f = jnp.asarray(focal_lengths)
+    if kind == "mirror":
+        new_c = jnp.where(jnp.isinf(f), 0.0, 1.0 / (2.0 * f))
+    else:  # lens
+        group = telescope.stage(stage)
+        n_inside = group.interaction_module.n_inside
+        n_outside = group.interaction_module.n_outside
+        delta_n = n_inside - n_outside
+        new_c = jnp.where(jnp.isinf(f), 0.0, 1.0 / (delta_n * f))
+    return set_curvatures(telescope, stage, new_c)
+
+
+def apply_focal_error(
+    telescope: Telescope,
+    stage: int,
     sigma: float,
     key: Array,
     relative: bool = False,
 ) -> Telescope:
-    """Apply random Gaussian error to mirror focal lengths.
+    """Perturb focal lengths by Gaussian noise; update curvatures accordingly.
 
-    Perturbs the focal length of each mirror and converts back to curvature.
-    For spherical/parabolic mirrors: f = 1/(2c), c = 1/(2f).
-
-    Args:
-        telescope: Telescope instance
-        group_idx: Index of mirror group to modify
-        sigma: Error magnitude:
-            - If relative=True: fractional error (e.g., 0.01 for 1%)
-            - If relative=False: absolute error in same units as focal length
-        key: JAX random key for reproducibility
-        relative: If True, apply relative (percentage) error; if False, absolute
-
-    Returns:
-        New Telescope with perturbed mirror curvatures
+    Kind-aware: uses the mirror or single-refracting-lens formula. Slabs
+    are rejected.
     """
-    group = telescope.mirror_groups[group_idx]
-    curvatures = group.curvatures
+    kind = _require_kind(telescope, stage, {"mirror", "lens"})
+    group = telescope.stage(stage)
+    curvatures = group.surface.curvatures
+    safe = jnp.where(curvatures == 0, 1e-10, curvatures)
 
-    # Convert curvature to focal length: f = 1/(2c)
-    # Handle zero curvature (flat mirrors) by using a large focal length
-    safe_curvatures = jnp.where(curvatures == 0, 1e-10, curvatures)
-    focal_lengths = 1.0 / (2.0 * safe_curvatures)
+    if kind == "mirror":
+        f = 1.0 / (2.0 * safe)
+    else:  # lens
+        delta_n = group.interaction_module.n_inside - group.interaction_module.n_outside
+        f = 1.0 / (delta_n * safe)
 
-    # Generate random perturbations
     noise = jax.random.normal(key, shape=(len(group),))
+    new_f = f * (1.0 + noise * sigma) if relative else f + noise * sigma
 
-    if relative:
-        # Relative error: f_new = f * (1 + noise * sigma)
-        new_focal_lengths = focal_lengths * (1.0 + noise * sigma)
+    if kind == "mirror":
+        new_c = jnp.where(curvatures == 0, 0.0, 1.0 / (2.0 * new_f))
     else:
-        # Absolute error: f_new = f + noise * sigma
-        new_focal_lengths = focal_lengths + noise * sigma
+        delta_n = group.interaction_module.n_inside - group.interaction_module.n_outside
+        new_c = jnp.where(curvatures == 0, 0.0, 1.0 / (delta_n * new_f))
 
-    # Convert back to curvature: c = 1/(2f)
-    # Preserve zero curvature for originally flat mirrors
-    new_curvatures = jnp.where(
-        curvatures == 0,
-        0.0,
-        1.0 / (2.0 * new_focal_lengths)
-    )
-
-    return _update_mirror_group_attr(
-        telescope, group_idx, lambda g: g.curvatures, new_curvatures
+    return _update_at_stage(
+        telescope, stage, lambda g: g.surface.curvatures, new_c
     )
 
 
-def get_mirrors_by_stage(telescope: Telescope, stage: int) -> list[int]:
-    """Get indices of mirror groups at a specific optical stage.
-
-    Args:
-        telescope: Telescope instance
-        stage: Optical stage (0=primary, 1=secondary, etc.)
-
-    Returns:
-        List of mirror group indices at the specified stage
-    """
-    return [
-        i for i, g in enumerate(telescope.mirror_groups) if g.optical_stage == stage
-    ]
+# Obstruction operations
 
 
-def get_mirror_count(telescope: Telescope) -> int:
-    """Get total number of mirrors across all groups.
-
-    Args:
-        telescope: Telescope instance
-
-    Returns:
-        Total mirror count
-    """
-    return sum(len(g) for g in telescope.mirror_groups)
-
-
-# Sensor Operations
-
-
-def add_sensor(telescope: Telescope, sensor: SensorGroup) -> Telescope:
-    """Add a new sensor group to the telescope.
-
-    Args:
-        telescope: Telescope instance
-        sensor: SensorGroup to add
-
-    Returns:
-        New Telescope with added sensor group
-    """
-    new_sensors = list(telescope.sensors) + [sensor]
-    return eqx.tree_at(lambda t: t.sensors, telescope, new_sensors)
-
-
-def replace_sensor(telescope: Telescope, sensor: SensorGroup, idx: int = 0) -> Telescope:
-    """Replace sensor group by index.
-
-    Args:
-        telescope: Telescope instance
-        sensor: SensorGroup replacement
-        idx: Index of sensor group to replace (default: 0)
-
-    Returns:
-        New telescope with replaced sensor group
-
-    Raises:
-        IndexError: If index is out of range
-    """
-    if idx < 0 or idx >= len(telescope.sensors):
-        raise IndexError(
-            f"Sensor index {idx} out of range (0-{len(telescope.sensors)-1})"
-        )
-    new_sensors = list(telescope.sensors)
-    new_sensors[idx] = sensor
-    return eqx.tree_at(lambda t: t.sensors, telescope, new_sensors)
-
-
-def remove_sensor(telescope: Telescope, idx: int = 0) -> Telescope:
-    """Remove a sensor group by index.
-
-    Args:
-        telescope: Telescope instance
-        idx: Index of sensor group to remove (default: 0)
-
-    Returns:
-        New Telescope with sensor group removed
-
-    Raises:
-        IndexError: If idx is out of range
-    """
-    if idx < 0 or idx >= len(telescope.sensors):
-        raise IndexError(
-            f"Sensor index {idx} out of range (0-{len(telescope.sensors)-1})"
-        )
-    new_sensors = [s for i, s in enumerate(telescope.sensors) if i != idx]
-    return eqx.tree_at(lambda t: t.sensors, telescope, new_sensors)
-
-
-def set_sensor_positions(
-    telescope: Telescope, group_idx: int, positions: Array
-) -> Telescope:
-    """Set positions for all sensors in a group.
-
-    Args:
-        telescope: Telescope instance
-        group_idx: Index of sensor group
-        positions: New positions array (N, 3)
-
-    Returns:
-        New Telescope with updated sensor positions
-    """
-    return _update_sensor_attr(
-        telescope, group_idx, lambda s: s.positions, jnp.asarray(positions)
-    )
-
-
-def set_sensor_rotations(
-    telescope: Telescope, group_idx: int, rotations: Array
-) -> Telescope:
-    """Set rotations for all sensors in a group.
-
-    Args:
-        telescope: Telescope instance
-        group_idx: Index of sensor group
-        rotations: New rotations array (N, 3) Euler angles in degrees
-
-    Returns:
-        New Telescope with updated sensor rotations
-    """
-    return _update_sensor_attr(
-        telescope, group_idx, lambda s: s.rotations, jnp.asarray(rotations)
-    )
-
-
-def focus(telescope: Telescope, delta_z: float, sensor_idx: int = 0) -> Telescope:
-    """Adjust all sensor positions in a group along optical axis (z-axis) for focus.
-
-    Args:
-        telescope: Telescope instance
-        delta_z: Distance to move sensors along z-axis (positive = away from mirrors)
-        sensor_idx: Index of sensor group to adjust (default: 0)
-
-    Returns:
-        New Telescope with adjusted sensor positions
-    """
-    current_positions = telescope.sensors[sensor_idx].positions
-    new_positions = current_positions.at[:, 2].add(delta_z)
-    return set_sensor_positions(telescope, sensor_idx, new_positions)
-
-
-def get_sensor_count(telescope: Telescope) -> int:
-    """Get number of sensor groups.
-
-    Args:
-        telescope: Telescope instance
-
-    Returns:
-        Number of sensor groups
-    """
-    return len(telescope.sensors)
-
-
-def get_total_sensor_count(telescope: Telescope) -> int:
-    """Get total number of individual sensors across all groups.
-
-    Args:
-        telescope: Telescope instance
-
-    Returns:
-        Total number of sensors
-    """
-    return sum(len(s) for s in telescope.sensors)
-
-
-def with_ste(telescope: Telescope, sensor_idx: int = 0) -> Telescope:
-    """Convert sensor group to straight-through estimator variant.
-
-    Returns a new telescope with the specified sensor group converted to use
-    straight-through estimation: hard assignment in forward pass,
-    differentiable interpolation (bilinear for square, barycentric for hex)
-    in backward pass.
-
-    Args:
-        telescope: Telescope instance
-        sensor_idx: Index of sensor group to convert
-
-    Returns:
-        New Telescope with converted sensor group
-
-    Raises:
-        IndexError: If sensor_idx is out of range
-        TypeError: If sensor type is not supported for conversion
-    """
-    from ..sensors import (
-        HexagonalSensorGroup,
-        SquareSensorGroup,
-        StraightThroughHexagonalSensorGroup,
-        StraightThroughSquareSensorGroup,
-    )
-
-    if sensor_idx < 0 or sensor_idx >= len(telescope.sensors):
-        raise IndexError(
-            f"Sensor index {sensor_idx} out of range (0-{len(telescope.sensors)-1})"
-        )
-
-    sensor = telescope.sensors[sensor_idx]
-
-    new_sensor: StraightThroughSquareSensorGroup | StraightThroughHexagonalSensorGroup
-    # Convert based on sensor type
-    if isinstance(sensor, SquareSensorGroup) and not isinstance(
-        sensor, StraightThroughSquareSensorGroup
-    ):
-        new_sensor = StraightThroughSquareSensorGroup(
-            positions=sensor.positions,
-            rotations=sensor.rotations,
-            width=sensor.width,
-            height=sensor.height,
-            bounds=(
-                sensor.x0,
-                sensor.x0 + sensor.width * sensor.dx,
-                sensor.y0,
-                sensor.y0 + sensor.height * sensor.dy,
-            ),
-            edge_width=sensor.edge_width,
-        )
-    elif isinstance(sensor, HexagonalSensorGroup) and not isinstance(
-        sensor, StraightThroughHexagonalSensorGroup
-    ):
-        new_sensor = StraightThroughHexagonalSensorGroup(
-            positions=sensor.positions,
-            rotations=sensor.rotations,
-            hex_centers=sensor.hex_centers,
-            edge_width=sensor.edge_width,
-        )
-    elif isinstance(
-        sensor, StraightThroughSquareSensorGroup | StraightThroughHexagonalSensorGroup
-    ):
-        # Already a straight-through sensor, return unchanged
-        return telescope
-    else:
-        raise TypeError(
-            f"Cannot convert sensor type {type(sensor).__name__} to straight-through estimator"
-        )
-
-    new_sensors = list(telescope.sensors)
-    new_sensors[sensor_idx] = new_sensor
-    return eqx.tree_at(lambda t: t.sensors, telescope, new_sensors)
-
-
-# Obstruction Operations
-
-
-def add_obstruction(
-    telescope: Telescope, obstruction: ObstructionGroup
-) -> Telescope:
-    """Add an obstruction group
-
-    Args:
-        telescope: Telescope instance
-        obstruction: Obstruction group to add to telescope
-
-    Returns:
-        New Telescope with obstruction group added
-    """
-    current = telescope.obstruction_groups or []
-    new_groups = list(current) + [obstruction]
+def add_obstruction(telescope: Telescope, obstruction: ObstructionGroup) -> Telescope:
+    """Append an obstruction group."""
+    new_groups = list(telescope.obstruction_groups) + [obstruction]
     return eqx.tree_at(lambda t: t.obstruction_groups, telescope, new_groups)
 
 
 def remove_obstruction(telescope: Telescope, group_idx: int) -> Telescope:
-    """Remove an obstruction group by index.
-
-    Args:
-        telescope: Telescope instance
-        group_idx: Index of obstruction group to remove
-
-    Returns:
-        New Telescope with obstruction group removed
-
-    Raises:
-        IndexError: If group_idx is out of range
-    """
+    """Remove the obstruction group at ``group_idx``."""
     if not telescope.obstruction_groups:
         raise IndexError("No obstruction groups to remove")
     if group_idx < 0 or group_idx >= len(telescope.obstruction_groups):
         raise IndexError(
             f"Obstruction group index {group_idx} out of range "
-            f"(0-{len(telescope.obstruction_groups)-1})"
+            f"(0-{len(telescope.obstruction_groups) - 1})"
         )
     new_groups = [
         g for i, g in enumerate(telescope.obstruction_groups) if i != group_idx
@@ -792,97 +370,38 @@ def remove_obstruction(telescope: Telescope, group_idx: int) -> Telescope:
 
 
 def clear_obstructions(telescope: Telescope) -> Telescope:
-    """Remove all obstructions from telescope.
-
-    Args:
-        telescope: Telescope instance
-
-    Returns:
-        New Telescope with no obstructions
-    """
+    """Drop all obstruction groups."""
     return eqx.tree_at(lambda t: t.obstruction_groups, telescope, [])
 
 
 def get_obstruction_count(telescope: Telescope) -> int:
-    """Get total number of obstructions across all groups.
-
-    Args:
-        telescope: Telescope instance
-
-    Returns:
-        Total obstruction count
-    """
-    if not telescope.obstruction_groups:
-        return 0
+    """Total number of obstruction elements across all groups."""
     return sum(len(g) for g in telescope.obstruction_groups)
 
 
-# Convenience Operations
-
-
-def clone(telescope: Telescope) -> Telescope:
-    """Create a deep copy of the telescope.
-
-    Args:
-        telescope: Telescope instance
-
-    Returns:
-        Independent copy of the telescope
-    """
-    return jax.tree_util.tree_map(lambda x: x, telescope)
+# Summary
 
 
 def get_info(telescope: Telescope) -> dict[str, Any]:
-    """Get summary information about telescope configuration.
+    """Summary dict of telescope configuration."""
+    from ..core.apertures import DiskAperture, PolygonAperture
 
-    Args:
-        telescope: Telescope instance
-
-    Returns:
-        Dictionary with telescope statistics and properties
-    """
-    from ..sensors import HexagonalSensorGroup, SquareSensorGroup
-    from .mirrors import AsphericDiskMirrorGroup, AsphericPolygonMirrorGroup
-
-    # Mirror info
-    n_mirror_groups = len(telescope.mirror_groups)
-    n_mirrors = get_mirror_count(telescope)
-
-    stages: set[int] = set()
-    mirror_types: list[str] = []
-    for group in telescope.mirror_groups:
-        stages.add(group.optical_stage)
-        if isinstance(group, AsphericDiskMirrorGroup):
-            mirror_types.append("disk")
-        elif isinstance(group, AsphericPolygonMirrorGroup):
-            mirror_types.append("polygon")
+    stages_info = []
+    for s in telescope.stage_indices():
+        g = telescope.stage(s)
+        if isinstance(g.aperture, DiskAperture):
+            ap = "disk"
+        elif isinstance(g.aperture, PolygonAperture):
+            ap = "polygon"
         else:
-            mirror_types.append("unknown")
+            ap = "unknown"
+        stages_info.append(
+            {"stage": s, "kind": g.kind, "n_elements": g.n_elements, "aperture": ap}
+        )
 
-    # Sensor info
-    n_sensor_groups = len(telescope.sensors)
-    n_sensors_total = get_total_sensor_count(telescope)
-    sensor_types: list[str] = []
-    sensors_per_group: list[int] = []
-    for sensor in telescope.sensors:
-        sensors_per_group.append(len(sensor))
-        if isinstance(sensor, SquareSensorGroup):
-            sensor_types.append("square")
-        elif isinstance(sensor, HexagonalSensorGroup):
-            sensor_types.append("hexagonal")
-        else:
-            sensor_types.append(type(sensor).__name__)
-
-    # Obstruction info
-    n_obstruction_groups = (
-        len(telescope.obstruction_groups) if telescope.obstruction_groups else 0
-    )
-    n_obstructions = get_obstruction_count(telescope)
-
-    # Compute bounding box of mirrors
-    if telescope.mirror_groups:
+    if telescope.optical_groups:
         all_positions = jnp.concatenate(
-            [g.positions for g in telescope.mirror_groups], axis=0
+            [g.positions for g in telescope.optical_groups], axis=0
         )
         bbox_min = all_positions.min(axis=0)
         bbox_max = all_positions.max(axis=0)
@@ -891,16 +410,12 @@ def get_info(telescope: Telescope) -> dict[str, Any]:
 
     return {
         "name": telescope.name,
-        "n_mirror_groups": n_mirror_groups,
-        "n_mirrors": n_mirrors,
-        "optical_stages": sorted(stages),
-        "mirror_types": mirror_types,
-        "n_sensor_groups": n_sensor_groups,
-        "n_sensors_total": n_sensors_total,
-        "sensors_per_group": sensors_per_group,
-        "sensor_types": sensor_types,
-        "n_obstruction_groups": n_obstruction_groups,
-        "n_obstructions": n_obstructions,
+        "n_stages": telescope.n_stages,
+        "stages": stages_info,
+        "n_mirror_elements": telescope.n_mirror_elements,
+        "n_lens_elements": telescope.n_lens_elements,
+        "n_obstruction_groups": len(telescope.obstruction_groups),
+        "n_obstructions": get_obstruction_count(telescope),
         "bbox_min": bbox_min,
         "bbox_max": bbox_max,
     }

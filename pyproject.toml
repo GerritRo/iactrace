@@ -31,23 +31,21 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Physics",
     "Topic :: Scientific/Engineering :: Astronomy",
     "License :: OSI Approved :: BSD License",
-    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Operating System :: OS Independent",
     "Typing :: Typed",
 ]
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 dependencies = [
     "jax>=0.4.20",
     "jaxlib>=0.4.20",
     "numpy>=1.22.0",
     "matplotlib>=3.5.0",
-    "pandas>=1.4.0",
     "trimesh>=3.15.0",
     "equinox>=0.11.0",
     "pyyaml>=6.0",
+    "pydantic>=2.0",
 ]
-
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0",
@@ -91,7 +89,7 @@ iactrace = ["py.typed"]
 version = {attr = "iactrace.__version__"}
 
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.12"
 warn_return_any = false  # Disabled due to equinox tree operations returning Any
 warn_unused_configs = true
 disallow_untyped_defs = false
@@ -102,7 +100,7 @@ follow_imports = "silent"  # Use type info from imports but don't check them
 
 [tool.ruff]
 line-length = 100
-target-version = "py311"
+target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "T10"]

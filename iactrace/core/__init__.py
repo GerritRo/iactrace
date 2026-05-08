@@ -1,14 +1,11 @@
-# Optical base classes (no dependencies, import first)
-from .integrators import Integrator, MCIntegrator
-from .intersections import (
-    intersect_box,
-    intersect_conic,
-    intersect_cylinder,
-    intersect_oriented_box,
-    intersect_plane,
-    intersect_sphere,
-    intersect_triangle,
-    newton_raphson_intersect,
+from .apertures import Aperture, DiskAperture, PolygonAperture
+from .bsdf import BSDF, DoubleGaussianBSDF, GaussianBSDF
+from .interactions import (
+    Interaction,
+    InteractionType,
+    ReflectInteraction,
+    RefractInteraction,
+    SlabInteraction,
 )
 from .obstructions import (
     BoxGroup,
@@ -19,69 +16,49 @@ from .obstructions import (
     SphereGroup,
     TriangleGroup,
 )
-from .optics import (
-    InteractionType,
-    OpticalGroupBase,
-    apply_perturbation,
-    fresnel_unpolarized,
-    generate_perturbation_angles,
-    reflect,
-    refract,
-    refract_slab,
-)
-from .render import render, render_debug, render_response_matrix, trace_rays, trace_rays_debug
-from .surfaces import AsphericSurface, compute_sag_and_normal, sag, sag_raw
-from .transforms import euler_to_matrix, look_at_rotation
+from .optics import OpticalElementGroup
+from .ray_bundle import LazyRayBundle, RayBundle
+from .render import render_optics, trace_optics
+from .surfaces import AsphericSurfaceGroup, SurfaceGroup
+from .transforms import euler_to_matrix
 
 __all__ = [
-    # Optical base classes
+    # Optical element group
     "InteractionType",
-    "OpticalGroupBase",
+    "OpticalElementGroup",
 
-    # Intersections
-    "intersect_plane",
-    "intersect_cylinder",
-    "intersect_box",
-    "intersect_sphere",
-    "intersect_oriented_box",
-    "intersect_triangle",
-    "intersect_conic",
-    "newton_raphson_intersect",
+    # Aperture modules
+    "Aperture",
+    "DiskAperture",
+    "PolygonAperture",
+
+    # Interaction modules
+    "Interaction",
+    "ReflectInteraction",
+    "RefractInteraction",
+    "SlabInteraction",
 
     # Surfaces
-    "AsphericSurface",
-    "sag_raw",
-    "sag",
-    "compute_sag_and_normal",
+    "SurfaceGroup",
+    "AsphericSurfaceGroup",
 
-    # Integrators
-    "Integrator",
-    "MCIntegrator",
-
-    # Normals / perturbations
-    "generate_perturbation_angles",
-    "apply_perturbation",
-
-    # Reflection
-    "reflect",
-
-    # Refraction
-    "refract",
-    "refract_slab",
-    "fresnel_unpolarized",
+    # BSDF
+    "BSDF",
+    "GaussianBSDF",
+    "DoubleGaussianBSDF",
 
     # Transforms
     "euler_to_matrix",
-    "look_at_rotation",
 
-    # Rendering
-    "render",
-    "render_debug",
-    "render_response_matrix",
-    "trace_rays",
-    "trace_rays_debug",
+    # Ray bundle
+    "RayBundle",
+    "LazyRayBundle",
 
-    # Obstructions (groups only)
+    # Render engine
+    "render_optics",
+    "trace_optics",
+
+    # Obstructions
     "ObstructionGroup",
     "CylinderGroup",
     "OpenCylinderGroup",
