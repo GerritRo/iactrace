@@ -1,0 +1,18 @@
+sensors:
+- type: square
+  position:
+  - 0.000000
+  - 0.000000
+  - 0.000000
+  orientation:
+  - 0.000000
+  - 0.000000
+  - 0.000000
+  width: 256
+  height: 256
+  bounds:
+  - -0.020000
+  - 0.020000
+  - -0.020000
+  - 0.020000
+  id: sensor_0

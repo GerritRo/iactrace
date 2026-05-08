@@ -1,6 +1,14 @@
 telescope:
   name: test_cassegrain
   units: m
+  camera_position:
+  - 0.000000
+  - 0.000000
+  - -0.140000
+  camera_rotation:
+  - 0.000000
+  - 0.000000
+  - 0.000000
 mirror_templates:
   template_0:
     surface:
@@ -24,7 +32,7 @@ mirrors:
   aperture:
     type: circular
     radius: 0.100000
-    inner_radius: 0.03
+    inner_radius: 0.030000
   id: M_0
   template: template_0
 - position:
@@ -97,21 +105,3 @@ obstructions:
   - 0.000000
   r: 0.002000
   id: obs_4
-sensors:
-- type: square
-  position:
-  - 0.000000
-  - 0.000000
-  - -0.140000
-  orientation:
-  - 0.000000
-  - 0.000000
-  - 0.000000
-  width: 256
-  height: 256
-  bounds:
-  - -0.018000
-  - 0.018000
-  - -0.018000
-  - 0.018000
-  id: sensor_0

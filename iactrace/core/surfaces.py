@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+from abc import abstractmethod
+
 import equinox as eqx
 import jax
 import jax.numpy as jnp
@@ -5,10 +9,80 @@ import jax.numpy as jnp
 from .intersections import intersect_conic, newton_raphson_intersect
 
 
+# Surface group protocol 
+
+
+class SurfaceGroup(eqx.Module):
+    """Abstract base for batched surface parameters of N optical elements.
+
+    A SurfaceGroup stores per-element surface geometry and provides:
+    - Sag/normal computation for the transform pipeline (vmapped per element)
+    - Per-element sag and ray intersection for rendering and visualization
+
+    Subclasses must store an ``offsets`` array of shape (N, 2) and implement
+    the abstract methods below.  See ``AsphericSurfaceGroup`` for a concrete
+    example.
+    """
+
+    offsets: jax.Array  # (N, 2) — per-element surface offsets
+
+    @abstractmethod
+    def compute_sag_and_normal_at(self, x, y):
+        """Compute surface point and normal at (x, y) for a single element.
+
+        Designed to be called inside ``jax.vmap`` over the module's axis 0.
+        After vmapping, per-element arrays become scalar/1D.
+
+        Args:
+            x: x-coordinate (scalar)
+            y: y-coordinate (scalar)
+
+        Returns:
+            Tuple of (point, normal) where point is (3,) and normal is (3,).
+        """
+        ...
+
+    @abstractmethod
+    def sag_at(self, element_idx, x, y):
+        """Compute surface sag z(x, y) for a single element.
+
+        Used by the visualization module for mesh generation.
+
+        Args:
+            element_idx: Element index within the group.
+            x: x-coordinate in local frame (scalar)
+            y: y-coordinate in local frame (scalar)
+
+        Returns:
+            z: Surface sag at (x, y) relative to the element's offset.
+        """
+        ...
+
+    @abstractmethod
+    def intersect_at(self, element_idx, ray_origin, ray_direction,
+                     max_iter=10, tol=1e-8):
+        """Intersect a ray with a single element's surface.
+
+        Used by the render pipeline for per-ray intersection.
+
+        Args:
+            element_idx: Element index within the group.
+            ray_origin: Ray origin in local coordinates (3,)
+            ray_direction: Ray direction (3,)
+            max_iter: Maximum Newton-Raphson iterations.
+            tol: Convergence tolerance.
+
+        Returns:
+            Tuple of (t, point, normal):
+                - t: Intersection distance (scalar)
+                - point: Intersection point (3,)
+                - normal: Surface normal at intersection (3,)
+        """
+        ...
+
+
 def sag_raw(x, y, curvature, conic, aspheric):
     """Compute surface sag z(x,y) without offset.
-
-    Standalone function enabling gradient flow from parameters to sag values.
 
     Args:
         x: x-coordinate (scalar)
@@ -27,7 +101,6 @@ def sag_raw(x, y, curvature, conic, aspheric):
     denom = 1 + jnp.sqrt(1 - (1 + k) * c * c * r2)
     z = r2 * c / denom
 
-    # Add aspheric terms if any (static check for JAX tracing)
     if aspheric.size > 0:
         powers = jnp.arange(2, 2 + 2 * len(aspheric), 2)
         z = z + jnp.sum(aspheric * r2 ** powers)
@@ -72,7 +145,6 @@ def compute_sag_and_normal(x, y, offset, curvature, conic, aspheric):
     z = sag(x, y, offset, curvature, conic, aspheric)
     point = jnp.stack([x, y, z], axis=-1)
 
-    # Compute normal via autodiff
     x_surf = x + offset[0]
     y_surf = y + offset[1]
     dzdx = jax.grad(lambda X: sag_raw(X, y_surf, curvature, conic, aspheric))(x_surf)
@@ -83,80 +155,61 @@ def compute_sag_and_normal(x, y, offset, curvature, conic, aspheric):
     return point, normal
 
 
+#  Aspheric surface group 
 
-class AsphericSurface(eqx.Module):
-    """Aspheric surface defined by curvature, conic constant, and polynomial terms.
 
-    When is_pure_conic is True, the intersection uses the exact closed-form
-    conic solution and skips Newton-Raphson refinement entirely.
+class AsphericSurfaceGroup(SurfaceGroup):
+    """Batched aspheric surface parameters for N optical elements.
+
+    This is the composable surface module used by ``OpticalElementGroup``.
+    When vmapped over axis 0, each element becomes a single-element surface
+    with scalar curvature/conic and (K,) aspheric coefficients, enabling
+    generic use in transform_to_world and render pipelines.
+
+    Attributes:
+        curvatures: Per-element curvatures (N,)
+        conics: Per-element conic constants (N,)
+        aspherics: Per-element aspheric coefficients (N, K)
+        offsets: Per-element surface offsets (N, 2)
     """
 
-    curvature: jax.Array | float
-    conic: jax.Array | float
-    aspheric: jax.Array  # (K,)
-    is_pure_conic: bool = eqx.field(static=True, default=False)
+    curvatures: jax.Array   # (N,)
+    conics: jax.Array        # (N,)
+    aspherics: jax.Array     # (N, K)
 
-    def sag(self, x, y, offset):
-        """Compute surface sag z(x,y) in local mirror coordinates.
-
-        Convenience method that calls the standalone sag function.
-
-        Args:
-            x: x-coordinate in local mirror frame (scalar)
-            y: y-coordinate in local mirror frame (scalar)
-            offset: (x0, y0) offset on parent surface (2,)
-
-        Returns:
-            z: Surface sag at (x, y) relative to offset point
-        """
-        return sag(x, y, offset, self.curvature, self.conic, self.aspheric)
-
-    def intersect(self, ray_origin, ray_direction, offset, max_iter=10, tol=1e-8):
-        """Find ray-surface intersection.
-
-        For pure conics (is_pure_conic=True), uses the exact closed-form solution.
-        For aspheric surfaces, uses Newton-Raphson refinement on top of the
-        conic initial guess.
-
-        Args:
-            ray_origin: Ray origin in local coordinates (3,)
-            ray_direction: Ray direction (3,)
-            offset: Surface offset (x0, y0) (2,)
-            max_iter: Maximum Newton-Raphson iterations (aspheric only)
-            tol: Convergence tolerance (aspheric only)
-
-        Returns:
-            t: Intersection distance
-            point: Intersection point (3,)
-            normal: Surface normal at intersection (3,)
-        """
-        # Translate ray origin to raw surface coordinates for conic intersection
-        z0 = sag_raw(offset[0], offset[1], self.curvature, self.conic, self.aspheric)
-        ray_origin_raw = jnp.array([
-            ray_origin[0] + offset[0],
-            ray_origin[1] + offset[1],
-            ray_origin[2] + z0
-        ])
-
-        # Get closed-form conic intersection
-        t = intersect_conic(ray_origin_raw, ray_direction, self.curvature, self.conic)
-
-        if not self.is_pure_conic:
-            # Refine with Newton-Raphson for aspheric terms
-            def sag_fn(x, y):
-                return sag(x, y, offset, self.curvature, self.conic, self.aspheric)
-
-            t, hit_xy, _ = newton_raphson_intersect(
-                sag_fn, ray_origin, ray_direction, t, max_iter, tol
-            )
-            x_hit, y_hit = hit_xy[0], hit_xy[1]
-        else:
-            x_hit = ray_origin[0] + t * ray_direction[0]
-            y_hit = ray_origin[1] + t * ray_direction[1]
-
-        # Compute point and normal using standalone functions
-        point, normal = compute_sag_and_normal(
-            x_hit, y_hit, offset, self.curvature, self.conic, self.aspheric
+    def compute_sag_and_normal_at(self, x, y):
+        return compute_sag_and_normal(
+            x, y, self.offsets, self.curvatures, self.conics, self.aspherics
         )
 
+    def sag_at(self, element_idx, x, y):
+        return sag(
+            x, y, self.offsets[element_idx],
+            self.curvatures[element_idx], self.conics[element_idx],
+            self.aspherics[element_idx],
+        )
+
+    def intersect_at(self, element_idx, ray_origin, ray_direction,
+                     max_iter=10, tol=1e-8):
+        c = self.curvatures[element_idx]
+        k = self.conics[element_idx]
+        a = self.aspherics[element_idx]
+        offset = self.offsets[element_idx]
+
+        # Translate to raw (unshifted) surface frame for the conic initial guess
+        z0 = sag_raw(offset[0], offset[1], c, k, a)
+        ray_origin_raw = ray_origin + jnp.array([offset[0], offset[1], z0])
+
+        t_init = intersect_conic(ray_origin_raw, ray_direction, c, k)
+
+        # Refine with Newton-Raphson in the offset frame
+        t, hit_xy, _ = newton_raphson_intersect(
+            lambda x, y: sag(x, y, offset, c, k, a),
+            ray_origin, ray_direction, t_init, max_iter, tol,
+        )
+
+        point, normal = compute_sag_and_normal(
+            hit_xy[0], hit_xy[1], offset, c, k, a,
+        )
         return t, point, normal
+

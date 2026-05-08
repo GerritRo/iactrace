@@ -1,7 +1,14 @@
 telescope:
   name: simple_parabolic
   units: m
-
+  camera_position:
+  - 0.000000
+  - 0.000000
+  - 0.400000
+  camera_rotation:
+  - 0.000000
+  - 0.000000
+  - 0.000000
 mirror_templates:
   primary:
     surface:
@@ -22,7 +29,6 @@ mirrors:
     radius: 0.100000
   id: M_primary
   template: primary
-
 obstructions:
 - type: cylinder
   p1:
@@ -68,21 +74,3 @@ obstructions:
   - 0.000000
   r: 0.002000
   id: spider_vane_3
-sensors:
-- type: square
-  position:
-  - 0.000000
-  - 0.000000
-  - 0.400000
-  orientation:
-  - 0.000000
-  - 0.000000
-  - 0.000000
-  width: 256
-  height: 256
-  bounds:
-  - -0.020000
-  - 0.020000
-  - -0.020000
-  - 0.020000
-  id: sensor_0
