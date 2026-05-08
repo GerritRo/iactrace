@@ -6,7 +6,6 @@ import jax
 import jax.numpy as jnp
 from jax import Array
 
-
 # Interaction type enum
 
 class InteractionType(enum.Enum):

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any
 
 import equinox as eqx
 import jax
@@ -155,7 +155,7 @@ class Camera(eqx.Module):
                 f"{len(self.sensor_groups)} sensor group(s)"
             )
 
-    # Pipeline 
+    # Pipeline
 
     def image(
         self,
@@ -252,7 +252,8 @@ class Camera(eqx.Module):
             s_idx, x, y, pe = _project_to_sensor(self, rb_cam, sensor_idx)
             # Per-element rays are source-major (see _build_source_rays):
             # the first n_samples rays belong to source 0, etc.
-            per_source = lambda a: a.reshape(n_sources, n_samples)
+            def per_source(a):
+                return a.reshape(n_sources, n_samples)
             contrib = jax.vmap(sensor.accumulate)(
                 per_source(s_idx), per_source(x), per_source(y), per_source(pe),
             )

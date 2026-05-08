@@ -9,8 +9,6 @@ values, and that the resulting objects can be handed straight to
 
 from __future__ import annotations
 
-import math
-
 import jax
 import jax.numpy as jnp
 import pytest
@@ -19,8 +17,8 @@ from iactrace.core.apertures import DiskAperture, PolygonAperture
 from iactrace.core.bsdf import DoubleGaussianBSDF, GaussianBSDF
 from iactrace.core.interactions import (
     InteractionType,
-    RefractInteraction,
     ReflectInteraction,
+    RefractInteraction,
     SlabInteraction,
 )
 from iactrace.core.obstructions import (
@@ -32,7 +30,6 @@ from iactrace.core.obstructions import (
 from iactrace.core.optics import OpticalElementGroup
 from iactrace.core.surfaces import AsphericSurfaceGroup
 from iactrace.telescope import Telescope, lenses, mirrors, obstructions
-
 
 # ---------------------------------------------------------------------------
 # mirrors.*

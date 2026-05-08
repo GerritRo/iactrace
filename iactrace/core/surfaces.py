@@ -8,8 +8,7 @@ import jax.numpy as jnp
 
 from .intersections import intersect_conic, newton_raphson_intersect
 
-
-# Surface group protocol 
+# Surface group protocol
 
 
 class SurfaceGroup(eqx.Module):
@@ -155,7 +154,7 @@ def compute_sag_and_normal(x, y, offset, curvature, conic, aspheric):
     return point, normal
 
 
-#  Aspheric surface group 
+#  Aspheric surface group
 
 
 class AsphericSurfaceGroup(SurfaceGroup):

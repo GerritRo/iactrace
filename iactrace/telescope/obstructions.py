@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-import math
 from collections.abc import Sequence
 
 import jax.numpy as jnp
 
 # Re-export the low-level primitives for convenience
-
 from ..core.obstructions import (
     BoxGroup,
     CylinderGroup,

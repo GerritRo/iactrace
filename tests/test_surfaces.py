@@ -1,8 +1,8 @@
 import jax
 import jax.numpy as jnp
 
-from iactrace.core.intersections import intersect_conic, newton_raphson_intersect
 from iactrace.core.bsdf import GaussianBSDF, _apply_perturbation
+from iactrace.core.intersections import intersect_conic, newton_raphson_intersect
 from iactrace.core.surfaces import compute_sag_and_normal, sag, sag_raw
 
 

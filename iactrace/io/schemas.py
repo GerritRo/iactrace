@@ -4,15 +4,14 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-
-# Reusable constrained types 
+# Reusable constrained types
 
 Vec2 = Annotated[list[float], Field(min_length=2, max_length=2)]
 Vec3 = Annotated[list[float], Field(min_length=3, max_length=3)]
 Bounds4 = Annotated[list[float], Field(min_length=4, max_length=4)]
 
 
-# Aperture schemas 
+# Aperture schemas
 
 
 class CircularApertureSchema(BaseModel):
@@ -32,7 +31,7 @@ ApertureSchema = Annotated[
 ]
 
 
-# Mirror template & mirror schemas 
+# Mirror template & mirror schemas
 
 
 class SurfaceSchema(BaseModel):
@@ -66,7 +65,7 @@ class MirrorSchema(BaseModel):
     id: str | None = None
 
 
-# Lens schemas 
+# Lens schemas
 
 
 class AsphericDiskLensSchema(BaseModel):
@@ -104,7 +103,7 @@ LensSchema = Annotated[
 ]
 
 
-# Obstruction schemas 
+# Obstruction schemas
 
 
 class CylinderObstructionSchema(BaseModel):
@@ -164,7 +163,7 @@ ObstructionSchema = Annotated[
 ]
 
 
-# Sensor schemas 
+# Sensor schemas
 
 
 class SquareSensorSchema(BaseModel):
@@ -205,14 +204,14 @@ SensorSchema = Annotated[
 ]
 
 
-# Camera schema 
+# Camera schema
 
 
 class CameraConfigSchema(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
-# Top-level telescope schema 
+# Top-level telescope schema
 
 
 class TelescopeMetadataSchema(BaseModel):
@@ -297,7 +296,7 @@ class TelescopeConfigSchema(BaseModel):
         return self
 
 
-# Top-level camera schema 
+# Top-level camera schema
 
 
 class CameraFileSchema(BaseModel):

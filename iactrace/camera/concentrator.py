@@ -1,11 +1,8 @@
 from __future__ import annotations
 
-import math
 from abc import abstractmethod
 
 import equinox as eqx
-import jax
-import jax.lax as lax
 import jax.numpy as jnp
 from jax import Array
 
