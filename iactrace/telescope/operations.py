@@ -1,15 +1,3 @@
-"""Functional operations on a :class:`~iactrace.Telescope`.
-
-All operations are addressed by ``stage`` — the integer ``optical_stage``
-of the target :class:`OpticalElementGroup`. The split between
-``mirror_groups`` and ``lens_groups`` on the Telescope is purely a
-storage / YAML detail; users only ever talk in stages.
-
-Generic operations work on any kind of stage (mirror, lens, or slab).
-Kind-specific operations validate at runtime and raise ``ValueError``
-when called on the wrong kind.
-"""
-
 from __future__ import annotations
 
 from collections.abc import Callable

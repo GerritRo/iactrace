@@ -20,7 +20,7 @@ __all__ = [
 ]
 
 
-# Input-shape helpers (kwargs → arrays)
+# Input-shape helpers
 
 def _as_vec3(value, name: str) -> Array:
     arr = jnp.asarray(value)

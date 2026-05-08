@@ -34,8 +34,8 @@ class Telescope(eqx.Module):
     mirror_groups: list[OpticalElementGroup]
     lens_groups: list[OpticalElementGroup]
     obstruction_groups: list[ObstructionGroup]
-    camera_position: Array   # (3,) — camera origin in world frame
-    camera_rotation: Array   # (3,) — Euler angles (degrees) for camera orientation
+    camera_position: Array   # (3,) camera origin in world frame
+    camera_rotation: Array   # (3,) Euler angles (degrees) for camera orientation
     name: str = eqx.field(static=True)
 
     def __init__(
