@@ -67,6 +67,17 @@ class SensorGroup(eqx.Module):
         """
         raise NotImplementedError
 
+    @abstractmethod
+    def in_bounds(self, x: Array, y: Array) -> Array:
+        """Predicate: True for ``(x, y)`` inside the sensor's active footprint.
+
+        Coordinates are in a single sensor's local frame. Used by
+        :func:`iactrace.camera.camera.intersect_sensor` to mask rays whose
+        plane intersection falls outside this tile's pixel region before
+        selecting the closest tile across a multi-sensor group.
+        """
+        raise NotImplementedError
+
 
 # Square pixel helpers
 
@@ -177,6 +188,11 @@ class SquareSensorGroup(SensorGroup):
         yi = jnp.clip(yi, 0, self.height - 1)
 
         return sensor_idx * (self.height * self.width) + yi * self.width + xi
+
+    def in_bounds(self, x: Array, y: Array) -> Array:
+        x_max = self.x0 + self.dx * self.width
+        y_max = self.y0 + self.dy * self.height
+        return (x >= self.x0) & (x <= x_max) & (y >= self.y0) & (y <= y_max)
 
 
 # Hexagonal pixel helpers
@@ -379,3 +395,10 @@ class HexagonalSensorGroup(SensorGroup):
         )
 
         return sensor_idx * self.n_pixels + pixel_idx
+
+    def in_bounds(self, x: Array, y: Array) -> Array:
+        x_grid, y_grid = self._to_grid_coords(x, y)
+        q, r = _cartesian_to_axial(x_grid, y_grid, self.hex_size)
+        qi, ri = _axial_round(q, r)
+        _, valid = self._lookup_pixels(qi.astype(jnp.int32), ri.astype(jnp.int32))
+        return valid

@@ -536,8 +536,12 @@ def _create_open_cylinder_mesh(p1, p2, radius, sections=16):
         # Top vertex indices: sections to 2*sections-1
         b0, b1 = i, next_i
         t0, t1 = i + sections, next_i + sections
-        faces.append([b0, t0, b1])
-        faces.append([b1, t0, t1])
+        # Outward-facing pair.
+        faces.append([b0, b1, t1])
+        faces.append([b0, t1, t0])
+        # Inward-facing pair
+        faces.append([b0, t1, b1])
+        faces.append([b0, t0, t1])
 
     mesh = trimesh.Trimesh(vertices=vertices, faces=faces)
 

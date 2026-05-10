@@ -454,14 +454,14 @@ def sensor_from_schema(
     **camera-local** coordinates — the camera file format is the single
     source of truth and always speaks in the camera's own frame.
     """
-    pos = list(schema.position)
-    rot = list(schema.orientation)
+    positions = [list(p) for p in schema.position_list]
+    rotations = [list(r) for r in schema.orientation_list]
 
     if isinstance(schema, SquareSensorSchema):
         bounds = schema.bounds
         return SquareSensorGroup(
-            positions=[pos],
-            rotations=[rot],
+            positions=positions,
+            rotations=rotations,
             width=schema.width,
             height=schema.height,
             bounds=(bounds[0], bounds[1], bounds[2], bounds[3]),
@@ -472,8 +472,8 @@ def sensor_from_schema(
             [x, y] for x, y in zip(schema.centers_x, schema.centers_y, strict=False)
         ]
         return HexagonalSensorGroup(
-            positions=[pos],
-            rotations=[rot],
+            positions=positions,
+            rotations=rotations,
             hex_centers=hex_centers,
             edge_width=schema.edge_width,
         )
@@ -722,32 +722,38 @@ def sensors_to_schemas(
 ) -> list[SensorSchemaType]:
     """Extract sensor schemas from a SensorGroup list.
 
-    Sensor positions stay in the camera-local frame (the only frame the
-    camera file format speaks).
+    One YAML entry per :class:`SensorGroup`: groups carrying multiple
+    sensors are written with plural ``positions``/``orientations`` lists,
+    so a multi-tile focal plane round-trips as a single group instead of
+    being split into N single-tile groups.
     """
     _extractors: dict[type, object] = {
-        SquareSensorGroup: _extract_square_sensor,
-        HexagonalSensorGroup: _extract_hex_sensor,
+        SquareSensorGroup: _extract_square_group,
+        HexagonalSensorGroup: _extract_hex_group,
     }
 
     result: list[SensorSchemaType] = []
-    counter = 0
-
-    for group in sensors:
+    for counter, group in enumerate(sensors):
         extractor = _extractors[type(group)]
-        for i in range(len(group)):
-            result.append(extractor(group, i, counter))
-            counter += 1
+        result.append(extractor(group, counter))
 
     return result
 
 
-def _extract_square_sensor(
-    group: SquareSensorGroup, i: int, counter: int,
+def _placement_kwargs(group: SensorGroup) -> dict[str, object]:
+    """Singular ``position``/``orientation`` for N=1, plural lists otherwise."""
+    positions = [_to_float_list(p) for p in group.positions]
+    rotations = [_to_float_list(r) for r in group.rotations]
+    if len(positions) == 1:
+        return {"position": positions[0], "orientation": rotations[0]}
+    return {"positions": positions, "orientations": rotations}
+
+
+def _extract_square_group(
+    group: SquareSensorGroup, counter: int,
 ) -> SquareSensorSchema:
     schema_kwargs: dict[str, object] = {
-        "position": _to_float_list(group.positions[i]),
-        "orientation": _to_float_list(group.rotations[i]),
+        **_placement_kwargs(group),
         "width": group.width,
         "height": group.height,
         "bounds": list(group.bounds),
@@ -758,13 +764,12 @@ def _extract_square_sensor(
     return SquareSensorSchema(**schema_kwargs)
 
 
-def _extract_hex_sensor(
-    group: HexagonalSensorGroup, i: int, counter: int,
+def _extract_hex_group(
+    group: HexagonalSensorGroup, counter: int,
 ) -> HexagonalSensorSchema:
     hex_centers = np.asarray(group.hex_centers)
     schema_kwargs: dict[str, object] = {
-        "position": _to_float_list(group.positions[i]),
-        "orientation": _to_float_list(group.rotations[i]),
+        **_placement_kwargs(group),
         "centers_x": _to_float_list(hex_centers[:, 0]),
         "centers_y": _to_float_list(hex_centers[:, 1]),
         "id": f"sensor_{counter}",

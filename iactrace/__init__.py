@@ -12,7 +12,7 @@ from .camera import (
 from .core import LazyRayBundle, RayBundle
 from .io import save_camera, save_telescope
 from .telescope import Telescope
-from .viz import hexshow, show_telescope, squareshow
+from .viz import show_camera, show_telescope
 
 __version__ = "0.6.1"
 
@@ -32,8 +32,7 @@ __all__ = [
     "PhotoSensor",
     "UniformQE",
     # Visualization
-    "hexshow",
-    "squareshow",
+    "show_camera",
     "show_telescope",
     # I/O
     "save_telescope",
