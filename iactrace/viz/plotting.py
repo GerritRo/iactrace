@@ -1,179 +1,175 @@
+from __future__ import annotations
+
 import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib.patches import RegularPolygon
+from matplotlib.collections import PolyCollection
 
 
-def squareshow(result, sensor, sensor_idx=None, ax=None, **kwargs):
-    """
-    Display square pixel data from a sensor group.
+def show_camera(
+    image,
+    sensor,
+    ax=None,
+    *,
+    cmap="viridis",
+    vmin=None,
+    vmax=None,
+    norm=None,
+    edgecolor="none",
+    linewidth=0.0,
+    colorbar=False,
+    cbar_label=None,
+):
+    """Render a camera image at actual focal-plane positions.
 
-    Args:
-        result: Accumulated result with shape (n_sensors, height, width)
-        sensor: SquareSensorGroup
-        sensor_idx: Index of sensor to display. If None:
-            - For single-sensor groups (n_sensors=1): displays that sensor
-            - For multi-sensor groups: defaults to grid visualization (calls show_sensor_grid)
-        ax: Matplotlib axis (creates new if None). If provided for multi-sensor groups,
-            sensor_idx must be specified.
-        **kwargs: Additional arguments for square plotting (vmin, vmax, cmap, etc.)
-
-    Returns:
-        Matplotlib axis (if single sensor or sensor_idx specified)
-        OR tuple of (Figure, array of axes) (if multi-sensor with no sensor_idx)
-    """
-    # Handle sensor group output shape (n_sensors, height, width)
-    if result.ndim == 3:
-        n_sensors = result.shape[0]
-        if sensor_idx is not None:
-            data = result[sensor_idx]
-        elif n_sensors == 1:
-            data = result[0]
-        else:
-            # Multi-sensor case with no sensor_idx specified
-            if ax is not None:
-                raise ValueError(
-                    "For multi-sensor groups, either specify sensor_idx to display a single sensor, "
-                    "or omit the ax parameter to use grid visualization."
-                )
-            # Default to grid visualization for multi-sensor groups
-            return show_sensor_grid(result, sensor, **kwargs)
-    else:
-        # Backward compatibility: accept 2D input
-        data = result
-
-    if ax is None:
-        ax = plt.gca()
-
-    vmin = kwargs.pop('vmin', data.min())
-    vmax = kwargs.pop('vmax', data.max())
-    cmap = plt.get_cmap(kwargs.pop('cmap', 'viridis'))
-
-    x_extent = sensor.x0 + sensor.width * sensor.dx
-    y_extent = sensor.y0 + sensor.height * sensor.dy
-    ax.imshow(data, origin='lower', extent=[sensor.x0, x_extent, sensor.y0, y_extent],
-              vmin=vmin, vmax=vmax, cmap=cmap)
-
-    ax.set_aspect('equal')
-    ax.autoscale_view()
-    return ax
-
-
-def hexshow(result, sensor, sensor_idx=None, ax=None, **kwargs):
-    """
-    Display hexagonal pixel data from a sensor group.
+    Builds a single :class:`~matplotlib.collections.PolyCollection` holding
+    every pixel in the camera. Pixel polygons are projected onto the camera
+    ``(x, y)`` plane after applying each tile's position and Euler rotation,
+    so curvature and tile tilt are reflected faithfully.
 
     Args:
-        result: Accumulated result with shape (n_sensors, n_pixels)
-        sensor: HexagonalSensorGroup
-        sensor_idx: Index of sensor to display. If None:
-            - For single-sensor groups (n_sensors=1): displays that sensor
-            - For multi-sensor groups: defaults to grid visualization (calls show_sensor_grid)
-        ax: Matplotlib axis (creates new if None). If provided for multi-sensor groups,
-            sensor_idx must be specified.
-        **kwargs: Additional arguments for hexagon plotting (vmin, vmax, cmap, etc.)
+        image: Pixel image array. Shape ``(n_sensors, height, width)`` for
+            :class:`~iactrace.SquareSensorGroup`, ``(n_sensors, n_pixels)``
+            for :class:`~iactrace.HexagonalSensorGroup`.
+        sensor: The sensor group that produced ``image``.
+        ax: Matplotlib axes. Created with a square aspect figure if ``None``.
+        cmap: Colormap name or instance.
+        vmin, vmax: Explicit colour limits. Default: data min/max.
+        norm: Optional :class:`matplotlib.colors.Normalize`. Overrides
+            ``vmin``/``vmax`` when given.
+        edgecolor: Pixel-boundary colour. Default ``"none"`` (no outlines).
+        linewidth: Pixel-boundary line width.
+        colorbar: Attach a vertical colorbar to ``ax``.
+        cbar_label: Colorbar label text.
 
     Returns:
-        Matplotlib axis (if single sensor or sensor_idx specified)
-        OR tuple of (Figure, array of axes) (if multi-sensor with no sensor_idx)
+        ``ax`` (the axes that received the collection).
     """
-    # Handle sensor group output shape (n_sensors, n_pixels)
-    if result.ndim == 2:
-        n_sensors = result.shape[0]
-        if sensor_idx is not None:
-            data = result[sensor_idx]
-        elif n_sensors == 1:
-            data = result[0]
-        else:
-            # Multi-sensor case with no sensor_idx specified
-            if ax is not None:
-                raise ValueError(
-                    "For multi-sensor groups, either specify sensor_idx to display a single sensor, "
-                    "or omit the ax parameter to use grid visualization."
-                )
-            # Default to grid visualization for multi-sensor groups
-            return show_sensor_grid(result, sensor, **kwargs)
+    from ..camera.layout import HexagonalSensorGroup, SquareSensorGroup
+
+    image = np.asarray(image)
+    if isinstance(sensor, SquareSensorGroup):
+        polys, values = _square_polygons(image, sensor)
+    elif isinstance(sensor, HexagonalSensorGroup):
+        polys, values = _hex_polygons(image, sensor)
     else:
-        # Backward compatibility: accept 1D input
-        data = result
-
-    if ax is None:
-        ax = plt.gca()
-
-    hex_centers = np.array(sensor.hex_centers)
-
-    # Determine hex size for plotting
-    hex_size = sensor.hex_size
-
-    # Get the grid rotation (how much the original grid was rotated)
-    grid_rotation = sensor.grid_rotation
-
-    vmin = kwargs.pop('vmin', data.min())
-    vmax = kwargs.pop('vmax', data.max())
-    cmap = plt.get_cmap(kwargs.pop('cmap', 'viridis'))
-
-    for i, (x, y) in enumerate(hex_centers):
-        value = float(data[i])
-        color = cmap(np.clip(value, vmin, np.inf) / vmax)
-
-        # Pointy-top base orientation (30 degrees) plus the grid's rotation
-        hex_patch = RegularPolygon(
-            (x, y),
-            numVertices=6,
-            radius=hex_size,
-            orientation=grid_rotation,
-            facecolor=color,
-            edgecolor='black',
-            linewidth=0.5
+        raise TypeError(
+            f"show_camera does not support sensor type {type(sensor).__name__}"
         )
-        ax.add_patch(hex_patch)
 
-    ax.set_aspect('equal')
+    if ax is None:
+        _, ax = plt.subplots(figsize=(6, 6))
+
+    if norm is None:
+        if vmin is None:
+            vmin = float(np.nanmin(values))
+        if vmax is None:
+            vmax = float(np.nanmax(values))
+
+    pc = PolyCollection(
+        polys, array=values, cmap=cmap, norm=norm,
+        edgecolors=edgecolor, linewidths=linewidth,
+    )
+    if norm is None:
+        pc.set_clim(vmin, vmax)
+    ax.add_collection(pc)
+    ax.set_aspect("equal")
     ax.autoscale_view()
+
+    if colorbar:
+        cb = ax.get_figure().colorbar(pc, ax=ax)
+        if cbar_label is not None:
+            cb.set_label(cbar_label)
     return ax
 
 
-def show_sensor_grid(result, sensor, ncols=None, figsize=None, **kwargs):
+def _euler_matrix(tip_deg, tilt_deg, roll_deg):
+    """NumPy mirror of :func:`iactrace.core.transforms.euler_to_matrix`."""
+    rx, ry, rz = np.radians([tip_deg, tilt_deg, roll_deg])
+    Rx = np.array([
+        [1, 0, 0],
+        [0, np.cos(rx), -np.sin(rx)],
+        [0, np.sin(rx), np.cos(rx)],
+    ])
+    Ry = np.array([
+        [np.cos(ry), 0, np.sin(ry)],
+        [0, 1, 0],
+        [-np.sin(ry), 0, np.cos(ry)],
+    ])
+    Rz = np.array([
+        [np.cos(rz), -np.sin(rz), 0],
+        [np.sin(rz), np.cos(rz), 0],
+        [0, 0, 1],
+    ])
+    return Rz @ Ry @ Rx
+
+
+def _stack_rotations(rotations):
+    """Per-sensor rotation matrices, shape (n_sensors, 3, 3)."""
+    return np.stack([_euler_matrix(*r) for r in np.asarray(rotations)])
+
+
+def _square_polygons(image, sensor):
+    """Return ``(polys, values)`` for a SquareSensorGroup image.
+
+    ``polys`` has shape ``(n_sensors * height * width, 4, 2)`` — one quad per
+    pixel, in camera-frame xy. ``values`` is the matching flat image array.
     """
-    Display all sensors in a sensor group as a grid of subplots.
+    expected_shape = (sensor.n_sensors, sensor.height, sensor.width)
+    if image.shape != expected_shape:
+        raise ValueError(
+            f"image shape {image.shape} does not match sensor shape {expected_shape}"
+        )
 
-    Args:
-        result: Accumulated result with shape (n_sensors, ...)
-        sensor: SensorGroup (SquareSensorGroup or HexagonalSensorGroup)
-        ncols: Number of columns in grid (default: auto)
-        figsize: Figure size tuple (default: auto based on grid size)
-        **kwargs: Additional arguments passed to squareshow/hexshow
+    h, w = sensor.height, sensor.width
+    xs = sensor.x0 + np.arange(w + 1) * sensor.dx          # (w+1,)
+    ys = sensor.y0 + np.arange(h + 1) * sensor.dy          # (h+1,)
+    XX, YY = np.meshgrid(xs, ys, indexing="xy")            # (h+1, w+1)
+    # CCW pixel quads: BL, BR, TR, TL.
+    corners_2d = np.stack([
+        np.stack([XX[:-1, :-1], YY[:-1, :-1]], axis=-1),
+        np.stack([XX[:-1,  1:], YY[:-1,  1:]], axis=-1),
+        np.stack([XX[ 1:,  1:], YY[ 1:,  1:]], axis=-1),
+        np.stack([XX[ 1:, :-1], YY[ 1:, :-1]], axis=-1),
+    ], axis=2)                                              # (h, w, 4, 2)
+    z = np.zeros(corners_2d.shape[:-1] + (1,))
+    local = np.concatenate([corners_2d, z], axis=-1)        # (h, w, 4, 3)
 
-    Returns:
-        Figure and array of axes
-    """
-    from ..camera import HexagonalSensorGroup, SquareSensorGroup
+    Rs = _stack_rotations(sensor.rotations)                 # (n, 3, 3)
+    pos = np.asarray(sensor.positions)                      # (n, 3)
+    world = (
+        np.einsum("sij,hwcj->shwci", Rs, local)
+        + pos[:, None, None, None, :]
+    )                                                        # (n, h, w, 4, 3)
 
-    n_sensors = result.shape[0]
+    polys = world[..., :2].reshape(-1, 4, 2)
+    values = np.asarray(image).reshape(-1)
+    return polys, values
 
-    if ncols is None:
-        ncols = min(4, n_sensors)
-    nrows = (n_sensors + ncols - 1) // ncols
 
-    if figsize is None:
-        figsize = (3 * ncols, 3 * nrows)
+def _hex_polygons(image, sensor):
+    """Return ``(polys, values)`` for a HexagonalSensorGroup image."""
+    expected_shape = (sensor.n_sensors, sensor.n_pixels)
+    if image.shape != expected_shape:
+        raise ValueError(
+            f"image shape {image.shape} does not match sensor shape {expected_shape}"
+        )
 
-    fig, axes = plt.subplots(nrows, ncols, figsize=figsize)
+    centers = np.asarray(sensor.hex_centers)                # (n_pix, 2)
+    s = sensor.hex_size
+    angles = np.deg2rad(np.arange(30.0, 360.0, 60.0)) + sensor.grid_rotation
+    vertex_offsets = s * np.stack([np.cos(angles), np.sin(angles)], axis=-1)  # (6, 2)
 
-    if n_sensors == 1:
-        axes = np.array([axes])
-    axes = np.atleast_1d(axes).flatten()
+    pix_corners_2d = centers[:, None, :] + vertex_offsets[None, :, :]   # (n_pix, 6, 2)
+    z = np.zeros(pix_corners_2d.shape[:-1] + (1,))
+    local = np.concatenate([pix_corners_2d, z], axis=-1)                # (n_pix, 6, 3)
 
-    for i in range(n_sensors):
-        ax = axes[i]
-        if isinstance(sensor, SquareSensorGroup):
-            squareshow(result, sensor, sensor_idx=i, ax=ax, **kwargs)
-        elif isinstance(sensor, HexagonalSensorGroup):
-            hexshow(result, sensor, sensor_idx=i, ax=ax, **kwargs)
-        ax.set_title(f"Sensor {i}")
+    Rs = _stack_rotations(sensor.rotations)
+    pos = np.asarray(sensor.positions)
+    world = (
+        np.einsum("sij,pcj->spci", Rs, local)
+        + pos[:, None, None, :]
+    )                                                                    # (n, n_pix, 6, 3)
 
-    # Hide unused axes
-    for i in range(n_sensors, len(axes)):
-        axes[i].set_visible(False)
-
-    plt.tight_layout()
-    return fig, axes
+    polys = world[..., :2].reshape(-1, 6, 2)
+    values = np.asarray(image).reshape(-1)
+    return polys, values

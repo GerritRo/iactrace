@@ -166,25 +166,69 @@ ObstructionSchema = Annotated[
 # Sensor schemas
 
 
+def _normalize_sensor_placement(model):
+    """Validate singular/plural ``position``/``orientation`` fields.
+
+    A sensor entry must specify exactly one of (``position``, ``positions``)
+    and exactly one of (``orientation``, ``orientations``). The plural form
+    carries N tiles in a single :class:`SensorGroup`; the singular form is
+    the convenient shortcut for N = 1.
+    """
+    if (model.position is None) == (model.positions is None):
+        raise ValueError(
+            "Sensor entry must set exactly one of `position` or `positions`."
+        )
+    if (model.orientation is None) == (model.orientations is None):
+        raise ValueError(
+            "Sensor entry must set exactly one of `orientation` or `orientations`."
+        )
+    pos = model.positions if model.positions is not None else [model.position]
+    rot = model.orientations if model.orientations is not None else [model.orientation]
+    if len(pos) != len(rot):
+        raise ValueError(
+            f"`positions` ({len(pos)}) and `orientations` ({len(rot)}) "
+            "must have the same length."
+        )
+    return model
+
+
 class SquareSensorSchema(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     type: Literal["square"] = "square"
-    position: Vec3
-    orientation: Vec3
+    position: Vec3 | None = None
+    orientation: Vec3 | None = None
+    positions: list[Vec3] | None = Field(default=None, min_length=1)
+    orientations: list[Vec3] | None = Field(default=None, min_length=1)
     width: int = Field(gt=0)
     height: int = Field(gt=0)
     bounds: Bounds4
     edge_width: float = Field(ge=0, default=0.0)
     id: str | None = None
 
+    @model_validator(mode="after")
+    def _check_placement(self) -> SquareSensorSchema:
+        return _normalize_sensor_placement(self)
+
+    @property
+    def position_list(self) -> list[Vec3]:
+        return self.positions if self.positions is not None else [self.position]
+
+    @property
+    def orientation_list(self) -> list[Vec3]:
+        return (
+            self.orientations if self.orientations is not None else [self.orientation]
+        )
+
 
 class HexagonalSensorSchema(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     type: Literal["hexagonal"] = "hexagonal"
-    position: Vec3
-    orientation: Vec3
+    position: Vec3 | None = None
+    orientation: Vec3 | None = None
+    positions: list[Vec3] | None = Field(default=None, min_length=1)
+    orientations: list[Vec3] | None = Field(default=None, min_length=1)
     centers_x: list[float] = Field(min_length=1)
     centers_y: list[float] = Field(min_length=1)
     edge_width: float = Field(ge=0, default=0.0)
@@ -196,6 +240,20 @@ class HexagonalSensorSchema(BaseModel):
         if "centers_x" in info.data and len(v) != len(info.data["centers_x"]):
             raise ValueError("centers_x and centers_y must have same length")
         return v
+
+    @model_validator(mode="after")
+    def _check_placement(self) -> HexagonalSensorSchema:
+        return _normalize_sensor_placement(self)
+
+    @property
+    def position_list(self) -> list[Vec3]:
+        return self.positions if self.positions is not None else [self.position]
+
+    @property
+    def orientation_list(self) -> list[Vec3]:
+        return (
+            self.orientations if self.orientations is not None else [self.orientation]
+        )
 
 
 SensorSchema = Annotated[

@@ -51,6 +51,11 @@ def intersect_sensor(
         rot = euler_to_matrix(sensor.rotations[s_idx])
         pts, ts = jax.vmap(intersect_plane, in_axes=(0, 0, None, None))(
             origins, directions, pos, rot)
+        # Tiles are bounded — mask hits that fall outside this tile's
+        # active footprint so argmin doesn't pick an infinite plane that
+        # the ray crosses before reaching its true tile.
+        in_b = sensor.in_bounds(pts[:, 0], pts[:, 1])
+        ts = jnp.where(in_b, ts, jnp.inf)
         dx = directions @ rot[:, 0]
         dy = directions @ rot[:, 1]
         return pts, ts, dx, dy
