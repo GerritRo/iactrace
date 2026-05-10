@@ -55,6 +55,19 @@ class TestSurfaceSag:
 
         assert jnp.allclose(z_computed, z_expected, atol=1e-12)
 
+    def test_aspheric_powers_are_consecutive_even(self):
+        """aspheric[i] must multiply r^(2*i+4): r^4, r^6, r^8, r^10, ..."""
+        r = 0.7
+        coeffs = jnp.array([1.1, -2.3, 3.7, -4.2])  # r^4, r^6, r^8, r^10
+        z_computed = sag_raw(r, 0.0, curvature=0.0, conic=0.0, aspheric=coeffs)
+        z_expected = (
+            coeffs[0] * r**4
+            + coeffs[1] * r**6
+            + coeffs[2] * r**8
+            + coeffs[3] * r**10
+        )
+        assert jnp.allclose(z_computed, z_expected, atol=1e-12)
+
     def test_offset_sag_equals_zero_at_offset_point(self):
         """sag() with offset returns 0 at the offset point itself."""
         offset = jnp.array([2.0, 3.0])
