@@ -101,7 +101,7 @@ def sag_raw(x, y, curvature, conic, aspheric):
     z = r2 * c / denom
 
     if aspheric.size > 0:
-        powers = jnp.arange(2, 2 + 2 * len(aspheric), 2)
+        powers = jnp.arange(2, 2 + len(aspheric))
         z = z + jnp.sum(aspheric * r2 ** powers)
 
     return z
@@ -211,4 +211,3 @@ class AsphericSurfaceGroup(SurfaceGroup):
             hit_xy[0], hit_xy[1], offset, c, k, a,
         )
         return t, point, normal
-
