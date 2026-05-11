@@ -161,6 +161,10 @@ Lens Definitions (optional)
 Refractive elements live under the top-level ``lenses:`` key. Two lens
 types are supported:
 
+Lenses share the same ``aperture`` block as mirrors — ``circular`` and
+``polygon`` apertures are both supported, so refractive elements can be
+rectangular, hexagonal, etc.
+
 **Aspheric disk** (curved refractive surface):
 
 .. code-block:: yaml
@@ -169,13 +173,15 @@ types are supported:
      - type: aspheric_disk
        position: [0, 0, 14.5]
        orientation: [0, 0, 0]
-       radius: 0.5
+       aperture:
+         type: circular
+         radius: 0.5
        curvature: 0.05
        conic: 0.0
        n_inside: 1.5
        n_outside: 1.0       # default; vacuum on the outside
        transmittance: 0.95  # default 1.0
-       optical_stage: 1
+       stage: 1
 
 **Plano slab** (parallel-faced window):
 
@@ -185,11 +191,13 @@ types are supported:
      - type: plano_slab
        position: [0, 0, 14.0]
        orientation: [0, 0, 0]
-       radius: 0.5
+       aperture:
+         type: polygon
+         vertices: [[-0.20, -0.15], [0.20, -0.15], [0.20, 0.15], [-0.20, 0.15]]
        thickness: 0.005
        n_inside: 1.5
        transmittance: 0.98
-       optical_stage: 2
+       stage: 2
 
 Obstruction Definitions
 -----------------------
