@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import TYPE_CHECKING, NamedTuple
+from typing import TYPE_CHECKING, Callable, NamedTuple, TypeVar
 
 import jax
 import jax.numpy as jnp
@@ -127,6 +127,55 @@ def _ensure_ccw(vertices: jnp.ndarray) -> jnp.ndarray:
     return jnp.where(signed_area < 0, vertices[::-1], vertices)
 
 
+_T = TypeVar("_T")
+
+
+def _aperture_from_schemas(
+    schemas: list[CircularApertureSchema | PolygonApertureSchema],
+) -> Aperture:
+    """Build a single ``Aperture`` from a list of homogeneous aperture schemas.
+
+    All schemas must share the same kind (and, for polygons, the same
+    vertex count); callers are expected to bucket via
+    :func:`_bucket_by_aperture_signature` first.
+    """
+    first = schemas[0]
+    if isinstance(first, CircularApertureSchema):
+        return DiskAperture(
+            radii=jnp.asarray([s.radius for s in schemas]),
+            inner_radii=jnp.asarray([s.inner_radius for s in schemas]),
+        )
+    vertices = jnp.stack([
+        _ensure_ccw(jnp.asarray(s.vertices)) for s in schemas
+    ])
+    return PolygonAperture(vertices=vertices, n_vertices=int(vertices.shape[1]))
+
+
+def _bucket_by_aperture_signature(
+    items: list[_T],
+    aperture_of: Callable[[_T], CircularApertureSchema | PolygonApertureSchema],
+) -> list[list[_T]]:
+    """Group items so each bucket has a single aperture signature.
+
+    Disk apertures form one bucket; each distinct polygon vertex count
+    forms its own bucket. Order within a bucket follows input order.
+    """
+    disk_bucket: list[_T] = []
+    poly_buckets: dict[int, list[_T]] = defaultdict(list)
+    for item in items:
+        ap = aperture_of(item)
+        if isinstance(ap, PolygonApertureSchema):
+            poly_buckets[len(ap.vertices)].append(item)
+        else:
+            disk_bucket.append(item)
+
+    buckets: list[list[_T]] = []
+    if disk_bucket:
+        buckets.append(disk_bucket)
+    buckets.extend(poly_buckets.values())
+    return buckets
+
+
 def _resolve_surface(
     mirror: MirrorSchema, template: MirrorTemplateSchema
 ) -> tuple[float, float, list[float]]:
@@ -206,32 +255,10 @@ def mirrors_from_schemas(
         by_stage[p.stage].append(p)
 
     for stage, stage_mirrors in sorted(by_stage.items()):
-        disk_mirrors = [m for m in stage_mirrors if isinstance(m.aperture, CircularApertureSchema)]
-        poly_mirrors = [m for m in stage_mirrors if isinstance(m.aperture, PolygonApertureSchema)]
-
-        if disk_mirrors:
-            aperture = DiskAperture(
-                radii=jnp.asarray([m.aperture.radius for m in disk_mirrors]),
-                inner_radii=jnp.asarray([m.aperture.inner_radius for m in disk_mirrors]),
-            )
+        for bucket in _bucket_by_aperture_signature(stage_mirrors, lambda m: m.aperture):
+            aperture = _aperture_from_schemas([m.aperture for m in bucket])
             key, subkey = jax.random.split(key)
-            groups.append(_build_mirror_group(disk_mirrors, aperture, stage, n_samples, sample_key=subkey))
-
-        if poly_mirrors:
-            by_nverts: dict[int, list[_ParsedMirror]] = defaultdict(list)
-            for m in poly_mirrors:
-                n_verts = len(m.aperture.vertices)
-                by_nverts[n_verts].append(m)
-
-            for _n_verts, mirror_list in by_nverts.items():
-                vertices_list = []
-                for m in mirror_list:
-                    verts = jnp.asarray(m.aperture.vertices)
-                    vertices_list.append(_ensure_ccw(verts))
-                vertices = jnp.stack(vertices_list)
-                aperture = PolygonAperture(vertices=vertices, n_vertices=int(vertices.shape[1]))
-                key, subkey = jax.random.split(key)
-                groups.append(_build_mirror_group(mirror_list, aperture, stage, n_samples, sample_key=subkey))
+            groups.append(_build_mirror_group(bucket, aperture, stage, n_samples, sample_key=subkey))
 
     return groups
 
@@ -280,33 +307,40 @@ def lenses_from_schemas(
 ) -> list[OpticalElementGroup]:
     """Convert validated lens schemas to OpticalElementGroup domain objects.
 
-    Groups by type and optical_stage, constructs OpticalElementGroup directly.
+    Groups by ``(type, stage, aperture_signature)`` — mirroring how
+    :func:`mirrors_from_schemas` groups mirrors — and constructs one
+    :class:`OpticalElementGroup` per bucket.
     """
     if not lenses:
         return []
 
     groups: list[OpticalElementGroup] = []
 
-    # Group by (type, optical_stage)
-    by_key: dict[tuple[str, int], list[LensSchemaType]] = defaultdict(list)
-    for lens in lenses:
-        by_key[(lens.type, lens.optical_stage)].append(lens)
-
     _builders = {
         "aspheric_disk": _build_aspheric_disk_lens_group,
         "plano_slab": _build_plano_slab_group,
     }
 
-    for (ltype, stage), lens_list in by_key.items():
+    by_type_stage: dict[tuple[str, int], list[LensSchemaType]] = defaultdict(list)
+    for lens in lenses:
+        by_type_stage[(lens.type, lens.stage)].append(lens)
+
+    for (ltype, stage), lens_list in by_type_stage.items():
         builder = _builders[ltype]
-        key, subkey = jax.random.split(key)
-        groups.append(builder(lens_list, stage, sample_key=subkey))
+        for bucket in _bucket_by_aperture_signature(lens_list, lambda l: l.aperture):
+            aperture = _aperture_from_schemas([l.aperture for l in bucket])
+            key, subkey = jax.random.split(key)
+            groups.append(builder(bucket, aperture, stage, sample_key=subkey))
 
     return groups
 
 
 def _build_aspheric_disk_lens_group(
-    lenses: list[LensSchemaType], stage: int, *, sample_key: Array
+    lenses: list[LensSchemaType],
+    aperture: Aperture,
+    stage: int,
+    *,
+    sample_key: Array,
 ) -> OpticalElementGroup:
     """Build an aspheric-disk refractive group via the telescope helper.
 
@@ -314,12 +348,6 @@ def _build_aspheric_disk_lens_group(
     schema fields have been projected into arrays.
     """
     from ..telescope.lenses import refractive_group
-
-    n_elements = len(lenses)
-    aperture = DiskAperture(
-        radii=jnp.asarray([lens.radius for lens in lenses]),
-        inner_radii=jnp.zeros(n_elements),
-    )
 
     return refractive_group(
         positions=jnp.asarray([lens.position for lens in lenses]),
@@ -338,7 +366,11 @@ def _build_aspheric_disk_lens_group(
 
 
 def _build_plano_slab_group(
-    lenses: list[LensSchemaType], stage: int, *, sample_key: Array
+    lenses: list[LensSchemaType],
+    aperture: Aperture,
+    stage: int,
+    *,
+    sample_key: Array,
 ) -> OpticalElementGroup:
     """Build a plano-slab group via the telescope helper.
 
@@ -346,12 +378,6 @@ def _build_plano_slab_group(
     fields have been projected into arrays.
     """
     from ..telescope.lenses import slab_group
-
-    n_elements = len(lenses)
-    aperture = DiskAperture(
-        radii=jnp.asarray([lens.radius for lens in lenses]),
-        inner_radii=jnp.zeros(n_elements),
-    )
 
     return slab_group(
         positions=jnp.asarray([lens.position for lens in lenses]),
@@ -605,15 +631,15 @@ def _extract_aspheric_disk_lens(
     return AsphericDiskLensSchema(
         position=_to_float_list(group.positions[i]),
         orientation=_to_float_list(group.rotations[i]),
+        aperture=_aperture_to_schema(group.aperture, i),
         curvature=float(group.surface.curvatures[i]),
         conic=float(group.surface.conics[i]),
-        radius=float(group.aperture.radii[i]),
         n_inside=float(group.interaction_module.n_inside[i]),
         n_outside=float(group.interaction_module.n_outside),
         aspheric=aspheric_raw,
         offset=_to_float_list(group.surface.offsets[i]),
         transmittance=float(group.interaction_module.transmittance[i]),
-        optical_stage=group.optical_stage,
+        stage=group.optical_stage,
         id=f"lens_{counter}",
     )
 
@@ -625,12 +651,12 @@ def _extract_plano_slab_lens(
     return PlanoSlabSchema(
         position=_to_float_list(group.positions[i]),
         orientation=_to_float_list(group.rotations[i]),
-        radius=float(group.aperture.radii[i]),
+        aperture=_aperture_to_schema(group.aperture, i),
         thickness=float(group.interaction_module.thickness[i]),
         n_inside=float(group.interaction_module.n_inside[i]),
         n_outside=float(group.interaction_module.n_outside),
         transmittance=float(group.interaction_module.transmittance[i]),
-        optical_stage=group.optical_stage,
+        stage=group.optical_stage,
         id=f"lens_{counter}",
     )
 

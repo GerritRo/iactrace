@@ -72,15 +72,15 @@ class AsphericDiskLensSchema(BaseModel):
     type: Literal["aspheric_disk"] = "aspheric_disk"
     position: Vec3
     orientation: Vec3
+    aperture: ApertureSchema
     curvature: float
     conic: float
-    radius: float = Field(gt=0)
     n_inside: float = Field(gt=0)
     n_outside: float = Field(gt=0, default=1.0)
     aspheric: list[float] = Field(default_factory=list)
     offset: Vec2 = Field(default_factory=lambda: [0.0, 0.0])
     transmittance: float = Field(ge=0, le=1, default=1.0)
-    optical_stage: int = Field(ge=0, default=0)
+    stage: int = Field(ge=0, default=0)
     id: str | None = None
 
 
@@ -88,12 +88,12 @@ class PlanoSlabSchema(BaseModel):
     type: Literal["plano_slab"] = "plano_slab"
     position: Vec3
     orientation: Vec3
-    radius: float = Field(gt=0)
+    aperture: ApertureSchema
     thickness: float = Field(gt=0)
     n_inside: float = Field(gt=0)
     n_outside: float = Field(gt=0, default=1.0)
     transmittance: float = Field(ge=0, le=1, default=1.0)
-    optical_stage: int = Field(ge=0, default=0)
+    stage: int = Field(ge=0, default=0)
     id: str | None = None
 
 
@@ -316,19 +316,20 @@ class TelescopeConfigSchema(BaseModel):
         """Each optical stage may contain only one optical group.
 
         Mirrors and lenses are each grouped per stage by the adapter;
-        having a mirror and a lens at the same stage, or mirrors of
+        having a mirror and a lens at the same stage, or elements of
         different aperture types at the same stage, would build two
         groups for that stage and trip the same check in
         ``Telescope.__init__`` with a far less actionable error.
         """
+        def _aperture_sig(ap: ApertureSchema) -> tuple[str, int]:
+            if isinstance(ap, PolygonApertureSchema):
+                return ("polygon", len(ap.vertices))
+            return ("circular", 0)
+
         # Collect mirror aperture signatures per stage.
         mirror_sigs: dict[int, set[tuple[str, int]]] = {}
         for i, mirror in enumerate(self.mirrors):
-            ap = mirror.aperture
-            if isinstance(ap, PolygonApertureSchema):
-                sig = ("polygon", len(ap.vertices))
-            else:
-                sig = ("circular", 0)
+            sig = _aperture_sig(mirror.aperture)
             sigs = mirror_sigs.setdefault(mirror.stage, set())
             if sigs and sig not in sigs:
                 mirror_id = mirror.id or f"mirror[{i}]"
@@ -341,16 +342,42 @@ class TelescopeConfigSchema(BaseModel):
                 )
             sigs.add(sig)
 
-        # Mirror and lens stages must not overlap.
+        # Collect lens aperture signatures per (type, stage). Multiple
+        # lens types may not share a stage either; within one (type, stage)
+        # bucket, all elements must share an aperture signature.
+        lens_sigs: dict[tuple[str, int], set[tuple[str, int]]] = {}
+        lens_stages: dict[int, str] = {}
         mirror_stages = set(mirror_sigs.keys())
         for i, lens in enumerate(self.lenses):
-            if lens.optical_stage in mirror_stages:
-                lens_id = lens.id or f"lens[{i}]"
+            lens_id = lens.id or f"lens[{i}]"
+
+            if lens.stage in mirror_stages:
                 raise ValueError(
-                    f"Lens '{lens_id}' at stage {lens.optical_stage} "
-                    f"conflicts with a mirror at the same stage. Only "
-                    f"one optical group per stage is allowed."
+                    f"Lens '{lens_id}' at stage {lens.stage} conflicts "
+                    f"with a mirror at the same stage. Only one optical "
+                    f"group per stage is allowed."
                 )
+
+            previous_type = lens_stages.setdefault(lens.stage, lens.type)
+            if previous_type != lens.type:
+                raise ValueError(
+                    f"Lens '{lens_id}' of type '{lens.type}' at stage "
+                    f"{lens.stage} conflicts with an earlier lens of type "
+                    f"'{previous_type}' at the same stage. Only one optical "
+                    f"group per stage is allowed."
+                )
+
+            sig = _aperture_sig(lens.aperture)
+            sigs = lens_sigs.setdefault((lens.type, lens.stage), set())
+            if sigs and sig not in sigs:
+                raise ValueError(
+                    f"Lens '{lens_id}' at stage {lens.stage} mixes "
+                    f"aperture type {sig} with already-seen apertures "
+                    f"{sorted(sigs)} at the same stage. Each optical "
+                    f"stage must contain a single lens aperture type "
+                    f"(disk OR polygon-with-N-vertices)."
+                )
+            sigs.add(sig)
         return self
 
 
