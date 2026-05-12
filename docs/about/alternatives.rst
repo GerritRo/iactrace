@@ -49,11 +49,11 @@ ROBAST
 
 `ROBAST <https://robast.github.io/>`_ (ROOT-based simulator for ray tracing) is an 
 open-source non-sequential ray-tracing library built on the ROOT framework, widely 
-used within the CTA collaboration.
+used within the CTAO collaboration.
 
 **Advantages of ROBAST:**
 
-- Established in the CTA community
+- Established in the CTAO community
 - Handles complex segmented mirrors and aspherical lenses
 - Integrates with ROOT analysis ecosystem
 - Supports Winston cone / light concentrator simulations

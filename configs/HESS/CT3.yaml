@@ -9,7282 +9,5336 @@
 # Derived from sim_telarray configuration files by Konrad Bernlöhr (MPI Heidelberg).
 # Citation: Bernlöhr, Astroparticle Physics 30 (2008) 149-158, arXiv:0808.2253
 
-
+telescope:
+  name: CT3
+  units: m
+  camera_position:
+  - 0.000000
+  - 0.000000
+  - 15.028000
+  camera_rotation:
+  - 0.000000
+  - 0.000000
+  - 0.000000
 mirror_templates:
   spherical_30m:
     surface:
       aspheric: []
-      conic: 0.0
-      curvature: 0.0333
+      conic: 0.000000
+      curvature: 0.033300
 mirrors:
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_0
   orientation:
-  - 2.252251148223877
-  - 0.5930137038230896
-  - 0.0
+  - 2.252251
+  - 0.593014
+  - 0.000000
   position:
-  - -0.31
-  - 1.178
-  - 0.0495
+  - -0.310000
+  - 1.178000
+  - 0.049500
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_1
   orientation:
-  - 2.252251148223877
-  - -0.5930137038230896
-  - -0.0
+  - 2.252251
+  - -0.593014
+  - -0.000000
   position:
-  - 0.31
-  - 1.178
-  - 0.0495
+  - 0.310000
+  - 1.178000
+  - 0.049500
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_2
   orientation:
-  - 3.2833001613616943
-  - 1.1883517503738403
-  - 0.0
+  - 3.283300
+  - 1.188352
+  - 0.000000
   position:
-  - -0.62
-  - 1.715
-  - 0.1113
+  - -0.620000
+  - 1.715000
+  - 0.111300
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_3
   orientation:
-  - 3.282590866088867
-  - 0.0
-  - 0.0
+  - 3.282591
+  - 0.000000
+  - 0.000000
   position:
-  - 0.0
-  - 1.715
-  - 0.0984
+  - 0.000000
+  - 1.715000
+  - 0.098400
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_4
   orientation:
-  - 3.2833001613616943
-  - -1.1883517503738403
-  - -0.0
+  - 3.283300
+  - -1.188352
+  - -0.000000
   position:
-  - 0.62
-  - 1.715
-  - 0.1113
+  - 0.620000
+  - 1.715000
+  - 0.111300
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_5
   orientation:
-  - 4.319444179534912
-  - 1.787461757659912
-  - 0.0
+  - 4.319444
+  - 1.787462
+  - 0.000000
   position:
-  - -0.93
-  - 2.252
-  - 0.1992
+  - -0.930000
+  - 2.252000
+  - 0.199200
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_6
   orientation:
-  - 4.317568302154541
-  - 0.5954749584197998
-  - 0.0
+  - 4.317568
+  - 0.595475
+  - 0.000000
   position:
-  - -0.31
-  - 2.252
-  - 0.1733
+  - -0.310000
+  - 2.252000
+  - 0.173300
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_7
   orientation:
-  - 4.317568302154541
-  - -0.5954749584197998
-  - -0.0
+  - 4.317568
+  - -0.595475
+  - -0.000000
   position:
-  - 0.31
-  - 2.252
-  - 0.1733
+  - 0.310000
+  - 2.252000
+  - 0.173300
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_8
   orientation:
-  - 4.319444179534912
-  - -1.787461757659912
-  - -0.0
+  - 4.319444
+  - -1.787462
+  - -0.000000
   position:
-  - 0.93
-  - 2.252
-  - 0.1992
+  - 0.930000
+  - 2.252000
+  - 0.199200
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_9
   orientation:
-  - 5.3625006675720215
-  - 2.391868829727173
-  - 0.0
+  - 5.362501
+  - 2.391869
+  - 0.000000
   position:
-  - -1.24
-  - 2.789
-  - 0.3138
+  - -1.240000
+  - 2.789000
+  - 0.313800
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_10
   orientation:
-  - 5.358953475952148
-  - 1.194878339767456
-  - 0.0
+  - 5.358953
+  - 1.194878
+  - 0.000000
   position:
-  - -0.62
-  - 2.789
-  - 0.2746
+  - -0.620000
+  - 2.789000
+  - 0.274600
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_12
   orientation:
-  - 5.358953475952148
-  - -1.194878339767456
-  - -0.0
+  - 5.358953
+  - -1.194878
+  - -0.000000
   position:
-  - 0.62
-  - 2.789
-  - 0.2746
+  - 0.620000
+  - 2.789000
+  - 0.274600
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_13
   orientation:
-  - 5.3625006675720215
-  - -2.391868829727173
-  - -0.0
+  - 5.362501
+  - -2.391869
+  - -0.000000
   position:
-  - 1.24
-  - 2.789
-  - 0.3138
+  - 1.240000
+  - 2.789000
+  - 0.313800
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_14
   orientation:
-  - 6.414379119873047
-  - 3.0031890869140625
-  - 0.0
+  - 6.414379
+  - 3.003189
+  - 0.000000
   position:
-  - -1.55
-  - 3.326
-  - 0.4557
+  - -1.550000
+  - 3.326000
+  - 0.455700
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_15
   orientation:
-  - 6.408648490905762
-  - 1.7997618913650513
-  - 0.0
+  - 6.408648
+  - 1.799762
+  - 0.000000
   position:
-  - -0.93
-  - 3.326
-  - 0.403
+  - -0.930000
+  - 3.326000
+  - 0.403000
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_16
   orientation:
-  - 6.405792236328125
-  - 0.5995632410049438
-  - 0.0
+  - 6.405792
+  - 0.599563
+  - 0.000000
   position:
-  - -0.31
-  - 3.326
-  - 0.3767
+  - -0.310000
+  - 3.326000
+  - 0.376700
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_18
   orientation:
-  - 6.408648490905762
-  - -1.7997618913650513
-  - -0.0
+  - 6.408648
+  - -1.799762
+  - -0.000000
   position:
-  - 0.93
-  - 3.326
-  - 0.403
+  - 0.930000
+  - 3.326000
+  - 0.403000
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_19
   orientation:
-  - 6.414379119873047
-  - -3.0031890869140625
-  - -0.0
+  - 6.414379
+  - -3.003189
+  - -0.000000
   position:
-  - 1.55
-  - 3.326
-  - 0.4557
+  - 1.550000
+  - 3.326000
+  - 0.455700
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_20
   orientation:
-  - 7.477167129516602
-  - 3.6231818199157715
-  - 0.0
+  - 7.477167
+  - 3.623182
+  - 0.000000
   position:
-  - -1.86
-  - 3.863
-  - 0.6258
+  - -1.860000
+  - 3.863000
+  - 0.625800
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_21
   orientation:
-  - 7.468643665313721
-  - 2.411774158477783
-  - 0.0
+  - 7.468644
+  - 2.411774
+  - 0.000000
   position:
-  - -1.24
-  - 3.863
-  - 0.5591
+  - -1.240000
+  - 3.863000
+  - 0.559100
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_22
   orientation:
-  - 7.463556289672852
-  - 1.2047890424728394
-  - 0.0
+  - 7.463556
+  - 1.204789
+  - 0.000000
   position:
-  - -0.62
-  - 3.863
-  - 0.5192
+  - -0.620000
+  - 3.863000
+  - 0.519200
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_23
   orientation:
-  - 7.461885452270508
-  - 0.0
-  - 0.0
+  - 7.461885
+  - 0.000000
+  - 0.000000
   position:
-  - 0.0
-  - 3.863
-  - 0.506
+  - 0.000000
+  - 3.863000
+  - 0.506000
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_24
   orientation:
-  - 7.463556289672852
-  - -1.2047890424728394
-  - -0.0
+  - 7.463556
+  - -1.204789
+  - -0.000000
   position:
-  - 0.62
-  - 3.863
-  - 0.5192
+  - 0.620000
+  - 3.863000
+  - 0.519200
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_25
   orientation:
-  - 7.468643665313721
-  - -2.411774158477783
-  - -0.0
+  - 7.468644
+  - -2.411774
+  - -0.000000
   position:
-  - 1.24
-  - 3.863
-  - 0.5591
+  - 1.240000
+  - 3.863000
+  - 0.559100
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_26
   orientation:
-  - 7.477167129516602
-  - -3.6231818199157715
-  - -0.0
+  - 7.477167
+  - -3.623182
+  - -0.000000
   position:
-  - 1.86
-  - 3.863
-  - 0.6258
+  - 1.860000
+  - 3.863000
+  - 0.625800
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_27
   orientation:
-  - 8.553101539611816
-  - 4.253756523132324
-  - 0.0
+  - 8.553102
+  - 4.253757
+  - 0.000000
   position:
-  - -2.17
-  - 4.4
-  - 0.825
+  - -2.170000
+  - 4.400000
+  - 0.825000
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_28
   orientation:
-  - 8.541152954101562
-  - 3.0327181816101074
-  - 0.0
+  - 8.541153
+  - 3.032718
+  - 0.000000
   position:
-  - -1.55
-  - 4.4
-  - 0.7439
+  - -1.550000
+  - 4.400000
+  - 0.743900
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_29
   orientation:
-  - 8.53322696685791
-  - 1.8173733949661255
-  - 0.0
+  - 8.533227
+  - 1.817373
+  - 0.000000
   position:
-  - -0.93
-  - 4.4
-  - 0.69
+  - -0.930000
+  - 4.400000
+  - 0.690000
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_30
   orientation:
-  - 8.529304504394531
-  - 0.6054182052612305
-  - 0.0
+  - 8.529305
+  - 0.605418
+  - 0.000000
   position:
-  - -0.31
-  - 4.4
-  - 0.6632
+  - -0.310000
+  - 4.400000
+  - 0.663200
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_31
   orientation:
-  - 8.529304504394531
-  - -0.6054182052612305
-  - -0.0
+  - 8.529305
+  - -0.605418
+  - -0.000000
   position:
-  - 0.31
-  - 4.4
-  - 0.6632
+  - 0.310000
+  - 4.400000
+  - 0.663200
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_32
   orientation:
-  - 8.53322696685791
-  - -1.8173733949661255
-  - -0.0
+  - 8.533227
+  - -1.817373
+  - -0.000000
   position:
-  - 0.93
-  - 4.4
-  - 0.69
+  - 0.930000
+  - 4.400000
+  - 0.690000
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_33
   orientation:
-  - 8.541152954101562
-  - -3.0327181816101074
-  - -0.0
+  - 8.541153
+  - -3.032718
+  - -0.000000
   position:
-  - 1.55
-  - 4.4
-  - 0.7439
+  - 1.550000
+  - 4.400000
+  - 0.743900
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_34
   orientation:
-  - 8.553101539611816
-  - -4.253756523132324
-  - -0.0
+  - 8.553102
+  - -4.253757
+  - -0.000000
   position:
-  - 2.17
-  - 4.4
-  - 0.825
+  - 2.170000
+  - 4.400000
+  - 0.825000
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_35
   orientation:
-  - 9.64466667175293
-  - 4.897043704986572
-  - 0.0
+  - 9.644667
+  - 4.897044
+  - 0.000000
   position:
-  - -2.48
-  - 4.937
-  - 1.0545
+  - -2.480000
+  - 4.937000
+  - 1.054500
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_36
   orientation:
-  - 9.628551483154297
-  - 3.6645638942718506
-  - 0.0
+  - 9.628551
+  - 3.664564
+  - 0.000000
   position:
-  - -1.86
-  - 4.937
-  - 0.9584
+  - -1.860000
+  - 4.937000
+  - 0.958400
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_37
   orientation:
-  - 9.61713695526123
-  - 2.4391651153564453
-  - 0.0
+  - 9.617137
+  - 2.439165
+  - 0.000000
   position:
-  - -1.24
-  - 4.937
-  - 0.8901
+  - -1.240000
+  - 4.937000
+  - 0.890100
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_38
   orientation:
-  - 9.610340118408203
-  - 1.2184280157089233
-  - 0.0
+  - 9.610340
+  - 1.218428
+  - 0.000000
   position:
-  - -0.62
-  - 4.937
-  - 0.8493
+  - -0.620000
+  - 4.937000
+  - 0.849300
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_39
   orientation:
-  - 9.608074188232422
-  - 0.0
-  - 0.0
+  - 9.608074
+  - 0.000000
+  - 0.000000
   position:
-  - 0.0
-  - 4.937
-  - 0.8357
+  - 0.000000
+  - 4.937000
+  - 0.835700
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_40
   orientation:
-  - 9.610340118408203
-  - -1.2184280157089233
-  - -0.0
+  - 9.610340
+  - -1.218428
+  - -0.000000
   position:
-  - 0.62
-  - 4.937
-  - 0.8493
+  - 0.620000
+  - 4.937000
+  - 0.849300
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_41
   orientation:
-  - 9.61713695526123
-  - -2.4391651153564453
-  - -0.0
+  - 9.617137
+  - -2.439165
+  - -0.000000
   position:
-  - 1.24
-  - 4.937
-  - 0.8901
+  - 1.240000
+  - 4.937000
+  - 0.890100
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_42
   orientation:
-  - 9.628551483154297
-  - -3.6645638942718506
-  - -0.0
+  - 9.628551
+  - -3.664564
+  - -0.000000
   position:
-  - 1.86
-  - 4.937
-  - 0.9584
+  - 1.860000
+  - 4.937000
+  - 0.958400
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_43
   orientation:
-  - 9.64466667175293
-  - -4.897043704986572
-  - -0.0
+  - 9.644667
+  - -4.897044
+  - -0.000000
   position:
-  - 2.48
-  - 4.937
-  - 1.0545
+  - 2.480000
+  - 4.937000
+  - 1.054500
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_44
   orientation:
-  - 10.752680778503418
-  - 5.555423259735107
-  - 0.0
+  - 10.752681
+  - 5.555423
+  - 0.000000
   position:
-  - -2.79
-  - 5.473
-  - 1.3156
+  - -2.790000
+  - 5.473000
+  - 1.315600
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_45
   orientation:
-  - 10.73151969909668
-  - 4.309488296508789
-  - 0.0
+  - 10.731520
+  - 4.309488
+  - 0.000000
   position:
-  - -2.17
-  - 5.473
-  - 1.2037
+  - -2.170000
+  - 5.473000
+  - 1.203700
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_46
   orientation:
-  - 10.71585464477539
-  - 3.0721800327301025
-  - 0.0
+  - 10.715855
+  - 3.072180
+  - 0.000000
   position:
-  - -1.55
-  - 5.473
-  - 1.1204
+  - -1.550000
+  - 5.473000
+  - 1.120400
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_47
   orientation:
-  - 10.705486297607422
-  - 1.8409167528152466
-  - 0.0
+  - 10.705486
+  - 1.840917
+  - 0.000000
   position:
-  - -0.93
-  - 5.473
-  - 1.0651
+  - -0.930000
+  - 5.473000
+  - 1.065100
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_48
   orientation:
-  - 10.700316429138184
-  - 0.6132417917251587
-  - 0.0
+  - 10.700316
+  - 0.613242
+  - 0.000000
   position:
-  - -0.31
-  - 5.473
-  - 1.0375
+  - -0.310000
+  - 5.473000
+  - 1.037500
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_49
   orientation:
-  - 10.700316429138184
-  - -0.6132417917251587
-  - -0.0
+  - 10.700316
+  - -0.613242
+  - -0.000000
   position:
-  - 0.31
-  - 5.473
-  - 1.0375
+  - 0.310000
+  - 5.473000
+  - 1.037500
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_50
   orientation:
-  - 10.705486297607422
-  - -1.8409167528152466
-  - -0.0
+  - 10.705486
+  - -1.840917
+  - -0.000000
   position:
-  - 0.93
-  - 5.473
-  - 1.0651
+  - 0.930000
+  - 5.473000
+  - 1.065100
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_51
   orientation:
-  - 10.71585464477539
-  - -3.0721800327301025
-  - -0.0
+  - 10.715855
+  - -3.072180
+  - -0.000000
   position:
-  - 1.55
-  - 5.473
-  - 1.1204
+  - 1.550000
+  - 5.473000
+  - 1.120400
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_52
   orientation:
-  - 10.73151969909668
-  - -4.309488296508789
-  - -0.0
+  - 10.731520
+  - -4.309488
+  - -0.000000
   position:
-  - 2.17
-  - 5.473
-  - 1.2037
+  - 2.170000
+  - 5.473000
+  - 1.203700
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_53
   orientation:
-  - 10.752680778503418
-  - -5.555423259735107
-  - -0.0
+  - 10.752681
+  - -5.555423
+  - -0.000000
   position:
-  - 2.79
-  - 5.473
-  - 1.3156
+  - 2.790000
+  - 5.473000
+  - 1.315600
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_54
   orientation:
-  - 11.857250213623047
-  - 4.97014045715332
-  - 0.0
+  - 11.857250
+  - 4.970140
+  - 0.000000
   position:
-  - -2.48
-  - 6.01
-  - 1.4823
+  - -2.480000
+  - 6.010000
+  - 1.482300
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_55
   orientation:
-  - 11.836376190185547
-  - 3.7187976837158203
-  - 0.0
+  - 11.836376
+  - 3.718798
+  - 0.000000
   position:
-  - -1.86
-  - 6.01
-  - 1.3831
+  - -1.860000
+  - 6.010000
+  - 1.383100
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_56
   orientation:
-  - 11.821630477905273
-  - 2.4750523567199707
-  - 0.0
+  - 11.821630
+  - 2.475052
+  - 0.000000
   position:
-  - -1.24
-  - 6.01
-  - 1.3127
+  - -1.240000
+  - 6.010000
+  - 1.312700
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_57
   orientation:
-  - 11.812833786010742
-  - 1.2362899780273438
-  - 0.0
+  - 11.812834
+  - 1.236290
+  - 0.000000
   position:
-  - -0.62
-  - 6.01
-  - 1.2706
+  - -0.620000
+  - 6.010000
+  - 1.270600
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_58
   orientation:
-  - 11.809913635253906
-  - 0.0
-  - 0.0
+  - 11.809914
+  - 0.000000
+  - 0.000000
   position:
-  - 0.0
-  - 6.01
-  - 1.2566
+  - 0.000000
+  - 6.010000
+  - 1.256600
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_59
   orientation:
-  - 11.812833786010742
-  - -1.2362899780273438
-  - -0.0
+  - 11.812834
+  - -1.236290
+  - -0.000000
   position:
-  - 0.62
-  - 6.01
-  - 1.2706
+  - 0.620000
+  - 6.010000
+  - 1.270600
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_60
   orientation:
-  - 11.821630477905273
-  - -2.4750523567199707
-  - -0.0
+  - 11.821630
+  - -2.475052
+  - -0.000000
   position:
-  - 1.24
-  - 6.01
-  - 1.3127
+  - 1.240000
+  - 6.010000
+  - 1.312700
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_61
   orientation:
-  - 11.836376190185547
-  - -3.7187976837158203
-  - -0.0
+  - 11.836376
+  - -3.718798
+  - -0.000000
   position:
-  - 1.86
-  - 6.01
-  - 1.3831
+  - 1.860000
+  - 6.010000
+  - 1.383100
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_62
   orientation:
-  - 11.857250213623047
-  - -4.97014045715332
-  - -0.0
+  - 11.857250
+  - -4.970140
+  - -0.000000
   position:
-  - 2.48
-  - 6.01
-  - 1.4823
+  - 2.480000
+  - 6.010000
+  - 1.482300
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_63
   orientation:
-  - 1.6383247375488281
-  - -1.654299020767212
-  - -0.0
+  - 1.638325
+  - -1.654299
+  - -0.000000
   position:
-  - 0.865
-  - 0.857
-  - 0.0495
+  - 0.865000
+  - 0.857000
+  - 0.049500
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_64
   orientation:
-  - 0.6135826110839844
-  - -2.2466413974761963
-  - -0.0
+  - 0.613583
+  - -2.246641
+  - -0.000000
   position:
-  - 1.175
-  - 0.321
-  - 0.0495
+  - 1.175000
+  - 0.321000
+  - 0.049500
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_65
   orientation:
-  - 2.6682560443878174
-  - -2.251274585723877
-  - -0.0
+  - 2.668256
+  - -2.251275
+  - -0.000000
   position:
-  - 1.175
-  - 1.394
-  - 0.1112
+  - 1.175000
+  - 1.394000
+  - 0.111200
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_66
   orientation:
-  - 1.6396613121032715
-  - -2.8431291580200195
-  - -0.0
+  - 1.639661
+  - -2.843129
+  - -0.000000
   position:
-  - 1.485
-  - 0.857
-  - 0.0983
+  - 1.485000
+  - 0.857000
+  - 0.098300
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_67
   orientation:
-  - 0.6142154335975647
-  - -3.436824083328247
-  - -0.0
+  - 0.614215
+  - -3.436824
+  - -0.000000
   position:
-  - 1.795
-  - 0.321
-  - 0.1112
+  - 1.795000
+  - 0.321000
+  - 0.111200
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_68
   orientation:
-  - 3.702812910079956
-  - -2.8527297973632812
-  - -0.0
+  - 3.702813
+  - -2.852730
+  - -0.000000
   position:
-  - 1.485
-  - 1.931
-  - 0.1991
+  - 1.485000
+  - 1.931000
+  - 0.199100
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_69
   orientation:
-  - 2.6710312366485596
-  - -3.44395112991333
-  - -0.0
+  - 2.671031
+  - -3.443951
+  - -0.000000
   position:
-  - 1.795
-  - 1.394
-  - 0.1732
+  - 1.795000
+  - 1.394000
+  - 0.173200
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_70
   orientation:
-  - 1.641720175743103
-  - -4.0369062423706055
-  - -0.0
+  - 1.641720
+  - -4.036906
+  - -0.000000
   position:
-  - 2.105
-  - 0.857
-  - 0.1732
+  - 2.105000
+  - 0.857000
+  - 0.173200
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_71
   orientation:
-  - 0.6151226162910461
-  - -4.633017063140869
-  - -0.0
+  - 0.615123
+  - -4.633017
+  - -0.000000
   position:
-  - 2.415
-  - 0.321
-  - 0.1992
+  - 2.415000
+  - 0.321000
+  - 0.199200
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_72
   orientation:
-  - 4.743788242340088
-  - -3.4602110385894775
-  - -0.0
+  - 4.743788
+  - -3.460211
+  - -0.000000
   position:
-  - 1.795
-  - 2.468
-  - 0.3137
+  - 1.795000
+  - 2.468000
+  - 0.313700
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_73
   orientation:
-  - 3.7075138092041016
-  - -4.05061674118042
-  - -0.0
+  - 3.707514
+  - -4.050617
+  - -0.000000
   position:
-  - 2.105
-  - 1.931
-  - 0.2745
+  - 2.105000
+  - 1.931000
+  - 0.274500
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_74
   orientation:
-  - 2.674996852874756
-  - -4.642679691314697
-  - -0.0
+  - 2.674997
+  - -4.642680
+  - -0.000000
   position:
-  - 2.415
-  - 1.394
-  - 0.2615
+  - 2.415000
+  - 1.394000
+  - 0.261500
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_75
   orientation:
-  - 1.644514799118042
-  - -5.237786769866943
-  - -0.0
+  - 1.644515
+  - -5.237787
+  - -0.000000
   position:
-  - 2.725
-  - 0.857
-  - 0.2745
+  - 2.725000
+  - 0.857000
+  - 0.274500
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_76
   orientation:
-  - 0.6163089275360107
-  - -5.837413787841797
-  - -0.0
+  - 0.616309
+  - -5.837414
+  - -0.000000
   position:
-  - 3.035
-  - 0.321
-  - 0.3138
+  - 3.035000
+  - 0.321000
+  - 0.313800
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_77
   orientation:
-  - 5.79307222366333
-  - -4.075362682342529
-  - -0.0
+  - 5.793072
+  - -4.075363
+  - -0.000000
   position:
-  - 2.105
-  - 3.005
-  - 0.4556
+  - 2.105000
+  - 3.005000
+  - 0.455600
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_78
   orientation:
-  - 4.75095272064209
-  - -4.664762496948242
-  - -0.0
+  - 4.750953
+  - -4.664762
+  - -0.000000
   position:
-  - 2.415
-  - 2.468
-  - 0.4029
+  - 2.415000
+  - 2.468000
+  - 0.402900
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_79
   orientation:
-  - 3.713897943496704
-  - -5.255720615386963
-  - -0.0
+  - 3.713898
+  - -5.255721
+  - -0.000000
   position:
-  - 2.725
-  - 1.931
-  - 0.3765
+  - 2.725000
+  - 1.931000
+  - 0.376500
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_80
   orientation:
-  - 2.6801846027374268
-  - -5.849682807922363
-  - -0.0
+  - 2.680185
+  - -5.849683
+  - -0.000000
   position:
-  - 3.035
-  - 1.394
-  - 0.3765
+  - 3.035000
+  - 1.394000
+  - 0.376500
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_81
   orientation:
-  - 1.648080825805664
-  - -6.448084354400635
-  - -0.0
+  - 1.648081
+  - -6.448084
+  - -0.000000
   position:
-  - 3.345
-  - 0.857
-  - 0.4029
+  - 3.345000
+  - 0.857000
+  - 0.402900
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_82
   orientation:
-  - 0.6177871823310852
-  - -7.052373886108398
-  - -0.0
+  - 0.617787
+  - -7.052374
+  - -0.000000
   position:
-  - 3.655
-  - 0.321
-  - 0.4557
+  - 3.655000
+  - 0.321000
+  - 0.455700
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_83
   orientation:
-  - 6.8526997566223145
-  - -4.6999711990356445
-  - -0.0
+  - 6.852700
+  - -4.699971
+  - -0.000000
   position:
-  - 2.415
-  - 3.542
-  - 0.6256
+  - 2.415000
+  - 3.542000
+  - 0.625600
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_84
   orientation:
-  - 5.803260326385498
-  - -5.288098335266113
-  - -0.0
+  - 5.803260
+  - -5.288098
+  - -0.000000
   position:
-  - 2.725
-  - 3.005
-  - 0.5589
+  - 2.725000
+  - 3.005000
+  - 0.558900
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_85
   orientation:
-  - 4.7603278160095215
-  - -5.877780437469482
-  - -0.0
+  - 4.760328
+  - -5.877780
+  - -0.000000
   position:
-  - 3.035
-  - 2.468
-  - 0.5191
+  - 3.035000
+  - 2.468000
+  - 0.519100
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_86
   orientation:
-  - 3.722043752670288
-  - -6.470389366149902
-  - -0.0
+  - 3.722044
+  - -6.470389
+  - -0.000000
   position:
-  - 3.345
-  - 1.931
-  - 0.5058
+  - 3.345000
+  - 1.931000
+  - 0.505800
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_87
   orientation:
-  - 2.6866674423217773
-  - -7.067386150360107
-  - -0.0
+  - 2.686667
+  - -7.067386
+  - -0.000000
   position:
-  - 3.655
-  - 1.394
-  - 0.5191
+  - 3.655000
+  - 1.394000
+  - 0.519100
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_88
   orientation:
-  - 1.6524404287338257
-  - -7.670198440551758
-  - -0.0
+  - 1.652440
+  - -7.670198
+  - -0.000000
   position:
-  - 3.965
-  - 0.857
-  - 0.5589
+  - 3.965000
+  - 0.857000
+  - 0.558900
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_89
   orientation:
-  - 0.6195722818374634
-  - -8.28042984008789
-  - -0.0
+  - 0.619572
+  - -8.280430
+  - -0.000000
   position:
-  - 4.275
-  - 0.321
-  - 0.6257
+  - 4.275000
+  - 0.321000
+  - 0.625700
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_90
   orientation:
-  - 7.9249114990234375
-  - -5.336015701293945
-  - -0.0
+  - 7.924911
+  - -5.336016
+  - -0.000000
   position:
-  - 2.725
-  - 4.079
-  - 0.8248
+  - 2.725000
+  - 4.079000
+  - 0.824800
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_91
   orientation:
-  - 6.866590976715088
-  - -5.922584533691406
-  - -0.0
+  - 6.866591
+  - -5.922585
+  - -0.000000
   position:
-  - 3.035
-  - 3.542
-  - 0.7437
+  - 3.035000
+  - 3.542000
+  - 0.743700
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_92
   orientation:
-  - 5.816249370574951
-  - -6.510661602020264
-  - -0.0
+  - 5.816249
+  - -6.510662
+  - -0.000000
   position:
-  - 3.345
-  - 3.005
-  - 0.6898
+  - 3.345000
+  - 3.005000
+  - 0.689800
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_93
   orientation:
-  - 4.772012710571289
-  - -7.101699352264404
-  - -0.0
+  - 4.772013
+  - -7.101699
+  - -0.000000
   position:
-  - 3.655
-  - 2.468
-  - 0.663
+  - 3.655000
+  - 2.468000
+  - 0.663000
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_94
   orientation:
-  - 3.7320175170898438
-  - -7.697088718414307
-  - -0.0
+  - 3.732018
+  - -7.697089
+  - -0.000000
   position:
-  - 3.965
-  - 1.931
-  - 0.663
+  - 3.965000
+  - 1.931000
+  - 0.663000
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_95
   orientation:
-  - 2.6944825649261475
-  - -8.298286437988281
-  - -0.0
+  - 2.694483
+  - -8.298286
+  - -0.000000
   position:
-  - 4.275
-  - 1.394
-  - 0.6898
+  - 4.275000
+  - 1.394000
+  - 0.689800
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_96
   orientation:
-  - 1.6576545238494873
-  - -8.906854629516602
-  - -0.0
+  - 1.657655
+  - -8.906855
+  - -0.000000
   position:
-  - 4.585
-  - 0.857
-  - 0.7437
+  - 4.585000
+  - 0.857000
+  - 0.743700
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_97
   orientation:
-  - 0.6216824054718018
-  - -9.524348258972168
-  - -0.0
+  - 0.621682
+  - -9.524348
+  - -0.000000
   position:
-  - 4.895
-  - 0.321
-  - 0.8248
+  - 4.895000
+  - 0.321000
+  - 0.824800
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_98
   orientation:
-  - 9.01213550567627
-  - -5.985677242279053
-  - -0.0
+  - 9.012136
+  - -5.985677
+  - -0.000000
   position:
-  - 3.035
-  - 4.616
-  - 1.0543
+  - 3.035000
+  - 4.616000
+  - 1.054300
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_99
   orientation:
-  - 7.943212032318115
-  - -6.570308208465576
-  - -0.0
+  - 7.943212
+  - -6.570308
+  - -0.000000
   position:
-  - 3.345
-  - 4.079
-  - 0.9582
+  - 3.345000
+  - 4.079000
+  - 0.958200
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_100
   orientation:
-  - 6.883893966674805
-  - -7.156482219696045
-  - -0.0
+  - 6.883894
+  - -7.156482
+  - -0.000000
   position:
-  - 3.655
-  - 3.542
-  - 0.8899
+  - 3.655000
+  - 3.542000
+  - 0.889900
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_101
   orientation:
-  - 5.832180976867676
-  - -7.745632648468018
-  - -0.0
+  - 5.832181
+  - -7.745633
+  - -0.000000
   position:
-  - 3.965
-  - 3.005
-  - 0.8491
+  - 3.965000
+  - 3.005000
+  - 0.849100
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_102
   orientation:
-  - 4.786137580871582
-  - -8.33916187286377
-  - -0.0
+  - 4.786138
+  - -8.339162
+  - -0.000000
   position:
-  - 4.275
-  - 2.468
-  - 0.8355
+  - 4.275000
+  - 2.468000
+  - 0.835500
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_103
   orientation:
-  - 3.743929386138916
-  - -8.9385404586792
-  - -0.0
+  - 3.743929
+  - -8.938540
+  - -0.000000
   position:
-  - 4.585
-  - 1.931
-  - 0.8491
+  - 4.585000
+  - 1.931000
+  - 0.849100
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_104
   orientation:
-  - 2.7037363052368164
-  - -9.545255661010742
-  - -0.0
+  - 2.703736
+  - -9.545256
+  - -0.000000
   position:
-  - 4.895
-  - 1.394
-  - 0.8899
+  - 4.895000
+  - 1.394000
+  - 0.889900
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_105
   orientation:
-  - 1.663766860961914
-  - -10.160926818847656
-  - -0.0
+  - 1.663767
+  - -10.160927
+  - -0.000000
   position:
-  - 5.205
-  - 0.857
-  - 0.9582
+  - 5.205000
+  - 0.857000
+  - 0.958200
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_106
   orientation:
-  - 0.6241419315338135
-  - -10.787225723266602
-  - -0.0
+  - 0.624142
+  - -10.787226
+  - -0.000000
   position:
-  - 5.515
-  - 0.321
-  - 1.0543
+  - 5.515000
+  - 0.321000
+  - 1.054300
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_107
   orientation:
-  - 10.117194175720215
-  - -6.651488780975342
-  - -0.0
+  - 10.117194
+  - -6.651489
+  - -0.000000
   position:
-  - 3.345
-  - 5.153
-  - 1.3158
+  - 3.345000
+  - 5.153000
+  - 1.315800
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_108
   orientation:
-  - 9.035722732543945
-  - -7.2336955070495605
-  - -0.0
+  - 9.035723
+  - -7.233696
+  - -0.000000
   position:
-  - 3.655
-  - 4.616
-  - 1.2039
+  - 3.655000
+  - 4.616000
+  - 1.203900
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_109
   orientation:
-  - 7.965643405914307
-  - -7.817528247833252
-  - -0.0
+  - 7.965643
+  - -7.817528
+  - -0.000000
   position:
-  - 3.965
-  - 4.079
-  - 1.1205
+  - 3.965000
+  - 4.079000
+  - 1.120500
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_110
   orientation:
-  - 6.904815196990967
-  - -8.404419898986816
-  - -0.0
+  - 6.904815
+  - -8.404420
+  - -0.000000
   position:
-  - 4.275
-  - 3.542
-  - 1.0652
+  - 4.275000
+  - 3.542000
+  - 1.065200
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_111
   orientation:
-  - 5.851190090179443
-  - -8.995767593383789
-  - -0.0
+  - 5.851190
+  - -8.995768
+  - -0.000000
   position:
-  - 4.585
-  - 3.005
-  - 1.0376
+  - 4.585000
+  - 3.005000
+  - 1.037600
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_112
   orientation:
-  - 4.802844047546387
-  - -9.593031883239746
-  - -0.0
+  - 4.802844
+  - -9.593032
+  - -0.000000
   position:
-  - 4.895
-  - 2.468
-  - 1.0376
+  - 4.895000
+  - 2.468000
+  - 1.037600
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_113
   orientation:
-  - 3.7579030990600586
-  - -10.197713851928711
-  - -0.0
+  - 3.757903
+  - -10.197714
+  - -0.000000
   position:
-  - 5.205
-  - 1.931
-  - 1.0652
+  - 5.205000
+  - 1.931000
+  - 1.065200
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_114
   orientation:
-  - 2.7145180702209473
-  - -10.811371803283691
-  - -0.0
+  - 2.714518
+  - -10.811372
+  - -0.000000
   position:
-  - 5.515
-  - 1.394
-  - 1.1205
+  - 5.515000
+  - 1.394000
+  - 1.120500
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_115
   orientation:
-  - 1.6708470582962036
-  - -11.435687065124512
-  - -0.0
+  - 1.670847
+  - -11.435687
+  - -0.000000
   position:
-  - 5.825
-  - 0.857
-  - 1.2038
+  - 5.825000
+  - 0.857000
+  - 1.203800
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_116
   orientation:
-  - 0.6269794702529907
-  - -12.072535514831543
-  - -0.0
+  - 0.626979
+  - -12.072536
+  - -0.000000
   position:
-  - 6.135
-  - 0.321
-  - 1.3157
+  - 6.135000
+  - 0.321000
+  - 1.315700
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_117
   orientation:
-  - 10.147013664245605
-  - -7.915486812591553
-  - -0.0
+  - 10.147014
+  - -7.915487
+  - -0.000000
   position:
-  - 3.965
-  - 5.153
-  - 1.4824
+  - 3.965000
+  - 5.153000
+  - 1.482400
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_118
   orientation:
-  - 9.064215660095215
-  - -8.49645709991455
-  - -0.0
+  - 9.064216
+  - -8.496457
+  - -0.000000
   position:
-  - 4.275
-  - 4.616
-  - 1.3832
+  - 4.275000
+  - 4.616000
+  - 1.383200
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_119
   orientation:
-  - 7.992470741271973
-  - -9.080634117126465
-  - -0.0
+  - 7.992471
+  - -9.080634
+  - -0.000000
   position:
-  - 4.585
-  - 4.079
-  - 1.3128
+  - 4.585000
+  - 4.079000
+  - 1.312800
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_120
   orientation:
-  - 6.929584503173828
-  - -9.669402122497559
-  - -0.0
+  - 6.929585
+  - -9.669402
+  - -0.000000
   position:
-  - 4.895
-  - 3.542
-  - 1.2707
+  - 4.895000
+  - 3.542000
+  - 1.270700
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_121
   orientation:
-  - 5.873528003692627
-  - -10.264215469360352
-  - -0.0
+  - 5.873528
+  - -10.264215
+  - -0.000000
   position:
-  - 5.205
-  - 3.005
-  - 1.2567
+  - 5.205000
+  - 3.005000
+  - 1.256700
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_122
   orientation:
-  - 4.822336196899414
-  - -10.866551399230957
-  - -0.0
+  - 4.822336
+  - -10.866551
+  - -0.000000
   position:
-  - 5.515
-  - 2.468
-  - 1.2707
+  - 5.515000
+  - 2.468000
+  - 1.270700
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_123
   orientation:
-  - 3.7741103172302246
-  - -11.477986335754395
-  - -0.0
+  - 3.774110
+  - -11.477986
+  - -0.000000
   position:
-  - 5.825
-  - 1.931
-  - 1.3128
+  - 5.825000
+  - 1.931000
+  - 1.312800
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_124
   orientation:
-  - 2.7269585132598877
-  - -12.100172996520996
-  - -0.0
+  - 2.726959
+  - -12.100173
+  - -0.000000
   position:
-  - 6.135
-  - 1.394
-  - 1.3832
+  - 6.135000
+  - 1.394000
+  - 1.383200
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_125
   orientation:
-  - 1.678987979888916
-  - -12.734906196594238
-  - -0.0
+  - 1.678988
+  - -12.734906
+  - -0.000000
   position:
-  - 6.445
-  - 0.857
-  - 1.4823
+  - 6.445000
+  - 0.857000
+  - 1.482300
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_126
   orientation:
-  - 0.6302310228347778
-  - -13.384267807006836
-  - -0.0
+  - 0.630231
+  - -13.384268
+  - -0.000000
   position:
-  - 6.755
-  - 0.321
-  - 1.6109
+  - 6.755000
+  - 0.321000
+  - 1.610900
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_127
   orientation:
-  - -0.6135826110839844
-  - -2.2466413974761963
-  - -0.0
+  - -0.613583
+  - -2.246641
+  - -0.000000
   position:
-  - 1.175
-  - -0.321
-  - 0.0495
+  - 1.175000
+  - -0.321000
+  - 0.049500
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_128
   orientation:
-  - -1.6383247375488281
-  - -1.654299020767212
-  - -0.0
+  - -1.638325
+  - -1.654299
+  - -0.000000
   position:
-  - 0.865
-  - -0.857
-  - 0.0495
+  - 0.865000
+  - -0.857000
+  - 0.049500
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_129
   orientation:
-  - -0.6142154335975647
-  - -3.436824083328247
-  - -0.0
+  - -0.614215
+  - -3.436824
+  - -0.000000
   position:
-  - 1.795
-  - -0.321
-  - 0.1112
+  - 1.795000
+  - -0.321000
+  - 0.111200
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_130
   orientation:
-  - -1.6396613121032715
-  - -2.8431291580200195
-  - -0.0
+  - -1.639661
+  - -2.843129
+  - -0.000000
   position:
-  - 1.485
-  - -0.857
-  - 0.0983
+  - 1.485000
+  - -0.857000
+  - 0.098300
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_131
   orientation:
-  - -2.6682560443878174
-  - -2.251274585723877
-  - -0.0
+  - -2.668256
+  - -2.251275
+  - -0.000000
   position:
-  - 1.175
-  - -1.394
-  - 0.1112
+  - 1.175000
+  - -1.394000
+  - 0.111200
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_132
   orientation:
-  - -0.6151226162910461
-  - -4.633017063140869
-  - -0.0
+  - -0.615123
+  - -4.633017
+  - -0.000000
   position:
-  - 2.415
-  - -0.321
-  - 0.1992
+  - 2.415000
+  - -0.321000
+  - 0.199200
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_133
   orientation:
-  - -1.641720175743103
-  - -4.0369062423706055
-  - -0.0
+  - -1.641720
+  - -4.036906
+  - -0.000000
   position:
-  - 2.105
-  - -0.857
-  - 0.1732
+  - 2.105000
+  - -0.857000
+  - 0.173200
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_134
   orientation:
-  - -2.6710312366485596
-  - -3.44395112991333
-  - -0.0
+  - -2.671031
+  - -3.443951
+  - -0.000000
   position:
-  - 1.795
-  - -1.394
-  - 0.1732
+  - 1.795000
+  - -1.394000
+  - 0.173200
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_135
   orientation:
-  - -3.702812910079956
-  - -2.8527297973632812
-  - -0.0
+  - -3.702813
+  - -2.852730
+  - -0.000000
   position:
-  - 1.485
-  - -1.931
-  - 0.1991
+  - 1.485000
+  - -1.931000
+  - 0.199100
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_136
   orientation:
-  - -0.6163089275360107
-  - -5.837413787841797
-  - -0.0
+  - -0.616309
+  - -5.837414
+  - -0.000000
   position:
-  - 3.035
-  - -0.321
-  - 0.3138
+  - 3.035000
+  - -0.321000
+  - 0.313800
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_137
   orientation:
-  - -1.644514799118042
-  - -5.237786769866943
-  - -0.0
+  - -1.644515
+  - -5.237787
+  - -0.000000
   position:
-  - 2.725
-  - -0.857
-  - 0.2745
+  - 2.725000
+  - -0.857000
+  - 0.274500
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_138
   orientation:
-  - -2.674996852874756
-  - -4.642679691314697
-  - -0.0
+  - -2.674997
+  - -4.642680
+  - -0.000000
   position:
-  - 2.415
-  - -1.394
-  - 0.2615
+  - 2.415000
+  - -1.394000
+  - 0.261500
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_139
   orientation:
-  - -3.7075138092041016
-  - -4.05061674118042
-  - -0.0
+  - -3.707514
+  - -4.050617
+  - -0.000000
   position:
-  - 2.105
-  - -1.931
-  - 0.2745
+  - 2.105000
+  - -1.931000
+  - 0.274500
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_140
   orientation:
-  - -4.743788242340088
-  - -3.4602110385894775
-  - -0.0
+  - -4.743788
+  - -3.460211
+  - -0.000000
   position:
-  - 1.795
-  - -2.468
-  - 0.3137
+  - 1.795000
+  - -2.468000
+  - 0.313700
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_141
   orientation:
-  - -0.6177871823310852
-  - -7.052373886108398
-  - -0.0
+  - -0.617787
+  - -7.052374
+  - -0.000000
   position:
-  - 3.655
-  - -0.321
-  - 0.4557
+  - 3.655000
+  - -0.321000
+  - 0.455700
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_142
   orientation:
-  - -1.648080825805664
-  - -6.448084354400635
-  - -0.0
+  - -1.648081
+  - -6.448084
+  - -0.000000
   position:
-  - 3.345
-  - -0.857
-  - 0.4029
+  - 3.345000
+  - -0.857000
+  - 0.402900
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_143
   orientation:
-  - -2.6801846027374268
-  - -5.849682807922363
-  - -0.0
+  - -2.680185
+  - -5.849683
+  - -0.000000
   position:
-  - 3.035
-  - -1.394
-  - 0.3765
+  - 3.035000
+  - -1.394000
+  - 0.376500
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_144
   orientation:
-  - -3.713897943496704
-  - -5.255720615386963
-  - -0.0
+  - -3.713898
+  - -5.255721
+  - -0.000000
   position:
-  - 2.725
-  - -1.931
-  - 0.3765
+  - 2.725000
+  - -1.931000
+  - 0.376500
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_145
   orientation:
-  - -4.75095272064209
-  - -4.664762496948242
-  - -0.0
+  - -4.750953
+  - -4.664762
+  - -0.000000
   position:
-  - 2.415
-  - -2.468
-  - 0.4029
+  - 2.415000
+  - -2.468000
+  - 0.402900
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_146
   orientation:
-  - -5.79307222366333
-  - -4.075362682342529
-  - -0.0
+  - -5.793072
+  - -4.075363
+  - -0.000000
   position:
-  - 2.105
-  - -3.005
-  - 0.4556
+  - 2.105000
+  - -3.005000
+  - 0.455600
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_147
   orientation:
-  - -0.6195722818374634
-  - -8.28042984008789
-  - -0.0
+  - -0.619572
+  - -8.280430
+  - -0.000000
   position:
-  - 4.275
-  - -0.321
-  - 0.6257
+  - 4.275000
+  - -0.321000
+  - 0.625700
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_148
   orientation:
-  - -1.6524404287338257
-  - -7.670198440551758
-  - -0.0
+  - -1.652440
+  - -7.670198
+  - -0.000000
   position:
-  - 3.965
-  - -0.857
-  - 0.5589
+  - 3.965000
+  - -0.857000
+  - 0.558900
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_149
   orientation:
-  - -2.6866674423217773
-  - -7.067386150360107
-  - -0.0
+  - -2.686667
+  - -7.067386
+  - -0.000000
   position:
-  - 3.655
-  - -1.394
-  - 0.5191
+  - 3.655000
+  - -1.394000
+  - 0.519100
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_150
   orientation:
-  - -3.722043752670288
-  - -6.470389366149902
-  - -0.0
+  - -3.722044
+  - -6.470389
+  - -0.000000
   position:
-  - 3.345
-  - -1.931
-  - 0.5058
+  - 3.345000
+  - -1.931000
+  - 0.505800
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_151
   orientation:
-  - -4.7603278160095215
-  - -5.877780437469482
-  - -0.0
+  - -4.760328
+  - -5.877780
+  - -0.000000
   position:
-  - 3.035
-  - -2.468
-  - 0.5191
+  - 3.035000
+  - -2.468000
+  - 0.519100
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_152
   orientation:
-  - -5.803260326385498
-  - -5.288098335266113
-  - -0.0
+  - -5.803260
+  - -5.288098
+  - -0.000000
   position:
-  - 2.725
-  - -3.005
-  - 0.5589
+  - 2.725000
+  - -3.005000
+  - 0.558900
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_153
   orientation:
-  - -6.8526997566223145
-  - -4.6999711990356445
-  - -0.0
+  - -6.852700
+  - -4.699971
+  - -0.000000
   position:
-  - 2.415
-  - -3.542
-  - 0.6256
+  - 2.415000
+  - -3.542000
+  - 0.625600
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_154
   orientation:
-  - -0.6216824054718018
-  - -9.524348258972168
-  - -0.0
+  - -0.621682
+  - -9.524348
+  - -0.000000
   position:
-  - 4.895
-  - -0.321
-  - 0.8248
+  - 4.895000
+  - -0.321000
+  - 0.824800
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_155
   orientation:
-  - -1.6576545238494873
-  - -8.906854629516602
-  - -0.0
+  - -1.657655
+  - -8.906855
+  - -0.000000
   position:
-  - 4.585
-  - -0.857
-  - 0.7437
+  - 4.585000
+  - -0.857000
+  - 0.743700
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_156
   orientation:
-  - -2.6944825649261475
-  - -8.298286437988281
-  - -0.0
+  - -2.694483
+  - -8.298286
+  - -0.000000
   position:
-  - 4.275
-  - -1.394
-  - 0.6898
+  - 4.275000
+  - -1.394000
+  - 0.689800
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_157
   orientation:
-  - -3.7320175170898438
-  - -7.697088718414307
-  - -0.0
+  - -3.732018
+  - -7.697089
+  - -0.000000
   position:
-  - 3.965
-  - -1.931
-  - 0.663
+  - 3.965000
+  - -1.931000
+  - 0.663000
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_158
   orientation:
-  - -4.772012710571289
-  - -7.101699352264404
-  - -0.0
+  - -4.772013
+  - -7.101699
+  - -0.000000
   position:
-  - 3.655
-  - -2.468
-  - 0.663
+  - 3.655000
+  - -2.468000
+  - 0.663000
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_159
   orientation:
-  - -5.816249370574951
-  - -6.510661602020264
-  - -0.0
+  - -5.816249
+  - -6.510662
+  - -0.000000
   position:
-  - 3.345
-  - -3.005
-  - 0.6898
+  - 3.345000
+  - -3.005000
+  - 0.689800
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_160
   orientation:
-  - -6.866590976715088
-  - -5.922584533691406
-  - -0.0
+  - -6.866591
+  - -5.922585
+  - -0.000000
   position:
-  - 3.035
-  - -3.542
-  - 0.7437
+  - 3.035000
+  - -3.542000
+  - 0.743700
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_161
   orientation:
-  - -7.9249114990234375
-  - -5.336015701293945
-  - -0.0
+  - -7.924911
+  - -5.336016
+  - -0.000000
   position:
-  - 2.725
-  - -4.079
-  - 0.8248
+  - 2.725000
+  - -4.079000
+  - 0.824800
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_162
   orientation:
-  - -0.6241419315338135
-  - -10.787225723266602
-  - -0.0
+  - -0.624142
+  - -10.787226
+  - -0.000000
   position:
-  - 5.515
-  - -0.321
-  - 1.0543
+  - 5.515000
+  - -0.321000
+  - 1.054300
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_163
   orientation:
-  - -1.663766860961914
-  - -10.160926818847656
-  - -0.0
+  - -1.663767
+  - -10.160927
+  - -0.000000
   position:
-  - 5.205
-  - -0.857
-  - 0.9582
+  - 5.205000
+  - -0.857000
+  - 0.958200
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_164
   orientation:
-  - -2.7037363052368164
-  - -9.545255661010742
-  - -0.0
+  - -2.703736
+  - -9.545256
+  - -0.000000
   position:
-  - 4.895
-  - -1.394
-  - 0.8899
+  - 4.895000
+  - -1.394000
+  - 0.889900
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_165
   orientation:
-  - -3.743929386138916
-  - -8.9385404586792
-  - -0.0
+  - -3.743929
+  - -8.938540
+  - -0.000000
   position:
-  - 4.585
-  - -1.931
-  - 0.8491
+  - 4.585000
+  - -1.931000
+  - 0.849100
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_166
   orientation:
-  - -4.786137580871582
-  - -8.33916187286377
-  - -0.0
+  - -4.786138
+  - -8.339162
+  - -0.000000
   position:
-  - 4.275
-  - -2.468
-  - 0.8355
+  - 4.275000
+  - -2.468000
+  - 0.835500
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_167
   orientation:
-  - -5.832180976867676
-  - -7.745632648468018
-  - -0.0
+  - -5.832181
+  - -7.745633
+  - -0.000000
   position:
-  - 3.965
-  - -3.005
-  - 0.8491
+  - 3.965000
+  - -3.005000
+  - 0.849100
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_168
   orientation:
-  - -6.883893966674805
-  - -7.156482219696045
-  - -0.0
+  - -6.883894
+  - -7.156482
+  - -0.000000
   position:
-  - 3.655
-  - -3.542
-  - 0.8899
+  - 3.655000
+  - -3.542000
+  - 0.889900
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_169
   orientation:
-  - -7.943212032318115
-  - -6.570308208465576
-  - -0.0
+  - -7.943212
+  - -6.570308
+  - -0.000000
   position:
-  - 3.345
-  - -4.079
-  - 0.9582
+  - 3.345000
+  - -4.079000
+  - 0.958200
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_170
   orientation:
-  - -9.01213550567627
-  - -5.985677242279053
-  - -0.0
+  - -9.012136
+  - -5.985677
+  - -0.000000
   position:
-  - 3.035
-  - -4.616
-  - 1.0543
+  - 3.035000
+  - -4.616000
+  - 1.054300
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_171
   orientation:
-  - -0.6269794702529907
-  - -12.072535514831543
-  - -0.0
+  - -0.626979
+  - -12.072536
+  - -0.000000
   position:
-  - 6.135
-  - -0.321
-  - 1.3157
+  - 6.135000
+  - -0.321000
+  - 1.315700
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_172
   orientation:
-  - -1.6708470582962036
-  - -11.435687065124512
-  - -0.0
+  - -1.670847
+  - -11.435687
+  - -0.000000
   position:
-  - 5.825
-  - -0.857
-  - 1.2038
+  - 5.825000
+  - -0.857000
+  - 1.203800
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_173
   orientation:
-  - -2.7145180702209473
-  - -10.811371803283691
-  - -0.0
+  - -2.714518
+  - -10.811372
+  - -0.000000
   position:
-  - 5.515
-  - -1.394
-  - 1.1205
+  - 5.515000
+  - -1.394000
+  - 1.120500
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_174
   orientation:
-  - -3.7579030990600586
-  - -10.197713851928711
-  - -0.0
+  - -3.757903
+  - -10.197714
+  - -0.000000
   position:
-  - 5.205
-  - -1.931
-  - 1.0652
+  - 5.205000
+  - -1.931000
+  - 1.065200
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_175
   orientation:
-  - -4.802844047546387
-  - -9.593031883239746
-  - -0.0
+  - -4.802844
+  - -9.593032
+  - -0.000000
   position:
-  - 4.895
-  - -2.468
-  - 1.0376
+  - 4.895000
+  - -2.468000
+  - 1.037600
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_176
   orientation:
-  - -5.851190090179443
-  - -8.995767593383789
-  - -0.0
+  - -5.851190
+  - -8.995768
+  - -0.000000
   position:
-  - 4.585
-  - -3.005
-  - 1.0376
+  - 4.585000
+  - -3.005000
+  - 1.037600
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_177
   orientation:
-  - -6.904815196990967
-  - -8.404419898986816
-  - -0.0
+  - -6.904815
+  - -8.404420
+  - -0.000000
   position:
-  - 4.275
-  - -3.542
-  - 1.0652
+  - 4.275000
+  - -3.542000
+  - 1.065200
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_178
   orientation:
-  - -7.965643405914307
-  - -7.817528247833252
-  - -0.0
+  - -7.965643
+  - -7.817528
+  - -0.000000
   position:
-  - 3.965
-  - -4.079
-  - 1.1205
+  - 3.965000
+  - -4.079000
+  - 1.120500
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_179
   orientation:
-  - -9.035722732543945
-  - -7.2336955070495605
-  - -0.0
+  - -9.035723
+  - -7.233696
+  - -0.000000
   position:
-  - 3.655
-  - -4.616
-  - 1.2039
+  - 3.655000
+  - -4.616000
+  - 1.203900
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_180
   orientation:
-  - -10.117194175720215
-  - -6.651488780975342
-  - -0.0
+  - -10.117194
+  - -6.651489
+  - -0.000000
   position:
-  - 3.345
-  - -5.153
-  - 1.3158
+  - 3.345000
+  - -5.153000
+  - 1.315800
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_181
   orientation:
-  - -0.6302310228347778
-  - -13.384267807006836
-  - -0.0
+  - -0.630231
+  - -13.384268
+  - -0.000000
   position:
-  - 6.755
-  - -0.321
-  - 1.6109
+  - 6.755000
+  - -0.321000
+  - 1.610900
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_182
   orientation:
-  - -1.678987979888916
-  - -12.734906196594238
-  - -0.0
+  - -1.678988
+  - -12.734906
+  - -0.000000
   position:
-  - 6.445
-  - -0.857
-  - 1.4823
+  - 6.445000
+  - -0.857000
+  - 1.482300
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_183
   orientation:
-  - -2.7269585132598877
-  - -12.100172996520996
-  - -0.0
+  - -2.726959
+  - -12.100173
+  - -0.000000
   position:
-  - 6.135
-  - -1.394
-  - 1.3832
+  - 6.135000
+  - -1.394000
+  - 1.383200
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_184
   orientation:
-  - -3.7741103172302246
-  - -11.477986335754395
-  - -0.0
+  - -3.774110
+  - -11.477986
+  - -0.000000
   position:
-  - 5.825
-  - -1.931
-  - 1.3128
+  - 5.825000
+  - -1.931000
+  - 1.312800
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_185
   orientation:
-  - -4.822336196899414
-  - -10.866551399230957
-  - -0.0
+  - -4.822336
+  - -10.866551
+  - -0.000000
   position:
-  - 5.515
-  - -2.468
-  - 1.2707
+  - 5.515000
+  - -2.468000
+  - 1.270700
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_186
   orientation:
-  - -5.873528003692627
-  - -10.264215469360352
-  - -0.0
+  - -5.873528
+  - -10.264215
+  - -0.000000
   position:
-  - 5.205
-  - -3.005
-  - 1.2567
+  - 5.205000
+  - -3.005000
+  - 1.256700
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_187
   orientation:
-  - -6.929584503173828
-  - -9.669402122497559
-  - -0.0
+  - -6.929585
+  - -9.669402
+  - -0.000000
   position:
-  - 4.895
-  - -3.542
-  - 1.2707
+  - 4.895000
+  - -3.542000
+  - 1.270700
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_188
   orientation:
-  - -7.992470741271973
-  - -9.080634117126465
-  - -0.0
+  - -7.992471
+  - -9.080634
+  - -0.000000
   position:
-  - 4.585
-  - -4.079
-  - 1.3128
+  - 4.585000
+  - -4.079000
+  - 1.312800
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_189
   orientation:
-  - -9.064215660095215
-  - -8.49645709991455
-  - -0.0
+  - -9.064216
+  - -8.496457
+  - -0.000000
   position:
-  - 4.275
-  - -4.616
-  - 1.3832
+  - 4.275000
+  - -4.616000
+  - 1.383200
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_190
   orientation:
-  - -10.147013664245605
-  - -7.915486812591553
-  - -0.0
+  - -10.147014
+  - -7.915487
+  - -0.000000
   position:
-  - 3.965
-  - -5.153
-  - 1.4824
+  - 3.965000
+  - -5.153000
+  - 1.482400
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_191
   orientation:
-  - -2.252251148223877
-  - -0.5930137038230896
-  - -0.0
+  - -2.252251
+  - -0.593014
+  - -0.000000
   position:
-  - 0.31
-  - -1.178
-  - 0.0495
+  - 0.310000
+  - -1.178000
+  - 0.049500
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_192
   orientation:
-  - -2.252251148223877
-  - 0.5930137038230896
-  - 0.0
+  - -2.252251
+  - 0.593014
+  - 0.000000
   position:
-  - -0.31
-  - -1.178
-  - 0.0495
+  - -0.310000
+  - -1.178000
+  - 0.049500
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_193
   orientation:
-  - -3.2833001613616943
-  - -1.1883517503738403
-  - -0.0
+  - -3.283300
+  - -1.188352
+  - -0.000000
   position:
-  - 0.62
-  - -1.715
-  - 0.1113
+  - 0.620000
+  - -1.715000
+  - 0.111300
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_194
   orientation:
-  - -3.282590866088867
-  - -0.0
-  - 0.0
+  - -3.282591
+  - -0.000000
+  - 0.000000
   position:
-  - 0.0
-  - -1.715
-  - 0.0984
+  - 0.000000
+  - -1.715000
+  - 0.098400
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_195
   orientation:
-  - -3.2833001613616943
-  - 1.1883517503738403
-  - 0.0
+  - -3.283300
+  - 1.188352
+  - 0.000000
   position:
-  - -0.62
-  - -1.715
-  - 0.1113
+  - -0.620000
+  - -1.715000
+  - 0.111300
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_196
   orientation:
-  - -4.319444179534912
-  - -1.787461757659912
-  - -0.0
+  - -4.319444
+  - -1.787462
+  - -0.000000
   position:
-  - 0.93
-  - -2.252
-  - 0.1992
+  - 0.930000
+  - -2.252000
+  - 0.199200
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_197
   orientation:
-  - -4.317568302154541
-  - -0.5954749584197998
-  - -0.0
+  - -4.317568
+  - -0.595475
+  - -0.000000
   position:
-  - 0.31
-  - -2.252
-  - 0.1733
+  - 0.310000
+  - -2.252000
+  - 0.173300
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_198
   orientation:
-  - -4.317568302154541
-  - 0.5954749584197998
-  - 0.0
+  - -4.317568
+  - 0.595475
+  - 0.000000
   position:
-  - -0.31
-  - -2.252
-  - 0.1733
+  - -0.310000
+  - -2.252000
+  - 0.173300
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_199
   orientation:
-  - -4.319444179534912
-  - 1.787461757659912
-  - 0.0
+  - -4.319444
+  - 1.787462
+  - 0.000000
   position:
-  - -0.93
-  - -2.252
-  - 0.1992
+  - -0.930000
+  - -2.252000
+  - 0.199200
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_200
   orientation:
-  - -5.3625006675720215
-  - -2.391868829727173
-  - -0.0
+  - -5.362501
+  - -2.391869
+  - -0.000000
   position:
-  - 1.24
-  - -2.789
-  - 0.3138
+  - 1.240000
+  - -2.789000
+  - 0.313800
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_201
   orientation:
-  - -5.358953475952148
-  - -1.194878339767456
-  - -0.0
+  - -5.358953
+  - -1.194878
+  - -0.000000
   position:
-  - 0.62
-  - -2.789
-  - 0.2746
+  - 0.620000
+  - -2.789000
+  - 0.274600
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_202
   orientation:
-  - -5.357783317565918
-  - -0.0
-  - 0.0
+  - -5.357783
+  - -0.000000
+  - 0.000000
   position:
-  - 0.0
-  - -2.789
-  - 0.2616
+  - 0.000000
+  - -2.789000
+  - 0.261600
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_203
   orientation:
-  - -5.358953475952148
-  - 1.194878339767456
-  - 0.0
+  - -5.358953
+  - 1.194878
+  - 0.000000
   position:
-  - -0.62
-  - -2.789
-  - 0.2746
+  - -0.620000
+  - -2.789000
+  - 0.274600
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_204
   orientation:
-  - -5.3625006675720215
-  - 2.391868829727173
-  - 0.0
+  - -5.362501
+  - 2.391869
+  - 0.000000
   position:
-  - -1.24
-  - -2.789
-  - 0.3138
+  - -1.240000
+  - -2.789000
+  - 0.313800
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_205
   orientation:
-  - -6.414379119873047
-  - -3.0031890869140625
-  - -0.0
+  - -6.414379
+  - -3.003189
+  - -0.000000
   position:
-  - 1.55
-  - -3.326
-  - 0.4557
+  - 1.550000
+  - -3.326000
+  - 0.455700
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_206
   orientation:
-  - -6.408648490905762
-  - -1.7997618913650513
-  - -0.0
+  - -6.408648
+  - -1.799762
+  - -0.000000
   position:
-  - 0.93
-  - -3.326
-  - 0.403
+  - 0.930000
+  - -3.326000
+  - 0.403000
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_207
   orientation:
-  - -6.405792236328125
-  - -0.5995632410049438
-  - -0.0
+  - -6.405792
+  - -0.599563
+  - -0.000000
   position:
-  - 0.31
-  - -3.326
-  - 0.3767
+  - 0.310000
+  - -3.326000
+  - 0.376700
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_208
   orientation:
-  - -6.405792236328125
-  - 0.5995632410049438
-  - 0.0
+  - -6.405792
+  - 0.599563
+  - 0.000000
   position:
-  - -0.31
-  - -3.326
-  - 0.3767
+  - -0.310000
+  - -3.326000
+  - 0.376700
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_209
   orientation:
-  - -6.408648490905762
-  - 1.7997618913650513
-  - 0.0
+  - -6.408648
+  - 1.799762
+  - 0.000000
   position:
-  - -0.93
-  - -3.326
-  - 0.403
+  - -0.930000
+  - -3.326000
+  - 0.403000
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_210
   orientation:
-  - -6.414379119873047
-  - 3.0031890869140625
-  - 0.0
+  - -6.414379
+  - 3.003189
+  - 0.000000
   position:
-  - -1.55
-  - -3.326
-  - 0.4557
+  - -1.550000
+  - -3.326000
+  - 0.455700
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_211
   orientation:
-  - -7.477167129516602
-  - -3.6231818199157715
-  - -0.0
+  - -7.477167
+  - -3.623182
+  - -0.000000
   position:
-  - 1.86
-  - -3.863
-  - 0.6258
+  - 1.860000
+  - -3.863000
+  - 0.625800
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_212
   orientation:
-  - -7.468643665313721
-  - -2.411774158477783
-  - -0.0
+  - -7.468644
+  - -2.411774
+  - -0.000000
   position:
-  - 1.24
-  - -3.863
-  - 0.5591
+  - 1.240000
+  - -3.863000
+  - 0.559100
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_213
   orientation:
-  - -7.463556289672852
-  - -1.2047890424728394
-  - -0.0
+  - -7.463556
+  - -1.204789
+  - -0.000000
   position:
-  - 0.62
-  - -3.863
-  - 0.5192
+  - 0.620000
+  - -3.863000
+  - 0.519200
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_214
   orientation:
-  - -7.461885452270508
-  - -0.0
-  - 0.0
+  - -7.461885
+  - -0.000000
+  - 0.000000
   position:
-  - 0.0
-  - -3.863
-  - 0.506
+  - 0.000000
+  - -3.863000
+  - 0.506000
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_215
   orientation:
-  - -7.463556289672852
-  - 1.2047890424728394
-  - 0.0
+  - -7.463556
+  - 1.204789
+  - 0.000000
   position:
-  - -0.62
-  - -3.863
-  - 0.5192
+  - -0.620000
+  - -3.863000
+  - 0.519200
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_216
   orientation:
-  - -7.468643665313721
-  - 2.411774158477783
-  - 0.0
+  - -7.468644
+  - 2.411774
+  - 0.000000
   position:
-  - -1.24
-  - -3.863
-  - 0.5591
+  - -1.240000
+  - -3.863000
+  - 0.559100
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_217
   orientation:
-  - -7.477167129516602
-  - 3.6231818199157715
-  - 0.0
+  - -7.477167
+  - 3.623182
+  - 0.000000
   position:
-  - -1.86
-  - -3.863
-  - 0.6258
+  - -1.860000
+  - -3.863000
+  - 0.625800
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_218
   orientation:
-  - -8.553101539611816
-  - -4.253756523132324
-  - -0.0
+  - -8.553102
+  - -4.253757
+  - -0.000000
   position:
-  - 2.17
-  - -4.4
-  - 0.825
+  - 2.170000
+  - -4.400000
+  - 0.825000
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_219
   orientation:
-  - -8.541152954101562
-  - -3.0327181816101074
-  - -0.0
+  - -8.541153
+  - -3.032718
+  - -0.000000
   position:
-  - 1.55
-  - -4.4
-  - 0.7439
+  - 1.550000
+  - -4.400000
+  - 0.743900
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_220
   orientation:
-  - -8.53322696685791
-  - -1.8173733949661255
-  - -0.0
+  - -8.533227
+  - -1.817373
+  - -0.000000
   position:
-  - 0.93
-  - -4.4
-  - 0.69
+  - 0.930000
+  - -4.400000
+  - 0.690000
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_221
   orientation:
-  - -8.529304504394531
-  - -0.6054182052612305
-  - -0.0
+  - -8.529305
+  - -0.605418
+  - -0.000000
   position:
-  - 0.31
-  - -4.4
-  - 0.6632
+  - 0.310000
+  - -4.400000
+  - 0.663200
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_222
   orientation:
-  - -8.529304504394531
-  - 0.6054182052612305
-  - 0.0
+  - -8.529305
+  - 0.605418
+  - 0.000000
   position:
-  - -0.31
-  - -4.4
-  - 0.6632
+  - -0.310000
+  - -4.400000
+  - 0.663200
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_223
   orientation:
-  - -8.53322696685791
-  - 1.8173733949661255
-  - 0.0
+  - -8.533227
+  - 1.817373
+  - 0.000000
   position:
-  - -0.93
-  - -4.4
-  - 0.69
+  - -0.930000
+  - -4.400000
+  - 0.690000
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_224
   orientation:
-  - -8.541152954101562
-  - 3.0327181816101074
-  - 0.0
+  - -8.541153
+  - 3.032718
+  - 0.000000
   position:
-  - -1.55
-  - -4.4
-  - 0.7439
+  - -1.550000
+  - -4.400000
+  - 0.743900
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_225
   orientation:
-  - -8.553101539611816
-  - 4.253756523132324
-  - 0.0
+  - -8.553102
+  - 4.253757
+  - 0.000000
   position:
-  - -2.17
-  - -4.4
-  - 0.825
+  - -2.170000
+  - -4.400000
+  - 0.825000
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_226
   orientation:
-  - -9.64466667175293
-  - -4.897043704986572
-  - -0.0
+  - -9.644667
+  - -4.897044
+  - -0.000000
   position:
-  - 2.48
-  - -4.937
-  - 1.0545
+  - 2.480000
+  - -4.937000
+  - 1.054500
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_227
   orientation:
-  - -9.628551483154297
-  - -3.6645638942718506
-  - -0.0
+  - -9.628551
+  - -3.664564
+  - -0.000000
   position:
-  - 1.86
-  - -4.937
-  - 0.9584
+  - 1.860000
+  - -4.937000
+  - 0.958400
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_228
   orientation:
-  - -9.61713695526123
-  - -2.4391651153564453
-  - -0.0
+  - -9.617137
+  - -2.439165
+  - -0.000000
   position:
-  - 1.24
-  - -4.937
-  - 0.8901
+  - 1.240000
+  - -4.937000
+  - 0.890100
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_229
   orientation:
-  - -9.610340118408203
-  - -1.2184280157089233
-  - -0.0
+  - -9.610340
+  - -1.218428
+  - -0.000000
   position:
-  - 0.62
-  - -4.937
-  - 0.8493
+  - 0.620000
+  - -4.937000
+  - 0.849300
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_230
   orientation:
-  - -9.608074188232422
-  - -0.0
-  - 0.0
+  - -9.608074
+  - -0.000000
+  - 0.000000
   position:
-  - 0.0
-  - -4.937
-  - 0.8357
+  - 0.000000
+  - -4.937000
+  - 0.835700
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_231
   orientation:
-  - -9.610340118408203
-  - 1.2184280157089233
-  - 0.0
+  - -9.610340
+  - 1.218428
+  - 0.000000
   position:
-  - -0.62
-  - -4.937
-  - 0.8493
+  - -0.620000
+  - -4.937000
+  - 0.849300
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_232
   orientation:
-  - -9.61713695526123
-  - 2.4391651153564453
-  - 0.0
+  - -9.617137
+  - 2.439165
+  - 0.000000
   position:
-  - -1.24
-  - -4.937
-  - 0.8901
+  - -1.240000
+  - -4.937000
+  - 0.890100
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_233
   orientation:
-  - -9.628551483154297
-  - 3.6645638942718506
-  - 0.0
+  - -9.628551
+  - 3.664564
+  - 0.000000
   position:
-  - -1.86
-  - -4.937
-  - 0.9584
+  - -1.860000
+  - -4.937000
+  - 0.958400
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_234
   orientation:
-  - -9.64466667175293
-  - 4.897043704986572
-  - 0.0
+  - -9.644667
+  - 4.897044
+  - 0.000000
   position:
-  - -2.48
-  - -4.937
-  - 1.0545
+  - -2.480000
+  - -4.937000
+  - 1.054500
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_235
   orientation:
-  - -10.752680778503418
-  - -5.555423259735107
-  - -0.0
+  - -10.752681
+  - -5.555423
+  - -0.000000
   position:
-  - 2.79
-  - -5.473
-  - 1.3156
+  - 2.790000
+  - -5.473000
+  - 1.315600
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_236
   orientation:
-  - -10.73151969909668
-  - -4.309488296508789
-  - -0.0
+  - -10.731520
+  - -4.309488
+  - -0.000000
   position:
-  - 2.17
-  - -5.473
-  - 1.2037
+  - 2.170000
+  - -5.473000
+  - 1.203700
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_237
   orientation:
-  - -10.71585464477539
-  - -3.0721800327301025
-  - -0.0
+  - -10.715855
+  - -3.072180
+  - -0.000000
   position:
-  - 1.55
-  - -5.473
-  - 1.1204
+  - 1.550000
+  - -5.473000
+  - 1.120400
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_238
   orientation:
-  - -10.705486297607422
-  - -1.8409167528152466
-  - -0.0
+  - -10.705486
+  - -1.840917
+  - -0.000000
   position:
-  - 0.93
-  - -5.473
-  - 1.0651
+  - 0.930000
+  - -5.473000
+  - 1.065100
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_239
   orientation:
-  - -10.700316429138184
-  - -0.6132417917251587
-  - -0.0
+  - -10.700316
+  - -0.613242
+  - -0.000000
   position:
-  - 0.31
-  - -5.473
-  - 1.0375
+  - 0.310000
+  - -5.473000
+  - 1.037500
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_240
   orientation:
-  - -10.700316429138184
-  - 0.6132417917251587
-  - 0.0
+  - -10.700316
+  - 0.613242
+  - 0.000000
   position:
-  - -0.31
-  - -5.473
-  - 1.0375
+  - -0.310000
+  - -5.473000
+  - 1.037500
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_241
   orientation:
-  - -10.705486297607422
-  - 1.8409167528152466
-  - 0.0
+  - -10.705486
+  - 1.840917
+  - 0.000000
   position:
-  - -0.93
-  - -5.473
-  - 1.0651
+  - -0.930000
+  - -5.473000
+  - 1.065100
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_242
   orientation:
-  - -10.71585464477539
-  - 3.0721800327301025
-  - 0.0
+  - -10.715855
+  - 3.072180
+  - 0.000000
   position:
-  - -1.55
-  - -5.473
-  - 1.1204
+  - -1.550000
+  - -5.473000
+  - 1.120400
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_243
   orientation:
-  - -10.73151969909668
-  - 4.309488296508789
-  - 0.0
+  - -10.731520
+  - 4.309488
+  - 0.000000
   position:
-  - -2.17
-  - -5.473
-  - 1.2037
+  - -2.170000
+  - -5.473000
+  - 1.203700
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_244
   orientation:
-  - -10.752680778503418
-  - 5.555423259735107
-  - 0.0
+  - -10.752681
+  - 5.555423
+  - 0.000000
   position:
-  - -2.79
-  - -5.473
-  - 1.3156
+  - -2.790000
+  - -5.473000
+  - 1.315600
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_245
   orientation:
-  - -11.857250213623047
-  - -4.97014045715332
-  - -0.0
+  - -11.857250
+  - -4.970140
+  - -0.000000
   position:
-  - 2.48
-  - -6.01
-  - 1.4823
+  - 2.480000
+  - -6.010000
+  - 1.482300
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_246
   orientation:
-  - -11.836376190185547
-  - -3.7187976837158203
-  - -0.0
+  - -11.836376
+  - -3.718798
+  - -0.000000
   position:
-  - 1.86
-  - -6.01
-  - 1.3831
+  - 1.860000
+  - -6.010000
+  - 1.383100
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_247
   orientation:
-  - -11.821630477905273
-  - -2.4750523567199707
-  - -0.0
+  - -11.821630
+  - -2.475052
+  - -0.000000
   position:
-  - 1.24
-  - -6.01
-  - 1.3127
+  - 1.240000
+  - -6.010000
+  - 1.312700
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_248
   orientation:
-  - -11.812833786010742
-  - -1.2362899780273438
-  - -0.0
+  - -11.812834
+  - -1.236290
+  - -0.000000
   position:
-  - 0.62
-  - -6.01
-  - 1.2706
+  - 0.620000
+  - -6.010000
+  - 1.270600
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_249
   orientation:
-  - -11.809913635253906
-  - -0.0
-  - 0.0
+  - -11.809914
+  - -0.000000
+  - 0.000000
   position:
-  - 0.0
-  - -6.01
-  - 1.2566
+  - 0.000000
+  - -6.010000
+  - 1.256600
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_250
   orientation:
-  - -11.812833786010742
-  - 1.2362899780273438
-  - 0.0
+  - -11.812834
+  - 1.236290
+  - 0.000000
   position:
-  - -0.62
-  - -6.01
-  - 1.2706
+  - -0.620000
+  - -6.010000
+  - 1.270600
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_251
   orientation:
-  - -11.821630477905273
-  - 2.4750523567199707
-  - 0.0
+  - -11.821630
+  - 2.475052
+  - 0.000000
   position:
-  - -1.24
-  - -6.01
-  - 1.3127
+  - -1.240000
+  - -6.010000
+  - 1.312700
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_252
   orientation:
-  - -11.836376190185547
-  - 3.7187976837158203
-  - 0.0
+  - -11.836376
+  - 3.718798
+  - 0.000000
   position:
-  - -1.86
-  - -6.01
-  - 1.3831
+  - -1.860000
+  - -6.010000
+  - 1.383100
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_253
   orientation:
-  - -11.857250213623047
-  - 4.97014045715332
-  - 0.0
+  - -11.857250
+  - 4.970140
+  - 0.000000
   position:
-  - -2.48
-  - -6.01
-  - 1.4823
+  - -2.480000
+  - -6.010000
+  - 1.482300
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_254
   orientation:
-  - -1.6383247375488281
-  - 1.654299020767212
-  - 0.0
+  - -1.638325
+  - 1.654299
+  - 0.000000
   position:
-  - -0.865
-  - -0.857
-  - 0.0495
+  - -0.865000
+  - -0.857000
+  - 0.049500
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_255
   orientation:
-  - -0.6135826110839844
-  - 2.2466413974761963
-  - 0.0
+  - -0.613583
+  - 2.246641
+  - 0.000000
   position:
-  - -1.175
-  - -0.321
-  - 0.0495
+  - -1.175000
+  - -0.321000
+  - 0.049500
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_256
   orientation:
-  - -2.6682560443878174
-  - 2.251274585723877
-  - 0.0
+  - -2.668256
+  - 2.251275
+  - 0.000000
   position:
-  - -1.175
-  - -1.394
-  - 0.1112
+  - -1.175000
+  - -1.394000
+  - 0.111200
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_257
   orientation:
-  - -1.6396613121032715
-  - 2.8431291580200195
-  - 0.0
+  - -1.639661
+  - 2.843129
+  - 0.000000
   position:
-  - -1.485
-  - -0.857
-  - 0.0983
+  - -1.485000
+  - -0.857000
+  - 0.098300
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_258
   orientation:
-  - -0.6142154335975647
-  - 3.436824083328247
-  - 0.0
+  - -0.614215
+  - 3.436824
+  - 0.000000
   position:
-  - -1.795
-  - -0.321
-  - 0.1112
+  - -1.795000
+  - -0.321000
+  - 0.111200
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_259
   orientation:
-  - -3.702812910079956
-  - 2.8527297973632812
-  - 0.0
+  - -3.702813
+  - 2.852730
+  - 0.000000
   position:
-  - -1.485
-  - -1.931
-  - 0.1991
+  - -1.485000
+  - -1.931000
+  - 0.199100
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_260
   orientation:
-  - -2.6710312366485596
-  - 3.44395112991333
-  - 0.0
+  - -2.671031
+  - 3.443951
+  - 0.000000
   position:
-  - -1.795
-  - -1.394
-  - 0.1732
+  - -1.795000
+  - -1.394000
+  - 0.173200
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_261
   orientation:
-  - -1.641720175743103
-  - 4.0369062423706055
-  - 0.0
+  - -1.641720
+  - 4.036906
+  - 0.000000
   position:
-  - -2.105
-  - -0.857
-  - 0.1732
+  - -2.105000
+  - -0.857000
+  - 0.173200
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_262
   orientation:
-  - -0.6151226162910461
-  - 4.633017063140869
-  - 0.0
+  - -0.615123
+  - 4.633017
+  - 0.000000
   position:
-  - -2.415
-  - -0.321
-  - 0.1992
+  - -2.415000
+  - -0.321000
+  - 0.199200
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_263
   orientation:
-  - -4.743788242340088
-  - 3.4602110385894775
-  - 0.0
+  - -4.743788
+  - 3.460211
+  - 0.000000
   position:
-  - -1.795
-  - -2.468
-  - 0.3137
+  - -1.795000
+  - -2.468000
+  - 0.313700
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_264
   orientation:
-  - -3.7075138092041016
-  - 4.05061674118042
-  - 0.0
+  - -3.707514
+  - 4.050617
+  - 0.000000
   position:
-  - -2.105
-  - -1.931
-  - 0.2745
+  - -2.105000
+  - -1.931000
+  - 0.274500
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_265
   orientation:
-  - -2.674996852874756
-  - 4.642679691314697
-  - 0.0
+  - -2.674997
+  - 4.642680
+  - 0.000000
   position:
-  - -2.415
-  - -1.394
-  - 0.2615
+  - -2.415000
+  - -1.394000
+  - 0.261500
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_266
   orientation:
-  - -1.644514799118042
-  - 5.237786769866943
-  - 0.0
+  - -1.644515
+  - 5.237787
+  - 0.000000
   position:
-  - -2.725
-  - -0.857
-  - 0.2745
+  - -2.725000
+  - -0.857000
+  - 0.274500
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_267
   orientation:
-  - -0.6163089275360107
-  - 5.837413787841797
-  - 0.0
+  - -0.616309
+  - 5.837414
+  - 0.000000
   position:
-  - -3.035
-  - -0.321
-  - 0.3138
+  - -3.035000
+  - -0.321000
+  - 0.313800
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_268
   orientation:
-  - -5.79307222366333
-  - 4.075362682342529
-  - 0.0
+  - -5.793072
+  - 4.075363
+  - 0.000000
   position:
-  - -2.105
-  - -3.005
-  - 0.4556
+  - -2.105000
+  - -3.005000
+  - 0.455600
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_269
   orientation:
-  - -4.75095272064209
-  - 4.664762496948242
-  - 0.0
+  - -4.750953
+  - 4.664762
+  - 0.000000
   position:
-  - -2.415
-  - -2.468
-  - 0.4029
+  - -2.415000
+  - -2.468000
+  - 0.402900
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_270
   orientation:
-  - -3.713897943496704
-  - 5.255720615386963
-  - 0.0
+  - -3.713898
+  - 5.255721
+  - 0.000000
   position:
-  - -2.725
-  - -1.931
-  - 0.3765
+  - -2.725000
+  - -1.931000
+  - 0.376500
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_271
   orientation:
-  - -2.6801846027374268
-  - 5.849682807922363
-  - 0.0
+  - -2.680185
+  - 5.849683
+  - 0.000000
   position:
-  - -3.035
-  - -1.394
-  - 0.3765
+  - -3.035000
+  - -1.394000
+  - 0.376500
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_272
   orientation:
-  - -1.648080825805664
-  - 6.448084354400635
-  - 0.0
+  - -1.648081
+  - 6.448084
+  - 0.000000
   position:
-  - -3.345
-  - -0.857
-  - 0.4029
+  - -3.345000
+  - -0.857000
+  - 0.402900
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_273
   orientation:
-  - -0.6177871823310852
-  - 7.052373886108398
-  - 0.0
+  - -0.617787
+  - 7.052374
+  - 0.000000
   position:
-  - -3.655
-  - -0.321
-  - 0.4557
+  - -3.655000
+  - -0.321000
+  - 0.455700
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_274
   orientation:
-  - -6.8526997566223145
-  - 4.6999711990356445
-  - 0.0
+  - -6.852700
+  - 4.699971
+  - 0.000000
   position:
-  - -2.415
-  - -3.542
-  - 0.6256
+  - -2.415000
+  - -3.542000
+  - 0.625600
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_275
   orientation:
-  - -5.803260326385498
-  - 5.288098335266113
-  - 0.0
+  - -5.803260
+  - 5.288098
+  - 0.000000
   position:
-  - -2.725
-  - -3.005
-  - 0.5589
+  - -2.725000
+  - -3.005000
+  - 0.558900
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_276
   orientation:
-  - -4.7603278160095215
-  - 5.877780437469482
-  - 0.0
+  - -4.760328
+  - 5.877780
+  - 0.000000
   position:
-  - -3.035
-  - -2.468
-  - 0.5191
+  - -3.035000
+  - -2.468000
+  - 0.519100
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_277
   orientation:
-  - -3.722043752670288
-  - 6.470389366149902
-  - 0.0
+  - -3.722044
+  - 6.470389
+  - 0.000000
   position:
-  - -3.345
-  - -1.931
-  - 0.5058
+  - -3.345000
+  - -1.931000
+  - 0.505800
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_278
   orientation:
-  - -2.6866674423217773
-  - 7.067386150360107
-  - 0.0
+  - -2.686667
+  - 7.067386
+  - 0.000000
   position:
-  - -3.655
-  - -1.394
-  - 0.5191
+  - -3.655000
+  - -1.394000
+  - 0.519100
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_279
   orientation:
-  - -1.6524404287338257
-  - 7.670198440551758
-  - 0.0
+  - -1.652440
+  - 7.670198
+  - 0.000000
   position:
-  - -3.965
-  - -0.857
-  - 0.5589
+  - -3.965000
+  - -0.857000
+  - 0.558900
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_280
   orientation:
-  - -0.6195722818374634
-  - 8.28042984008789
-  - 0.0
+  - -0.619572
+  - 8.280430
+  - 0.000000
   position:
-  - -4.275
-  - -0.321
-  - 0.6257
+  - -4.275000
+  - -0.321000
+  - 0.625700
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_281
   orientation:
-  - -7.9249114990234375
-  - 5.336015701293945
-  - 0.0
+  - -7.924911
+  - 5.336016
+  - 0.000000
   position:
-  - -2.725
-  - -4.079
-  - 0.8248
+  - -2.725000
+  - -4.079000
+  - 0.824800
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_282
   orientation:
-  - -6.866590976715088
-  - 5.922584533691406
-  - 0.0
+  - -6.866591
+  - 5.922585
+  - 0.000000
   position:
-  - -3.035
-  - -3.542
-  - 0.7437
+  - -3.035000
+  - -3.542000
+  - 0.743700
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_283
   orientation:
-  - -5.816249370574951
-  - 6.510661602020264
-  - 0.0
+  - -5.816249
+  - 6.510662
+  - 0.000000
   position:
-  - -3.345
-  - -3.005
-  - 0.6898
+  - -3.345000
+  - -3.005000
+  - 0.689800
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_284
   orientation:
-  - -4.772012710571289
-  - 7.101699352264404
-  - 0.0
+  - -4.772013
+  - 7.101699
+  - 0.000000
   position:
-  - -3.655
-  - -2.468
-  - 0.663
+  - -3.655000
+  - -2.468000
+  - 0.663000
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_285
   orientation:
-  - -3.7320175170898438
-  - 7.697088718414307
-  - 0.0
+  - -3.732018
+  - 7.697089
+  - 0.000000
   position:
-  - -3.965
-  - -1.931
-  - 0.663
+  - -3.965000
+  - -1.931000
+  - 0.663000
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_286
   orientation:
-  - -2.6944825649261475
-  - 8.298286437988281
-  - 0.0
+  - -2.694483
+  - 8.298286
+  - 0.000000
   position:
-  - -4.275
-  - -1.394
-  - 0.6898
+  - -4.275000
+  - -1.394000
+  - 0.689800
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_287
   orientation:
-  - -1.6576545238494873
-  - 8.906854629516602
-  - 0.0
+  - -1.657655
+  - 8.906855
+  - 0.000000
   position:
-  - -4.585
-  - -0.857
-  - 0.7437
+  - -4.585000
+  - -0.857000
+  - 0.743700
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_288
   orientation:
-  - -0.6216824054718018
-  - 9.524348258972168
-  - 0.0
+  - -0.621682
+  - 9.524348
+  - 0.000000
   position:
-  - -4.895
-  - -0.321
-  - 0.8248
+  - -4.895000
+  - -0.321000
+  - 0.824800
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_289
   orientation:
-  - -9.01213550567627
-  - 5.985677242279053
-  - 0.0
+  - -9.012136
+  - 5.985677
+  - 0.000000
   position:
-  - -3.035
-  - -4.616
-  - 1.0543
+  - -3.035000
+  - -4.616000
+  - 1.054300
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_290
   orientation:
-  - -7.943212032318115
-  - 6.570308208465576
-  - 0.0
+  - -7.943212
+  - 6.570308
+  - 0.000000
   position:
-  - -3.345
-  - -4.079
-  - 0.9582
+  - -3.345000
+  - -4.079000
+  - 0.958200
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_291
   orientation:
-  - -6.883893966674805
-  - 7.156482219696045
-  - 0.0
+  - -6.883894
+  - 7.156482
+  - 0.000000
   position:
-  - -3.655
-  - -3.542
-  - 0.8899
+  - -3.655000
+  - -3.542000
+  - 0.889900
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_292
   orientation:
-  - -5.832180976867676
-  - 7.745632648468018
-  - 0.0
+  - -5.832181
+  - 7.745633
+  - 0.000000
   position:
-  - -3.965
-  - -3.005
-  - 0.8491
+  - -3.965000
+  - -3.005000
+  - 0.849100
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_293
   orientation:
-  - -4.786137580871582
-  - 8.33916187286377
-  - 0.0
+  - -4.786138
+  - 8.339162
+  - 0.000000
   position:
-  - -4.275
-  - -2.468
-  - 0.8355
+  - -4.275000
+  - -2.468000
+  - 0.835500
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_294
   orientation:
-  - -3.743929386138916
-  - 8.9385404586792
-  - 0.0
+  - -3.743929
+  - 8.938540
+  - 0.000000
   position:
-  - -4.585
-  - -1.931
-  - 0.8491
+  - -4.585000
+  - -1.931000
+  - 0.849100
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_295
   orientation:
-  - -2.7037363052368164
-  - 9.545255661010742
-  - 0.0
+  - -2.703736
+  - 9.545256
+  - 0.000000
   position:
-  - -4.895
-  - -1.394
-  - 0.8899
+  - -4.895000
+  - -1.394000
+  - 0.889900
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_296
   orientation:
-  - -1.663766860961914
-  - 10.160926818847656
-  - 0.0
+  - -1.663767
+  - 10.160927
+  - 0.000000
   position:
-  - -5.205
-  - -0.857
-  - 0.9582
+  - -5.205000
+  - -0.857000
+  - 0.958200
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_297
   orientation:
-  - -0.6241419315338135
-  - 10.787225723266602
-  - 0.0
+  - -0.624142
+  - 10.787226
+  - 0.000000
   position:
-  - -5.515
-  - -0.321
-  - 1.0543
+  - -5.515000
+  - -0.321000
+  - 1.054300
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_298
   orientation:
-  - -10.117194175720215
-  - 6.651488780975342
-  - 0.0
+  - -10.117194
+  - 6.651489
+  - 0.000000
   position:
-  - -3.345
-  - -5.153
-  - 1.3158
+  - -3.345000
+  - -5.153000
+  - 1.315800
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_299
   orientation:
-  - -9.035722732543945
-  - 7.2336955070495605
-  - 0.0
+  - -9.035723
+  - 7.233696
+  - 0.000000
   position:
-  - -3.655
-  - -4.616
-  - 1.2039
+  - -3.655000
+  - -4.616000
+  - 1.203900
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_300
   orientation:
-  - -7.965643405914307
-  - 7.817528247833252
-  - 0.0
+  - -7.965643
+  - 7.817528
+  - 0.000000
   position:
-  - -3.965
-  - -4.079
-  - 1.1205
+  - -3.965000
+  - -4.079000
+  - 1.120500
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_301
   orientation:
-  - -6.904815196990967
-  - 8.404419898986816
-  - 0.0
+  - -6.904815
+  - 8.404420
+  - 0.000000
   position:
-  - -4.275
-  - -3.542
-  - 1.0652
+  - -4.275000
+  - -3.542000
+  - 1.065200
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_302
   orientation:
-  - -5.851190090179443
-  - 8.995767593383789
-  - 0.0
+  - -5.851190
+  - 8.995768
+  - 0.000000
   position:
-  - -4.585
-  - -3.005
-  - 1.0376
+  - -4.585000
+  - -3.005000
+  - 1.037600
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_303
   orientation:
-  - -4.802844047546387
-  - 9.593031883239746
-  - 0.0
+  - -4.802844
+  - 9.593032
+  - 0.000000
   position:
-  - -4.895
-  - -2.468
-  - 1.0376
+  - -4.895000
+  - -2.468000
+  - 1.037600
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_304
   orientation:
-  - -3.7579030990600586
-  - 10.197713851928711
-  - 0.0
+  - -3.757903
+  - 10.197714
+  - 0.000000
   position:
-  - -5.205
-  - -1.931
-  - 1.0652
+  - -5.205000
+  - -1.931000
+  - 1.065200
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_305
   orientation:
-  - -2.7145180702209473
-  - 10.811371803283691
-  - 0.0
+  - -2.714518
+  - 10.811372
+  - 0.000000
   position:
-  - -5.515
-  - -1.394
-  - 1.1205
+  - -5.515000
+  - -1.394000
+  - 1.120500
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_306
   orientation:
-  - -1.6708470582962036
-  - 11.435687065124512
-  - 0.0
+  - -1.670847
+  - 11.435687
+  - 0.000000
   position:
-  - -5.825
-  - -0.857
-  - 1.2038
+  - -5.825000
+  - -0.857000
+  - 1.203800
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_307
   orientation:
-  - -0.6269794702529907
-  - 12.072535514831543
-  - 0.0
+  - -0.626979
+  - 12.072536
+  - 0.000000
   position:
-  - -6.135
-  - -0.321
-  - 1.3157
+  - -6.135000
+  - -0.321000
+  - 1.315700
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_308
   orientation:
-  - -10.147013664245605
-  - 7.915486812591553
-  - 0.0
+  - -10.147014
+  - 7.915487
+  - 0.000000
   position:
-  - -3.965
-  - -5.153
-  - 1.4824
+  - -3.965000
+  - -5.153000
+  - 1.482400
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_309
   orientation:
-  - -9.064215660095215
-  - 8.49645709991455
-  - 0.0
+  - -9.064216
+  - 8.496457
+  - 0.000000
   position:
-  - -4.275
-  - -4.616
-  - 1.3832
+  - -4.275000
+  - -4.616000
+  - 1.383200
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_310
   orientation:
-  - -7.992470741271973
-  - 9.080634117126465
-  - 0.0
+  - -7.992471
+  - 9.080634
+  - 0.000000
   position:
-  - -4.585
-  - -4.079
-  - 1.3128
+  - -4.585000
+  - -4.079000
+  - 1.312800
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_311
   orientation:
-  - -6.929584503173828
-  - 9.669402122497559
-  - 0.0
+  - -6.929585
+  - 9.669402
+  - 0.000000
   position:
-  - -4.895
-  - -3.542
-  - 1.2707
+  - -4.895000
+  - -3.542000
+  - 1.270700
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_312
   orientation:
-  - -5.873528003692627
-  - 10.264215469360352
-  - 0.0
+  - -5.873528
+  - 10.264215
+  - 0.000000
   position:
-  - -5.205
-  - -3.005
-  - 1.2567
+  - -5.205000
+  - -3.005000
+  - 1.256700
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_313
   orientation:
-  - -4.822336196899414
-  - 10.866551399230957
-  - 0.0
+  - -4.822336
+  - 10.866551
+  - 0.000000
   position:
-  - -5.515
-  - -2.468
-  - 1.2707
+  - -5.515000
+  - -2.468000
+  - 1.270700
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_314
   orientation:
-  - -3.7741103172302246
-  - 11.477986335754395
-  - 0.0
+  - -3.774110
+  - 11.477986
+  - 0.000000
   position:
-  - -5.825
-  - -1.931
-  - 1.3128
+  - -5.825000
+  - -1.931000
+  - 1.312800
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_315
   orientation:
-  - -2.7269585132598877
-  - 12.100172996520996
-  - 0.0
+  - -2.726959
+  - 12.100173
+  - 0.000000
   position:
-  - -6.135
-  - -1.394
-  - 1.3832
+  - -6.135000
+  - -1.394000
+  - 1.383200
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_316
   orientation:
-  - -1.678987979888916
-  - 12.734906196594238
-  - 0.0
+  - -1.678988
+  - 12.734906
+  - 0.000000
   position:
-  - -6.445
-  - -0.857
-  - 1.4823
+  - -6.445000
+  - -0.857000
+  - 1.482300
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_317
   orientation:
-  - -0.6302310228347778
-  - 13.384267807006836
-  - 0.0
+  - -0.630231
+  - 13.384268
+  - 0.000000
   position:
-  - -6.755
-  - -0.321
-  - 1.6109
+  - -6.755000
+  - -0.321000
+  - 1.610900
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_318
   orientation:
-  - 0.6135826110839844
-  - 2.2466413974761963
-  - 0.0
+  - 0.613583
+  - 2.246641
+  - 0.000000
   position:
-  - -1.175
-  - 0.321
-  - 0.0495
+  - -1.175000
+  - 0.321000
+  - 0.049500
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_319
   orientation:
-  - 1.6383247375488281
-  - 1.654299020767212
-  - 0.0
+  - 1.638325
+  - 1.654299
+  - 0.000000
   position:
-  - -0.865
-  - 0.857
-  - 0.0495
+  - -0.865000
+  - 0.857000
+  - 0.049500
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_320
   orientation:
-  - 0.6142154335975647
-  - 3.436824083328247
-  - 0.0
+  - 0.614215
+  - 3.436824
+  - 0.000000
   position:
-  - -1.795
-  - 0.321
-  - 0.1112
+  - -1.795000
+  - 0.321000
+  - 0.111200
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_321
   orientation:
-  - 1.6396613121032715
-  - 2.8431291580200195
-  - 0.0
+  - 1.639661
+  - 2.843129
+  - 0.000000
   position:
-  - -1.485
-  - 0.857
-  - 0.0983
+  - -1.485000
+  - 0.857000
+  - 0.098300
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_322
   orientation:
-  - 2.6682560443878174
-  - 2.251274585723877
-  - 0.0
+  - 2.668256
+  - 2.251275
+  - 0.000000
   position:
-  - -1.175
-  - 1.394
-  - 0.1112
+  - -1.175000
+  - 1.394000
+  - 0.111200
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_323
   orientation:
-  - 0.6151226162910461
-  - 4.633017063140869
-  - 0.0
+  - 0.615123
+  - 4.633017
+  - 0.000000
   position:
-  - -2.415
-  - 0.321
-  - 0.1992
+  - -2.415000
+  - 0.321000
+  - 0.199200
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_324
   orientation:
-  - 1.641720175743103
-  - 4.0369062423706055
-  - 0.0
+  - 1.641720
+  - 4.036906
+  - 0.000000
   position:
-  - -2.105
-  - 0.857
-  - 0.1732
+  - -2.105000
+  - 0.857000
+  - 0.173200
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_325
   orientation:
-  - 2.6710312366485596
-  - 3.44395112991333
-  - 0.0
+  - 2.671031
+  - 3.443951
+  - 0.000000
   position:
-  - -1.795
-  - 1.394
-  - 0.1732
+  - -1.795000
+  - 1.394000
+  - 0.173200
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_326
   orientation:
-  - 3.702812910079956
-  - 2.8527297973632812
-  - 0.0
+  - 3.702813
+  - 2.852730
+  - 0.000000
   position:
-  - -1.485
-  - 1.931
-  - 0.1991
+  - -1.485000
+  - 1.931000
+  - 0.199100
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_327
   orientation:
-  - 0.6163089275360107
-  - 5.837413787841797
-  - 0.0
+  - 0.616309
+  - 5.837414
+  - 0.000000
   position:
-  - -3.035
-  - 0.321
-  - 0.3138
+  - -3.035000
+  - 0.321000
+  - 0.313800
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_328
   orientation:
-  - 1.644514799118042
-  - 5.237786769866943
-  - 0.0
+  - 1.644515
+  - 5.237787
+  - 0.000000
   position:
-  - -2.725
-  - 0.857
-  - 0.2745
+  - -2.725000
+  - 0.857000
+  - 0.274500
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_329
   orientation:
-  - 2.674996852874756
-  - 4.642679691314697
-  - 0.0
+  - 2.674997
+  - 4.642680
+  - 0.000000
   position:
-  - -2.415
-  - 1.394
-  - 0.2615
+  - -2.415000
+  - 1.394000
+  - 0.261500
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_330
   orientation:
-  - 3.7075138092041016
-  - 4.05061674118042
-  - 0.0
+  - 3.707514
+  - 4.050617
+  - 0.000000
   position:
-  - -2.105
-  - 1.931
-  - 0.2745
+  - -2.105000
+  - 1.931000
+  - 0.274500
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_331
   orientation:
-  - 4.743788242340088
-  - 3.4602110385894775
-  - 0.0
+  - 4.743788
+  - 3.460211
+  - 0.000000
   position:
-  - -1.795
-  - 2.468
-  - 0.3137
+  - -1.795000
+  - 2.468000
+  - 0.313700
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_332
   orientation:
-  - 0.6177871823310852
-  - 7.052373886108398
-  - 0.0
+  - 0.617787
+  - 7.052374
+  - 0.000000
   position:
-  - -3.655
-  - 0.321
-  - 0.4557
+  - -3.655000
+  - 0.321000
+  - 0.455700
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_333
   orientation:
-  - 1.648080825805664
-  - 6.448084354400635
-  - 0.0
+  - 1.648081
+  - 6.448084
+  - 0.000000
   position:
-  - -3.345
-  - 0.857
-  - 0.4029
+  - -3.345000
+  - 0.857000
+  - 0.402900
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_334
   orientation:
-  - 2.6801846027374268
-  - 5.849682807922363
-  - 0.0
+  - 2.680185
+  - 5.849683
+  - 0.000000
   position:
-  - -3.035
-  - 1.394
-  - 0.3765
+  - -3.035000
+  - 1.394000
+  - 0.376500
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_335
   orientation:
-  - 3.713897943496704
-  - 5.255720615386963
-  - 0.0
+  - 3.713898
+  - 5.255721
+  - 0.000000
   position:
-  - -2.725
-  - 1.931
-  - 0.3765
+  - -2.725000
+  - 1.931000
+  - 0.376500
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_336
   orientation:
-  - 4.75095272064209
-  - 4.664762496948242
-  - 0.0
+  - 4.750953
+  - 4.664762
+  - 0.000000
   position:
-  - -2.415
-  - 2.468
-  - 0.4029
+  - -2.415000
+  - 2.468000
+  - 0.402900
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_337
   orientation:
-  - 5.79307222366333
-  - 4.075362682342529
-  - 0.0
+  - 5.793072
+  - 4.075363
+  - 0.000000
   position:
-  - -2.105
-  - 3.005
-  - 0.4556
+  - -2.105000
+  - 3.005000
+  - 0.455600
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_338
   orientation:
-  - 0.6195722818374634
-  - 8.28042984008789
-  - 0.0
+  - 0.619572
+  - 8.280430
+  - 0.000000
   position:
-  - -4.275
-  - 0.321
-  - 0.6257
+  - -4.275000
+  - 0.321000
+  - 0.625700
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_339
   orientation:
-  - 1.6524404287338257
-  - 7.670198440551758
-  - 0.0
+  - 1.652440
+  - 7.670198
+  - 0.000000
   position:
-  - -3.965
-  - 0.857
-  - 0.5589
+  - -3.965000
+  - 0.857000
+  - 0.558900
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_340
   orientation:
-  - 2.6866674423217773
-  - 7.067386150360107
-  - 0.0
+  - 2.686667
+  - 7.067386
+  - 0.000000
   position:
-  - -3.655
-  - 1.394
-  - 0.5191
+  - -3.655000
+  - 1.394000
+  - 0.519100
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_341
   orientation:
-  - 3.722043752670288
-  - 6.470389366149902
-  - 0.0
+  - 3.722044
+  - 6.470389
+  - 0.000000
   position:
-  - -3.345
-  - 1.931
-  - 0.5058
+  - -3.345000
+  - 1.931000
+  - 0.505800
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_342
   orientation:
-  - 4.7603278160095215
-  - 5.877780437469482
-  - 0.0
+  - 4.760328
+  - 5.877780
+  - 0.000000
   position:
-  - -3.035
-  - 2.468
-  - 0.5191
+  - -3.035000
+  - 2.468000
+  - 0.519100
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_343
   orientation:
-  - 5.803260326385498
-  - 5.288098335266113
-  - 0.0
+  - 5.803260
+  - 5.288098
+  - 0.000000
   position:
-  - -2.725
-  - 3.005
-  - 0.5589
+  - -2.725000
+  - 3.005000
+  - 0.558900
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_344
   orientation:
-  - 6.8526997566223145
-  - 4.6999711990356445
-  - 0.0
+  - 6.852700
+  - 4.699971
+  - 0.000000
   position:
-  - -2.415
-  - 3.542
-  - 0.6256
+  - -2.415000
+  - 3.542000
+  - 0.625600
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_345
   orientation:
-  - 0.6216824054718018
-  - 9.524348258972168
-  - 0.0
+  - 0.621682
+  - 9.524348
+  - 0.000000
   position:
-  - -4.895
-  - 0.321
-  - 0.8248
+  - -4.895000
+  - 0.321000
+  - 0.824800
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_346
   orientation:
-  - 1.6576545238494873
-  - 8.906854629516602
-  - 0.0
+  - 1.657655
+  - 8.906855
+  - 0.000000
   position:
-  - -4.585
-  - 0.857
-  - 0.7437
+  - -4.585000
+  - 0.857000
+  - 0.743700
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_347
   orientation:
-  - 2.6944825649261475
-  - 8.298286437988281
-  - 0.0
+  - 2.694483
+  - 8.298286
+  - 0.000000
   position:
-  - -4.275
-  - 1.394
-  - 0.6898
+  - -4.275000
+  - 1.394000
+  - 0.689800
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_348
   orientation:
-  - 3.7320175170898438
-  - 7.697088718414307
-  - 0.0
+  - 3.732018
+  - 7.697089
+  - 0.000000
   position:
-  - -3.965
-  - 1.931
-  - 0.663
+  - -3.965000
+  - 1.931000
+  - 0.663000
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_349
   orientation:
-  - 4.772012710571289
-  - 7.101699352264404
-  - 0.0
+  - 4.772013
+  - 7.101699
+  - 0.000000
   position:
-  - -3.655
-  - 2.468
-  - 0.663
+  - -3.655000
+  - 2.468000
+  - 0.663000
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_350
   orientation:
-  - 5.816249370574951
-  - 6.510661602020264
-  - 0.0
+  - 5.816249
+  - 6.510662
+  - 0.000000
   position:
-  - -3.345
-  - 3.005
-  - 0.6898
+  - -3.345000
+  - 3.005000
+  - 0.689800
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_351
   orientation:
-  - 6.866590976715088
-  - 5.922584533691406
-  - 0.0
+  - 6.866591
+  - 5.922585
+  - 0.000000
   position:
-  - -3.035
-  - 3.542
-  - 0.7437
+  - -3.035000
+  - 3.542000
+  - 0.743700
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_352
   orientation:
-  - 7.9249114990234375
-  - 5.336015701293945
-  - 0.0
+  - 7.924911
+  - 5.336016
+  - 0.000000
   position:
-  - -2.725
-  - 4.079
-  - 0.8248
+  - -2.725000
+  - 4.079000
+  - 0.824800
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_353
   orientation:
-  - 0.6241419315338135
-  - 10.787225723266602
-  - 0.0
+  - 0.624142
+  - 10.787226
+  - 0.000000
   position:
-  - -5.515
-  - 0.321
-  - 1.0543
+  - -5.515000
+  - 0.321000
+  - 1.054300
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_354
   orientation:
-  - 1.663766860961914
-  - 10.160926818847656
-  - 0.0
+  - 1.663767
+  - 10.160927
+  - 0.000000
   position:
-  - -5.205
-  - 0.857
-  - 0.9582
+  - -5.205000
+  - 0.857000
+  - 0.958200
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_355
   orientation:
-  - 2.7037363052368164
-  - 9.545255661010742
-  - 0.0
+  - 2.703736
+  - 9.545256
+  - 0.000000
   position:
-  - -4.895
-  - 1.394
-  - 0.8899
+  - -4.895000
+  - 1.394000
+  - 0.889900
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_356
   orientation:
-  - 3.743929386138916
-  - 8.9385404586792
-  - 0.0
+  - 3.743929
+  - 8.938540
+  - 0.000000
   position:
-  - -4.585
-  - 1.931
-  - 0.8491
+  - -4.585000
+  - 1.931000
+  - 0.849100
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_357
   orientation:
-  - 4.786137580871582
-  - 8.33916187286377
-  - 0.0
+  - 4.786138
+  - 8.339162
+  - 0.000000
   position:
-  - -4.275
-  - 2.468
-  - 0.8355
+  - -4.275000
+  - 2.468000
+  - 0.835500
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_358
   orientation:
-  - 5.832180976867676
-  - 7.745632648468018
-  - 0.0
+  - 5.832181
+  - 7.745633
+  - 0.000000
   position:
-  - -3.965
-  - 3.005
-  - 0.8491
+  - -3.965000
+  - 3.005000
+  - 0.849100
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_359
   orientation:
-  - 6.883893966674805
-  - 7.156482219696045
-  - 0.0
+  - 6.883894
+  - 7.156482
+  - 0.000000
   position:
-  - -3.655
-  - 3.542
-  - 0.8899
+  - -3.655000
+  - 3.542000
+  - 0.889900
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_360
   orientation:
-  - 7.943212032318115
-  - 6.570308208465576
-  - 0.0
+  - 7.943212
+  - 6.570308
+  - 0.000000
   position:
-  - -3.345
-  - 4.079
-  - 0.9582
+  - -3.345000
+  - 4.079000
+  - 0.958200
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_361
   orientation:
-  - 9.01213550567627
-  - 5.985677242279053
-  - 0.0
+  - 9.012136
+  - 5.985677
+  - 0.000000
   position:
-  - -3.035
-  - 4.616
-  - 1.0543
+  - -3.035000
+  - 4.616000
+  - 1.054300
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_362
   orientation:
-  - 0.6269794702529907
-  - 12.072535514831543
-  - 0.0
+  - 0.626979
+  - 12.072536
+  - 0.000000
   position:
-  - -6.135
-  - 0.321
-  - 1.3157
+  - -6.135000
+  - 0.321000
+  - 1.315700
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_363
   orientation:
-  - 1.6708470582962036
-  - 11.435687065124512
-  - 0.0
+  - 1.670847
+  - 11.435687
+  - 0.000000
   position:
-  - -5.825
-  - 0.857
-  - 1.2038
+  - -5.825000
+  - 0.857000
+  - 1.203800
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_364
   orientation:
-  - 2.7145180702209473
-  - 10.811371803283691
-  - 0.0
+  - 2.714518
+  - 10.811372
+  - 0.000000
   position:
-  - -5.515
-  - 1.394
-  - 1.1205
+  - -5.515000
+  - 1.394000
+  - 1.120500
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_365
   orientation:
-  - 3.7579030990600586
-  - 10.197713851928711
-  - 0.0
+  - 3.757903
+  - 10.197714
+  - 0.000000
   position:
-  - -5.205
-  - 1.931
-  - 1.0652
+  - -5.205000
+  - 1.931000
+  - 1.065200
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_366
   orientation:
-  - 4.802844047546387
-  - 9.593031883239746
-  - 0.0
+  - 4.802844
+  - 9.593032
+  - 0.000000
   position:
-  - -4.895
-  - 2.468
-  - 1.0376
+  - -4.895000
+  - 2.468000
+  - 1.037600
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_367
   orientation:
-  - 5.851190090179443
-  - 8.995767593383789
-  - 0.0
+  - 5.851190
+  - 8.995768
+  - 0.000000
   position:
-  - -4.585
-  - 3.005
-  - 1.0376
+  - -4.585000
+  - 3.005000
+  - 1.037600
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_368
   orientation:
-  - 6.904815196990967
-  - 8.404419898986816
-  - 0.0
+  - 6.904815
+  - 8.404420
+  - 0.000000
   position:
-  - -4.275
-  - 3.542
-  - 1.0652
+  - -4.275000
+  - 3.542000
+  - 1.065200
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_369
   orientation:
-  - 7.965643405914307
-  - 7.817528247833252
-  - 0.0
+  - 7.965643
+  - 7.817528
+  - 0.000000
   position:
-  - -3.965
-  - 4.079
-  - 1.1205
+  - -3.965000
+  - 4.079000
+  - 1.120500
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_370
   orientation:
-  - 9.035722732543945
-  - 7.2336955070495605
-  - 0.0
+  - 9.035723
+  - 7.233696
+  - 0.000000
   position:
-  - -3.655
-  - 4.616
-  - 1.2039
+  - -3.655000
+  - 4.616000
+  - 1.203900
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_371
   orientation:
-  - 10.117194175720215
-  - 6.651488780975342
-  - 0.0
+  - 10.117194
+  - 6.651489
+  - 0.000000
   position:
-  - -3.345
-  - 5.153
-  - 1.3158
+  - -3.345000
+  - 5.153000
+  - 1.315800
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_372
   orientation:
-  - 0.6302310228347778
-  - 13.384267807006836
-  - 0.0
+  - 0.630231
+  - 13.384268
+  - 0.000000
   position:
-  - -6.755
-  - 0.321
-  - 1.6109
+  - -6.755000
+  - 0.321000
+  - 1.610900
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_373
   orientation:
-  - 1.678987979888916
-  - 12.734906196594238
-  - 0.0
+  - 1.678988
+  - 12.734906
+  - 0.000000
   position:
-  - -6.445
-  - 0.857
-  - 1.4823
+  - -6.445000
+  - 0.857000
+  - 1.482300
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_374
   orientation:
-  - 2.7269585132598877
-  - 12.100172996520996
-  - 0.0
+  - 2.726959
+  - 12.100173
+  - 0.000000
   position:
-  - -6.135
-  - 1.394
-  - 1.3832
+  - -6.135000
+  - 1.394000
+  - 1.383200
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_375
   orientation:
-  - 3.7741103172302246
-  - 11.477986335754395
-  - 0.0
+  - 3.774110
+  - 11.477986
+  - 0.000000
   position:
-  - -5.825
-  - 1.931
-  - 1.3128
+  - -5.825000
+  - 1.931000
+  - 1.312800
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_376
   orientation:
-  - 4.822336196899414
-  - 10.866551399230957
-  - 0.0
+  - 4.822336
+  - 10.866551
+  - 0.000000
   position:
-  - -5.515
-  - 2.468
-  - 1.2707
+  - -5.515000
+  - 2.468000
+  - 1.270700
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_377
   orientation:
-  - 5.873528003692627
-  - 10.264215469360352
-  - 0.0
+  - 5.873528
+  - 10.264215
+  - 0.000000
   position:
-  - -5.205
-  - 3.005
-  - 1.2567
+  - -5.205000
+  - 3.005000
+  - 1.256700
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_378
   orientation:
-  - 6.929584503173828
-  - 9.669402122497559
-  - 0.0
+  - 6.929585
+  - 9.669402
+  - 0.000000
   position:
-  - -4.895
-  - 3.542
-  - 1.2707
+  - -4.895000
+  - 3.542000
+  - 1.270700
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_379
   orientation:
-  - 7.992470741271973
-  - 9.080634117126465
-  - 0.0
+  - 7.992471
+  - 9.080634
+  - 0.000000
   position:
-  - -4.585
-  - 4.079
-  - 1.3128
+  - -4.585000
+  - 4.079000
+  - 1.312800
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_380
   orientation:
-  - 9.064215660095215
-  - 8.49645709991455
-  - 0.0
+  - 9.064216
+  - 8.496457
+  - 0.000000
   position:
-  - -4.275
-  - 4.616
-  - 1.3832
+  - -4.275000
+  - 4.616000
+  - 1.383200
   template: spherical_30m
 - aperture:
-    radius: 0.3
+    radius: 0.300000
     type: circular
   id: M_381
   orientation:
-  - 10.147013664245605
-  - 7.915486812591553
-  - 0.0
+  - 10.147014
+  - 7.915487
+  - 0.000000
   position:
-  - -3.965
-  - 5.153
-  - 1.4824
+  - -3.965000
+  - 5.153000
+  - 1.482400
   template: spherical_30m
 obstructions:
 - id: Main_Mast_0
   p1:
-  - 3.423
-  - 5.93
-  - 1.224
+  - 3.423000
+  - 5.930000
+  - 1.224000
   p2:
-  - 0.577
-  - 1.0
-  - 15.555
-  r: 0.0841
+  - 0.577000
+  - 1.000000
+  - 15.555000
+  r: 0.084100
   type: cylinder
 - id: Main_Mast_1
   p1:
-  - -3.423
-  - 5.93
-  - 1.224
+  - -3.423000
+  - 5.930000
+  - 1.224000
   p2:
-  - -0.577
-  - 1.0
-  - 15.555
-  r: 0.0841
+  - -0.577000
+  - 1.000000
+  - 15.555000
+  r: 0.084100
   type: cylinder
 - id: Main_Mast_2
   p1:
-  - 3.423
-  - -5.93
-  - 1.224
+  - 3.423000
+  - -5.930000
+  - 1.224000
   p2:
-  - 0.577
-  - -1.0
-  - 15.555
-  r: 0.0841
+  - 0.577000
+  - -1.000000
+  - 15.555000
+  r: 0.084100
   type: cylinder
 - id: Main_Mast_3
   p1:
-  - -3.423
-  - -5.93
-  - 1.224
+  - -3.423000
+  - -5.930000
+  - 1.224000
   p2:
-  - -0.577
-  - -1.0
-  - 15.555
-  r: 0.0841
+  - -0.577000
+  - -1.000000
+  - 15.555000
+  r: 0.084100
   type: cylinder
 - id: Interconnecting_Mast_0
   p1:
-  - 2.053
-  - 3.556
-  - 8.054
+  - 2.053000
+  - 3.556000
+  - 8.054000
   p2:
-  - 2.053
-  - -3.556
-  - 8.054
-  r: 0.0635
+  - 2.053000
+  - -3.556000
+  - 8.054000
+  r: 0.063500
   type: cylinder
 - id: Interconnecting_Mast_1
   p1:
-  - 2.053
-  - -3.556
-  - 8.054
+  - 2.053000
+  - -3.556000
+  - 8.054000
   p2:
-  - -2.053
-  - -3.556
-  - 8.054
-  r: 0.0635
+  - -2.053000
+  - -3.556000
+  - 8.054000
+  r: 0.063500
   type: cylinder
 - id: Interconnecting_Mast_2
   p1:
-  - -2.053
-  - -3.556
-  - 8.054
+  - -2.053000
+  - -3.556000
+  - 8.054000
   p2:
-  - -2.053
-  - 3.556
-  - 8.054
-  r: 0.0635
+  - -2.053000
+  - 3.556000
+  - 8.054000
+  r: 0.063500
   type: cylinder
 - id: Interconnecting_Mast_3
   p1:
-  - -2.053
-  - 3.556
-  - 8.054
+  - -2.053000
+  - 3.556000
+  - 8.054000
   p2:
-  - 2.053
-  - 3.556
-  - 8.054
-  r: 0.0635
+  - 2.053000
+  - 3.556000
+  - 8.054000
+  r: 0.063500
   type: cylinder
 - id: Stabilizing_String_0
   p1:
-  - 3.423
-  - 5.93
-  - 1.224
+  - 3.423000
+  - 5.930000
+  - 1.224000
   p2:
-  - -2.053
-  - 3.556
-  - 8.054
-  r: 0.012
+  - -2.053000
+  - 3.556000
+  - 8.054000
+  r: 0.012000
   type: cylinder
 - id: Stabilizing_String_1
   p1:
-  - -3.423
-  - 5.93
-  - 1.224
+  - -3.423000
+  - 5.930000
+  - 1.224000
   p2:
-  - 2.053
-  - 3.556
-  - 8.054
-  r: 0.012
+  - 2.053000
+  - 3.556000
+  - 8.054000
+  r: 0.012000
   type: cylinder
 - id: Stabilizing_String_2
   p1:
-  - 3.423
-  - -5.93
-  - 1.224
+  - 3.423000
+  - -5.930000
+  - 1.224000
   p2:
-  - -2.053
-  - -3.556
-  - 8.054
-  r: 0.012
+  - -2.053000
+  - -3.556000
+  - 8.054000
+  r: 0.012000
   type: cylinder
 - id: Stabilizing_String_3
   p1:
-  - -3.423
-  - -5.93
-  - 1.224
+  - -3.423000
+  - -5.930000
+  - 1.224000
   p2:
-  - 2.053
-  - -3.556
-  - 8.054
-  r: 0.012
+  - 2.053000
+  - -3.556000
+  - 8.054000
+  r: 0.012000
   type: cylinder
 - id: Stabilizing_String_4
   p1:
-  - 3.423
-  - 5.93
-  - 1.224
+  - 3.423000
+  - 5.930000
+  - 1.224000
   p2:
-  - 2.053
-  - -3.556
-  - 8.054
-  r: 0.006
+  - 2.053000
+  - -3.556000
+  - 8.054000
+  r: 0.006000
   type: cylinder
 - id: Stabilizing_String_5
   p1:
-  - 3.423
-  - -5.93
-  - 1.224
+  - 3.423000
+  - -5.930000
+  - 1.224000
   p2:
-  - 2.053
-  - 3.556
-  - 8.054
-  r: 0.006
+  - 2.053000
+  - 3.556000
+  - 8.054000
+  r: 0.006000
   type: cylinder
 - id: Stabilizing_String_6
   p1:
-  - -3.423
-  - 5.93
-  - 1.224
+  - -3.423000
+  - 5.930000
+  - 1.224000
   p2:
-  - -2.053
-  - -3.556
-  - 8.054
-  r: 0.006
+  - -2.053000
+  - -3.556000
+  - 8.054000
+  r: 0.006000
   type: cylinder
 - id: Stabilizing_String_7
   p1:
-  - -3.423
-  - -5.93
-  - 1.224
+  - -3.423000
+  - -5.930000
+  - 1.224000
   p2:
-  - -2.053
-  - 3.556
-  - 8.054
-  r: 0.006
+  - -2.053000
+  - 3.556000
+  - 8.054000
+  r: 0.006000
   type: cylinder
 - id: Stabilizing_String_8
   p1:
-  - 2.053
-  - 3.556
-  - 8.054
+  - 2.053000
+  - 3.556000
+  - 8.054000
   p2:
-  - -0.577
-  - 1.0
-  - 15.555
-  r: 0.012
+  - -0.577000
+  - 1.000000
+  - 15.555000
+  r: 0.012000
   type: cylinder
 - id: Stabilizing_String_9
   p1:
-  - -2.053
-  - 3.556
-  - 8.054
+  - -2.053000
+  - 3.556000
+  - 8.054000
   p2:
-  - 0.577
-  - 1.0
-  - 15.555
-  r: 0.012
+  - 0.577000
+  - 1.000000
+  - 15.555000
+  r: 0.012000
   type: cylinder
 - id: Stabilizing_String_10
   p1:
-  - 2.053
-  - -3.556
-  - 8.054
+  - 2.053000
+  - -3.556000
+  - 8.054000
   p2:
-  - -0.577
-  - -1.0
-  - 15.555
-  r: 0.012
+  - -0.577000
+  - -1.000000
+  - 15.555000
+  r: 0.012000
   type: cylinder
 - id: Stabilizing_String_11
   p1:
-  - -2.053
-  - -3.556
-  - 8.054
+  - -2.053000
+  - -3.556000
+  - 8.054000
   p2:
-  - 0.577
-  - -1.0
-  - 15.555
-  r: 0.012
+  - 0.577000
+  - -1.000000
+  - 15.555000
+  r: 0.012000
   type: cylinder
 - id: Stabilizing_String_12
   p1:
-  - 2.053
-  - 3.556
-  - 8.054
+  - 2.053000
+  - 3.556000
+  - 8.054000
   p2:
-  - 0.577
-  - -1.0
-  - 15.555
-  r: 0.006
+  - 0.577000
+  - -1.000000
+  - 15.555000
+  r: 0.006000
   type: cylinder
 - id: Stabilizing_String_13
   p1:
-  - 2.053
-  - -3.556
-  - 8.054
+  - 2.053000
+  - -3.556000
+  - 8.054000
   p2:
-  - 0.577
-  - 1.0
-  - 15.555
-  r: 0.006
+  - 0.577000
+  - 1.000000
+  - 15.555000
+  r: 0.006000
   type: cylinder
 - id: Stabilizing_String_14
   p1:
-  - -2.053
-  - 3.556
-  - 8.054
+  - -2.053000
+  - 3.556000
+  - 8.054000
   p2:
-  - -0.577
-  - -1.0
-  - 15.555
-  r: 0.006
+  - -0.577000
+  - -1.000000
+  - 15.555000
+  r: 0.006000
   type: cylinder
 - id: Stabilizing_String_15
   p1:
-  - -2.053
-  - -3.556
-  - 8.054
+  - -2.053000
+  - -3.556000
+  - 8.054000
   p2:
-  - -0.577
-  - 1.0
-  - 15.555
-  r: 0.006
+  - -0.577000
+  - 1.000000
+  - 15.555000
+  r: 0.006000
   type: cylinder
 - id: Camera_Mounting_Frame_0
   p1:
-  - 1.0
-  - 0.577
-  - 15.555
+  - 1.000000
+  - 0.577000
+  - 15.555000
   p2:
-  - 1.0
-  - -0.577
-  - 15.555
-  r: 0.1
+  - 1.000000
+  - -0.577000
+  - 15.555000
+  r: 0.100000
   type: cylinder
 - id: Camera_Mounting_Frame_1
   p1:
-  - 1.0
-  - -0.577
-  - 15.555
+  - 1.000000
+  - -0.577000
+  - 15.555000
   p2:
-  - 0.577
-  - -1.0
-  - 15.555
-  r: 0.1
+  - 0.577000
+  - -1.000000
+  - 15.555000
+  r: 0.100000
   type: cylinder
 - id: Camera_Mounting_Frame_2
   p1:
-  - 0.577
-  - -1.0
-  - 15.555
+  - 0.577000
+  - -1.000000
+  - 15.555000
   p2:
-  - -0.577
-  - -1.0
-  - 15.555
-  r: 0.1
+  - -0.577000
+  - -1.000000
+  - 15.555000
+  r: 0.100000
   type: cylinder
 - id: Camera_Mounting_Frame_3
   p1:
-  - -0.577
-  - -1.0
-  - 15.555
+  - -0.577000
+  - -1.000000
+  - 15.555000
   p2:
-  - -1.0
-  - -0.577
-  - 15.555
-  r: 0.1
+  - -1.000000
+  - -0.577000
+  - 15.555000
+  r: 0.100000
   type: cylinder
 - id: Camera_Mounting_Frame_4
   p1:
-  - -1.0
-  - -0.577
-  - 15.555
+  - -1.000000
+  - -0.577000
+  - 15.555000
   p2:
-  - -1.0
-  - 0.577
-  - 15.555
-  r: 0.1
+  - -1.000000
+  - 0.577000
+  - 15.555000
+  r: 0.100000
   type: cylinder
 - id: Camera_Mounting_Frame_5
   p1:
-  - -1.0
-  - 0.577
-  - 15.555
+  - -1.000000
+  - 0.577000
+  - 15.555000
   p2:
-  - -0.577
-  - 1.0
-  - 15.555
-  r: 0.1
+  - -0.577000
+  - 1.000000
+  - 15.555000
+  r: 0.100000
   type: cylinder
 - id: Camera_Mounting_Frame_6
   p1:
-  - -0.577
-  - 1.0
-  - 15.555
+  - -0.577000
+  - 1.000000
+  - 15.555000
   p2:
-  - 0.577
-  - 1.0
-  - 15.555
-  r: 0.1
+  - 0.577000
+  - 1.000000
+  - 15.555000
+  r: 0.100000
   type: cylinder
 - id: Camera_Mounting_Frame_7
   p1:
-  - 0.577
-  - 1.0
-  - 15.555
+  - 0.577000
+  - 1.000000
+  - 15.555000
   p2:
-  - 1.0
-  - 0.577
-  - 15.555
-  r: 0.1
+  - 1.000000
+  - 0.577000
+  - 15.555000
+  r: 0.100000
   type: cylinder
 - id: Camera_Body
   p1:
-  - 0.0
-  - 0.0
-  - 15.0
+  - 0.000000
+  - 0.000000
+  - 15.000000
   p2:
-  - 0.0
-  - 0.0
-  - 16.555
-  r: 0.8
+  - 0.000000
+  - 0.000000
+  - 16.555000
+  r: 0.800000
   type: cylinder
 - id: Camera_Lid_Open
   p1:
-  - 0.0
-  - 1.25
-  - 14.28
+  - 0.000000
+  - 1.250000
+  - 14.280000
   p2:
-  - 0.0
-  - 1.0
-  - 14.2
-  r: 0.8
+  - 0.000000
+  - 1.000000
+  - 14.200000
+  r: 0.800000
   type: cylinder
-sensors:
-- centers_x:
-  - 0.6615
-  - 0.6195
-  - 0.5775
-  - 0.5355
-  - 0.6405
-  - 0.5985
-  - 0.5565
-  - 0.5145
-  - 0.6615
-  - 0.6195
-  - 0.5775
-  - 0.5355
-  - 0.6405
-  - 0.5985
-  - 0.5565
-  - 0.5145
-  - 0.6615
-  - 0.6195
-  - 0.5775
-  - 0.5355
-  - 0.6405
-  - 0.5985
-  - 0.5565
-  - 0.5145
-  - 0.6615
-  - 0.6195
-  - 0.5775
-  - 0.5355
-  - 0.6405
-  - 0.5985
-  - 0.5565
-  - 0.5145
-  - 0.6615
-  - 0.6195
-  - 0.5775
-  - 0.5355
-  - 0.6405
-  - 0.5985
-  - 0.5565
-  - 0.5145
-  - 0.6615
-  - 0.6195
-  - 0.5775
-  - 0.5355
-  - 0.6405
-  - 0.5985
-  - 0.5565
-  - 0.5145
-  - 0.6615
-  - 0.6195
-  - 0.5775
-  - 0.5355
-  - 0.6405
-  - 0.5985
-  - 0.5565
-  - 0.5145
-  - 0.6615
-  - 0.6195
-  - 0.5775
-  - 0.5355
-  - 0.6405
-  - 0.5985
-  - 0.5565
-  - 0.5145
-  - 0.6615
-  - 0.6195
-  - 0.5775
-  - 0.5355
-  - 0.6405
-  - 0.5985
-  - 0.5565
-  - 0.5145
-  - 0.6615
-  - 0.6195
-  - 0.5775
-  - 0.5355
-  - 0.6405
-  - 0.5985
-  - 0.5565
-  - 0.5145
-  - 0.4935
-  - 0.4515
-  - 0.4095
-  - 0.3675
-  - 0.4725
-  - 0.4305
-  - 0.3885
-  - 0.3465
-  - 0.4935
-  - 0.4515
-  - 0.4095
-  - 0.3675
-  - 0.4725
-  - 0.4305
-  - 0.3885
-  - 0.3465
-  - 0.4935
-  - 0.4515
-  - 0.4095
-  - 0.3675
-  - 0.4725
-  - 0.4305
-  - 0.3885
-  - 0.3465
-  - 0.4935
-  - 0.4515
-  - 0.4095
-  - 0.3675
-  - 0.4725
-  - 0.4305
-  - 0.3885
-  - 0.3465
-  - 0.4935
-  - 0.4515
-  - 0.4095
-  - 0.3675
-  - 0.4725
-  - 0.4305
-  - 0.3885
-  - 0.3465
-  - 0.4935
-  - 0.4515
-  - 0.4095
-  - 0.3675
-  - 0.4725
-  - 0.4305
-  - 0.3885
-  - 0.3465
-  - 0.4935
-  - 0.4515
-  - 0.4095
-  - 0.3675
-  - 0.4725
-  - 0.4305
-  - 0.3885
-  - 0.3465
-  - 0.4935
-  - 0.4515
-  - 0.4095
-  - 0.3675
-  - 0.4725
-  - 0.4305
-  - 0.3885
-  - 0.3465
-  - 0.4935
-  - 0.4515
-  - 0.4095
-  - 0.3675
-  - 0.4725
-  - 0.4305
-  - 0.3885
-  - 0.3465
-  - 0.4935
-  - 0.4515
-  - 0.4095
-  - 0.3675
-  - 0.4725
-  - 0.4305
-  - 0.3885
-  - 0.3465
-  - 0.4935
-  - 0.4515
-  - 0.4095
-  - 0.3675
-  - 0.4725
-  - 0.4305
-  - 0.3885
-  - 0.3465
-  - 0.4935
-  - 0.4515
-  - 0.4095
-  - 0.3675
-  - 0.4725
-  - 0.4305
-  - 0.3885
-  - 0.3465
-  - 0.4935
-  - 0.4515
-  - 0.4095
-  - 0.3675
-  - 0.4725
-  - 0.4305
-  - 0.3885
-  - 0.3465
-  - 0.4935
-  - 0.4515
-  - 0.4095
-  - 0.3675
-  - 0.4725
-  - 0.4305
-  - 0.3885
-  - 0.3465
-  - 0.3255
-  - 0.2835
-  - 0.2415
-  - 0.1995
-  - 0.3045
-  - 0.2625
-  - 0.2205
-  - 0.1785
-  - 0.3255
-  - 0.2835
-  - 0.2415
-  - 0.1995
-  - 0.3045
-  - 0.2625
-  - 0.2205
-  - 0.1785
-  - 0.3255
-  - 0.2835
-  - 0.2415
-  - 0.1995
-  - 0.3045
-  - 0.2625
-  - 0.2205
-  - 0.1785
-  - 0.3255
-  - 0.2835
-  - 0.2415
-  - 0.1995
-  - 0.3045
-  - 0.2625
-  - 0.2205
-  - 0.1785
-  - 0.3255
-  - 0.2835
-  - 0.2415
-  - 0.1995
-  - 0.3045
-  - 0.2625
-  - 0.2205
-  - 0.1785
-  - 0.3255
-  - 0.2835
-  - 0.2415
-  - 0.1995
-  - 0.3045
-  - 0.2625
-  - 0.2205
-  - 0.1785
-  - 0.3255
-  - 0.2835
-  - 0.2415
-  - 0.1995
-  - 0.3045
-  - 0.2625
-  - 0.2205
-  - 0.1785
-  - 0.3255
-  - 0.2835
-  - 0.2415
-  - 0.1995
-  - 0.3045
-  - 0.2625
-  - 0.2205
-  - 0.1785
-  - 0.3255
-  - 0.2835
-  - 0.2415
-  - 0.1995
-  - 0.3045
-  - 0.2625
-  - 0.2205
-  - 0.1785
-  - 0.3255
-  - 0.2835
-  - 0.2415
-  - 0.1995
-  - 0.3045
-  - 0.2625
-  - 0.2205
-  - 0.1785
-  - 0.3255
-  - 0.2835
-  - 0.2415
-  - 0.1995
-  - 0.3045
-  - 0.2625
-  - 0.2205
-  - 0.1785
-  - 0.3255
-  - 0.2835
-  - 0.2415
-  - 0.1995
-  - 0.3045
-  - 0.2625
-  - 0.2205
-  - 0.1785
-  - 0.3255
-  - 0.2835
-  - 0.2415
-  - 0.1995
-  - 0.3045
-  - 0.2625
-  - 0.2205
-  - 0.1785
-  - 0.3255
-  - 0.2835
-  - 0.2415
-  - 0.1995
-  - 0.3045
-  - 0.2625
-  - 0.2205
-  - 0.1785
-  - 0.3255
-  - 0.2835
-  - 0.2415
-  - 0.1995
-  - 0.3045
-  - 0.2625
-  - 0.2205
-  - 0.1785
-  - 0.3255
-  - 0.2835
-  - 0.2415
-  - 0.1995
-  - 0.3045
-  - 0.2625
-  - 0.2205
-  - 0.1785
-  - 0.3255
-  - 0.2835
-  - 0.2415
-  - 0.1995
-  - 0.3045
-  - 0.2625
-  - 0.2205
-  - 0.1785
-  - 0.3255
-  - 0.2835
-  - 0.2415
-  - 0.1995
-  - 0.3045
-  - 0.2625
-  - 0.2205
-  - 0.1785
-  - 0.1575
-  - 0.1155
-  - 0.0735
-  - 0.0315
-  - 0.1365
-  - 0.0945
-  - 0.0525
-  - 0.0105
-  - 0.1575
-  - 0.1155
-  - 0.0735
-  - 0.0315
-  - 0.1365
-  - 0.0945
-  - 0.0525
-  - 0.0105
-  - 0.1575
-  - 0.1155
-  - 0.0735
-  - 0.0315
-  - 0.1365
-  - 0.0945
-  - 0.0525
-  - 0.0105
-  - 0.1575
-  - 0.1155
-  - 0.0735
-  - 0.0315
-  - 0.1365
-  - 0.0945
-  - 0.0525
-  - 0.0105
-  - 0.1575
-  - 0.1155
-  - 0.0735
-  - 0.0315
-  - 0.1365
-  - 0.0945
-  - 0.0525
-  - 0.0105
-  - 0.1575
-  - 0.1155
-  - 0.0735
-  - 0.0315
-  - 0.1365
-  - 0.0945
-  - 0.0525
-  - 0.0105
-  - 0.1575
-  - 0.1155
-  - 0.0735
-  - 0.0315
-  - 0.1365
-  - 0.0945
-  - 0.0525
-  - 0.0105
-  - 0.1575
-  - 0.1155
-  - 0.0735
-  - 0.0315
-  - 0.1365
-  - 0.0945
-  - 0.0525
-  - 0.0105
-  - 0.1575
-  - 0.1155
-  - 0.0735
-  - 0.0315
-  - 0.1365
-  - 0.0945
-  - 0.0525
-  - 0.0105
-  - 0.1575
-  - 0.1155
-  - 0.0735
-  - 0.0315
-  - 0.1365
-  - 0.0945
-  - 0.0525
-  - 0.0105
-  - 0.1575
-  - 0.1155
-  - 0.0735
-  - 0.0315
-  - 0.1365
-  - 0.0945
-  - 0.0525
-  - 0.0105
-  - 0.1575
-  - 0.1155
-  - 0.0735
-  - 0.0315
-  - 0.1365
-  - 0.0945
-  - 0.0525
-  - 0.0105
-  - 0.1575
-  - 0.1155
-  - 0.0735
-  - 0.0315
-  - 0.1365
-  - 0.0945
-  - 0.0525
-  - 0.0105
-  - 0.1575
-  - 0.1155
-  - 0.0735
-  - 0.0315
-  - 0.1365
-  - 0.0945
-  - 0.0525
-  - 0.0105
-  - 0.1575
-  - 0.1155
-  - 0.0735
-  - 0.0315
-  - 0.1365
-  - 0.0945
-  - 0.0525
-  - 0.0105
-  - 0.1575
-  - 0.1155
-  - 0.0735
-  - 0.0315
-  - 0.1365
-  - 0.0945
-  - 0.0525
-  - 0.0105
-  - 0.1575
-  - 0.1155
-  - 0.0735
-  - 0.0315
-  - 0.1365
-  - 0.0945
-  - 0.0525
-  - 0.0105
-  - 0.1575
-  - 0.1155
-  - 0.0735
-  - 0.0315
-  - 0.1365
-  - 0.0945
-  - 0.0525
-  - 0.0105
-  - -0.0105
-  - -0.0525
-  - -0.0945
-  - -0.1365
-  - -0.0315
-  - -0.0735
-  - -0.1155
-  - -0.1575
-  - -0.0105
-  - -0.0525
-  - -0.0945
-  - -0.1365
-  - -0.0315
-  - -0.0735
-  - -0.1155
-  - -0.1575
-  - -0.0105
-  - -0.0525
-  - -0.0945
-  - -0.1365
-  - -0.0315
-  - -0.0735
-  - -0.1155
-  - -0.1575
-  - -0.0105
-  - -0.0525
-  - -0.0945
-  - -0.1365
-  - -0.0315
-  - -0.0735
-  - -0.1155
-  - -0.1575
-  - -0.0105
-  - -0.0525
-  - -0.0945
-  - -0.1365
-  - -0.0315
-  - -0.0735
-  - -0.1155
-  - -0.1575
-  - -0.0105
-  - -0.0525
-  - -0.0945
-  - -0.1365
-  - -0.0315
-  - -0.0735
-  - -0.1155
-  - -0.1575
-  - -0.0105
-  - -0.0525
-  - -0.0945
-  - -0.1365
-  - -0.0315
-  - -0.0735
-  - -0.1155
-  - -0.1575
-  - -0.0105
-  - -0.0525
-  - -0.0945
-  - -0.1365
-  - -0.0315
-  - -0.0735
-  - -0.1155
-  - -0.1575
-  - -0.0105
-  - -0.0525
-  - -0.0945
-  - -0.1365
-  - -0.0315
-  - -0.0735
-  - -0.1155
-  - -0.1575
-  - -0.0105
-  - -0.0525
-  - -0.0945
-  - -0.1365
-  - -0.0315
-  - -0.0735
-  - -0.1155
-  - -0.1575
-  - -0.0105
-  - -0.0525
-  - -0.0945
-  - -0.1365
-  - -0.0315
-  - -0.0735
-  - -0.1155
-  - -0.1575
-  - -0.0105
-  - -0.0525
-  - -0.0945
-  - -0.1365
-  - -0.0315
-  - -0.0735
-  - -0.1155
-  - -0.1575
-  - -0.0105
-  - -0.0525
-  - -0.0945
-  - -0.1365
-  - -0.0315
-  - -0.0735
-  - -0.1155
-  - -0.1575
-  - -0.0105
-  - -0.0525
-  - -0.0945
-  - -0.1365
-  - -0.0315
-  - -0.0735
-  - -0.1155
-  - -0.1575
-  - -0.0105
-  - -0.0525
-  - -0.0945
-  - -0.1365
-  - -0.0315
-  - -0.0735
-  - -0.1155
-  - -0.1575
-  - -0.0105
-  - -0.0525
-  - -0.0945
-  - -0.1365
-  - -0.0315
-  - -0.0735
-  - -0.1155
-  - -0.1575
-  - -0.0105
-  - -0.0525
-  - -0.0945
-  - -0.1365
-  - -0.0315
-  - -0.0735
-  - -0.1155
-  - -0.1575
-  - -0.0105
-  - -0.0525
-  - -0.0945
-  - -0.1365
-  - -0.0315
-  - -0.0735
-  - -0.1155
-  - -0.1575
-  - -0.1785
-  - -0.2205
-  - -0.2625
-  - -0.3045
-  - -0.1995
-  - -0.2415
-  - -0.2835
-  - -0.3255
-  - -0.1785
-  - -0.2205
-  - -0.2625
-  - -0.3045
-  - -0.1995
-  - -0.2415
-  - -0.2835
-  - -0.3255
-  - -0.1785
-  - -0.2205
-  - -0.2625
-  - -0.3045
-  - -0.1995
-  - -0.2415
-  - -0.2835
-  - -0.3255
-  - -0.1785
-  - -0.2205
-  - -0.2625
-  - -0.3045
-  - -0.1995
-  - -0.2415
-  - -0.2835
-  - -0.3255
-  - -0.1785
-  - -0.2205
-  - -0.2625
-  - -0.3045
-  - -0.1995
-  - -0.2415
-  - -0.2835
-  - -0.3255
-  - -0.1785
-  - -0.2205
-  - -0.2625
-  - -0.3045
-  - -0.1995
-  - -0.2415
-  - -0.2835
-  - -0.3255
-  - -0.1785
-  - -0.2205
-  - -0.2625
-  - -0.3045
-  - -0.1995
-  - -0.2415
-  - -0.2835
-  - -0.3255
-  - -0.1785
-  - -0.2205
-  - -0.2625
-  - -0.3045
-  - -0.1995
-  - -0.2415
-  - -0.2835
-  - -0.3255
-  - -0.1785
-  - -0.2205
-  - -0.2625
-  - -0.3045
-  - -0.1995
-  - -0.2415
-  - -0.2835
-  - -0.3255
-  - -0.1785
-  - -0.2205
-  - -0.2625
-  - -0.3045
-  - -0.1995
-  - -0.2415
-  - -0.2835
-  - -0.3255
-  - -0.1785
-  - -0.2205
-  - -0.2625
-  - -0.3045
-  - -0.1995
-  - -0.2415
-  - -0.2835
-  - -0.3255
-  - -0.1785
-  - -0.2205
-  - -0.2625
-  - -0.3045
-  - -0.1995
-  - -0.2415
-  - -0.2835
-  - -0.3255
-  - -0.1785
-  - -0.2205
-  - -0.2625
-  - -0.3045
-  - -0.1995
-  - -0.2415
-  - -0.2835
-  - -0.3255
-  - -0.1785
-  - -0.2205
-  - -0.2625
-  - -0.3045
-  - -0.1995
-  - -0.2415
-  - -0.2835
-  - -0.3255
-  - -0.1785
-  - -0.2205
-  - -0.2625
-  - -0.3045
-  - -0.1995
-  - -0.2415
-  - -0.2835
-  - -0.3255
-  - -0.1785
-  - -0.2205
-  - -0.2625
-  - -0.3045
-  - -0.1995
-  - -0.2415
-  - -0.2835
-  - -0.3255
-  - -0.1785
-  - -0.2205
-  - -0.2625
-  - -0.3045
-  - -0.1995
-  - -0.2415
-  - -0.2835
-  - -0.3255
-  - -0.1785
-  - -0.2205
-  - -0.2625
-  - -0.3045
-  - -0.1995
-  - -0.2415
-  - -0.2835
-  - -0.3255
-  - -0.3465
-  - -0.3885
-  - -0.4305
-  - -0.4725
-  - -0.3675
-  - -0.4095
-  - -0.4515
-  - -0.4935
-  - -0.3465
-  - -0.3885
-  - -0.4305
-  - -0.4725
-  - -0.3675
-  - -0.4095
-  - -0.4515
-  - -0.4935
-  - -0.3465
-  - -0.3885
-  - -0.4305
-  - -0.4725
-  - -0.3675
-  - -0.4095
-  - -0.4515
-  - -0.4935
-  - -0.3465
-  - -0.3885
-  - -0.4305
-  - -0.4725
-  - -0.3675
-  - -0.4095
-  - -0.4515
-  - -0.4935
-  - -0.3465
-  - -0.3885
-  - -0.4305
-  - -0.4725
-  - -0.3675
-  - -0.4095
-  - -0.4515
-  - -0.4935
-  - -0.3465
-  - -0.3885
-  - -0.4305
-  - -0.4725
-  - -0.3675
-  - -0.4095
-  - -0.4515
-  - -0.4935
-  - -0.3465
-  - -0.3885
-  - -0.4305
-  - -0.4725
-  - -0.3675
-  - -0.4095
-  - -0.4515
-  - -0.4935
-  - -0.3465
-  - -0.3885
-  - -0.4305
-  - -0.4725
-  - -0.3675
-  - -0.4095
-  - -0.4515
-  - -0.4935
-  - -0.3465
-  - -0.3885
-  - -0.4305
-  - -0.4725
-  - -0.3675
-  - -0.4095
-  - -0.4515
-  - -0.4935
-  - -0.3465
-  - -0.3885
-  - -0.4305
-  - -0.4725
-  - -0.3675
-  - -0.4095
-  - -0.4515
-  - -0.4935
-  - -0.3465
-  - -0.3885
-  - -0.4305
-  - -0.4725
-  - -0.3675
-  - -0.4095
-  - -0.4515
-  - -0.4935
-  - -0.3465
-  - -0.3885
-  - -0.4305
-  - -0.4725
-  - -0.3675
-  - -0.4095
-  - -0.4515
-  - -0.4935
-  - -0.3465
-  - -0.3885
-  - -0.4305
-  - -0.4725
-  - -0.3675
-  - -0.4095
-  - -0.4515
-  - -0.4935
-  - -0.3465
-  - -0.3885
-  - -0.4305
-  - -0.4725
-  - -0.3675
-  - -0.4095
-  - -0.4515
-  - -0.4935
-  - -0.5145
-  - -0.5565
-  - -0.5985
-  - -0.6405
-  - -0.5355
-  - -0.5775
-  - -0.6195
-  - -0.6615
-  - -0.5145
-  - -0.5565
-  - -0.5985
-  - -0.6405
-  - -0.5355
-  - -0.5775
-  - -0.6195
-  - -0.6615
-  - -0.5145
-  - -0.5565
-  - -0.5985
-  - -0.6405
-  - -0.5355
-  - -0.5775
-  - -0.6195
-  - -0.6615
-  - -0.5145
-  - -0.5565
-  - -0.5985
-  - -0.6405
-  - -0.5355
-  - -0.5775
-  - -0.6195
-  - -0.6615
-  - -0.5145
-  - -0.5565
-  - -0.5985
-  - -0.6405
-  - -0.5355
-  - -0.5775
-  - -0.6195
-  - -0.6615
-  - -0.5145
-  - -0.5565
-  - -0.5985
-  - -0.6405
-  - -0.5355
-  - -0.5775
-  - -0.6195
-  - -0.6615
-  - -0.5145
-  - -0.5565
-  - -0.5985
-  - -0.6405
-  - -0.5355
-  - -0.5775
-  - -0.6195
-  - -0.6615
-  - -0.5145
-  - -0.5565
-  - -0.5985
-  - -0.6405
-  - -0.5355
-  - -0.5775
-  - -0.6195
-  - -0.6615
-  - -0.5145
-  - -0.5565
-  - -0.5985
-  - -0.6405
-  - -0.5355
-  - -0.5775
-  - -0.6195
-  - -0.6615
-  - -0.5145
-  - -0.5565
-  - -0.5985
-  - -0.6405
-  - -0.5355
-  - -0.5775
-  - -0.6195
-  - -0.6615
-  centers_y:
-  - 0.3455
-  - 0.3455
-  - 0.3455
-  - 0.3455
-  - 0.3092
-  - 0.3092
-  - 0.3092
-  - 0.3092
-  - 0.2728
-  - 0.2728
-  - 0.2728
-  - 0.2728
-  - 0.2364
-  - 0.2364
-  - 0.2364
-  - 0.2364
-  - 0.2
-  - 0.2
-  - 0.2
-  - 0.2
-  - 0.1637
-  - 0.1637
-  - 0.1637
-  - 0.1637
-  - 0.1273
-  - 0.1273
-  - 0.1273
-  - 0.1273
-  - 0.0909
-  - 0.0909
-  - 0.0909
-  - 0.0909
-  - 0.0546
-  - 0.0546
-  - 0.0546
-  - 0.0546
-  - 0.0182
-  - 0.0182
-  - 0.0182
-  - 0.0182
-  - -0.0182
-  - -0.0182
-  - -0.0182
-  - -0.0182
-  - -0.0546
-  - -0.0546
-  - -0.0546
-  - -0.0546
-  - -0.0909
-  - -0.0909
-  - -0.0909
-  - -0.0909
-  - -0.1273
-  - -0.1273
-  - -0.1273
-  - -0.1273
-  - -0.1637
-  - -0.1637
-  - -0.1637
-  - -0.1637
-  - -0.2
-  - -0.2
-  - -0.2
-  - -0.2
-  - -0.2364
-  - -0.2364
-  - -0.2364
-  - -0.2364
-  - -0.2728
-  - -0.2728
-  - -0.2728
-  - -0.2728
-  - -0.3092
-  - -0.3092
-  - -0.3092
-  - -0.3092
-  - -0.3455
-  - -0.3455
-  - -0.3455
-  - -0.3455
-  - 0.491
-  - 0.491
-  - 0.491
-  - 0.491
-  - 0.4547
-  - 0.4547
-  - 0.4547
-  - 0.4547
-  - 0.4183
-  - 0.4183
-  - 0.4183
-  - 0.4183
-  - 0.3819
-  - 0.3819
-  - 0.3819
-  - 0.3819
-  - 0.3455
-  - 0.3455
-  - 0.3455
-  - 0.3455
-  - 0.3092
-  - 0.3092
-  - 0.3092
-  - 0.3092
-  - 0.2728
-  - 0.2728
-  - 0.2728
-  - 0.2728
-  - 0.2364
-  - 0.2364
-  - 0.2364
-  - 0.2364
-  - 0.2
-  - 0.2
-  - 0.2
-  - 0.2
-  - 0.1637
-  - 0.1637
-  - 0.1637
-  - 0.1637
-  - 0.1273
-  - 0.1273
-  - 0.1273
-  - 0.1273
-  - 0.0909
-  - 0.0909
-  - 0.0909
-  - 0.0909
-  - 0.0546
-  - 0.0546
-  - 0.0546
-  - 0.0546
-  - 0.0182
-  - 0.0182
-  - 0.0182
-  - 0.0182
-  - -0.0182
-  - -0.0182
-  - -0.0182
-  - -0.0182
-  - -0.0546
-  - -0.0546
-  - -0.0546
-  - -0.0546
-  - -0.0909
-  - -0.0909
-  - -0.0909
-  - -0.0909
-  - -0.1273
-  - -0.1273
-  - -0.1273
-  - -0.1273
-  - -0.1637
-  - -0.1637
-  - -0.1637
-  - -0.1637
-  - -0.2
-  - -0.2
-  - -0.2
-  - -0.2
-  - -0.2364
-  - -0.2364
-  - -0.2364
-  - -0.2364
-  - -0.2728
-  - -0.2728
-  - -0.2728
-  - -0.2728
-  - -0.3092
-  - -0.3092
-  - -0.3092
-  - -0.3092
-  - -0.3455
-  - -0.3455
-  - -0.3455
-  - -0.3455
-  - -0.3819
-  - -0.3819
-  - -0.3819
-  - -0.3819
-  - -0.4183
-  - -0.4183
-  - -0.4183
-  - -0.4183
-  - -0.4547
-  - -0.4547
-  - -0.4547
-  - -0.4547
-  - -0.491
-  - -0.491
-  - -0.491
-  - -0.491
-  - 0.6365
-  - 0.6365
-  - 0.6365
-  - 0.6365
-  - 0.6002
-  - 0.6002
-  - 0.6002
-  - 0.6002
-  - 0.5638
-  - 0.5638
-  - 0.5638
-  - 0.5638
-  - 0.5274
-  - 0.5274
-  - 0.5274
-  - 0.5274
-  - 0.491
-  - 0.491
-  - 0.491
-  - 0.491
-  - 0.4547
-  - 0.4547
-  - 0.4547
-  - 0.4547
-  - 0.4183
-  - 0.4183
-  - 0.4183
-  - 0.4183
-  - 0.3819
-  - 0.3819
-  - 0.3819
-  - 0.3819
-  - 0.3455
-  - 0.3455
-  - 0.3455
-  - 0.3455
-  - 0.3092
-  - 0.3092
-  - 0.3092
-  - 0.3092
-  - 0.2728
-  - 0.2728
-  - 0.2728
-  - 0.2728
-  - 0.2364
-  - 0.2364
-  - 0.2364
-  - 0.2364
-  - 0.2
-  - 0.2
-  - 0.2
-  - 0.2
-  - 0.1637
-  - 0.1637
-  - 0.1637
-  - 0.1637
-  - 0.1273
-  - 0.1273
-  - 0.1273
-  - 0.1273
-  - 0.0909
-  - 0.0909
-  - 0.0909
-  - 0.0909
-  - 0.0546
-  - 0.0546
-  - 0.0546
-  - 0.0546
-  - 0.0182
-  - 0.0182
-  - 0.0182
-  - 0.0182
-  - -0.0182
-  - -0.0182
-  - -0.0182
-  - -0.0182
-  - -0.0546
-  - -0.0546
-  - -0.0546
-  - -0.0546
-  - -0.0909
-  - -0.0909
-  - -0.0909
-  - -0.0909
-  - -0.1273
-  - -0.1273
-  - -0.1273
-  - -0.1273
-  - -0.1637
-  - -0.1637
-  - -0.1637
-  - -0.1637
-  - -0.2
-  - -0.2
-  - -0.2
-  - -0.2
-  - -0.2364
-  - -0.2364
-  - -0.2364
-  - -0.2364
-  - -0.2728
-  - -0.2728
-  - -0.2728
-  - -0.2728
-  - -0.3092
-  - -0.3092
-  - -0.3092
-  - -0.3092
-  - -0.3455
-  - -0.3455
-  - -0.3455
-  - -0.3455
-  - -0.3819
-  - -0.3819
-  - -0.3819
-  - -0.3819
-  - -0.4183
-  - -0.4183
-  - -0.4183
-  - -0.4183
-  - -0.4547
-  - -0.4547
-  - -0.4547
-  - -0.4547
-  - -0.491
-  - -0.491
-  - -0.491
-  - -0.491
-  - -0.5274
-  - -0.5274
-  - -0.5274
-  - -0.5274
-  - -0.5638
-  - -0.5638
-  - -0.5638
-  - -0.5638
-  - -0.6002
-  - -0.6002
-  - -0.6002
-  - -0.6002
-  - -0.6365
-  - -0.6365
-  - -0.6365
-  - -0.6365
-  - 0.6365
-  - 0.6365
-  - 0.6365
-  - 0.6365
-  - 0.6002
-  - 0.6002
-  - 0.6002
-  - 0.6002
-  - 0.5638
-  - 0.5638
-  - 0.5638
-  - 0.5638
-  - 0.5274
-  - 0.5274
-  - 0.5274
-  - 0.5274
-  - 0.491
-  - 0.491
-  - 0.491
-  - 0.491
-  - 0.4547
-  - 0.4547
-  - 0.4547
-  - 0.4547
-  - 0.4183
-  - 0.4183
-  - 0.4183
-  - 0.4183
-  - 0.3819
-  - 0.3819
-  - 0.3819
-  - 0.3819
-  - 0.3455
-  - 0.3455
-  - 0.3455
-  - 0.3455
-  - 0.3092
-  - 0.3092
-  - 0.3092
-  - 0.3092
-  - 0.2728
-  - 0.2728
-  - 0.2728
-  - 0.2728
-  - 0.2364
-  - 0.2364
-  - 0.2364
-  - 0.2364
-  - 0.2
-  - 0.2
-  - 0.2
-  - 0.2
-  - 0.1637
-  - 0.1637
-  - 0.1637
-  - 0.1637
-  - 0.1273
-  - 0.1273
-  - 0.1273
-  - 0.1273
-  - 0.0909
-  - 0.0909
-  - 0.0909
-  - 0.0909
-  - 0.0546
-  - 0.0546
-  - 0.0546
-  - 0.0546
-  - 0.0182
-  - 0.0182
-  - 0.0182
-  - 0.0182
-  - -0.0182
-  - -0.0182
-  - -0.0182
-  - -0.0182
-  - -0.0546
-  - -0.0546
-  - -0.0546
-  - -0.0546
-  - -0.0909
-  - -0.0909
-  - -0.0909
-  - -0.0909
-  - -0.1273
-  - -0.1273
-  - -0.1273
-  - -0.1273
-  - -0.1637
-  - -0.1637
-  - -0.1637
-  - -0.1637
-  - -0.2
-  - -0.2
-  - -0.2
-  - -0.2
-  - -0.2364
-  - -0.2364
-  - -0.2364
-  - -0.2364
-  - -0.2728
-  - -0.2728
-  - -0.2728
-  - -0.2728
-  - -0.3092
-  - -0.3092
-  - -0.3092
-  - -0.3092
-  - -0.3455
-  - -0.3455
-  - -0.3455
-  - -0.3455
-  - -0.3819
-  - -0.3819
-  - -0.3819
-  - -0.3819
-  - -0.4183
-  - -0.4183
-  - -0.4183
-  - -0.4183
-  - -0.4547
-  - -0.4547
-  - -0.4547
-  - -0.4547
-  - -0.491
-  - -0.491
-  - -0.491
-  - -0.491
-  - -0.5274
-  - -0.5274
-  - -0.5274
-  - -0.5274
-  - -0.5638
-  - -0.5638
-  - -0.5638
-  - -0.5638
-  - -0.6002
-  - -0.6002
-  - -0.6002
-  - -0.6002
-  - -0.6365
-  - -0.6365
-  - -0.6365
-  - -0.6365
-  - 0.6365
-  - 0.6365
-  - 0.6365
-  - 0.6365
-  - 0.6002
-  - 0.6002
-  - 0.6002
-  - 0.6002
-  - 0.5638
-  - 0.5638
-  - 0.5638
-  - 0.5638
-  - 0.5274
-  - 0.5274
-  - 0.5274
-  - 0.5274
-  - 0.491
-  - 0.491
-  - 0.491
-  - 0.491
-  - 0.4547
-  - 0.4547
-  - 0.4547
-  - 0.4547
-  - 0.4183
-  - 0.4183
-  - 0.4183
-  - 0.4183
-  - 0.3819
-  - 0.3819
-  - 0.3819
-  - 0.3819
-  - 0.3455
-  - 0.3455
-  - 0.3455
-  - 0.3455
-  - 0.3092
-  - 0.3092
-  - 0.3092
-  - 0.3092
-  - 0.2728
-  - 0.2728
-  - 0.2728
-  - 0.2728
-  - 0.2364
-  - 0.2364
-  - 0.2364
-  - 0.2364
-  - 0.2
-  - 0.2
-  - 0.2
-  - 0.2
-  - 0.1637
-  - 0.1637
-  - 0.1637
-  - 0.1637
-  - 0.1273
-  - 0.1273
-  - 0.1273
-  - 0.1273
-  - 0.0909
-  - 0.0909
-  - 0.0909
-  - 0.0909
-  - 0.0546
-  - 0.0546
-  - 0.0546
-  - 0.0546
-  - 0.0182
-  - 0.0182
-  - 0.0182
-  - 0.0182
-  - -0.0182
-  - -0.0182
-  - -0.0182
-  - -0.0182
-  - -0.0546
-  - -0.0546
-  - -0.0546
-  - -0.0546
-  - -0.0909
-  - -0.0909
-  - -0.0909
-  - -0.0909
-  - -0.1273
-  - -0.1273
-  - -0.1273
-  - -0.1273
-  - -0.1637
-  - -0.1637
-  - -0.1637
-  - -0.1637
-  - -0.2
-  - -0.2
-  - -0.2
-  - -0.2
-  - -0.2364
-  - -0.2364
-  - -0.2364
-  - -0.2364
-  - -0.2728
-  - -0.2728
-  - -0.2728
-  - -0.2728
-  - -0.3092
-  - -0.3092
-  - -0.3092
-  - -0.3092
-  - -0.3455
-  - -0.3455
-  - -0.3455
-  - -0.3455
-  - -0.3819
-  - -0.3819
-  - -0.3819
-  - -0.3819
-  - -0.4183
-  - -0.4183
-  - -0.4183
-  - -0.4183
-  - -0.4547
-  - -0.4547
-  - -0.4547
-  - -0.4547
-  - -0.491
-  - -0.491
-  - -0.491
-  - -0.491
-  - -0.5274
-  - -0.5274
-  - -0.5274
-  - -0.5274
-  - -0.5638
-  - -0.5638
-  - -0.5638
-  - -0.5638
-  - -0.6002
-  - -0.6002
-  - -0.6002
-  - -0.6002
-  - -0.6365
-  - -0.6365
-  - -0.6365
-  - -0.6365
-  - 0.6365
-  - 0.6365
-  - 0.6365
-  - 0.6365
-  - 0.6002
-  - 0.6002
-  - 0.6002
-  - 0.6002
-  - 0.5638
-  - 0.5638
-  - 0.5638
-  - 0.5638
-  - 0.5274
-  - 0.5274
-  - 0.5274
-  - 0.5274
-  - 0.491
-  - 0.491
-  - 0.491
-  - 0.491
-  - 0.4547
-  - 0.4547
-  - 0.4547
-  - 0.4547
-  - 0.4183
-  - 0.4183
-  - 0.4183
-  - 0.4183
-  - 0.3819
-  - 0.3819
-  - 0.3819
-  - 0.3819
-  - 0.3455
-  - 0.3455
-  - 0.3455
-  - 0.3455
-  - 0.3092
-  - 0.3092
-  - 0.3092
-  - 0.3092
-  - 0.2728
-  - 0.2728
-  - 0.2728
-  - 0.2728
-  - 0.2364
-  - 0.2364
-  - 0.2364
-  - 0.2364
-  - 0.2
-  - 0.2
-  - 0.2
-  - 0.2
-  - 0.1637
-  - 0.1637
-  - 0.1637
-  - 0.1637
-  - 0.1273
-  - 0.1273
-  - 0.1273
-  - 0.1273
-  - 0.0909
-  - 0.0909
-  - 0.0909
-  - 0.0909
-  - 0.0546
-  - 0.0546
-  - 0.0546
-  - 0.0546
-  - 0.0182
-  - 0.0182
-  - 0.0182
-  - 0.0182
-  - -0.0182
-  - -0.0182
-  - -0.0182
-  - -0.0182
-  - -0.0546
-  - -0.0546
-  - -0.0546
-  - -0.0546
-  - -0.0909
-  - -0.0909
-  - -0.0909
-  - -0.0909
-  - -0.1273
-  - -0.1273
-  - -0.1273
-  - -0.1273
-  - -0.1637
-  - -0.1637
-  - -0.1637
-  - -0.1637
-  - -0.2
-  - -0.2
-  - -0.2
-  - -0.2
-  - -0.2364
-  - -0.2364
-  - -0.2364
-  - -0.2364
-  - -0.2728
-  - -0.2728
-  - -0.2728
-  - -0.2728
-  - -0.3092
-  - -0.3092
-  - -0.3092
-  - -0.3092
-  - -0.3455
-  - -0.3455
-  - -0.3455
-  - -0.3455
-  - -0.3819
-  - -0.3819
-  - -0.3819
-  - -0.3819
-  - -0.4183
-  - -0.4183
-  - -0.4183
-  - -0.4183
-  - -0.4547
-  - -0.4547
-  - -0.4547
-  - -0.4547
-  - -0.491
-  - -0.491
-  - -0.491
-  - -0.491
-  - -0.5274
-  - -0.5274
-  - -0.5274
-  - -0.5274
-  - -0.5638
-  - -0.5638
-  - -0.5638
-  - -0.5638
-  - -0.6002
-  - -0.6002
-  - -0.6002
-  - -0.6002
-  - -0.6365
-  - -0.6365
-  - -0.6365
-  - -0.6365
-  - 0.491
-  - 0.491
-  - 0.491
-  - 0.491
-  - 0.4547
-  - 0.4547
-  - 0.4547
-  - 0.4547
-  - 0.4183
-  - 0.4183
-  - 0.4183
-  - 0.4183
-  - 0.3819
-  - 0.3819
-  - 0.3819
-  - 0.3819
-  - 0.3455
-  - 0.3455
-  - 0.3455
-  - 0.3455
-  - 0.3092
-  - 0.3092
-  - 0.3092
-  - 0.3092
-  - 0.2728
-  - 0.2728
-  - 0.2728
-  - 0.2728
-  - 0.2364
-  - 0.2364
-  - 0.2364
-  - 0.2364
-  - 0.2
-  - 0.2
-  - 0.2
-  - 0.2
-  - 0.1637
-  - 0.1637
-  - 0.1637
-  - 0.1637
-  - 0.1273
-  - 0.1273
-  - 0.1273
-  - 0.1273
-  - 0.0909
-  - 0.0909
-  - 0.0909
-  - 0.0909
-  - 0.0546
-  - 0.0546
-  - 0.0546
-  - 0.0546
-  - 0.0182
-  - 0.0182
-  - 0.0182
-  - 0.0182
-  - -0.0182
-  - -0.0182
-  - -0.0182
-  - -0.0182
-  - -0.0546
-  - -0.0546
-  - -0.0546
-  - -0.0546
-  - -0.0909
-  - -0.0909
-  - -0.0909
-  - -0.0909
-  - -0.1273
-  - -0.1273
-  - -0.1273
-  - -0.1273
-  - -0.1637
-  - -0.1637
-  - -0.1637
-  - -0.1637
-  - -0.2
-  - -0.2
-  - -0.2
-  - -0.2
-  - -0.2364
-  - -0.2364
-  - -0.2364
-  - -0.2364
-  - -0.2728
-  - -0.2728
-  - -0.2728
-  - -0.2728
-  - -0.3092
-  - -0.3092
-  - -0.3092
-  - -0.3092
-  - -0.3455
-  - -0.3455
-  - -0.3455
-  - -0.3455
-  - -0.3819
-  - -0.3819
-  - -0.3819
-  - -0.3819
-  - -0.4183
-  - -0.4183
-  - -0.4183
-  - -0.4183
-  - -0.4547
-  - -0.4547
-  - -0.4547
-  - -0.4547
-  - -0.491
-  - -0.491
-  - -0.491
-  - -0.491
-  - 0.3455
-  - 0.3455
-  - 0.3455
-  - 0.3455
-  - 0.3092
-  - 0.3092
-  - 0.3092
-  - 0.3092
-  - 0.2728
-  - 0.2728
-  - 0.2728
-  - 0.2728
-  - 0.2364
-  - 0.2364
-  - 0.2364
-  - 0.2364
-  - 0.2
-  - 0.2
-  - 0.2
-  - 0.2
-  - 0.1637
-  - 0.1637
-  - 0.1637
-  - 0.1637
-  - 0.1273
-  - 0.1273
-  - 0.1273
-  - 0.1273
-  - 0.0909
-  - 0.0909
-  - 0.0909
-  - 0.0909
-  - 0.0546
-  - 0.0546
-  - 0.0546
-  - 0.0546
-  - 0.0182
-  - 0.0182
-  - 0.0182
-  - 0.0182
-  - -0.0182
-  - -0.0182
-  - -0.0182
-  - -0.0182
-  - -0.0546
-  - -0.0546
-  - -0.0546
-  - -0.0546
-  - -0.0909
-  - -0.0909
-  - -0.0909
-  - -0.0909
-  - -0.1273
-  - -0.1273
-  - -0.1273
-  - -0.1273
-  - -0.1637
-  - -0.1637
-  - -0.1637
-  - -0.1637
-  - -0.2
-  - -0.2
-  - -0.2
-  - -0.2
-  - -0.2364
-  - -0.2364
-  - -0.2364
-  - -0.2364
-  - -0.2728
-  - -0.2728
-  - -0.2728
-  - -0.2728
-  - -0.3092
-  - -0.3092
-  - -0.3092
-  - -0.3092
-  - -0.3455
-  - -0.3455
-  - -0.3455
-  - -0.3455
-  id: science_camera
-  orientation:
-  - 0.0
-  - 0.0
-  - 0.0
-  position:
-  - 0.0
-  - 0.0
-  - 15.028
-  type: hexagonal
-  edge_width: 0.0004
-- bounds:
-  - -0.768
-  - 0.768
-  - -0.512
-  - 0.512
-  height: 1024
-  id: camera_lid
-  orientation:
-  - 0.0
-  - 0.0
-  - 0.0
-  position:
-  - 0.0
-  - 0.0
-  - 15.0
-  type: square
-  width: 1536
-telescope:
-  name: CT3
-  units: m
-
-

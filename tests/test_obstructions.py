@@ -54,22 +54,6 @@ class TestCylinderGroup:
 
         assert jnp.isinf(t)
 
-    def test_to_config(self):
-        """Cylinder converts to config dict."""
-        cylinder = CylinderGroup(
-            p1=[[0, 0, 0]],
-            p2=[[0, 0, 5]],
-            r=[0.1],
-        )
-
-        config = cylinder.to_config(0)
-
-        assert config['type'] == 'cylinder'
-        assert config['p1'] == [0.0, 0.0, 0.0]
-        assert config['p2'] == [0.0, 0.0, 5.0]
-        assert config['r'] == 0.1
-
-
 class TestOpenCylinderGroup:
     """Test open cylinder (no caps) obstruction group."""
 
@@ -155,20 +139,6 @@ class TestBoxGroup:
 
         assert jnp.isinf(t)
 
-    def test_to_config(self):
-        """Box converts to config dict."""
-        box = BoxGroup(
-            p1=[[0, 0, 0]],
-            p2=[[1, 2, 3]],
-        )
-
-        config = box.to_config(0)
-
-        assert config['type'] == 'box'
-        assert config['p1'] == [0.0, 0.0, 0.0]
-        assert config['p2'] == [1.0, 2.0, 3.0]
-
-
 class TestSphereGroup:
     """Test sphere obstruction group."""
 
@@ -209,20 +179,6 @@ class TestSphereGroup:
         t = sphere.intersect(ray_origin, ray_direction)
 
         assert jnp.isinf(t)
-
-    def test_to_config(self):
-        """Sphere converts to config dict."""
-        sphere = SphereGroup(
-            centers=[[1, 2, 3]],
-            radii=[0.5],
-        )
-
-        config = sphere.to_config(0)
-
-        assert config['type'] == 'sphere'
-        assert config['center'] == [1.0, 2.0, 3.0]
-        assert config['r'] == 0.5
-
 
 class TestTriangleGroup:
     """Test triangle obstruction group."""
@@ -344,21 +300,3 @@ class TestMultipleObstructions:
         # Hits larger cylinder (r=2) first at t=3
         assert jnp.isclose(t, 3.0, atol=1e-6)
 
-    def test_from_config_roundtrip(self):
-        """Config roundtrip preserves obstruction parameters."""
-        original = CylinderGroup(
-            p1=[[0, 0, 0], [1, 1, 1]],
-            p2=[[0, 0, 5], [1, 1, 6]],
-            r=[0.1, 0.2],
-        )
-
-        # Convert to config
-        configs = [original.to_config(i) for i in range(len(original))]
-
-        # Reconstruct
-        reconstructed = CylinderGroup.from_config(configs)
-
-        assert len(reconstructed) == len(original)
-        assert jnp.allclose(original.p1, reconstructed.p1)
-        assert jnp.allclose(original.p2, reconstructed.p2)
-        assert jnp.allclose(original.r, reconstructed.r)

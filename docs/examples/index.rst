@@ -77,24 +77,15 @@ Simulations of CTAO-like telescopes (obstruction geometry gathered from images)
 Others
 ------
 
-Response matrix calculation and gradient optimization example for Bokeh alignment.
-
 .. grid:: 2
    :gutter: 3
-   
+
    .. grid-item-card:: Response Matrix
       :link: ResponseMatrix
       :link-type: doc
 
-      Computing effective area and source-to-pixel response matrices
-      for calibration and analysis.   
-
-   .. grid-item-card:: Gradient Optimization
-      :link: GradientOptimization
-      :link-type: doc
-
-      Mirror alignment via gradient descent. Demonstrates fitting mirror
-      orientations to match observed Bokeh patterns.
+      Computing per-source per-pixel effective aperture in a single
+      render pass via :meth:`iactrace.Camera.response_matrix`.
 
 .. toctree::
    :maxdepth: 1
@@ -107,4 +98,3 @@ Response matrix calculation and gradient optimization example for Bokeh alignmen
    MST
    LST
    ResponseMatrix
-   GradientOptimization

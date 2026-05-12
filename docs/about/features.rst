@@ -6,7 +6,7 @@ This page provides an overview of IACTrace's capabilities.
 Differentiable Ray Tracing
 --------------------------
 
-The core feature of IACTrace is end-to-end differentiability. Every operation
+The core feature of IACTrace is end-to-end differentiability. Most operations
 from light source to camera image can be differentiated using JAX's automatic
 differentiation:
 
@@ -17,13 +17,15 @@ differentiation:
    from iactrace import Telescope
 
    # Define a loss function
-   def loss_fn(telescope, sources, target_image):
-       pred_image = telescope.render(sources, values, source_type='parallel')
+   def loss_fn(telescope, camera, sources, target_image):
+       rays = telescope.render(sources, values, source_type='parallel')
+       pred_image = camera.image(rays)
+
        return jnp.mean((pred_image - target_image)**2)
 
    # Compute gradients w.r.t. telescope parameters
    grad_fn = eqx.filter_grad(loss_fn)
-   gradients = grad_fn(telescope, sources, target_image)
+   gradients = grad_fn(telescope, camera, sources, target_image)
 
 Multi-Stage Optical Systems
 ---------------------------
@@ -33,7 +35,7 @@ IACTrace supports multi-stage optical configurations:
 - **Single-mirror systems**: Davies-Cotton or parabolic primaries (H.E.S.S.,
   VERITAS, MAGIC)
 - **Two-mirror systems**: Schwarzschild-Couder designs (pSCT, ASTRI)
-- **Additional stages**: Windows, Lenses
+- **Additional stages**: Windows (Slabs), Lenses
 
 Mirrors are organized into groups by optical stage, with each facet having
 independent position, orientation, and surface parameters.
@@ -67,9 +69,6 @@ Two camera geometries are supported:
 **Hexagonal sensors**
    Hexagonally-packed pixels matching the geometry of PMT-based IACT cameras.
    Proper handling of hexagon rotations.
-
-Both sensor types support "straight-through" variants that have a soft backwards pass
-via bilinear/barycentric interpolation
 
 Obstruction Modeling
 --------------------
@@ -109,13 +108,20 @@ Realistic telescope imperfections can be applied:
 YAML Configuration
 ------------------
 
-Telescope geometries are defined in human-readable YAML files:
+Telescope optics and the camera are defined in two separate human-readable
+YAML files (see :doc:`/getting_started/custom_telescopes` for the full
+schema).
+
+The telescope file describes the optics plus the camera frame in world
+coordinates:
 
 .. code-block:: yaml
 
    telescope:
      name: example_telescope
      units: m
+     camera_position: [0.0, 0.0, 15.0]
+     camera_rotation: [0.0, 0.0, 0.0]
 
    mirror_templates:
      primary:
@@ -128,39 +134,24 @@ Telescope geometries are defined in human-readable YAML files:
      - position: [0, 0, 0]
        orientation: [0, 0, 0]
        aperture:
-         type: hexagonal
-         radius: 0.3
+         type: polygon
+         vertices: [[0.3, 0], [0.15, 0.26], [-0.15, 0.26],
+                    [-0.3, 0], [-0.15, -0.26], [0.15, -0.26]]
        template: primary
+
+The camera file describes the sensor layout in the camera-local frame:
+
+.. code-block:: yaml
 
    sensors:
      - type: hexagonal
-       position: [0, 0, 15.0]
-       n_pixels: 1855
-       pixel_size: 0.05
+       position: [0, 0, 0]
+       orientation: [0, 0, 0]
+       centers_x: [0.0, 0.05, ...]
+       centers_y: [0.0, 0.0, ...]
 
 Templates allow sharing surface parameters across multiple facets, reducing
 configuration file size for large segmented mirrors.
-
-Response Matrix Calculation
----------------------------
-
-For calibration and analysis, IACTrace can compute the full source-to-pixel
-response matrix:
-
-.. code-block:: python
-
-   from iactrace.core import render_response_matrix
-
-   # Grid of source directions
-   response = render_response_matrix(
-       telescope, sources, values,
-       source_type='parallel', sensor_idx=0
-   )
-   # response.shape = (n_sources, n_pixels)
-
-This matrix encodes the effective area and PSF for each pixel as a function of
-source position. This is especially useful for generating telescope approximations
-for `nyx <https://github.com/GerritRo/nyx>`_, used to render the night sky.
 
 Performance
 -----------

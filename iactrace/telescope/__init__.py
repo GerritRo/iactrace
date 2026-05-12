@@ -1,26 +1,15 @@
-from .lenses import (
-    AsphericDiskLensGroup,
-    LensGroup,
-    PlanoSlabGroup,
-)
-from .mirrors import (
-    AsphericDiskMirrorGroup,
-    AsphericPolygonMirrorGroup,
-    MirrorGroup,
-)
+from ..core.interactions import InteractionType
+from ..core.optics import OpticalElementGroup
+from ..core.ray_bundle import LazyRayBundle
+from . import lenses, mirrors, obstructions
 from .telescope import Telescope
 
 __all__ = [
     'Telescope',
-    # Mirrors
-    'MirrorGroup',
-    'AsphericDiskMirrorGroup',
-    'AsphericPolygonMirrorGroup',
-    # Lenses
-    'LensGroup',
-    'AsphericDiskLensGroup',
-    'PlanoSlabGroup',
-    # Base classes
-    'OpticalGroupBase',
+    'LazyRayBundle',
+    'OpticalElementGroup',
     'InteractionType',
+    'mirrors',
+    'lenses',
+    'obstructions',
 ]

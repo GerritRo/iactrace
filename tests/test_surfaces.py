@@ -1,9 +1,9 @@
 import jax
 import jax.numpy as jnp
 
+from iactrace.core.bsdf import GaussianBSDF, _apply_perturbation
 from iactrace.core.intersections import intersect_conic, newton_raphson_intersect
-from iactrace.core.optics import apply_perturbation, generate_perturbation_angles
-from iactrace.core.surfaces import AsphericSurface, compute_sag_and_normal, sag, sag_raw
+from iactrace.core.surfaces import compute_sag_and_normal, sag, sag_raw
 
 
 class TestSurfaceSag:
@@ -53,6 +53,19 @@ class TestSurfaceSag:
         z_computed = sag_raw(r, 0.0, c, conic=-1.0, aspheric=jnp.array([]))
         z_expected = c * r * r / 2.0
 
+        assert jnp.allclose(z_computed, z_expected, atol=1e-12)
+
+    def test_aspheric_powers_are_consecutive_even(self):
+        """aspheric[i] must multiply r^(2*i+4): r^4, r^6, r^8, r^10, ..."""
+        r = 0.7
+        coeffs = jnp.array([1.1, -2.3, 3.7, -4.2])  # r^4, r^6, r^8, r^10
+        z_computed = sag_raw(r, 0.0, curvature=0.0, conic=0.0, aspheric=coeffs)
+        z_expected = (
+            coeffs[0] * r**4
+            + coeffs[1] * r**6
+            + coeffs[2] * r**8
+            + coeffs[3] * r**10
+        )
         assert jnp.allclose(z_computed, z_expected, atol=1e-12)
 
     def test_offset_sag_equals_zero_at_offset_point(self):
@@ -110,7 +123,7 @@ class TestSurfaceNormals:
 
 
 class TestPerturbation:
-    """Test surface roughness perturbation."""
+    """Test surface roughness perturbation via BSDF modules."""
 
     def test_zero_scale_no_perturbation(self):
         """With zero perturbation scale, normals are unchanged."""
@@ -118,7 +131,7 @@ class TestPerturbation:
         normals = normals / jnp.linalg.norm(normals, axis=-1, keepdims=True)
         angles = jnp.array([[0.5, -0.3], [1.0, 0.2]])
 
-        perturbed = apply_perturbation(normals, angles, scale=0.0)
+        perturbed = _apply_perturbation(normals, angles, scale=0.0)
 
         assert jnp.allclose(perturbed, normals, atol=1e-10)
 
@@ -128,8 +141,9 @@ class TestPerturbation:
         normals = jnp.array([[0.0, 0.0, 1.0], [0.1, 0.2, 0.97], [-0.3, 0.1, 0.95]])
         normals = normals / jnp.linalg.norm(normals, axis=-1, keepdims=True)
 
-        angles = generate_perturbation_angles(normals, key)
-        perturbed = apply_perturbation(normals, angles, scale=0.01)
+        bsdf = GaussianBSDF(scale=jnp.array([0.01, 0.01, 0.01]))
+        element_idx = jnp.array([0, 1, 2])
+        perturbed = bsdf.perturb_normals(normals, key, element_idx)
 
         norms = jnp.linalg.norm(perturbed, axis=-1)
         assert jnp.allclose(norms, 1.0, atol=1e-10)
@@ -138,12 +152,11 @@ class TestPerturbation:
         """Small perturbation scale produces small angular deviations."""
         key = jax.random.key(123)
         normal = jnp.array([[0.0, 0.0, 1.0]])
-        angles = generate_perturbation_angles(normal, key)
 
-        scale = 1e-4  # Very small
-        perturbed = apply_perturbation(normal, angles, scale=scale)
+        bsdf = GaussianBSDF(scale=jnp.array([1e-4]))
+        element_idx = jnp.array([0])
+        perturbed = bsdf.perturb_normals(normal, key, element_idx)
 
-        # Dot product should be very close to 1
         dot = jnp.sum(normal * perturbed)
         assert dot > 0.9999
 
@@ -368,44 +381,3 @@ class TestNewtonRaphsonIntersect:
         assert valid
         expected_xy = origin[:2] + t * direction[:2]
         assert jnp.allclose(hit_xy, expected_xy, atol=1e-8)
-
-
-class TestAsphericSurfaceIntersect:
-    """Test AsphericSurface.intersect branch selection."""
-
-    def test_pure_conic_skips_newton_raphson(self):
-        """Pure conic surface never calls newton_raphson_intersect."""
-        from unittest.mock import patch
-
-        surf = AsphericSurface(0.05, -1.0, jnp.array([]), is_pure_conic=True)
-        assert surf.is_pure_conic
-
-        offset = jnp.array([0.0, 0.0])
-        origin = jnp.array([1.0, 0.5, 10.0])
-        direction = jnp.array([0.0, 0.0, -1.0])
-
-        with patch('iactrace.core.surfaces.newton_raphson_intersect',
-                   side_effect=AssertionError("NR should not be called")):
-            t, pt, n = surf.intersect(origin, direction, offset)
-
-        assert jnp.isfinite(t) and t > 0
-
-    def test_aspheric_surface_uses_newton_raphson(self):
-        """Non-pure-conic surface does call newton_raphson_intersect."""
-        from unittest.mock import MagicMock, patch
-
-        surf = AsphericSurface(0.05, -1.0, jnp.array([1e-10]))
-        assert not surf.is_pure_conic
-
-        offset = jnp.array([0.0, 0.0])
-        origin = jnp.array([1.0, 0.5, 10.0])
-        direction = jnp.array([0.0, 0.0, -1.0])
-
-        # Let it call through to the real function but track the call
-        mock_nr = MagicMock(side_effect=newton_raphson_intersect)
-
-        with patch('iactrace.core.surfaces.newton_raphson_intersect', mock_nr):
-            t, pt, n = surf.intersect(origin, direction, offset)
-
-        mock_nr.assert_called_once()
-        assert jnp.isfinite(t) and t > 0
