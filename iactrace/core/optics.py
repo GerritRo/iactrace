@@ -9,9 +9,16 @@ from jax import Array
 
 from .apertures import Aperture
 from .bsdf import BSDF, GaussianBSDF
-from .interactions import Interaction, InteractionType
-from .surfaces import SurfaceGroup
+from .interactions import (
+    InteractionType,
+    ReflectInteraction,
+    RefractInteraction,
+    SlabInteraction,
+)
+from .surfaces import AsphericSurfaceGroup
 from .transforms import transform_to_world
+
+InteractionModule = ReflectInteraction | RefractInteraction | SlabInteraction
 
 
 class OpticalElementGroup(eqx.Module):
@@ -26,9 +33,9 @@ class OpticalElementGroup(eqx.Module):
     rotations: Array           # (N, 3) euler angles in degrees
 
     # Composable modules
-    surface: SurfaceGroup
+    surface: AsphericSurfaceGroup
     aperture: Aperture
-    interaction_module: Interaction
+    interaction_module: InteractionModule
     bsdf: BSDF
 
     # PRNG state for sampling and roughness
@@ -90,7 +97,7 @@ class OpticalElementGroup(eqx.Module):
     def check_aperture(self, x, y, element_idx):
         return self.aperture.check(x, y, element_idx)
 
-    # --- Geometry ---
+    # Geometry
 
     def transform_to_world(self):
         """Compute geometry from current surface params and transform to world coordinates.
@@ -110,4 +117,3 @@ class OpticalElementGroup(eqx.Module):
             aperture_samples, self.surface, aperture_data,
             self.positions, self.rotations, area_fn=area_fn,
         )
-

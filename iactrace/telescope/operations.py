@@ -8,6 +8,8 @@ import jax
 import jax.numpy as jnp
 from jax import Array
 
+from ..core.interactions import ReflectInteraction, RefractInteraction, SlabInteraction
+
 if TYPE_CHECKING:
     from ..core import ObstructionGroup
     from .telescope import Telescope
@@ -43,18 +45,6 @@ def _update_at_stage(
     new_groups = list(groups)
     new_groups[idx] = new_group
     return eqx.tree_at(lambda t: getattr(t, list_name), telescope, new_groups)
-
-
-def _require_kind(
-    telescope: Telescope, stage: int, allowed: set[str]
-) -> str:
-    """Validate the kind of the group at ``stage`` and return it."""
-    kind = telescope.stage(stage).kind
-    if kind not in allowed:
-        raise ValueError(
-            f"stage {stage} is {kind}; expected one of {sorted(allowed)}"
-        )
-    return kind
 
 
 # Generic operations (any kind)
@@ -191,11 +181,15 @@ def set_reflectivity(
     telescope: Telescope, stage: int, reflectivity: Array | float
 ) -> Telescope:
     """Set per-element mirror reflectivity. Mirror stages only."""
-    _require_kind(telescope, stage, {"mirror"})
-    n = len(telescope.stage(stage))
+    group = telescope.stage(stage)
+    match group.interaction_module:
+        case ReflectInteraction():
+            pass
+        case _:
+            raise ValueError(f"stage {stage} is {group.kind}; expected mirror")
     r = jnp.asarray(reflectivity)
     if r.ndim == 0:
-        r = jnp.full(n, r)
+        r = jnp.full(len(group), r)
     return _update_at_stage(
         telescope, stage, lambda g: g.interaction_module.reflectivity, r
     )
@@ -205,12 +199,16 @@ def scale_reflectivity(
     telescope: Telescope, stage: int, factor: Array | float
 ) -> Telescope:
     """Multiply mirror reflectivity by ``factor``. Mirror stages only."""
-    _require_kind(telescope, stage, {"mirror"})
     group = telescope.stage(stage)
+    match group.interaction_module:
+        case ReflectInteraction(reflectivity=reflectivity):
+            pass
+        case _:
+            raise ValueError(f"stage {stage} is {group.kind}; expected mirror")
     factor = jnp.asarray(factor)
     if factor.ndim == 0:
         factor = jnp.full(len(group), factor)
-    new = group.interaction_module.reflectivity * factor
+    new = reflectivity * factor
     return _update_at_stage(
         telescope, stage, lambda g: g.interaction_module.reflectivity, new
     )
@@ -220,11 +218,15 @@ def set_transmittance(
     telescope: Telescope, stage: int, transmittance: Array | float
 ) -> Telescope:
     """Set per-element bulk transmittance. Lens or slab stages only."""
-    _require_kind(telescope, stage, {"lens", "slab"})
-    n = len(telescope.stage(stage))
+    group = telescope.stage(stage)
+    match group.interaction_module:
+        case RefractInteraction() | SlabInteraction():
+            pass
+        case _:
+            raise ValueError(f"stage {stage} is {group.kind}; expected lens or slab")
     t = jnp.asarray(transmittance)
     if t.ndim == 0:
-        t = jnp.full(n, t)
+        t = jnp.full(len(group), t)
     return _update_at_stage(
         telescope, stage, lambda g: g.interaction_module.transmittance,
         jnp.clip(t, 0.0, 1.0),
@@ -235,12 +237,16 @@ def scale_transmittance(
     telescope: Telescope, stage: int, factor: Array | float
 ) -> Telescope:
     """Multiply bulk transmittance by ``factor``. Lens or slab stages only."""
-    _require_kind(telescope, stage, {"lens", "slab"})
     group = telescope.stage(stage)
+    match group.interaction_module:
+        case RefractInteraction(transmittance=transmittance) | SlabInteraction(transmittance=transmittance):
+            pass
+        case _:
+            raise ValueError(f"stage {stage} is {group.kind}; expected lens or slab")
     factor = jnp.asarray(factor)
     if factor.ndim == 0:
         factor = jnp.full(len(group), factor)
-    new = jnp.clip(group.interaction_module.transmittance * factor, 0.0, 1.0)
+    new = jnp.clip(transmittance * factor, 0.0, 1.0)
     return _update_at_stage(
         telescope, stage, lambda g: g.interaction_module.transmittance, new
     )
@@ -250,11 +256,15 @@ def set_refractive_index(
     telescope: Telescope, stage: int, n_inside: Array | float
 ) -> Telescope:
     """Set per-element refractive index. Lens or slab stages only."""
-    _require_kind(telescope, stage, {"lens", "slab"})
-    n_elements = len(telescope.stage(stage))
+    group = telescope.stage(stage)
+    match group.interaction_module:
+        case RefractInteraction() | SlabInteraction():
+            pass
+        case _:
+            raise ValueError(f"stage {stage} is {group.kind}; expected lens or slab")
     n = jnp.asarray(n_inside)
     if n.ndim == 0:
-        n = jnp.full(n_elements, n)
+        n = jnp.full(len(group), n)
     return _update_at_stage(
         telescope, stage, lambda g: g.interaction_module.n_inside, n
     )
@@ -264,11 +274,15 @@ def set_thickness(
     telescope: Telescope, stage: int, thickness: Array | float
 ) -> Telescope:
     """Set slab thickness in metres. Slab stages only."""
-    _require_kind(telescope, stage, {"slab"})
-    n = len(telescope.stage(stage))
+    group = telescope.stage(stage)
+    match group.interaction_module:
+        case SlabInteraction():
+            pass
+        case _:
+            raise ValueError(f"stage {stage} is {group.kind}; expected slab")
     t = jnp.asarray(thickness)
     if t.ndim == 0:
-        t = jnp.full(n, t)
+        t = jnp.full(len(group), t)
     return _update_at_stage(
         telescope, stage, lambda g: g.interaction_module.thickness, t
     )
@@ -283,16 +297,16 @@ def set_focal_lengths(
     Lens stages (single refracting surface): ``c = 1 / ((n - 1) f)``.
     Slab stages: not meaningful — raises ``ValueError``.
     """
-    kind = _require_kind(telescope, stage, {"mirror", "lens"})
+    group = telescope.stage(stage)
     f = jnp.asarray(focal_lengths)
-    if kind == "mirror":
-        new_c = jnp.where(jnp.isinf(f), 0.0, 1.0 / (2.0 * f))
-    else:  # lens
-        group = telescope.stage(stage)
-        n_inside = group.interaction_module.n_inside
-        n_outside = group.interaction_module.n_outside
-        delta_n = n_inside - n_outside
-        new_c = jnp.where(jnp.isinf(f), 0.0, 1.0 / (delta_n * f))
+    match group.interaction_module:
+        case ReflectInteraction():
+            new_c = jnp.where(jnp.isinf(f), 0.0, 1.0 / (2.0 * f))
+        case RefractInteraction(n_inside=ni, n_outside=no):
+            delta_n = ni - no
+            new_c = jnp.where(jnp.isinf(f), 0.0, 1.0 / (delta_n * f))
+        case SlabInteraction():
+            raise ValueError(f"stage {stage} is slab; focal length is not meaningful")
     return set_curvatures(telescope, stage, new_c)
 
 
@@ -308,25 +322,23 @@ def apply_focal_error(
     Kind-aware: uses the mirror or single-refracting-lens formula. Slabs
     are rejected.
     """
-    kind = _require_kind(telescope, stage, {"mirror", "lens"})
     group = telescope.stage(stage)
     curvatures = group.surface.curvatures
     safe = jnp.where(curvatures == 0, 1e-10, curvatures)
 
-    if kind == "mirror":
-        f = 1.0 / (2.0 * safe)
-    else:  # lens
-        delta_n = group.interaction_module.n_inside - group.interaction_module.n_outside
-        f = 1.0 / (delta_n * safe)
+    scale: Array | float
+    match group.interaction_module:
+        case ReflectInteraction():
+            scale = 2.0
+        case RefractInteraction(n_inside=ni, n_outside=no):
+            scale = ni - no
+        case SlabInteraction():
+            raise ValueError(f"stage {stage} is slab; focal length is not meaningful")
 
+    f = 1.0 / (scale * safe)
     noise = jax.random.normal(key, shape=(len(group),))
     new_f = f * (1.0 + noise * sigma) if relative else f + noise * sigma
-
-    if kind == "mirror":
-        new_c = jnp.where(curvatures == 0, 0.0, 1.0 / (2.0 * new_f))
-    else:
-        delta_n = group.interaction_module.n_inside - group.interaction_module.n_outside
-        new_c = jnp.where(curvatures == 0, 0.0, 1.0 / (delta_n * new_f))
+    new_c = jnp.where(curvatures == 0, 0.0, 1.0 / (scale * new_f))
 
     return _update_at_stage(
         telescope, stage, lambda g: g.surface.curvatures, new_c

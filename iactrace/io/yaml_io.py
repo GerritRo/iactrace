@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 import jax
+import jax.numpy as jnp
 import numpy as np
 import yaml  # type: ignore[import-untyped]
 from jax import Array
@@ -115,8 +116,8 @@ def build_telescope_config(
         obstruction_groups=obstruction_groups,
         name=schema.telescope.name,
         lens_groups=lens_groups,
-        camera_position=schema.telescope.camera_position,
-        camera_rotation=schema.telescope.camera_rotation,
+        camera_position=jnp.asarray(schema.telescope.camera_position),
+        camera_rotation=jnp.asarray(schema.telescope.camera_rotation),
     )
 
 

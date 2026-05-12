@@ -1,8 +1,16 @@
 from __future__ import annotations
 
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    SerializerFunctionWrapHandler,
+    field_validator,
+    model_serializer,
+    model_validator,
+)
 
 # Reusable constrained types
 
@@ -166,69 +174,77 @@ ObstructionSchema = Annotated[
 # Sensor schemas
 
 
-def _normalize_sensor_placement(model):
-    """Validate singular/plural ``position``/``orientation`` fields.
+def _normalize_sensor_placement(data: Any) -> Any:
+    """Fold singular ``position``/``orientation`` into the plural form.
 
-    A sensor entry must specify exactly one of (``position``, ``positions``)
-    and exactly one of (``orientation``, ``orientations``). The plural form
-    carries N tiles in a single :class:`SensorGroup`; the singular form is
-    the convenient shortcut for N = 1.
+    A sensor entry may write either the singular ``position``/``orientation``
+    (N=1 shortcut) or the plural ``positions``/``orientations`` lists, but
+    not both. After this validator runs the schema only stores the plural
+    canonical form; downstream code never has to disambiguate.
     """
-    if (model.position is None) == (model.positions is None):
+    if not isinstance(data, dict):
+        return data
+    data = dict(data)
+    for singular, plural in (("position", "positions"), ("orientation", "orientations")):
+        has_s = data.get(singular) is not None
+        has_p = data.get(plural) is not None
+        if has_s == has_p:
+            raise ValueError(
+                f"Sensor entry must set exactly one of `{singular}` or `{plural}`."
+            )
+        if has_s:
+            data[plural] = [data.pop(singular)]
+        else:
+            data.pop(singular, None)
+    if len(data["positions"]) != len(data["orientations"]):
         raise ValueError(
-            "Sensor entry must set exactly one of `position` or `positions`."
+            f"`positions` ({len(data['positions'])}) and "
+            f"`orientations` ({len(data['orientations'])}) must have the same length."
         )
-    if (model.orientation is None) == (model.orientations is None):
-        raise ValueError(
-            "Sensor entry must set exactly one of `orientation` or `orientations`."
-        )
-    pos = model.positions if model.positions is not None else [model.position]
-    rot = model.orientations if model.orientations is not None else [model.orientation]
-    if len(pos) != len(rot):
-        raise ValueError(
-            f"`positions` ({len(pos)}) and `orientations` ({len(rot)}) "
-            "must have the same length."
-        )
-    return model
+    return data
+
+
+def _serialize_placement_singular(
+    self: BaseModel, handler: SerializerFunctionWrapHandler
+) -> dict[str, Any]:
+    """Emit ``position``/``orientation`` for N=1 sensors, plural otherwise."""
+    out = handler(self)
+    for singular, plural in (("position", "positions"), ("orientation", "orientations")):
+        values = out.get(plural)
+        if isinstance(values, list) and len(values) == 1:
+            out[singular] = values[0]
+            del out[plural]
+    return out
 
 
 class SquareSensorSchema(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     type: Literal["square"] = "square"
-    position: Vec3 | None = None
-    orientation: Vec3 | None = None
-    positions: list[Vec3] | None = Field(default=None, min_length=1)
-    orientations: list[Vec3] | None = Field(default=None, min_length=1)
+    positions: list[Vec3] = Field(min_length=1)
+    orientations: list[Vec3] = Field(min_length=1)
     width: int = Field(gt=0)
     height: int = Field(gt=0)
     bounds: Bounds4
     edge_width: float = Field(ge=0, default=0.0)
     id: str | None = None
 
-    @model_validator(mode="after")
-    def _check_placement(self) -> SquareSensorSchema:
-        return _normalize_sensor_placement(self)
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize_placement(cls, data: Any) -> Any:
+        return _normalize_sensor_placement(data)
 
-    @property
-    def position_list(self) -> list[Vec3]:
-        return self.positions if self.positions is not None else [self.position]
-
-    @property
-    def orientation_list(self) -> list[Vec3]:
-        return (
-            self.orientations if self.orientations is not None else [self.orientation]
-        )
+    @model_serializer(mode="wrap")
+    def _serialize(self, handler: SerializerFunctionWrapHandler) -> dict[str, Any]:
+        return _serialize_placement_singular(self, handler)
 
 
 class HexagonalSensorSchema(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     type: Literal["hexagonal"] = "hexagonal"
-    position: Vec3 | None = None
-    orientation: Vec3 | None = None
-    positions: list[Vec3] | None = Field(default=None, min_length=1)
-    orientations: list[Vec3] | None = Field(default=None, min_length=1)
+    positions: list[Vec3] = Field(min_length=1)
+    orientations: list[Vec3] = Field(min_length=1)
     centers_x: list[float] = Field(min_length=1)
     centers_y: list[float] = Field(min_length=1)
     edge_width: float = Field(ge=0, default=0.0)
@@ -241,19 +257,14 @@ class HexagonalSensorSchema(BaseModel):
             raise ValueError("centers_x and centers_y must have same length")
         return v
 
-    @model_validator(mode="after")
-    def _check_placement(self) -> HexagonalSensorSchema:
-        return _normalize_sensor_placement(self)
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize_placement(cls, data: Any) -> Any:
+        return _normalize_sensor_placement(data)
 
-    @property
-    def position_list(self) -> list[Vec3]:
-        return self.positions if self.positions is not None else [self.position]
-
-    @property
-    def orientation_list(self) -> list[Vec3]:
-        return (
-            self.orientations if self.orientations is not None else [self.orientation]
-        )
+    @model_serializer(mode="wrap")
+    def _serialize(self, handler: SerializerFunctionWrapHandler) -> dict[str, Any]:
+        return _serialize_placement_singular(self, handler)
 
 
 SensorSchema = Annotated[
