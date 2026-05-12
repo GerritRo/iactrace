@@ -15,6 +15,7 @@ These modules contain the main user-facing APIs:
    telescope
    camera
    viz
+   analysis
 
 Core Components
 ---------------

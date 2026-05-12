@@ -102,30 +102,22 @@ Render multiple sources simultaneously by stacking them:
 Visualizing Results
 -------------------
 
-IACTrace provides visualization functions for both sensor types:
-
-**Hexagonal sensors** (typical IACT cameras):
+IACTrace provides a unified :func:`~iactrace.viz.show_camera` function
+that renders both hexagonal IACT cameras and square pixel grids
+(monitoring cameras, SiPM arrays):
 
 .. code-block:: python
 
    import matplotlib.pyplot as plt
-   from iactrace import hexshow
+   from iactrace.viz import show_camera
 
    fig, ax = plt.subplots(figsize=(8, 8))
-   hexshow(image, camera.sensor_groups[0], ax=ax)
-   plt.colorbar(ax.collections[0], label='Intensity')
+   show_camera(image, camera.sensor_groups[0], ax=ax, colorbar=True,
+               cbar_label='Intensity')
    plt.show()
 
-**Square sensors** (monitoring cameras, SiPM arrays):
-
-.. code-block:: python
-
-   from iactrace import squareshow
-
-   fig, ax = plt.subplots(figsize=(8, 8))
-   squareshow(image, camera.sensor_groups[0], ax=ax)
-   plt.colorbar(ax.images[0], label='Intensity')
-   plt.show()
+The pixel layout (hexagonal vs. square) is detected automatically from
+the sensor group type.
 
 3D Telescope Visualization
 --------------------------
