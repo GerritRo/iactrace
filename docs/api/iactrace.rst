@@ -55,7 +55,20 @@ Visualization Functions
 .. list-table::
    :widths: 30 70
 
-   * - :func:`~iactrace.viz.hexshow`
-     - Display hexagonal sensor image
-   * - :func:`~iactrace.viz.squareshow`
-     - Display square sensor image
+   * - :func:`~iactrace.viz.show_camera`
+     - Display a sensor image (hexagonal or square pixel layout)
+
+Analysis Tools
+^^^^^^^^^^^^^^
+
+Available under :mod:`iactrace.analysis`:
+
+.. list-table::
+   :widths: 30 70
+
+   * - :class:`~iactrace.analysis.FlatFocalPlane`
+     - Flat focal plane for spot-diagram analysis
+   * - :class:`~iactrace.analysis.AsphericFocalSurface`
+     - Curved aspheric focal surface for spot-diagram analysis
+   * - :class:`~iactrace.analysis.FocalSurfaceHits`
+     - Per-ray intersection results returned by :meth:`FocalSurface.intersect`
