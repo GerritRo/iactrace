@@ -4,7 +4,7 @@ import equinox as eqx
 import jax
 import jax.numpy as jnp
 
-from iactrace import MCIntegrator, Telescope
+from iactrace import Telescope
 
 # Get absolute path to config files (relative to this benchmark file)
 _BENCHMARK_DIR = Path(__file__).parent.absolute()
@@ -41,8 +41,8 @@ class RenderBenchmarks:
         """Set up telescope and sources, trigger JIT compilation."""
         self.telescope = Telescope.from_yaml(
             str(_CONFIG_PATH),
-            MCIntegrator(n_samples),
-            key=jax.random.key(42)
+            n_samples=n_samples,
+            key=jax.random.key(42),
         )
 
         # Create point sources at varying positions
@@ -54,16 +54,18 @@ class RenderBenchmarks:
         )
         self.values = jnp.ones(n_sources)
 
-        # Warmup: trigger JIT compilation
+        # Warmup: trigger JIT compilation. Telescope.render returns a
+        # LazyRayBundle, so we have to materialise it to actually execute
+        # the ray-trace.
         _ = _block(self.telescope.render(
             self.sources, self.values, source_type='point'
-        ))
+        ).materialise())
 
     def time_render_point_sources(self, n_sources, n_samples):
         """Time rendering point sources."""
         result = self.telescope.render(
             self.sources, self.values, source_type='point'
-        )
+        ).materialise()
         _block(result)
 
 
@@ -85,8 +87,8 @@ class RayTracingBenchmarks:
         """Set up telescope and rays, trigger JIT compilation."""
         self.telescope = Telescope.from_yaml(
             str(_CONFIG_PATH),
-            MCIntegrator(1),
-            key=jax.random.key(42)
+            n_samples=1,
+            key=jax.random.key(42),
         )
 
         # Create rays starting above the telescope, pointing down
@@ -143,8 +145,8 @@ class GradientBenchmarks:
         """Set up telescope and sources, trigger JIT compilation."""
         telescope = Telescope.from_yaml(
             str(_CONFIG_PATH),
-            MCIntegrator(n_samples),
-            key=jax.random.key(42)
+            n_samples=n_samples,
+            key=jax.random.key(42),
         )
 
         key = jax.random.key(111)
@@ -156,16 +158,16 @@ class GradientBenchmarks:
         self.values = jnp.ones(n_sources)
 
         # Split telescope into trainable (arrays) and static (non-arrays) parts
-        # This is how equinox handles differentiation through PyTrees with
-        # non-differentiable components (like random keys)
         filter_spec = jax.tree.map(eqx.is_array, telescope)
         self.trainable, self.static = eqx.partition(telescope, filter_spec)
 
-        # Define loss function that takes trainable/static split
+        # Define loss function that takes trainable/static split. We sum
         def loss_fn(trainable, static):
             tel = eqx.combine(trainable, static)
-            img = tel.render(self.sources, self.values, source_type='point')
-            return jnp.sum(img ** 2)
+            rays = tel.render(
+                self.sources, self.values, source_type='point',
+            ).materialise()
+            return jnp.sum(rays.directions ** 2)
 
         self.loss_fn = loss_fn
         self.grad_fn = eqx.filter_value_and_grad(loss_fn)
@@ -196,8 +198,8 @@ class TelescopeLoadingBenchmarks:
         """Time loading telescope from YAML configuration."""
         tel = Telescope.from_yaml(
             str(_CONFIG_PATH),
-            MCIntegrator(n_samples),
-            key=jax.random.key(42)
+            n_samples=n_samples,
+            key=jax.random.key(42),
         )
         # Force evaluation of lazy operations
         _ = tel.mirror_groups
