@@ -4,6 +4,7 @@ from collections.abc import Sequence
 
 import jax.numpy as jnp
 from jax import Array
+from jax.typing import ArrayLike
 
 from ..core.apertures import Aperture, DiskAperture
 from ..core.bsdf import BSDF, GaussianBSDF
@@ -117,16 +118,16 @@ def mirror_group(
 
 def disk_array(
     *,
-    positions: Sequence[Sequence[float]],
-    rotations: Sequence[Sequence[float]],
-    curvatures: Sequence[float],
-    radii: Sequence[float],
-    conics: Sequence[float] | None = None,
-    aspheric_coeffs: Sequence[Sequence[float]] | None = None,
-    inner_radii: Sequence[float] | None = None,
-    reflectivities: Sequence[float] | None = None,
-    bsdf_scales: Sequence[float] | None = None,
-    offsets: Sequence[Sequence[float]] | None = None,
+    positions: ArrayLike,
+    rotations: ArrayLike,
+    curvatures: ArrayLike,
+    radii: ArrayLike,
+    conics: ArrayLike | None = None,
+    aspheric_coeffs: ArrayLike | None = None,
+    inner_radii: ArrayLike | None = None,
+    reflectivities: ArrayLike | None = None,
+    bsdf_scales: ArrayLike | None = None,
+    offsets: ArrayLike | None = None,
     optical_stage: int = 0,
     n_samples: int = 100,
     key: Array,

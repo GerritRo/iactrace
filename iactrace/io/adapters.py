@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from collections.abc import Callable
-from typing import TYPE_CHECKING, NamedTuple, TypeVar
+from typing import TYPE_CHECKING, NamedTuple
 
 import jax
 import jax.numpy as jnp
@@ -55,7 +55,7 @@ if TYPE_CHECKING:
     from ..camera.layout import SensorGroup
     from ..telescope import Telescope
 
-# Type aliases for discriminated union schema types
+# Type aliases
 LensSchemaType = AsphericDiskLensSchema | PlanoSlabSchema
 ObstructionSchemaType = (
     CylinderObstructionSchema
@@ -68,7 +68,7 @@ ObstructionSchemaType = (
 SensorSchemaType = SquareSensorSchema | HexagonalSensorSchema
 
 
-# ---------- Private helpers ----------
+# Helpers
 
 
 class _ParsedMirror(NamedTuple):
@@ -128,7 +128,16 @@ def _ensure_ccw(vertices: jnp.ndarray) -> jnp.ndarray:
     return jnp.where(signed_area < 0, vertices[::-1], vertices)
 
 
-_T = TypeVar("_T")
+def _disk_aperture_from_schemas(schemas: list[CircularApertureSchema]) -> DiskAperture:
+    return DiskAperture(
+        radii=jnp.asarray([s.radius for s in schemas]),
+        inner_radii=jnp.asarray([s.inner_radius for s in schemas]),
+    )
+
+
+def _polygon_aperture_from_schemas(schemas: list[PolygonApertureSchema]) -> PolygonAperture:
+    vertices = jnp.stack([_ensure_ccw(jnp.asarray(s.vertices)) for s in schemas])
+    return PolygonAperture(vertices=vertices, n_vertices=int(vertices.shape[1]))
 
 
 def _aperture_from_schemas(
@@ -140,37 +149,41 @@ def _aperture_from_schemas(
     vertex count); callers are expected to bucket via
     :func:`_bucket_by_aperture_signature` first.
     """
-    first = schemas[0]
-    if isinstance(first, CircularApertureSchema):
-        return DiskAperture(
-            radii=jnp.asarray([s.radius for s in schemas]),
-            inner_radii=jnp.asarray([s.inner_radius for s in schemas]),
-        )
-    vertices = jnp.stack([
-        _ensure_ccw(jnp.asarray(s.vertices)) for s in schemas
-    ])
-    return PolygonAperture(vertices=vertices, n_vertices=int(vertices.shape[1]))
+    disks: list[CircularApertureSchema] = []
+    polys: list[PolygonApertureSchema] = []
+    for s in schemas:
+        match s.type:
+            case "circular":
+                disks.append(s)
+            case "polygon":
+                polys.append(s)
+    if disks and not polys:
+        return _disk_aperture_from_schemas(disks)
+    if polys and not disks:
+        return _polygon_aperture_from_schemas(polys)
+    raise ValueError("aperture schemas must be homogeneous (all disk or all polygon)")
 
 
 def _bucket_by_aperture_signature[T](
-    items: list[_T],
-    aperture_of: Callable[[_T], CircularApertureSchema | PolygonApertureSchema],
-) -> list[list[_T]]:
+    items: list[T],
+    aperture_of: Callable[[T], CircularApertureSchema | PolygonApertureSchema],
+) -> list[list[T]]:
     """Group items so each bucket has a single aperture signature.
 
     Disk apertures form one bucket; each distinct polygon vertex count
     forms its own bucket. Order within a bucket follows input order.
     """
-    disk_bucket: list[_T] = []
-    poly_buckets: dict[int, list[_T]] = defaultdict(list)
+    disk_bucket: list[T] = []
+    poly_buckets: dict[int, list[T]] = defaultdict(list)
     for item in items:
         ap = aperture_of(item)
-        if isinstance(ap, PolygonApertureSchema):
-            poly_buckets[len(ap.vertices)].append(item)
-        else:
-            disk_bucket.append(item)
+        match ap.type:
+            case "polygon":
+                poly_buckets[len(ap.vertices)].append(item)
+            case "circular":
+                disk_bucket.append(item)
 
-    buckets: list[list[_T]] = []
+    buckets: list[list[T]] = []
     if disk_bucket:
         buckets.append(disk_bucket)
     buckets.extend(poly_buckets.values())
@@ -312,35 +325,43 @@ def lenses_from_schemas(
     :func:`mirrors_from_schemas` groups mirrors — and constructs one
     :class:`OpticalElementGroup` per bucket.
     """
-    if not lenses:
-        return []
+    aspheric_disks: list[AsphericDiskLensSchema] = []
+    plano_slabs: list[PlanoSlabSchema] = []
+    for lens in lenses:
+        match lens.type:
+            case "aspheric_disk":
+                aspheric_disks.append(lens)
+            case "plano_slab":
+                plano_slabs.append(lens)
 
     groups: list[OpticalElementGroup] = []
-
-    _builders = {
-        "aspheric_disk": _build_aspheric_disk_lens_group,
-        "plano_slab": _build_plano_slab_group,
-    }
-
-    by_type_stage: dict[tuple[str, int], list[LensSchemaType]] = defaultdict(list)
-    for lens in lenses:
-        by_type_stage[(lens.type, lens.stage)].append(lens)
-
-    for (ltype, stage), lens_list in by_type_stage.items():
-        builder = _builders[ltype]
-        for bucket in _bucket_by_aperture_signature(lens_list, lambda lens: lens.aperture):
-            aperture = _aperture_from_schemas([lens.aperture for lens in bucket])
-            key, subkey = jax.random.split(key)
-            groups.append(builder(bucket, aperture, stage, sample_key=subkey))
-
+    key, groups = _build_lens_groups_by_stage(aspheric_disks, _build_aspheric_disk_lens_group, key, groups)
+    key, groups = _build_lens_groups_by_stage(plano_slabs, _build_plano_slab_group, key, groups)
     return groups
 
 
+def _build_lens_groups_by_stage[L: AsphericDiskLensSchema | PlanoSlabSchema](
+    lenses: list[L],
+    builder: Callable[[list[L], Aperture, int, Array], OpticalElementGroup],
+    key: Array,
+    groups: list[OpticalElementGroup],
+) -> tuple[Array, list[OpticalElementGroup]]:
+    """Bucket ``lenses`` by (stage, aperture signature) and build one group per bucket."""
+    by_stage: dict[int, list[L]] = defaultdict(list)
+    for lens in lenses:
+        by_stage[lens.stage].append(lens)
+    for stage, lens_list in by_stage.items():
+        for bucket in _bucket_by_aperture_signature(lens_list, lambda lens: lens.aperture):
+            aperture = _aperture_from_schemas([lens.aperture for lens in bucket])
+            key, subkey = jax.random.split(key)
+            groups.append(builder(bucket, aperture, stage, subkey))
+    return key, groups
+
+
 def _build_aspheric_disk_lens_group(
-    lenses: list[LensSchemaType],
+    lenses: list[AsphericDiskLensSchema],
     aperture: Aperture,
     stage: int,
-    *,
     sample_key: Array,
 ) -> OpticalElementGroup:
     """Build an aspheric-disk refractive group via the telescope helper.
@@ -367,10 +388,9 @@ def _build_aspheric_disk_lens_group(
 
 
 def _build_plano_slab_group(
-    lenses: list[LensSchemaType],
+    lenses: list[PlanoSlabSchema],
     aperture: Aperture,
     stage: int,
-    *,
     sample_key: Array,
 ) -> OpticalElementGroup:
     """Build a plano-slab group via the telescope helper.
@@ -397,27 +417,41 @@ def obstructions_from_schemas(
     obstructions: list[ObstructionSchemaType],
 ) -> list[ObstructionGroup]:
     """Convert validated obstruction schemas to ObstructionGroup domain objects."""
-    if not obstructions:
-        return []
+    cylinders: list[CylinderObstructionSchema] = []
+    open_cyls: list[OpenCylinderObstructionSchema] = []
+    boxes: list[BoxObstructionSchema] = []
+    spheres: list[SphereObstructionSchema] = []
+    ori_boxes: list[OrientedBoxObstructionSchema] = []
+    triangles: list[TriangleObstructionSchema] = []
 
-    by_type: dict[str, list[ObstructionSchemaType]] = defaultdict(list)
     for obs in obstructions:
-        by_type[obs.type].append(obs)
+        match obs.type:
+            case "cylinder":
+                cylinders.append(obs)
+            case "open_cylinder":
+                open_cyls.append(obs)
+            case "box":
+                boxes.append(obs)
+            case "sphere":
+                spheres.append(obs)
+            case "oriented_box":
+                ori_boxes.append(obs)
+            case "triangle":
+                triangles.append(obs)
 
     groups: list[ObstructionGroup] = []
-    _builders = {
-        "cylinder": _build_cylinder_group,
-        "open_cylinder": _build_open_cylinder_group,
-        "box": _build_box_group,
-        "sphere": _build_sphere_group,
-        "oriented_box": _build_oriented_box_group,
-        "triangle": _build_triangle_group,
-    }
-
-    for otype, schemas in by_type.items():
-        builder = _builders[otype]
-        groups.append(builder(schemas))
-
+    if cylinders:
+        groups.append(_build_cylinder_group(cylinders))
+    if open_cyls:
+        groups.append(_build_open_cylinder_group(open_cyls))
+    if boxes:
+        groups.append(_build_box_group(boxes))
+    if spheres:
+        groups.append(_build_sphere_group(spheres))
+    if ori_boxes:
+        groups.append(_build_oriented_box_group(ori_boxes))
+    if triangles:
+        groups.append(_build_triangle_group(triangles))
     return groups
 
 
@@ -481,33 +515,32 @@ def sensor_from_schema(
     **camera-local** coordinates — the camera file format is the single
     source of truth and always speaks in the camera's own frame.
     """
-    positions = [list(p) for p in schema.position_list]
-    rotations = [list(r) for r in schema.orientation_list]
+    positions = [list(p) for p in schema.positions]
+    rotations = [list(r) for r in schema.orientations]
 
-    if isinstance(schema, SquareSensorSchema):
-        bounds = schema.bounds
-        return SquareSensorGroup(
-            positions=positions,
-            rotations=rotations,
-            width=schema.width,
-            height=schema.height,
-            bounds=(bounds[0], bounds[1], bounds[2], bounds[3]),
-            edge_width=schema.edge_width,
-        )
-    elif isinstance(schema, HexagonalSensorSchema):
-        hex_centers = [
-            [x, y] for x, y in zip(schema.centers_x, schema.centers_y, strict=False)
-        ]
-        return HexagonalSensorGroup(
-            positions=positions,
-            rotations=rotations,
-            hex_centers=hex_centers,
-            edge_width=schema.edge_width,
-        )
-    raise ValueError(f"Unknown sensor schema type: {type(schema)}")
+    match schema.type:
+        case "square":
+            b = schema.bounds
+            return SquareSensorGroup(
+                positions=positions,
+                rotations=rotations,
+                width=schema.width,
+                height=schema.height,
+                bounds=(b[0], b[1], b[2], b[3]),
+                edge_width=schema.edge_width,
+            )
+        case "hexagonal":
+            return HexagonalSensorGroup(
+                positions=positions,
+                rotations=rotations,
+                hex_centers=[
+                    [x, y] for x, y in zip(schema.centers_x, schema.centers_y, strict=False)
+                ],
+                edge_width=schema.edge_width,
+            )
 
 
-# ---------- Domain -> Schema (saving) ----------
+# Domain -> Schema (saving)
 
 
 def mirrors_to_schemas(
@@ -562,25 +595,17 @@ def mirrors_to_schemas(
             # Build aperture schema
             aperture = _aperture_to_schema(group.aperture, i)
 
-            mirror_kwargs: dict[str, object] = {
-                "position": position,
-                "orientation": orientation,
-                "aperture": aperture,
-                "template": template_name,
-                "id": f"M_{len(mirrors)}",
-            }
-
-            if group.optical_stage != 0:
-                mirror_kwargs["stage"] = group.optical_stage
-
             offset = _to_float_list(group.surface.offsets[i])
-            if not (offset[0] == 0.0 and offset[1] == 0.0):
-                mirror_kwargs["offset"] = offset
-
-            if bsdf_scale_val != 0.0:
-                mirror_kwargs["bsdf_scale"] = bsdf_scale_val
-
-            mirrors.append(MirrorSchema(**mirror_kwargs))
+            mirrors.append(MirrorSchema(
+                position=position,
+                orientation=orientation,
+                aperture=aperture,
+                template=template_name,
+                stage=group.optical_stage,
+                offset=offset,
+                bsdf_scale=bsdf_scale_val if bsdf_scale_val != 0.0 else None,
+                id=f"M_{len(mirrors)}",
+            ))
 
     return templates, mirrors
 
@@ -589,15 +614,18 @@ def _aperture_to_schema(
     aperture: Aperture, i: int
 ) -> CircularApertureSchema | PolygonApertureSchema:
     """Convert a domain aperture element to its schema representation."""
-    if isinstance(aperture, DiskAperture):
-        return CircularApertureSchema(
-            radius=float(aperture.radii[i]),
-            inner_radius=float(aperture.inner_radii[i]),
-        )
-    elif isinstance(aperture, PolygonAperture):
-        verts = [[float(v[0]), float(v[1])] for v in np.asarray(aperture.vertices[i])]
-        return PolygonApertureSchema(vertices=verts)
-    raise ValueError(f"Unknown aperture type: {type(aperture)}")
+    match aperture:
+        case DiskAperture(radii=radii, inner_radii=inner_radii):
+            return CircularApertureSchema(
+                radius=float(radii[i]),
+                inner_radius=float(inner_radii[i]),
+            )
+        case PolygonAperture(vertices=vertices):
+            return PolygonApertureSchema(
+                vertices=[[float(v[0]), float(v[1])] for v in np.asarray(vertices[i])],
+            )
+        case _:
+            raise ValueError(f"Unknown aperture type: {type(aperture)}")
 
 
 def lenses_to_schemas(
@@ -608,24 +636,24 @@ def lenses_to_schemas(
         return []
 
     lenses: list[LensSchemaType] = []
-
-    _extractors: dict[type, object] = {
-        RefractInteraction: _extract_aspheric_disk_lens,
-        SlabInteraction: _extract_plano_slab_lens,
-    }
-
     for group in groups:
-        extractor = _extractors.get(type(group.interaction_module))
-        if extractor is None:
-            continue
-        for i in range(len(group)):
-            lenses.append(extractor(group, i, len(lenses)))
-
+        match group.interaction_module:
+            case RefractInteraction() as interaction:
+                for i in range(len(group)):
+                    lenses.append(_extract_aspheric_disk_lens(group, interaction, i, len(lenses)))
+            case SlabInteraction() as interaction:
+                for i in range(len(group)):
+                    lenses.append(_extract_plano_slab_lens(group, interaction, i, len(lenses)))
+            case _:
+                continue
     return lenses
 
 
 def _extract_aspheric_disk_lens(
-    group: OpticalElementGroup, i: int, counter: int
+    group: OpticalElementGroup,
+    interaction: RefractInteraction,
+    i: int,
+    counter: int,
 ) -> AsphericDiskLensSchema:
     """Extract an AsphericDiskLensSchema from element i of a group."""
     aspheric_raw = _strip_trailing_zeros(_to_float_list(group.surface.aspherics[i]))
@@ -635,28 +663,31 @@ def _extract_aspheric_disk_lens(
         aperture=_aperture_to_schema(group.aperture, i),
         curvature=float(group.surface.curvatures[i]),
         conic=float(group.surface.conics[i]),
-        n_inside=float(group.interaction_module.n_inside[i]),
-        n_outside=float(group.interaction_module.n_outside),
+        n_inside=float(interaction.n_inside[i]),
+        n_outside=float(interaction.n_outside),
         aspheric=aspheric_raw,
         offset=_to_float_list(group.surface.offsets[i]),
-        transmittance=float(group.interaction_module.transmittance[i]),
+        transmittance=float(interaction.transmittance[i]),
         stage=group.optical_stage,
         id=f"lens_{counter}",
     )
 
 
 def _extract_plano_slab_lens(
-    group: OpticalElementGroup, i: int, counter: int
+    group: OpticalElementGroup,
+    interaction: SlabInteraction,
+    i: int,
+    counter: int,
 ) -> PlanoSlabSchema:
     """Extract a PlanoSlabSchema from element i of a group."""
     return PlanoSlabSchema(
         position=_to_float_list(group.positions[i]),
         orientation=_to_float_list(group.rotations[i]),
         aperture=_aperture_to_schema(group.aperture, i),
-        thickness=float(group.interaction_module.thickness[i]),
-        n_inside=float(group.interaction_module.n_inside[i]),
-        n_outside=float(group.interaction_module.n_outside),
-        transmittance=float(group.interaction_module.transmittance[i]),
+        thickness=float(interaction.thickness[i]),
+        n_inside=float(interaction.n_inside[i]),
+        n_outside=float(interaction.n_outside),
+        transmittance=float(interaction.transmittance[i]),
         stage=group.optical_stage,
         id=f"lens_{counter}",
     )
@@ -669,24 +700,26 @@ def obstructions_to_schemas(
     if not groups:
         return []
 
-    _extractors: dict[type, object] = {
-        CylinderGroup: _extract_cylinder,
-        OpenCylinderGroup: _extract_open_cylinder,
-        BoxGroup: _extract_box,
-        SphereGroup: _extract_sphere,
-        OrientedBoxGroup: _extract_oriented_box,
-        TriangleGroup: _extract_triangle,
-    }
-
     obstructions: list[ObstructionSchemaType] = []
     counter = 0
-
     for group in groups:
-        extractor = _extractors[type(group)]
         for i in range(len(group)):
-            obstructions.append(extractor(group, i, counter))
+            match group:
+                case CylinderGroup():
+                    obstructions.append(_extract_cylinder(group, i, counter))
+                case OpenCylinderGroup():
+                    obstructions.append(_extract_open_cylinder(group, i, counter))
+                case BoxGroup():
+                    obstructions.append(_extract_box(group, i, counter))
+                case SphereGroup():
+                    obstructions.append(_extract_sphere(group, i, counter))
+                case OrientedBoxGroup():
+                    obstructions.append(_extract_oriented_box(group, i, counter))
+                case TriangleGroup():
+                    obstructions.append(_extract_triangle(group, i, counter))
+                case _:
+                    raise ValueError(f"Unknown obstruction group type: {type(group)}")
             counter += 1
-
     return obstructions
 
 
@@ -754,56 +787,44 @@ def sensors_to_schemas(
     so a multi-tile focal plane round-trips as a single group instead of
     being split into N single-tile groups.
     """
-    _extractors: dict[type, object] = {
-        SquareSensorGroup: _extract_square_group,
-        HexagonalSensorGroup: _extract_hex_group,
-    }
-
     result: list[SensorSchemaType] = []
     for counter, group in enumerate(sensors):
-        extractor = _extractors[type(group)]
-        result.append(extractor(group, counter))
-
+        match group:
+            case SquareSensorGroup():
+                result.append(_extract_square_group(group, counter))
+            case HexagonalSensorGroup():
+                result.append(_extract_hex_group(group, counter))
+            case _:
+                raise ValueError(f"Unknown sensor group type: {type(group)}")
     return result
-
-
-def _placement_kwargs(group: SensorGroup) -> dict[str, object]:
-    """Singular ``position``/``orientation`` for N=1, plural lists otherwise."""
-    positions = [_to_float_list(p) for p in group.positions]
-    rotations = [_to_float_list(r) for r in group.rotations]
-    if len(positions) == 1:
-        return {"position": positions[0], "orientation": rotations[0]}
-    return {"positions": positions, "orientations": rotations}
 
 
 def _extract_square_group(
     group: SquareSensorGroup, counter: int,
 ) -> SquareSensorSchema:
-    schema_kwargs: dict[str, object] = {
-        **_placement_kwargs(group),
-        "width": group.width,
-        "height": group.height,
-        "bounds": list(group.bounds),
-        "id": f"sensor_{counter}",
-    }
-    if group.edge_width > 0:
-        schema_kwargs["edge_width"] = group.edge_width
-    return SquareSensorSchema(**schema_kwargs)
+    return SquareSensorSchema(
+        positions=[_to_float_list(p) for p in group.positions],
+        orientations=[_to_float_list(r) for r in group.rotations],
+        width=group.width,
+        height=group.height,
+        bounds=list(group.bounds),
+        edge_width=group.edge_width,
+        id=f"sensor_{counter}",
+    )
 
 
 def _extract_hex_group(
     group: HexagonalSensorGroup, counter: int,
 ) -> HexagonalSensorSchema:
     hex_centers = np.asarray(group.hex_centers)
-    schema_kwargs: dict[str, object] = {
-        **_placement_kwargs(group),
-        "centers_x": _to_float_list(hex_centers[:, 0]),
-        "centers_y": _to_float_list(hex_centers[:, 1]),
-        "id": f"sensor_{counter}",
-    }
-    if group.edge_width > 0:
-        schema_kwargs["edge_width"] = group.edge_width
-    return HexagonalSensorSchema(**schema_kwargs)
+    return HexagonalSensorSchema(
+        positions=[_to_float_list(p) for p in group.positions],
+        orientations=[_to_float_list(r) for r in group.rotations],
+        centers_x=_to_float_list(hex_centers[:, 0]),
+        centers_y=_to_float_list(hex_centers[:, 1]),
+        edge_width=group.edge_width,
+        id=f"sensor_{counter}",
+    )
 
 
 def camera_to_schema(camera: Camera) -> CameraConfigSchema:

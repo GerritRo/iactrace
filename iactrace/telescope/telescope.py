@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any, Literal
 import equinox as eqx
 import jax.numpy as jnp
 from jax import Array
+from jax.typing import ArrayLike
 
 from ..core.ray_bundle import LazyRayBundle, RayBundle
 from ..core.render import trace_optics
@@ -44,8 +45,8 @@ class Telescope(eqx.Module):
         obstruction_groups: list[ObstructionGroup] | None = None,
         name: str = "telescope",
         lens_groups: list[OpticalElementGroup] | None = None,
-        camera_position: Array | None = None,
-        camera_rotation: Array | None = None,
+        camera_position: ArrayLike | None = None,
+        camera_rotation: ArrayLike | None = None,
     ) -> None:
         """Initialize Telescope.
 
