@@ -1,29 +1,5 @@
-"""Sampling utilities for ray generation."""
-
 import jax.numpy as jnp
 from jax import random
-
-
-def sample_disk(key, shape):
-    """
-    Generate uniform random samples within a unit disk.
-
-    Args:
-        key: JAX random key
-        shape: Shape of samples to generate
-
-    Returns:
-        2D points in unit disk (..., 2)
-    """
-    key1, key2 = random.split(key)
-
-    r = jnp.sqrt(random.uniform(key1, shape))
-    theta = random.uniform(key2, shape) * 2 * jnp.pi
-
-    x = r * jnp.cos(theta)
-    y = r * jnp.sin(theta)
-
-    return jnp.stack([x, y], axis=-1)
 
 
 def sample_annulus(key, inner_radius, outer_radius, shape):

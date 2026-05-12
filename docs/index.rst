@@ -11,19 +11,23 @@ optimization and differentiable simulations.
 .. code-block:: python
 
    import jax
-   from iactrace import MCIntegrator, load_telescope
+   import jax.numpy as jnp
+   from iactrace import Telescope, Camera
 
-   # Load a telescope configuration
+   # Load telescope and camera.
    key = jax.random.key(0)
-   integrator = MCIntegrator(n_samples=1024)
-   telescope = load_telescope("configs/HESS/CT3.yaml", integrator, key)
+   telescope = Telescope.from_yaml(
+       "configs/HESS/CT3.yaml", n_samples=256, key=key,
+   )
+   camera = Camera.from_yaml("configs/HESS/HESS1U.yaml")
 
-   # Simulate a star field
-   sources = jax.numpy.array([[0.0, 0.0, -1.0]])  # Direction vector
-   values = jax.numpy.array([1.0])                 # Intensity
+   # Simulate an on-axis parallel source.
+   sources = jnp.array([[0.0, 0.0, -1.0]])  # direction vector
+   values = jnp.array([1.0])                # intensity
 
-   # Render the image
-   image = telescope.render(sources, values, source_type='parallel')
+   # Trace through optics, then form a pixel image.
+   ray_bundle = telescope.render(sources, values, source_type="parallel")
+   image = camera.image(ray_bundle)
 
 ----
 
@@ -41,6 +45,7 @@ optimization and differentiable simulations.
    :caption: Getting Started
 
    getting_started/installation
+   getting_started/conventions
    getting_started/concept
    getting_started/quickstart
    getting_started/custom_telescopes

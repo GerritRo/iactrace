@@ -1,60 +1,48 @@
 iactrace.telescope
 ==================
 
-The Telescope class and related components for building optical systems.
+The Telescope class and helper modules for building optical systems.
 
 Telescope Class
 ---------------
 
-The main class representing an optical telescope system:
-
 .. autoclass:: iactrace.telescope.Telescope
    :members:
    :undoc-members:
-   :show-inheritance:
 
-Mirror Groups
--------------
+Optical Element Composition
+---------------------------
 
-Classes for representing groups of mirror facets:
+Mirrors and lenses are both represented as
+:class:`~iactrace.core.OpticalElementGroup` instances composed from a
+surface, an aperture, an interaction, and an optional BSDF (see
+:doc:`core`). The helper submodules below provide builders that assemble
+the right combination for common optical elements.
 
-.. autoclass:: iactrace.telescope.MirrorGroup
+Mirror builders
+~~~~~~~~~~~~~~~
+
+.. automodule:: iactrace.telescope.mirrors
    :members:
-   :undoc-members:
 
-.. autoclass:: iactrace.telescope.AsphericDiskMirrorGroup
+Lens builders
+~~~~~~~~~~~~~
+
+.. automodule:: iactrace.telescope.lenses
    :members:
-   :undoc-members:
-   :show-inheritance:
 
-.. autoclass:: iactrace.telescope.AsphericPolygonMirrorGroup
+Obstruction builders
+~~~~~~~~~~~~~~~~~~~~
+
+.. automodule:: iactrace.telescope.obstructions
    :members:
-   :undoc-members:
-   :show-inheritance:
-
-Lens Groups
------------
-
-Classes for representing refractive optical elements:
-
-.. autoclass:: iactrace.telescope.LensGroup
-   :members:
-   :undoc-members:
-
-.. autoclass:: iactrace.telescope.AsphericDiskLensGroup
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-.. autoclass:: iactrace.telescope.PlanoSlabGroup
-   :members:
-   :undoc-members:
-   :show-inheritance:
 
 Operations
 ----------
 
-Functional operations for modifying telescope configurations (e.g., for optimization):
+Functional operations for modifying telescope configurations (e.g., for
+calibration, error injection, optimization). All operations return new
+telescope instances.
 
 .. automodule:: iactrace.telescope.operations
    :members:

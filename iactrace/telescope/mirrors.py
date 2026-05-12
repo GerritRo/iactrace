@@ -1,554 +1,410 @@
 from __future__ import annotations
 
-from abc import abstractmethod
-from typing import Any, ClassVar
+from collections.abc import Sequence
 
-import equinox as eqx
-import jax
 import jax.numpy as jnp
-import numpy as np
+from jax import Array
+from jax.typing import ArrayLike
 
-from ..core.optics import InteractionType, OpticalGroupBase
-from ..core.transforms import euler_to_matrix
+from ..core.apertures import Aperture, DiskAperture
+from ..core.bsdf import BSDF, GaussianBSDF
+from ..core.interactions import ReflectInteraction
+from ..core.optics import OpticalElementGroup
+from ..core.surfaces import AsphericSurfaceGroup
+
+__all__ = [
+    "mirror_group",
+    "spherical",
+    "parabolic",
+    "aspheric",
+    "disk_array",
+]
 
 
-def _point_in_convex_polygon(x, y, vertices, n_vertices):
-    """Check if points (x, y) are inside a convex polygon.
+# Input-shape helpers
 
-    Assumes vertices are in counter-clockwise order (ensured at load time).
-    For CCW vertices, a point is inside if all edge cross products are >= 0.
+def _as_vec3(value, name: str) -> Array:
+    arr = jnp.asarray(value)
+    if arr.shape != (3,):
+        raise ValueError(f"{name} must have shape (3,), got {arr.shape}")
+    return arr
+
+
+def _as_aspheric_row(coeffs: Sequence[float] | None) -> Array:
+    if coeffs is None:
+        return jnp.zeros((0,))
+    return jnp.asarray(coeffs)
+
+
+# Low-level canonical builder
+
+def mirror_group(
+    *,
+    positions: Array,
+    rotations: Array,
+    curvatures: Array,
+    conics: Array,
+    aspherics: Array,
+    offsets: Array,
+    aperture: Aperture,
+    reflectivity: Array,
+    sample_key: Array,
+    bsdf: BSDF | None = None,
+    optical_stage: int = 0,
+    n_samples: int = 100,
+) -> OpticalElementGroup:
+    """Canonical reflective :class:`OpticalElementGroup` builder.
+
+    Takes pre-shaped per-element arrays plus a pre-built aperture and an
+    optional :class:`BSDF` instance, and assembles the surface + interaction
+    + group wiring. This is the single assembly point for every reflective
+    group in the project — the sugar helpers in this module and the YAML
+    adapter both route through it, so any future additions (new BSDF
+    types, new surface fields, ...) only need to be plumbed once.
 
     Args:
-        x: x-coordinates (can be scalar or array)
-        y: y-coordinates (can be scalar or array)
-        vertices: Polygon vertices in CCW order (K, 2)
-        n_vertices: Number of vertices
+        positions: Per-element vertex positions, shape ``(N, 3)``.
+        rotations: Per-element Euler angles in degrees, shape ``(N, 3)``.
+        curvatures: Per-element curvatures ``1/R``, shape ``(N,)``.
+        conics: Per-element Schwarzschild conic constants, shape ``(N,)``.
+        aspherics: Per-element aspheric coefficients, shape ``(N, K)``.
+            Use ``(N, 0)`` to disable aspherics.
+        offsets: Per-element surface decentering, shape ``(N, 2)``. Use
+            ``jnp.zeros((N, 2))`` for a centred disk.
+        aperture: Pre-built aperture — either :class:`DiskAperture` or
+            :class:`PolygonAperture` — sized to ``N``.
+        reflectivity: Per-element reflectivity in ``[0, 1]``, shape ``(N,)``.
+        sample_key: JAX PRNG key used for aperture sampling and BSDF.
+        bsdf: Optional :class:`BSDF` instance. ``None`` leaves the element
+            perfectly specular (the :class:`OpticalElementGroup` constructor
+            fills in a zero-scale :class:`GaussianBSDF`).
+        optical_stage: Stage index within the Telescope; each group in a
+            telescope must have a unique stage.
+        n_samples: Monte Carlo samples per element per render.
 
     Returns:
-        Boolean mask, True if inside polygon
+        A ready-to-use :class:`OpticalElementGroup`.
     """
-    def edge_check(carry, i):
-        v1, v2 = vertices[i], vertices[(i + 1) % n_vertices]
-        cross = (v2[0] - v1[0]) * (y - v1[1]) - (v2[1] - v1[1]) * (x - v1[0])
-        return carry & (cross >= 0), None
+    positions = jnp.asarray(positions)
+    rotations = jnp.asarray(rotations)
+    curvatures = jnp.asarray(curvatures)
+    conics = jnp.asarray(conics)
+    aspherics = jnp.asarray(aspherics)
+    offsets = jnp.asarray(offsets)
+    reflectivity = jnp.asarray(reflectivity)
 
-    inside, _ = jax.lax.scan(edge_check, jnp.ones_like(x, dtype=bool), jnp.arange(n_vertices))
-    return inside
+    surface = AsphericSurfaceGroup(
+        curvatures=curvatures,
+        conics=conics,
+        aspherics=aspherics,
+        offsets=offsets,
+    )
+    interaction = ReflectInteraction(reflectivity=reflectivity)
 
-
-def _polygon_area(vertices):
-    """Compute area of convex polygon using shoelace formula.
-
-    Args:
-        vertices: Polygon vertices (K, 2)
-
-    Returns:
-        Polygon area (scalar)
-    """
-    vx = vertices[:, 0]
-    vy = vertices[:, 1]
-    return 0.5 * jnp.abs(jnp.sum(vx * jnp.roll(vy, -1) - jnp.roll(vx, -1) * vy))
-
-
-def _transform_to_world_common(aperture_samples, offsets, curvatures, conics, aspherics,
-                                aperture_data, perturbation_angles, positions, rotations,
-                                perturbation_scale, reflectivity, area_fn):
-    """Common transform_to_world logic for all mirror group types.
-
-    Args:
-        aperture_samples: 2D sample positions on aperture (N, M, 2)
-        offsets: Per-mirror offsets (N, 2)
-        curvatures: Per-mirror curvatures (N,)
-        conics: Per-mirror conic constants (N,)
-        aspherics: Per-mirror aspheric coefficients (N, K)
-        aperture_data: Aperture-specific data (radii for disk, vertices for polygon)
-        perturbation_angles: Random angles for roughness (N, M, 2)
-        positions: Mirror positions (N, 3)
-        rotations: Mirror rotations (N, 3)
-        perturbation_scale: Roughness scale per mirror (N,)
-        reflectivity: Reflectivity per mirror (N,)
-        area_fn: Function to compute aperture area from aperture_data
-
-    Returns:
-        Tuple of (points_world, normals_world, weights)
-    """
-    from ..core.optics import apply_perturbation
-    from ..core.surfaces import compute_sag_and_normal
-
-    def compute_and_transform_single(xy, offset, curvature, conic, aspheric, ap_data,
-                                      angles, position, rotation, scale, refl):
-        # Compute sag and normals for all sample points
-        x, y = xy[..., 0], xy[..., 1]
-        points, normals = jax.vmap(
-            lambda xi, yi: compute_sag_and_normal(xi, yi, offset, curvature, conic, aspheric)
-        )(x, y)
-
-        # Compute weights: cos(angle to z-axis) / area * n_samples / reflectivity
-        cos_z = jnp.sum(normals * jnp.array([0.0, 0.0, 1.0]), axis=-1, keepdims=True)
-        n_samples = xy.shape[0]
-        area = area_fn(ap_data)
-        weights = cos_z / area * n_samples / refl
-
-        # Transform to world coordinates
-        rot = euler_to_matrix(rotation)
-        points_world = jnp.einsum('ij,nj->ni', rot, points) + position
-        normals_world = jnp.einsum('ij,nj->ni', rot, normals)
-
-        # Apply perturbation using current normals and stored random angles
-        perturbed = apply_perturbation(normals_world, angles, scale)
-
-        return points_world, perturbed, weights
-
-    return jax.vmap(compute_and_transform_single)(
-        aperture_samples, offsets, curvatures, conics, aspherics,
-        aperture_data, perturbation_angles, positions, rotations,
-        perturbation_scale, reflectivity
+    return OpticalElementGroup(
+        positions=positions,
+        rotations=rotations,
+        surface=surface,
+        aperture=aperture,
+        interaction_module=interaction,
+        sample_key=sample_key,
+        optical_stage=int(optical_stage),
+        n_samples=int(n_samples),
+        bsdf=bsdf,
     )
 
 
-class MirrorGroup(OpticalGroupBase):
-    """Base class for grouped mirrors with shared surface type and aperture type."""
-
-    config_type: ClassVar[str]
-
-    # Transformations (one per mirror)
-    positions: jax.Array      # (N, 3)
-    rotations: jax.Array      # (N, 3) euler angles in degrees
-
-    # 2D sample positions on aperture
-    aperture_samples: jax.Array   # (N, M, 2) - 2D aperture coordinates
-
-    # Perturbation: random angles in tangent space (recomputed at render time)
-    perturbation_angles: jax.Array  # (N, M, 2) - (theta1, theta2) random values
-    perturbation_scale: jax.Array   # (N,) - per-mirror scale factor (radians)
-    perturbation_key: jax.Array     # PRNGKey for deterministic perturbation in ray tracing
-
-    # Per-mirror reflectivity scale (divides computed weights)
-    reflectivity: jax.Array         # (N,) - reflectivity for each mirror (default 1.0)
-
-    optical_stage: int = eqx.field(static=True)  # 0=primary, 1=secondary, etc.
-
-    @property
-    def interaction(self) -> InteractionType:
-        """Mirrors always reflect."""
-        return InteractionType.REFLECT
-
-    @abstractmethod
-    def get_surface(self, mirror_idx):
-        """Return the surface object for a specific mirror."""
-        ...
-
-    @abstractmethod
-    def check_aperture(self, x, y, mirror_idx):
-        """Check if points (x, y) are within aperture of specified mirror."""
-        ...
-
-    @abstractmethod
-    def get_sampling_params(self):
-        """Return structured dict with geometry parameters for sampling."""
-        ...
-
-    @abstractmethod
-    def transform_to_world(self):
-        """Compute geometry from current surface params and transform to world coordinates.
-
-        Computes points/normals/weights dynamically from aperture_samples and current
-        surface parameters (curvature, conic, aspheric), then transforms to world
-        coordinates with perturbation applied.
-
-        Returns:
-            Tuple of (points_world, normals_world, weights) arrays
-        """
-        ...
-
-    @abstractmethod
-    def to_config(self, index: int) -> dict[str, Any]:
-        """Convert a single mirror at index to a config dict.
-
-        Args:
-            index: Index of the mirror within the group.
-
-        Returns:
-            Configuration dictionary for this mirror (without template).
-        """
-        ...
-
-    @abstractmethod
-    def get_surface_params(self, index: int) -> dict[str, Any]:
-        """Get surface parameters for a single mirror.
-
-        Args:
-            index: Index of the mirror within the group.
-
-        Returns:
-            Dictionary with curvature, conic, aspheric coefficients.
-        """
-        ...
-
-    @classmethod
-    @abstractmethod
-    def from_config(
-        cls,
-        configs: list[dict[str, Any]],
-        templates: dict[str, Any],
-        optical_stage: int = 0,
-    ) -> MirrorGroup:
-        """Create a MirrorGroup from a list of config dicts.
-
-        Args:
-            configs: List of mirror configurations with aperture, position, etc.
-            templates: Dictionary of surface templates.
-            optical_stage: Optical stage (0=primary, 1=secondary, etc.).
-
-        Returns:
-            New MirrorGroup instance.
-        """
-        ...
-
-    def __len__(self):
-        """Return number of mirrors in group."""
-        return self.positions.shape[0]
-
-
-class AsphericDiskMirrorGroup(MirrorGroup):
-    """Group of mirrors with aspheric surfaces and circular/annular apertures.
-
-    Each mirror has individual surface parameters (curvature, conic, aspherics).
-    Supports optional center hole via inner_radii parameter.
-    Geometry is computed dynamically from aperture_samples and current surface parameters.
-    """
-
-    config_type: ClassVar[str] = "circular"
-
-    # Per-mirror surface parameters
-    curvatures: jax.Array     # (N,) curvature for each mirror
-    conics: jax.Array         # (N,) conic constant for each mirror
-    aspherics: jax.Array      # (N, K_max) polynomial coefficients, padded
-
-    # Per-mirror aperture data
-    radii: jax.Array          # (N,) - disk radius for each mirror
-    inner_radii: jax.Array    # (N,) - inner radius (hole) for each mirror, 0 for solid disk
-    offsets: jax.Array        # (N, 2) - x0, y0 offset for each mirror
-
-    is_pure_conic: bool = eqx.field(static=True)  # True if all aspherics are zero
-
-    def __init__(self, positions, rotations, curvatures, conics, aspherics, radii,
-                 optical_stage=0, offsets=None, inner_radii=None):
-        """
-        Create group from positions, rotations, per-mirror surface params, and radii.
-        """
-        self.positions = jnp.asarray(positions)
-        self.rotations = jnp.asarray(rotations)
-        self.curvatures = jnp.asarray(curvatures)
-        self.conics = jnp.asarray(conics)
-        self.aspherics = jnp.asarray(aspherics)
-        self.radii = jnp.asarray(radii)
-        self.optical_stage = int(optical_stage)
-
-        n_mirrors = self.positions.shape[0]
-        self.offsets = jnp.asarray(offsets) if offsets is not None else jnp.zeros((n_mirrors, 2))
-        self.inner_radii = jnp.asarray(inner_radii) if inner_radii is not None else jnp.zeros(n_mirrors)
-
-        # Determine if all mirrors are pure conics (no aspheric terms)
-        self.is_pure_conic = bool(np.all(np.asarray(aspherics) == 0))
-
-        # Initialize empty - will be set by integrator
-        self.aperture_samples = jnp.zeros((n_mirrors, 0, 2))
-        self.perturbation_angles = jnp.zeros((n_mirrors, 0, 2))
-        self.perturbation_scale = jnp.zeros(n_mirrors)
-        self.perturbation_key = jax.random.key(0)
-        self.reflectivity = jnp.ones(n_mirrors)
-
-    def get_surface(self, mirror_idx):
-        """Return the surface object for a specific mirror."""
-        from ..core import AsphericSurface
-        return AsphericSurface(
-            self.curvatures[mirror_idx],
-            self.conics[mirror_idx],
-            self.aspherics[mirror_idx],
-            is_pure_conic=self.is_pure_conic,
-        )
-
-    def check_aperture(self, x, y, mirror_idx):
-        """Check if points (x, y) are within mirror aperture (between inner and outer radius)."""
-        r_sq = x**2 + y**2
-        return (r_sq >= self.inner_radii[mirror_idx]**2) & (r_sq <= self.radii[mirror_idx]**2)
-
-    def get_sampling_params(self):
-        """Return structured dict with geometry parameters for sampling."""
-        return {
-            'type': 'disk',
-            'radii': self.radii,
-            'inner_radii': self.inner_radii,
-            'offsets': self.offsets,
-        }
-
-    def transform_to_world(self):
-        """Compute geometry from current surface params and transform to world coordinates."""
-        radii_stacked = jnp.stack([self.inner_radii, self.radii], axis=-1)
-        return _transform_to_world_common(
-            self.aperture_samples, self.offsets, self.curvatures, self.conics, self.aspherics,
-            radii_stacked, self.perturbation_angles, self.positions, self.rotations,
-            self.perturbation_scale, self.reflectivity,
-            area_fn=lambda r: jnp.pi * (r[1]**2 - r[0]**2)
-        )
-
-    def to_config(self, index: int) -> dict[str, Any]:
-        """Convert mirror at index to config dict."""
-        offset = [float(o) for o in np.asarray(self.offsets[index])]
-        config: dict[str, Any] = {
-            "position": [float(p) for p in np.asarray(self.positions[index])],
-            "orientation": [float(r) for r in np.asarray(self.rotations[index])],
-            "aperture": {
-                "type": "circular",
-                "radius": float(self.radii[index]),
-                "inner_radius": float(self.inner_radii[index]),
-            },
-        }
-        if self.optical_stage != 0:
-            config["stage"] = self.optical_stage
-        if not (offset[0] == 0.0 and offset[1] == 0.0):
-            config["offset"] = offset
-        return config
-
-    def get_surface_params(self, index: int) -> dict[str, Any]:
-        """Get surface parameters for a single mirror."""
-        aspheric = [float(a) for a in np.asarray(self.aspherics[index])]
-        # Trim trailing zeros
-        while aspheric and aspheric[-1] == 0.0:
-            aspheric.pop()
-        return {
-            "curvature": float(self.curvatures[index]),
-            "conic": float(self.conics[index]),
-            "aspheric": aspheric,
-        }
-
-    @classmethod
-    def from_config(
-        cls,
-        configs: list[dict[str, Any]],
-        templates: dict[str, Any],
-        optical_stage: int = 0,
-    ) -> AsphericDiskMirrorGroup:
-        """Create AsphericDiskMirrorGroup from config dicts."""
-        positions = []
-        rotations = []
-        curvatures = []
-        conics = []
-        aspherics = []
-        radii = []
-        inner_radii = []
-        offsets = []
-
-        for config in configs:
-            positions.append(config["position"])
-            rotations.append(config["orientation"])
-            radii.append(config["aperture"]["radius"])
-            inner_radii.append(config["aperture"].get("inner_radius", 0))
-            offsets.append(config.get("offset", [0.0, 0.0]))
-
-            # Get surface params from template or config override
-            template_name = config.get("template")
-            if template_name and template_name in templates:
-                surface = templates[template_name]["surface"]
-                curvatures.append(config.get("curvature", surface["curvature"]))
-                conics.append(config.get("conic", surface["conic"]))
-                aspherics.append(config.get("aspheric", surface.get("aspheric", [])))
-            else:
-                curvatures.append(config["curvature"])
-                conics.append(config["conic"])
-                aspherics.append(config.get("aspheric", []))
-
-        return cls(
-            positions=positions,
-            rotations=rotations,
-            curvatures=curvatures,
-            conics=conics,
-            aspherics=_pad_aspherics(aspherics),
-            radii=radii,
-            inner_radii=inner_radii,
-            optical_stage=optical_stage,
-            offsets=offsets,
-        )
-
-
-class AsphericPolygonMirrorGroup(MirrorGroup):
-    """Group of mirrors with aspheric surfaces and polygon apertures (same vertex count).
-
-    Each mirror has individual surface parameters (curvature, conic, aspherics).
-    Geometry is computed dynamically from aperture_samples and current surface parameters.
-    """
-
-    config_type: ClassVar[str] = "polygon"
-
-    # Per-mirror surface parameters
-    curvatures: jax.Array     # (N,) curvature for each mirror
-    conics: jax.Array         # (N,) conic constant for each mirror
-    aspherics: jax.Array      # (N, K_max) polynomial coefficients, padded
-
-    # Per-mirror aperture data
-    vertices: jax.Array       # (N, K, 2) - K vertices for each of N mirrors
-    n_vertices: int = eqx.field(static=True)  # Number of vertices (3, 4, 6, etc.)
-    offsets: jax.Array        # (N, 2) - x0, y0 offset for each mirror
-
-    is_pure_conic: bool = eqx.field(static=True)  # True if all aspherics are zero
-
-    def __init__(self, positions, rotations, curvatures, conics, aspherics, vertices_list,
-                 optical_stage=0, offsets=None):
-        """
-        Create group from positions, rotations, per-mirror surface params, and vertices.
-        """
-        self.positions = jnp.asarray(positions)
-        self.rotations = jnp.asarray(rotations)
-        self.curvatures = jnp.asarray(curvatures)
-        self.conics = jnp.asarray(conics)
-        self.aspherics = jnp.asarray(aspherics)
-        self.vertices = jnp.asarray(vertices_list)
-        self.n_vertices = int(self.vertices.shape[1])
-        self.optical_stage = int(optical_stage)
-
-        n_mirrors = self.positions.shape[0]
-        self.offsets = jnp.asarray(offsets) if offsets is not None else jnp.zeros((n_mirrors, 2))
-
-        # Determine if all mirrors are pure conics (no aspheric terms)
-        self.is_pure_conic = bool(np.all(np.asarray(aspherics) == 0))
-
-        # Initialize empty - will be set by integrator
-        self.aperture_samples = jnp.zeros((n_mirrors, 0, 2))
-        self.perturbation_angles = jnp.zeros((n_mirrors, 0, 2))
-        self.perturbation_scale = jnp.zeros(n_mirrors)
-        self.perturbation_key = jax.random.key(0)
-        self.reflectivity = jnp.ones(n_mirrors)
-
-    def get_surface(self, mirror_idx):
-        """Return the surface object for a specific mirror."""
-        from ..core import AsphericSurface
-        return AsphericSurface(
-            self.curvatures[mirror_idx],
-            self.conics[mirror_idx],
-            self.aspherics[mirror_idx],
-            is_pure_conic=self.is_pure_conic,
-        )
-
-    def check_aperture(self, x, y, mirror_idx):
-        """Check if points (x, y) are within mirror aperture (convex polygon)."""
-        return _point_in_convex_polygon(x, y, self.vertices[mirror_idx], self.n_vertices)
-
-    def get_sampling_params(self):
-        """Return structured dict with geometry parameters for sampling."""
-        return {
-            'type': 'polygon',
-            'vertices': self.vertices,
-            'offsets': self.offsets,
-        }
-
-    def transform_to_world(self):
-        """Compute geometry from current surface params and transform to world coordinates."""
-        return _transform_to_world_common(
-            self.aperture_samples, self.offsets, self.curvatures, self.conics, self.aspherics,
-            self.vertices, self.perturbation_angles, self.positions, self.rotations,
-            self.perturbation_scale, self.reflectivity,
-            area_fn=_polygon_area
-        )
-
-    def to_config(self, index: int) -> dict[str, Any]:
-        """Convert mirror at index to config dict."""
-        offset = [float(o) for o in np.asarray(self.offsets[index])]
-        vertices = [[float(v[0]), float(v[1])] for v in np.asarray(self.vertices[index])]
-        config: dict[str, Any] = {
-            "position": [float(p) for p in np.asarray(self.positions[index])],
-            "orientation": [float(r) for r in np.asarray(self.rotations[index])],
-            "aperture": {
-                "type": "polygon",
-                "vertices": vertices,
-            },
-        }
-        if self.optical_stage != 0:
-            config["stage"] = self.optical_stage
-        if not (offset[0] == 0.0 and offset[1] == 0.0):
-            config["offset"] = offset
-        return config
-
-    def get_surface_params(self, index: int) -> dict[str, Any]:
-        """Get surface parameters for a single mirror."""
-        aspheric = [float(a) for a in np.asarray(self.aspherics[index])]
-        # Trim trailing zeros
-        while aspheric and aspheric[-1] == 0.0:
-            aspheric.pop()
-        return {
-            "curvature": float(self.curvatures[index]),
-            "conic": float(self.conics[index]),
-            "aspheric": aspheric,
-        }
-
-    @classmethod
-    def from_config(
-        cls,
-        configs: list[dict[str, Any]],
-        templates: dict[str, Any],
-        optical_stage: int = 0,
-    ) -> AsphericPolygonMirrorGroup:
-        """Create AsphericPolygonMirrorGroup from config dicts."""
-        positions = []
-        rotations = []
-        curvatures = []
-        conics = []
-        aspherics = []
-        vertices_list = []
-        offsets = []
-
-        for config in configs:
-            positions.append(config["position"])
-            rotations.append(config["orientation"])
-            vertices_list.append(config["aperture"]["vertices"])
-            offsets.append(config.get("offset", [0.0, 0.0]))
-
-            # Get surface params from template or config override
-            template_name = config.get("template")
-            if template_name and template_name in templates:
-                surface = templates[template_name]["surface"]
-                curvatures.append(config.get("curvature", surface["curvature"]))
-                conics.append(config.get("conic", surface["conic"]))
-                aspherics.append(config.get("aspheric", surface.get("aspheric", [])))
-            else:
-                curvatures.append(config["curvature"])
-                conics.append(config["conic"])
-                aspherics.append(config.get("aspheric", []))
-
-        return cls(
-            positions=positions,
-            rotations=rotations,
-            curvatures=curvatures,
-            conics=conics,
-            aspherics=_pad_aspherics(aspherics),
-            vertices_list=jnp.array(vertices_list),
-            optical_stage=optical_stage,
-            offsets=offsets,
-        )
-
-
-def _pad_aspherics(aspheric_list):
-    """
-    Pad aspheric coefficient arrays to uniform length.
+# High-level sugar: batched disk-aperture mirror group
+
+def disk_array(
+    *,
+    positions: ArrayLike,
+    rotations: ArrayLike,
+    curvatures: ArrayLike,
+    radii: ArrayLike,
+    conics: ArrayLike | None = None,
+    aspheric_coeffs: ArrayLike | None = None,
+    inner_radii: ArrayLike | None = None,
+    reflectivities: ArrayLike | None = None,
+    bsdf_scales: ArrayLike | None = None,
+    offsets: ArrayLike | None = None,
+    optical_stage: int = 0,
+    n_samples: int = 100,
+    key: Array,
+) -> OpticalElementGroup:
+    """Build a batched ``N``-element disk-aperture mirror group.
+
+    Use this for segmented primary mirrors. Per-element arrays must all
+    match length ``N``. Scalar defaults fill in where an argument is
+    omitted. For anything beyond disk apertures / Gaussian BSDF, drop
+    down to :func:`mirror_group`.
 
     Args:
-        aspheric_list: List of (K_i,) arrays with varying lengths
-
-    Returns:
-        (N, K_max) array padded with zeros
+        positions: Per-element vertex positions, shape ``(N, 3)``.
+        rotations: Per-element Euler angles in degrees, shape ``(N, 3)``.
+        curvatures: Per-element curvatures ``1/R``, shape ``(N,)``.
+        radii: Outer disk radii, shape ``(N,)``.
+        conics: Per-element conic constants, shape ``(N,)``. Defaults to
+            zeros (spherical).
+        aspheric_coeffs: Per-element aspheric coefficients, shape ``(N, K)``.
+            ``None`` disables aspherics.
+        inner_radii: Per-element central hole radii, shape ``(N,)``.
+            Defaults to zeros.
+        reflectivities: Per-element reflectivities, shape ``(N,)``. Defaults
+            to ones.
+        bsdf_scales: Per-element Gaussian BSDF roughness in arcseconds,
+            shape ``(N,)``. Zero (the default) disables the BSDF.
+        offsets: Per-element surface decentering, shape ``(N, 2)``. Defaults
+            to zeros.
+        optical_stage: Stage index shared by all elements in this group.
+        n_samples: Monte Carlo samples per element per render.
+        key: JAX PRNG key for aperture sampling and BSDF.
     """
-    if not aspheric_list:
-        return jnp.zeros((0, 0))
+    positions_arr = jnp.asarray(positions)
+    if positions_arr.ndim != 2 or positions_arr.shape[1] != 3:
+        raise ValueError(
+            f"positions must have shape (N, 3), got {positions_arr.shape}"
+        )
+    n = positions_arr.shape[0]
 
-    max_len = max(len(a) for a in aspheric_list)
-    # Ensure at least length 1 to avoid empty array issues
-    max_len = max(max_len, 1)
+    rotations_arr = jnp.asarray(rotations)
+    if rotations_arr.shape != (n, 3):
+        raise ValueError(
+            f"rotations must have shape ({n}, 3), got {rotations_arr.shape}"
+        )
 
-    padded = []
-    for a in aspheric_list:
-        a = jnp.asarray(a)
-        if len(a) < max_len:
-            a = jnp.concatenate([a, jnp.zeros(max_len - len(a))])
-        padded.append(a)
+    curvatures_arr = jnp.asarray(curvatures)
+    if curvatures_arr.shape != (n,):
+        raise ValueError(
+            f"curvatures must have shape ({n},), got {curvatures_arr.shape}"
+        )
 
-    return jnp.stack(padded)
+    radii_arr = jnp.asarray(radii)
+    if radii_arr.shape != (n,):
+        raise ValueError(f"radii must have shape ({n},), got {radii_arr.shape}")
+
+    conics_arr = (
+        jnp.zeros(n) if conics is None else jnp.asarray(conics)
+    )
+    if conics_arr.shape != (n,):
+        raise ValueError(f"conics must have shape ({n},), got {conics_arr.shape}")
+
+    if aspheric_coeffs is None:
+        aspherics_arr = jnp.zeros((n, 0))
+    else:
+        aspherics_arr = jnp.asarray(aspheric_coeffs)
+        if aspherics_arr.ndim != 2 or aspherics_arr.shape[0] != n:
+            raise ValueError(
+                f"aspheric_coeffs must have shape ({n}, K), "
+                f"got {aspherics_arr.shape}"
+            )
+
+    inner_arr = (
+        jnp.zeros(n) if inner_radii is None else jnp.asarray(inner_radii)
+    )
+    refl_arr = (
+        jnp.ones(n) if reflectivities is None else jnp.asarray(reflectivities)
+    )
+
+    if offsets is None:
+        offsets_arr = jnp.zeros((n, 2))
+    else:
+        offsets_arr = jnp.asarray(offsets)
+        if offsets_arr.shape != (n, 2):
+            raise ValueError(
+                f"offsets must have shape ({n}, 2), got {offsets_arr.shape}"
+            )
+
+    bsdf_arr = (
+        jnp.zeros(n) if bsdf_scales is None else jnp.asarray(bsdf_scales)
+    )
+    bsdf = None if bool(jnp.all(bsdf_arr == 0)) else GaussianBSDF(scale=bsdf_arr)
+
+    aperture = DiskAperture(radii=radii_arr, inner_radii=inner_arr)
+
+    return mirror_group(
+        positions=positions_arr,
+        rotations=rotations_arr,
+        curvatures=curvatures_arr,
+        conics=conics_arr,
+        aspherics=aspherics_arr,
+        offsets=offsets_arr,
+        aperture=aperture,
+        reflectivity=refl_arr,
+        bsdf=bsdf,
+        sample_key=key,
+        optical_stage=optical_stage,
+        n_samples=n_samples,
+    )
+
+
+# High-level sugar: single-element factories
+
+def _single_disk_mirror(
+    *,
+    position,
+    rotation,
+    curvature,
+    conic,
+    aspheric_coeffs,
+    radius,
+    inner_radius,
+    reflectivity,
+    bsdf_scale,
+    optical_stage,
+    n_samples,
+    key,
+) -> OpticalElementGroup:
+    """Common backing for :func:`spherical`, :func:`parabolic`, :func:`aspheric`."""
+    pos = _as_vec3(position, "position")
+    rot = _as_vec3(rotation, "rotation")
+    aspheric_row = _as_aspheric_row(aspheric_coeffs)
+
+    return disk_array(
+        positions=pos.reshape(1, 3),
+        rotations=rot.reshape(1, 3),
+        curvatures=jnp.asarray([float(curvature)]),
+        conics=jnp.asarray([float(conic)]),
+        aspheric_coeffs=aspheric_row.reshape(1, aspheric_row.shape[0]),
+        radii=jnp.asarray([float(radius)]),
+        inner_radii=jnp.asarray([float(inner_radius)]),
+        reflectivities=jnp.asarray([float(reflectivity)]),
+        bsdf_scales=jnp.asarray([float(bsdf_scale)]),
+        optical_stage=optical_stage,
+        n_samples=n_samples,
+        key=key,
+    )
+
+
+def spherical(
+    *,
+    position: Sequence[float],
+    focal_length: float,
+    radius: float,
+    rotation: Sequence[float] = (0.0, 0.0, 0.0),
+    inner_radius: float = 0.0,
+    reflectivity: float = 1.0,
+    bsdf_scale: float = 0.0,
+    optical_stage: int = 0,
+    n_samples: int = 100,
+    key: Array,
+) -> OpticalElementGroup:
+    """Build a spherical mirror as a single-element group.
+
+    Uses ``c = 1 / (2 * focal_length)`` with ``conic = 0``. Set
+    ``inner_radius > 0`` for an annular mirror.
+
+    Args:
+        position: Mirror vertex in world coordinates, shape (3,).
+        focal_length: Paraxial focal length in metres (positive = concave).
+        radius: Outer disk radius in metres.
+        rotation: Euler angles in degrees. Defaults to no rotation.
+        inner_radius: Inner hole radius in metres. Zero for a solid disk.
+        reflectivity: Per-element reflectivity in ``[0, 1]``.
+        bsdf_scale: Gaussian roughness sigma in arcseconds (0 disables).
+        optical_stage: Stage index within the Telescope.
+        n_samples: Monte Carlo samples per render call.
+        key: JAX PRNG key.
+    """
+    return _single_disk_mirror(
+        position=position,
+        rotation=rotation,
+        curvature=1.0 / (2.0 * float(focal_length)),
+        conic=0.0,
+        aspheric_coeffs=None,
+        radius=radius,
+        inner_radius=inner_radius,
+        reflectivity=reflectivity,
+        bsdf_scale=bsdf_scale,
+        optical_stage=optical_stage,
+        n_samples=n_samples,
+        key=key,
+    )
+
+
+def parabolic(
+    *,
+    position: Sequence[float],
+    focal_length: float,
+    radius: float,
+    rotation: Sequence[float] = (0.0, 0.0, 0.0),
+    inner_radius: float = 0.0,
+    reflectivity: float = 1.0,
+    bsdf_scale: float = 0.0,
+    optical_stage: int = 0,
+    n_samples: int = 100,
+    key: Array,
+) -> OpticalElementGroup:
+    """Build a parabolic mirror as a single-element group.
+
+    Uses ``c = 1 / (2 * focal_length)`` and ``conic = -1``, matching the
+    reference ``configs/BASIC/Cassegrain_telescope.yaml`` primary
+    (``focal_length=0.4`` → ``curvature=1.25``).
+
+    Args: see :func:`spherical`.
+    """
+    return _single_disk_mirror(
+        position=position,
+        rotation=rotation,
+        curvature=1.0 / (2.0 * float(focal_length)),
+        conic=-1.0,
+        aspheric_coeffs=None,
+        radius=radius,
+        inner_radius=inner_radius,
+        reflectivity=reflectivity,
+        bsdf_scale=bsdf_scale,
+        optical_stage=optical_stage,
+        n_samples=n_samples,
+        key=key,
+    )
+
+
+def aspheric(
+    *,
+    position: Sequence[float],
+    curvature: float,
+    radius: float,
+    rotation: Sequence[float] = (0.0, 0.0, 0.0),
+    conic: float = 0.0,
+    aspheric_coeffs: Sequence[float] | None = None,
+    inner_radius: float = 0.0,
+    reflectivity: float = 1.0,
+    bsdf_scale: float = 0.0,
+    optical_stage: int = 0,
+    n_samples: int = 100,
+    key: Array,
+) -> OpticalElementGroup:
+    """Build a general aspheric mirror as a single-element group.
+
+    Fully explicit version of :func:`spherical` / :func:`parabolic`: you
+    supply the curvature, conic constant, and optional even aspheric
+    coefficients. Use this for hyperbolic / elliptic / higher-order
+    aspheric mirrors.
+
+    Args:
+        position: Mirror vertex in world coordinates, shape (3,).
+        curvature: Paraxial curvature ``1/R`` in m⁻¹.
+        radius: Outer disk radius in metres.
+        rotation: Euler angles in degrees. Defaults to no rotation.
+        conic: Schwarzschild conic constant. ``0`` spherical, ``-1``
+            parabolic, ``-1 < k < 0`` prolate ellipsoid, ``k < -1``
+            hyperboloid.
+        aspheric_coeffs: Even aspheric coefficients ``[a2, a4, ...]``.
+            ``None`` disables aspherics.
+        inner_radius, reflectivity, bsdf_scale, optical_stage, n_samples, key:
+            see :func:`spherical`.
+    """
+    return _single_disk_mirror(
+        position=position,
+        rotation=rotation,
+        curvature=curvature,
+        conic=conic,
+        aspheric_coeffs=aspheric_coeffs,
+        radius=radius,
+        inner_radius=inner_radius,
+        reflectivity=reflectivity,
+        bsdf_scale=bsdf_scale,
+        optical_stage=optical_stage,
+        n_samples=n_samples,
+        key=key,
+    )

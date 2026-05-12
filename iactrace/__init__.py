@@ -1,37 +1,40 @@
 import jax
 
-from .core import Integrator, MCIntegrator
-from .io import build_telescope, load_telescope, save_telescope
-from .sensors import (
+from .camera import (
+    Camera,
+    Concentrator,
     HexagonalSensorGroup,
+    PhotoSensor,
     SensorGroup,
     SquareSensorGroup,
-    StraightThroughHexagonalSensorGroup,
-    StraightThroughSquareSensorGroup,
+    UniformQE,
 )
+from .core import LazyRayBundle, RayBundle
+from .io import save_camera, save_telescope
 from .telescope import Telescope
-from .viz import hexshow, show_telescope, squareshow
+from .viz import show_camera, show_telescope
 
-__version__ = "0.6.1"
+__version__ = "0.7.0"
 
 jax.config.update("jax_default_matmul_precision", "highest")
 
 __all__ = [
     "Telescope",
-    "Integrator",
-    "MCIntegrator",
+    "Camera",
+    "RayBundle",
+    "LazyRayBundle",
+    "Concentrator",
     # Sensors
     "SensorGroup",
     "SquareSensorGroup",
-    "StraightThroughSquareSensorGroup",
     "HexagonalSensorGroup",
-    "StraightThroughHexagonalSensorGroup",
+    # PhotoSensor
+    "PhotoSensor",
+    "UniformQE",
     # Visualization
-    "hexshow",
-    "squareshow",
+    "show_camera",
     "show_telescope",
     # I/O
-    "load_telescope",
-    "build_telescope",
     "save_telescope",
+    "save_camera",
 ]
