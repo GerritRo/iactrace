@@ -117,7 +117,7 @@ markers = [
 # -- Commitizen (conventional commits + changelog) --
 [tool.commitizen]
 name = "cz_conventional_commits"
-version = "0.6.1"
+version = "0.7.0"
 version_files = [
     "iactrace/__init__.py:__version__",
 ]
