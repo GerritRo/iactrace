@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import TYPE_CHECKING, Callable, NamedTuple, TypeVar
+from collections.abc import Callable
+from typing import TYPE_CHECKING, NamedTuple, TypeVar
 
 import jax
 import jax.numpy as jnp
@@ -151,7 +152,7 @@ def _aperture_from_schemas(
     return PolygonAperture(vertices=vertices, n_vertices=int(vertices.shape[1]))
 
 
-def _bucket_by_aperture_signature(
+def _bucket_by_aperture_signature[T](
     items: list[_T],
     aperture_of: Callable[[_T], CircularApertureSchema | PolygonApertureSchema],
 ) -> list[list[_T]]:
@@ -327,8 +328,8 @@ def lenses_from_schemas(
 
     for (ltype, stage), lens_list in by_type_stage.items():
         builder = _builders[ltype]
-        for bucket in _bucket_by_aperture_signature(lens_list, lambda l: l.aperture):
-            aperture = _aperture_from_schemas([l.aperture for l in bucket])
+        for bucket in _bucket_by_aperture_signature(lens_list, lambda lens: lens.aperture):
+            aperture = _aperture_from_schemas([lens.aperture for lens in bucket])
             key, subkey = jax.random.split(key)
             groups.append(builder(bucket, aperture, stage, sample_key=subkey))
 
