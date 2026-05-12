@@ -60,13 +60,13 @@ class FocalSurface(eqx.Module):
     @abstractmethod
     def _intersect_local(
         self, o_local: Array, d_local: Array,
-    ) -> tuple[Array, Array, Array, Array]:        
+    ) -> tuple[Array, Array, Array, Array]:
         """Intersect a single local-frame ray with the surface.
-    
+
         Args:
             o_local: Ray origin in the surface-local frame (3,).
             d_local: Ray direction in the surface-local frame (3,), normalized.
-    
+
         Returns:
             Tuple ``(t, xy_local, z_local, valid)`` where:
                 - ``t`` is the ray parameter (scalar),
