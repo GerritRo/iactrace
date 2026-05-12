@@ -1,8 +1,5 @@
 # Changelog
 
-### Features
-
-- Initial release
 ## v0.6.1 (2026-05-06)
 
 ### Fix

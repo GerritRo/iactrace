@@ -2,36 +2,67 @@ iactrace.core
 =============
 
 Low-level ray tracing components. Most users should use the
-:class:`~iactrace.telescope.Telescope` class instead of these functions
-directly.
+:class:`~iactrace.telescope.Telescope` and :class:`~iactrace.camera.Camera`
+classes instead of these functions directly.
 
-Rendering Functions
--------------------
+Render Engine
+-------------
 
-High-level functions for rendering images through a telescope:
+.. autofunction:: iactrace.core.render_optics
 
-.. autofunction:: iactrace.core.render
+.. autofunction:: iactrace.core.trace_optics
 
-.. autofunction:: iactrace.core.render_debug
+Ray Bundle
+----------
 
-.. autofunction:: iactrace.core.render_response_matrix
-
-.. autofunction:: iactrace.core.trace_rays
-
-.. autofunction:: iactrace.core.trace_rays_debug
-
-Integrators
------------
-
-Classes for sampling rays on optical surfaces:
-
-.. autoclass:: iactrace.core.Integrator
+.. autoclass:: iactrace.core.RayBundle
    :members:
-   :undoc-members:
 
-.. autoclass:: iactrace.core.MCIntegrator
+Optical Element Composition
+---------------------------
+
+.. autoclass:: iactrace.core.OpticalElementGroup
    :members:
-   :undoc-members:
+
+Apertures
+~~~~~~~~~
+
+.. autoclass:: iactrace.core.Aperture
+   :members:
+
+.. autoclass:: iactrace.core.DiskAperture
+   :members:
+   :show-inheritance:
+
+.. autoclass:: iactrace.core.PolygonAperture
+   :members:
+   :show-inheritance:
+
+Interactions
+~~~~~~~~~~~~
+
+.. autoclass:: iactrace.core.Interaction
+   :members:
+
+.. autoclass:: iactrace.core.ReflectInteraction
+   :show-inheritance:
+
+.. autoclass:: iactrace.core.RefractInteraction
+   :show-inheritance:
+
+.. autoclass:: iactrace.core.SlabInteraction
+   :show-inheritance:
+
+BSDF (surface scattering)
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: iactrace.core.BSDF
+   :members:
+
+.. autoclass:: iactrace.core.GaussianBSDF
+   :show-inheritance:
+
+.. autoclass:: iactrace.core.DoubleGaussianBSDF
    :show-inheritance:
 
 Optical Physics
@@ -39,45 +70,51 @@ Optical Physics
 
 Functions for ray-surface interactions:
 
-.. autofunction:: iactrace.core.reflect
+.. autofunction:: iactrace.core.interactions.reflect
 
-.. autofunction:: iactrace.core.refract
+.. autofunction:: iactrace.core.interactions.refract
 
-.. autofunction:: iactrace.core.refract_slab
+.. autofunction:: iactrace.core.interactions.refract_slab
 
-.. autofunction:: iactrace.core.fresnel_unpolarized
+.. autofunction:: iactrace.core.interactions.fresnel_unpolarized
 
 Surfaces
 --------
 
 Aspheric surface calculations:
 
-.. autoclass:: iactrace.core.AsphericSurface
+.. autoclass:: iactrace.core.SurfaceGroup
    :members:
-   :undoc-members:
 
-.. autofunction:: iactrace.core.sag
+.. autoclass:: iactrace.core.AsphericSurfaceGroup
+   :members:
+   :show-inheritance:
 
-.. autofunction:: iactrace.core.compute_sag_and_normal
+.. autofunction:: iactrace.core.surfaces.sag
+
+.. autofunction:: iactrace.core.surfaces.compute_sag_and_normal
 
 Intersection Functions
 ----------------------
 
-Geometric ray-primitive intersection tests:
+Geometric ray-primitive intersection tests (in
+:mod:`iactrace.core.intersections`):
 
-.. autofunction:: iactrace.core.intersect_plane
+.. autofunction:: iactrace.core.intersections.intersect_plane
 
-.. autofunction:: iactrace.core.intersect_sphere
+.. autofunction:: iactrace.core.intersections.intersect_sphere
 
-.. autofunction:: iactrace.core.intersect_cylinder
+.. autofunction:: iactrace.core.intersections.intersect_cylinder
 
-.. autofunction:: iactrace.core.intersect_box
+.. autofunction:: iactrace.core.intersections.intersect_open_cylinder
 
-.. autofunction:: iactrace.core.intersect_oriented_box
+.. autofunction:: iactrace.core.intersections.intersect_box
 
-.. autofunction:: iactrace.core.intersect_triangle
+.. autofunction:: iactrace.core.intersections.intersect_oriented_box
 
-.. autofunction:: iactrace.core.intersect_conic
+.. autofunction:: iactrace.core.intersections.intersect_triangle
+
+.. autofunction:: iactrace.core.intersections.intersect_conic
 
 Obstruction Groups
 ------------------
@@ -86,31 +123,23 @@ Classes for modeling ray obstructions:
 
 .. autoclass:: iactrace.core.ObstructionGroup
    :members:
-   :undoc-members:
 
 .. autoclass:: iactrace.core.CylinderGroup
-   :members:
-   :undoc-members:
+   :show-inheritance:
+
+.. autoclass:: iactrace.core.OpenCylinderGroup
    :show-inheritance:
 
 .. autoclass:: iactrace.core.BoxGroup
-   :members:
-   :undoc-members:
    :show-inheritance:
 
 .. autoclass:: iactrace.core.SphereGroup
-   :members:
-   :undoc-members:
    :show-inheritance:
 
 .. autoclass:: iactrace.core.OrientedBoxGroup
-   :members:
-   :undoc-members:
    :show-inheritance:
 
 .. autoclass:: iactrace.core.TriangleGroup
-   :members:
-   :undoc-members:
    :show-inheritance:
 
 Transforms
@@ -119,5 +148,3 @@ Transforms
 Coordinate transformation utilities:
 
 .. autofunction:: iactrace.core.euler_to_matrix
-
-.. autofunction:: iactrace.core.look_at_rotation

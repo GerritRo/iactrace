@@ -4,7 +4,7 @@ Installation
 Requirements
 ------------
 
-IACTrace requires **Python 3.11 or later**.
+IACTrace requires **Python 3.12 or later**.
 
 For GPU acceleration, you will also need:
 
@@ -100,9 +100,6 @@ IACTrace depends on:
    * - `Matplotlib <https://matplotlib.org/>`_
      - >= 3.5.0
      - 2D plotting and visualization
-   * - `Pandas <https://pandas.pydata.org/>`_
-     - >= 1.4.0
-     - Configuration file handling
    * - `Trimesh <https://trimsh.org/>`_
      - >= 3.15.0
      - 3D geometry and visualization

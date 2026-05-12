@@ -2,10 +2,11 @@ import jax
 import numpy as np
 import trimesh
 
-from ..core import AsphericSurface, euler_to_matrix
+from ..core import euler_to_matrix
+from ._utils import convex_hull_2d as _convex_hull_2d
 
 
-def show_telescope(telescope, **kwargs):
+def show_telescope(telescope, camera=None, **kwargs):
     """
     Visualize telescope in 3D.
 
@@ -14,6 +15,7 @@ def show_telescope(telescope, **kwargs):
 
     Args:
         telescope: Telescope object
+        camera: Optional Camera object (for rendering sensors)
         **kwargs: Additional options:
             - mirror_color: RGBA color for mirrors (default: light blue)
             - obstruction_color: RGBA color for obstructions (default: gray)
@@ -39,29 +41,32 @@ def show_telescope(telescope, **kwargs):
             scene.add_geometry(combined)
 
     # Add lens groups
-    if telescope.lens_groups:
-        for group in telescope.lens_groups:
-            meshes = _get_lens_meshes(group)
-            if meshes:
-                combined = trimesh.util.concatenate(meshes)
-                combined.visual.face_colors = lens_color
-                scene.add_geometry(combined)
+    for group in telescope.lens_groups:
+        meshes = _get_lens_meshes(group)
+        if meshes:
+            combined = trimesh.util.concatenate(meshes)
+            combined.visual.face_colors = lens_color
+            scene.add_geometry(combined)
 
     # Add obstruction groups
-    if telescope.obstruction_groups:
-        for group in telescope.obstruction_groups:
-            meshes = _get_obstruction_meshes(group)
-            if meshes:
-                combined = trimesh.util.concatenate(meshes)
-                combined.visual.face_colors = obstruction_color
-                scene.add_geometry(combined)
+    for group in telescope.obstruction_groups:
+        meshes = _get_obstruction_meshes(group)
+        if meshes:
+            combined = trimesh.util.concatenate(meshes)
+            combined.visual.face_colors = obstruction_color
+            scene.add_geometry(combined)
 
-    # Add sensors (each sensor group may contain multiple sensors)
-    for sensor_group in telescope.sensors:
-        meshes = _get_sensor_meshes(sensor_group)
-        for mesh in meshes:
-            mesh.visual.face_colors = sensor_color
-            scene.add_geometry(mesh)
+    # Add sensors from camera
+    if camera is not None:
+        cam_transform = np.eye(4)
+        cam_transform[:3, :3] = np.asarray(euler_to_matrix(telescope.camera_rotation))
+        cam_transform[:3, 3] = np.asarray(telescope.camera_position)
+        for sensor_group in camera.sensor_groups:
+            meshes = _get_sensor_meshes(sensor_group)
+            for mesh in meshes:
+                mesh.apply_transform(cam_transform)
+                mesh.visual.face_colors = sensor_color
+                scene.add_geometry(mesh)
 
     return scene
 
@@ -90,74 +95,45 @@ def _get_mirror_meshes(group):
 
     Each mirror has its own surface parameters (curvature, conic, aspherics).
     """
-    from ..telescope.mirrors import AsphericDiskMirrorGroup, AsphericPolygonMirrorGroup
-
-    positions = np.asarray(group.positions)
-    rotations = np.asarray(group.rotations)
-    offsets = np.asarray(group.offsets)
-    curvatures = np.asarray(group.curvatures)
-    conics = np.asarray(group.conics)
-    aspherics = np.asarray(group.aspherics)
-
     meshes = []
-    if isinstance(group, AsphericDiskMirrorGroup):
-        radii = np.asarray(group.radii)
-        inner_radii = np.asarray(group.inner_radii)
-        for i in range(len(group)):
-            surface = AsphericSurface(curvatures[i], conics[i], aspherics[i])
-            mesh = _create_disk_mesh(positions[i], rotations[i], radii[i], surface, offsets[i],
-                                     inner_radius=inner_radii[i])
-            mesh = _make_double_sided(mesh)
-            if mesh is not None:
-                meshes.append(mesh)
-
-    elif isinstance(group, AsphericPolygonMirrorGroup):
-        vertices = np.asarray(group.vertices)
-        for i in range(len(group)):
-            surface = AsphericSurface(curvatures[i], conics[i], aspherics[i])
-            mesh = _create_polygon_mesh(positions[i], rotations[i], vertices[i], surface, offsets[i])
-            mesh = _make_double_sided(mesh)
-            if mesh is not None:
-                meshes.append(mesh)
-
+    for i in range(len(group)):
+        def sag_fn(x, y, _i=i):
+            return group.surface.sag_at(_i, x, y)
+        mesh = _aperture_face_mesh(group.positions[i], group.rotations[i],
+                                   group.aperture, i, sag_fn=sag_fn)
+        if mesh is None:
+            continue
+        meshes.append(_make_double_sided(mesh))
     return meshes
 
 
 def _get_lens_meshes(group):
     """Get list of lens meshes from group.
 
-    Lenses are rendered similarly to mirrors, as curved surfaces.
-    For AsphericDiskLensGroup, creates disk meshes with the surface curvature.
-    For PlanoSlabGroup, creates flat disk meshes (or optionally cylindrical slabs).
+    Refractive elements render as a single curved face (one per element);
+    slab elements render as a volume extruded along the local Z-axis.
+    Both honour the element's aperture, so polygonal lenses and windows
+    are supported alongside circular ones.
     """
-    from ..telescope.lenses import AsphericDiskLensGroup, PlanoSlabGroup
-
-    positions = np.asarray(group.positions)
-    rotations = np.asarray(group.rotations)
+    from ..core.interactions import RefractInteraction, SlabInteraction
 
     meshes = []
 
-    if isinstance(group, AsphericDiskLensGroup):
-        curvatures = np.asarray(group.curvatures)
-        conics = np.asarray(group.conics)
-        aspherics = np.asarray(group.aspherics)
-        offsets = np.asarray(group.offsets)
-        radii = np.asarray(group.radii)
-
+    if isinstance(group.interaction_module, RefractInteraction):
         for i in range(len(group)):
-            surface = AsphericSurface(curvatures[i], conics[i], aspherics[i])
-            mesh = _create_disk_mesh(positions[i], rotations[i], radii[i], surface, offsets[i])
-            mesh = _make_double_sided(mesh)
-            if mesh is not None:
-                meshes.append(mesh)
+            def sag_fn(x, y, _i=i):
+                return group.surface.sag_at(_i, x, y)
+            mesh = _aperture_face_mesh(group.positions[i], group.rotations[i],
+                                       group.aperture, i, sag_fn=sag_fn)
+            if mesh is None:
+                continue
+            meshes.append(_make_double_sided(mesh))
 
-    elif isinstance(group, PlanoSlabGroup):
-        radii = np.asarray(group.radii)
-        thickness = np.asarray(group.thickness)
-
+    elif isinstance(group.interaction_module, SlabInteraction):
+        thickness = np.asarray(group.interaction_module.thickness)
         for i in range(len(group)):
-            # Create a slab (short cylinder) representation
-            mesh = _create_slab_mesh(positions[i], rotations[i], radii[i], thickness[i])
+            mesh = _aperture_slab_mesh(group.positions[i], group.rotations[i],
+                                       group.aperture, i, float(thickness[i]))
             if mesh is not None:
                 meshes.append(mesh)
 
@@ -236,7 +212,7 @@ def _get_sensor_meshes(sensor_group):
 
     Each sensor in the group gets its own mesh, rendered at its position/rotation.
     """
-    from ..sensors import HexagonalSensorGroup, SquareSensorGroup
+    from ..camera import HexagonalSensorGroup, SquareSensorGroup
 
     positions = np.asarray(sensor_group.positions)
     rotations = np.asarray(sensor_group.rotations)
@@ -252,7 +228,7 @@ def _get_sensor_meshes(sensor_group):
         vertices = np.array([[x0, y0], [x1, y0], [x1, y1], [x0, y1]])
 
         for i in range(n_sensors):
-            mesh = _create_polygon_mesh(positions[i], rotations[i], vertices, surface=None)
+            mesh = _create_polygon_mesh(positions[i], rotations[i], vertices, sag_fn=None)
             mesh = _make_double_sided(mesh)
             if mesh is not None:
                 meshes.append(mesh)
@@ -264,7 +240,7 @@ def _get_sensor_meshes(sensor_group):
 
         if boundary is not None:
             for i in range(n_sensors):
-                mesh = _create_polygon_mesh(positions[i], rotations[i], boundary, surface=None)
+                mesh = _create_polygon_mesh(positions[i], rotations[i], boundary, sag_fn=None)
                 mesh = _make_double_sided(mesh)
                 if mesh is not None:
                     meshes.append(mesh)
@@ -272,19 +248,12 @@ def _get_sensor_meshes(sensor_group):
     return meshes
 
 
-def _convex_hull_2d(points):
-    """Compute convex hull of 2D points."""
-    try:
-        from scipy.spatial import ConvexHull  # type: ignore[import-untyped]
-        hull = ConvexHull(points)
-        return points[hull.vertices]
-    except (ImportError, Exception):
-        return None
-
-
-def _create_disk_mesh(position, rotation_euler, radius, surface, offset=None,
+def _create_disk_mesh(position, rotation_euler, radius, sag_fn=None,
                       inner_radius=0.0, resolution=32, radial_resolution=8):
     """Create disk mesh with surface curvature.
+
+    Args:
+        sag_fn: Callable (x, y) -> z for surface height, or None for flat.
 
     For annulus shapes (inner_radius > 0), creates a ring mesh with a center hole.
     """
@@ -302,9 +271,7 @@ def _create_disk_mesh(position, rotation_euler, radius, surface, offset=None,
         x_all = (r_grid * np.cos(t_grid)).ravel()
         y_all = (r_grid * np.sin(t_grid)).ravel()
 
-        if offset is None:
-            offset = np.zeros(2)
-        z_all = np.asarray(jax.vmap(lambda x, y: surface.sag(x, y, offset))(x_all, y_all))
+        z_all = np.asarray(jax.vmap(sag_fn)(x_all, y_all)) if sag_fn else np.zeros_like(x_all)
 
         vertices = np.column_stack([x_all, y_all, z_all])
 
@@ -336,9 +303,7 @@ def _create_disk_mesh(position, rotation_euler, radius, surface, offset=None,
         # Compute z for all points at once using vmap
         x_all = np.concatenate([[0.0], x_ring])
         y_all = np.concatenate([[0.0], y_ring])
-        if offset is None:
-            offset = np.zeros(2)
-        z_all = np.asarray(jax.vmap(lambda x, y: surface.sag(x, y, offset))(x_all, y_all))
+        z_all = np.asarray(jax.vmap(sag_fn)(x_all, y_all)) if sag_fn else np.zeros_like(x_all)
 
         vertices = np.column_stack([x_all, y_all, z_all])
 
@@ -372,13 +337,17 @@ def _create_disk_mesh(position, rotation_euler, radius, surface, offset=None,
     return trimesh.Trimesh(vertices=world_vertices, faces=faces)
 
 
-def _create_polygon_mesh(position, rotation_euler, vertices_2d, surface, offset=None,
+def _create_polygon_mesh(position, rotation_euler, vertices_2d, sag_fn=None,
                          grid_resolution=8):
-    """Create polygon mesh with optional surface curvature."""
+    """Create polygon mesh with optional surface curvature.
+
+    Args:
+        sag_fn: Callable (x, y) -> z for surface height, or None for flat.
+    """
     vertices_2d = np.asarray(vertices_2d)
     n_verts = len(vertices_2d)
 
-    if surface is None:
+    if sag_fn is None:
         # Flat polygon: use fan triangulation
         local_verts = np.zeros((n_verts, 3))
         local_verts[:, :2] = vertices_2d
@@ -403,9 +372,7 @@ def _create_polygon_mesh(position, rotation_euler, vertices_2d, surface, offset=
         all_points_2d = np.vstack([vertices_2d, interior_points])
 
         # Compute z from surface - vectorized with vmap
-        if offset is None:
-            offset = np.zeros(2)
-        z = np.asarray(jax.vmap(lambda x, y: surface.sag(x, y, offset))(all_points_2d[:, 0], all_points_2d[:, 1]))
+        z = np.asarray(jax.vmap(sag_fn)(all_points_2d[:, 0], all_points_2d[:, 1]))
         local_verts = np.column_stack([all_points_2d, z])
 
         # Delaunay triangulation
@@ -422,7 +389,7 @@ def _create_polygon_mesh(position, rotation_euler, vertices_2d, surface, offset=
             # Fallback: fan triangulation on boundary only
             local_verts = np.zeros((n_verts, 3))
             local_verts[:, :2] = vertices_2d
-            local_verts[:, 2] = np.asarray(jax.vmap(lambda x, y: surface.sag(x, y, offset))(vertices_2d[:, 0], vertices_2d[:, 1]))
+            local_verts[:, 2] = np.asarray(jax.vmap(sag_fn)(vertices_2d[:, 0], vertices_2d[:, 1]))
             faces = np.array([[0, i, i + 1] for i in range(1, n_verts - 1)])
 
     if len(faces) == 0:
@@ -548,8 +515,12 @@ def _create_open_cylinder_mesh(p1, p2, radius, sections=16):
         # Top vertex indices: sections to 2*sections-1
         b0, b1 = i, next_i
         t0, t1 = i + sections, next_i + sections
-        faces.append([b0, t0, b1])
-        faces.append([b1, t0, t1])
+        # Outward-facing pair.
+        faces.append([b0, b1, t1])
+        faces.append([b0, t1, t0])
+        # Inward-facing pair
+        faces.append([b0, t1, b1])
+        faces.append([b0, t0, t1])
 
     mesh = trimesh.Trimesh(vertices=vertices, faces=faces)
 
@@ -630,36 +601,64 @@ def _create_triangle_mesh(v0, v1, v2):
     return mesh
 
 
-def _create_slab_mesh(position, rotation_euler, radius, thickness, sections=32):
-    """Create a slab (short cylinder) mesh for PlanoSlabGroup visualization.
+def _aperture_face_mesh(position, rotation_euler, aperture, i, sag_fn=None):
+    """Build a single face mesh for element ``i`` of ``aperture``.
 
-    The slab is a cylinder aligned with the local Z-axis, then rotated and translated.
-
-    Args:
-        position: Center position (3,)
-        rotation_euler: Euler angles in degrees (3,)
-        radius: Slab radius
-        thickness: Slab thickness
-        sections: Number of sides for the cylinder
-
-    Returns:
-        trimesh.Trimesh or None
+    Dispatches on aperture type so callers (mirrors, refractive lenses,
+    slab caps) don't need to special-case disks vs. polygons.
     """
-    if radius < 1e-10 or thickness < 1e-10:
+    from ..core.apertures import DiskAperture, PolygonAperture
+
+    if isinstance(aperture, DiskAperture):
+        return _create_disk_mesh(
+            position, rotation_euler,
+            radius=float(aperture.radii[i]),
+            sag_fn=sag_fn,
+            inner_radius=float(aperture.inner_radii[i]),
+        )
+    if isinstance(aperture, PolygonAperture):
+        return _create_polygon_mesh(
+            position, rotation_euler,
+            vertices_2d=np.asarray(aperture.vertices[i]),
+            sag_fn=sag_fn,
+        )
+    raise TypeError(f"Unsupported aperture type: {type(aperture).__name__}")
+
+
+def _aperture_slab_mesh(position, rotation_euler, aperture, i, thickness, sections=32):
+    """Extrude element ``i`` of ``aperture`` along the local Z-axis.
+
+    Produces a cylinder for ``DiskAperture`` and a prism for
+    ``PolygonAperture``. The front face sits at ``position`` (local
+    z = 0) and the back face at local z = +thickness, matching the
+    physics convention in :func:`iactrace.core.interactions.refract_slab`
+    where ``position`` is the entry point on the front surface.
+    """
+    from ..core.apertures import DiskAperture, PolygonAperture
+
+    if thickness < 1e-10:
         return None
 
-    # Create cylinder along Z axis, centered at origin
-    cylinder = trimesh.creation.cylinder(radius=radius, height=thickness, sections=sections)
+    if isinstance(aperture, DiskAperture):
+        radius = float(aperture.radii[i])
+        if radius < 1e-10:
+            return None
+        mesh = trimesh.creation.cylinder(radius=radius, height=thickness, sections=sections)
+        mesh.apply_translation([0.0, 0.0, thickness / 2.0])
+    elif isinstance(aperture, PolygonAperture):
+        verts_2d = np.asarray(aperture.vertices[i])
+        n_verts = len(verts_2d)
+        faces_2d = np.array([[0, k, k + 1] for k in range(1, n_verts - 1)])
+        mesh = trimesh.creation.extrude_triangulation(verts_2d, faces_2d, height=thickness)
+    else:
+        raise TypeError(f"Unsupported aperture type: {type(aperture).__name__}")
 
-    # Transform to world coordinates
     rot_matrix = np.asarray(euler_to_matrix(rotation_euler))
-
     transform = np.eye(4)
     transform[:3, :3] = rot_matrix
-    transform[:3, 3] = position
-
-    cylinder.apply_transform(transform)
-    return cylinder
+    transform[:3, 3] = np.asarray(position)
+    mesh.apply_transform(transform)
+    return mesh
 
 
 def add_rays(scene, origins, directions, length=10.0, color=None):
