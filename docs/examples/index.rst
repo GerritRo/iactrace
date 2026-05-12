@@ -72,6 +72,12 @@ Simulations of CTAO-like telescopes (obstruction geometry gathered from images)
 
       Simulation of the LST
 
+   .. grid-item-card:: SST
+      :link: SST
+      :link-type: doc
+
+      Simulation of the SST
+
 ----
 
 Others
@@ -97,4 +103,5 @@ Others
    HESS_II
    MST
    LST
+   SST
    ResponseMatrix
