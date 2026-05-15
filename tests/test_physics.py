@@ -178,7 +178,7 @@ class TestRefractSlab:
         n_out, n_in = 1.0, 1.5
         thickness = 0.01
 
-        exit_dir, exit_pos, transmittance, valid = refract_slab(
+        exit_dir, exit_pos, transmittance, valid, opl_inside = refract_slab(
             direction, normal, position, n_out, n_in, thickness
         )
 
@@ -189,6 +189,8 @@ class TestRefractSlab:
         assert jnp.isclose(exit_pos[0], 0.0, atol=1e-10)
         assert jnp.isclose(exit_pos[1], 0.0, atol=1e-10)
         assert valid
+        # OPL inside slab at normal incidence is n_in * thickness
+        assert jnp.isclose(opl_inside, n_in * thickness, atol=1e-10)
 
     def test_oblique_incidence_direction_preserved(self):
         """For parallel surfaces, exit direction equals entry direction."""
@@ -199,13 +201,15 @@ class TestRefractSlab:
         n_out, n_in = 1.0, 1.5
         thickness = 0.01
 
-        exit_dir, exit_pos, transmittance, valid = refract_slab(
+        exit_dir, exit_pos, transmittance, valid, opl_inside = refract_slab(
             direction, normal, position, n_out, n_in, thickness
         )
 
         # Exit direction should match entry direction
         assert jnp.allclose(exit_dir, direction, atol=1e-6)
         assert valid
+        # OPL inside is n_in * (thickness / cos_theta_inside) > n_in * thickness
+        assert opl_inside > n_in * thickness
 
     def test_lateral_displacement_increases_with_angle(self):
         """Oblique rays have larger lateral offset than normal rays."""
@@ -216,12 +220,12 @@ class TestRefractSlab:
 
         # Normal incidence
         dir_normal = jnp.array([0.0, 0.0, -1.0])
-        _, pos_normal, _, _ = refract_slab(dir_normal, normal, position, n_out, n_in, thickness)
+        _, pos_normal, _, _, _ = refract_slab(dir_normal, normal, position, n_out, n_in, thickness)
 
         # 30 degree incidence
         theta_30 = jnp.deg2rad(30.0)
         dir_30 = jnp.array([jnp.sin(theta_30), 0.0, -jnp.cos(theta_30)])
-        _, pos_30, _, _ = refract_slab(dir_30, normal, position, n_out, n_in, thickness)
+        _, pos_30, _, _, _ = refract_slab(dir_30, normal, position, n_out, n_in, thickness)
 
         # Lateral offset (in x) should be larger for oblique ray
         assert jnp.abs(pos_30[0]) > jnp.abs(pos_normal[0]) + 1e-10
@@ -234,7 +238,7 @@ class TestRefractSlab:
         n_out, n_in = 1.0, 1.5
         thickness = 0.01
 
-        _, _, transmittance, valid = refract_slab(
+        _, _, transmittance, valid, _ = refract_slab(
             direction, normal, position, n_out, n_in, thickness
         )
 
@@ -254,7 +258,7 @@ class TestRefractSlab:
         n_out, n_in = 1.0, 1.5
         thickness = 0.01
 
-        _, _, _, valid = refract_slab(direction, normal, position, n_out, n_in, thickness)
+        _, _, _, valid, _ = refract_slab(direction, normal, position, n_out, n_in, thickness)
 
         assert valid
 
@@ -266,8 +270,8 @@ class TestRefractSlab:
         position = jnp.array([0.0, 0.0, 0.0])
         n_out, n_in = 1.0, 1.5
 
-        _, pos_thin, _, _ = refract_slab(direction, normal, position, n_out, n_in, thickness=0.01)
-        _, pos_thick, _, _ = refract_slab(direction, normal, position, n_out, n_in, thickness=0.02)
+        _, pos_thin, _, _, _ = refract_slab(direction, normal, position, n_out, n_in, thickness=0.01)
+        _, pos_thick, _, _, _ = refract_slab(direction, normal, position, n_out, n_in, thickness=0.02)
 
         # Thicker slab should have larger x offset
         assert jnp.abs(pos_thick[0]) > jnp.abs(pos_thin[0])
@@ -280,7 +284,7 @@ class TestRefractSlab:
         n_out, n_in = 1.0, 1.5
         thickness = 0.015
 
-        _, exit_pos, _, _ = refract_slab(direction, normal, position, n_out, n_in, thickness)
+        _, exit_pos, _, _, _ = refract_slab(direction, normal, position, n_out, n_in, thickness)
 
         # Z displacement should be exactly the thickness
         assert jnp.isclose(exit_pos[2] - position[2], -thickness, atol=1e-10)

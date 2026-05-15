@@ -1,5 +1,4 @@
 import jax.numpy as jnp
-import pytest
 
 from iactrace import RayBundle
 from iactrace.analysis import (
@@ -19,6 +18,7 @@ def _downward_bundle(origins):
         directions=directions,
         values=jnp.ones(n),
         path_length=jnp.zeros(n),
+        n=jnp.ones(n),
     )
 
 
@@ -114,7 +114,3 @@ class TestVmapping:
             jnp.array([[0.0, 0.0], [0.5, 0.0], [0.0, 0.5]]),
             atol=1e-6,
         )
-
-
-if __name__ == "__main__":
-    pytest.main([__file__, "-v"])
