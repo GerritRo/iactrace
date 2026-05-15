@@ -8,12 +8,13 @@ applies uniformly across the library.
 Coordinate frame
 ----------------
 
-Right-handed Cartesian. World coordinates have:
+Coordinate frame like in sim_telarray. Assuming the telescope is first
+pointed towards magnetic north and then up to the zenith.
 
 - **Z-axis** along the optical axis, pointing from the primary mirror
   toward the sky (positive Z is "up", toward incoming light).
-- **X-axis** along the altitude rotation axis of the mount.
-- **Y-axis** along the azimuth rotation axis (orthogonal to X and Z).
+- **X-axis** along the north-south axis
+- **Y-axis** along the west-east axis
 
 The origin is conventionally at the centre of the primary-mirror dish.
 After optics tracing, rays are expressed in the **camera-local frame**
