@@ -35,6 +35,14 @@ class FocalSurfaceHits(eqx.Module):
         hit_mask: True for rays that actually crossed the surface (n_rays,).
         directions_local: Ray directions in the surface-local frame (n_rays, 3).
             Useful for chief-ray / angle-of-incidence analysis.
+        opl: Per-ray optical path length from the source wavefront to the
+            focal surface, in metres (n_rays,). Equals
+            ``ray_bundle.path_length + t * ray_bundle.n`` — the final
+            geometric leg from the bundle's origin to the focal surface
+            is weighted by the ray's current medium index. Use directly
+            for OPD / wavefront-error analysis; for a parallel source
+            the absolute value carries a per-source constant offset, so
+            differences across rays are the physical quantity.
     """
 
     xy_local: Array
@@ -42,6 +50,7 @@ class FocalSurfaceHits(eqx.Module):
     t: Array
     hit_mask: Array
     directions_local: Array
+    opl: Array
 
 
 class FocalSurface(eqx.Module):
@@ -87,9 +96,7 @@ class FocalSurface(eqx.Module):
             ray_bundle = ray_bundle.materialise()
 
         rot = euler_to_matrix(self.rotation)
-        # World -> local: subtract vertex, then express in local axes.
-        # Columns of R are the local axes in world coords, so o_world @ R
-        # gives the local components.
+
         o_local = (ray_bundle.origins - self.position) @ rot
         d_local = ray_bundle.directions @ rot
 
@@ -97,12 +104,17 @@ class FocalSurface(eqx.Module):
             o_local, d_local,
         )
         hit_mask = valid & jnp.isfinite(t)
+
+        opl = ray_bundle.path_length + jnp.where(
+            hit_mask, t * ray_bundle.n, 0.0,
+        )
         return FocalSurfaceHits(
             xy_local=xy_local,
             z_local=z_local,
             t=t,
             hit_mask=hit_mask,
             directions_local=d_local,
+            opl=opl,
         )
 
 
@@ -186,9 +198,7 @@ class AsphericFocalSurface(FocalSurface):
         a = self.aspherics
 
         # Closed-form conic intersection as initial guess; Newton-Raphson then
-        # refines for the aspheric terms. With the vertex at the local origin,
-        # the offset machinery in AsphericSurfaceGroup.intersect_at collapses
-        # and we work directly with sag_raw.
+        # refines for the aspheric terms.
         t_init = intersect_conic(o_local, d_local, c, k)
         t, hit_xy, valid = newton_raphson_intersect(
             lambda x, y: sag_raw(x, y, c, k, a),

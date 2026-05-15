@@ -38,4 +38,5 @@ class Concentrator(eqx.Module):
             directions=jnp.stack([edx, edy, edz], axis=-1),
             values=ray_bundle.values * tp,
             path_length=ray_bundle.path_length,
+            n=ray_bundle.n,
         )

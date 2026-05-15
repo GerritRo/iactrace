@@ -70,7 +70,10 @@ def intersect_sensor(
     s_idx = s_idx.astype(jnp.int32)
 
     hit_mask = t_sensor < 1e10
-    path_length = ray_bundle.path_length + jnp.where(hit_mask, t_sensor, 0.0)
+    # Weight the final geometric leg by the ray's current medium index.
+    path_length = ray_bundle.path_length + jnp.where(
+        hit_mask, t_sensor * ray_bundle.n, 0.0,
+    )
     dz = jnp.sqrt(jnp.maximum(1.0 - dx**2 - dy**2, 0.0))
 
     sensor_rays = RayBundle(
@@ -78,6 +81,7 @@ def intersect_sensor(
         directions=jnp.stack([dx, dy, dz], axis=-1),
         values=ray_bundle.values,
         path_length=path_length,
+        n=ray_bundle.n,
     )
     return sensor_rays, s_idx, hit_mask
 

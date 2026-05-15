@@ -25,9 +25,19 @@ def _shadow_mask(origins, directions, obstructions, max_t=1e10):
     return mask
 
 
-def _trace_stage(origins, directions, values, group, obstructions):
+def _trace_stage(origins, directions, values, current_n, group, obstructions):
     """Process rays through one optical stage: intersect all elements, apply physics,
-    check shadows. Returns (new_origins, new_directions, new_values, segment_length).
+    check shadows.
+
+    Returns ``(new_origins, new_directions, new_values, segment_length,
+    opl_internal, new_n)``:
+
+    * ``segment_length`` — geometric distance from the previous stage
+      to this surface (in the medium ``current_n``).
+    * ``opl_internal`` — per-ray OPL accumulated *inside* the
+      interaction (non-zero only for slabs / windows).
+    * ``new_n`` — per-ray refractive index of the medium the ray is in
+      after this stage, ready to weight the next segment.
 
     Uses lax.scan over elements, keeping only the closest hit per ray.
     Memory usage is O(n_rays) regardless of element count.
@@ -79,13 +89,21 @@ def _trace_stage(origins, directions, values, group, obstructions):
     roughness_key = jr.fold_in(group.sample_key, 0xB5DF01)
     best_norms = group.bsdf.perturb_normals(safe_norms, roughness_key, best_elem)
 
-    new_dirs, new_origins, coeffs = group.interaction_module.apply(
-        directions, best_norms, best_pts, best_elem
+    new_dirs, new_origins, coeffs, opl_internal, new_n = (
+        group.interaction_module.apply(
+            directions, best_norms, best_pts, best_elem, current_n,
+        )
     )
 
     shadow = _shadow_mask(origins, directions, obstructions, best_t)
     segment = jnp.where(hit, best_t, 0.0)
-    return new_origins, new_dirs, values * hit * shadow * coeffs, segment
+    opl_internal = jnp.where(hit, opl_internal, 0.0)
+    # Rays that missed keep their medium; only rays that interacted update it.
+    new_n = jnp.where(hit, new_n, current_n)
+    return (
+        new_origins, new_dirs, values * hit * shadow * coeffs,
+        segment, opl_internal, new_n,
+    )
 
 
 def _build_primary_geometry(group):
@@ -109,23 +127,37 @@ def _build_source_rays(points, normals, weights, sources, source_values,
         points: (n_samples, 3) sampled surface points for one element.
         normals: (n_samples, 3) surface normals at those points.
         weights: (n_samples, 1) importance weights.
-        sources: (n_sources, 3) source positions or directions.
+        sources: (n_sources, 3) source positions or unit propagation
+            directions (depending on ``source_type``).
         source_values: (n_sources,) source intensities.
         source_type: 'point' or 'parallel'.
         obstruction_groups: list of ObstructionGroup for shadow testing.
 
     Returns:
-        (origins, directions, normals, values) all shaped (n_rays, ...).
+        ``(origins, directions, normals, values, leg_in)`` all shaped
+        (n_rays, ...). ``leg_in`` is the optical path length each ray
+        already accumulated travelling from the source (or reference
+        wavefront) to its primary sample point — added to
+        ``path_length`` so the Monte-Carlo sampling location on the
+        primary doesn't conflate with downstream OPL analysis.
     """
     n_sources = sources.shape[0]
     n_samples = points.shape[0]
     n_rays = n_sources * n_samples
 
     if source_type == 'point':
-        dirs = points[None, :, :] - sources[:, None, :]
-        dirs = dirs / jnp.linalg.norm(dirs, axis=-1, keepdims=True)
+        deltas = points[None, :, :] - sources[:, None, :]
+        lengths = jnp.linalg.norm(deltas, axis=-1)
+        dirs = deltas / lengths[..., None]
+        # Distance from each source to each primary sample point.
+        leg_in = lengths
     else:
         dirs = jnp.broadcast_to(sources[:, None, :], (n_sources, n_samples, 3))
+        # Signed offset of each sample point from a reference wavefront
+        # plane through the world origin, perpendicular to the source
+        # direction. Per-source constant offset is absorbed; per-sample
+        # *differences* exactly cancel the geometric sag of the primary.
+        leg_in = (points[None, :, :] * dirs).sum(axis=-1)
 
     dirs_flat = dirs.reshape(n_rays, 3)
     origins_flat = jnp.broadcast_to(
@@ -134,6 +166,7 @@ def _build_source_rays(points, normals, weights, sources, source_values,
     normals_flat = jnp.broadcast_to(
         normals[None, :, :], (n_sources, n_samples, 3)
     ).reshape(n_rays, 3)
+    leg_in_flat = leg_in.reshape(n_rays)
 
     shadow = _shadow_mask(origins_flat, -dirs_flat, obstruction_groups)
     weights_flat = jnp.broadcast_to(
@@ -143,32 +176,34 @@ def _build_source_rays(points, normals, weights, sources, source_values,
         source_values[:, None], (n_sources, n_samples)
     ).reshape(n_rays) / weights_flat * shadow
 
-    return origins_flat, dirs_flat, normals_flat, vals
+    return origins_flat, dirs_flat, normals_flat, vals, leg_in_flat
 
 
 def _apply_primary_interaction(group, element_idx, origins, directions,
-                               normals, values):
+                               normals, values, current_n):
     """Apply stage-0 physics: interaction + cos-theta weighting.
 
     Returns:
-        (new_origins, new_directions, updated_values).
+        (new_origins, new_directions, updated_values, new_n).
     """
     n_rays = origins.shape[0]
     elem_indices = jnp.full((n_rays,), element_idx, dtype=jnp.int32)
 
-    new_dirs, new_origins, coeffs = group.interaction_module.apply(
-        directions, normals, origins, elem_indices
+    new_dirs, new_origins, coeffs, _opl_internal, new_n = (
+        group.interaction_module.apply(
+            directions, normals, origins, elem_indices, current_n,
+        )
     )
 
     cos_theta = jnp.abs(jnp.sum(directions * normals, axis=-1))
-    return new_origins, new_dirs, values * coeffs * cos_theta
+    return new_origins, new_dirs, values * coeffs * cos_theta, new_n
 
 
 def _empty_bundle() -> RayBundle:
     z = jnp.zeros(0)
     return RayBundle(
         origins=jnp.zeros((0, 3)), directions=jnp.zeros((0, 3)),
-        values=z, path_length=z,
+        values=z, path_length=z, n=z,
     )
 
 
@@ -180,21 +215,26 @@ def _trace_one_element(stages, stage_indices, geom, sources, values,
     in world coordinates, source-major.
     """
     s0_points, s0_normals, s0_weights = geom
-    origins, dirs, normals, vals = _build_source_rays(
+    origins, dirs, normals, vals, leg_in = _build_source_rays(
         s0_points[eidx], s0_normals[eidx], s0_weights[eidx],
         sources, values, source_type, obstructions,
     )
-    origins, dirs, vals = _apply_primary_interaction(
-        stages[0], eidx, origins, dirs, normals, vals,
+    current_n = jnp.ones(vals.shape[0])
+    origins, dirs, vals, current_n = _apply_primary_interaction(
+        stages[0], eidx, origins, dirs, normals, vals, current_n,
     )
-    path_length = jnp.zeros(vals.shape[0])
+    # Seed OPL with the source-to-primary leg so the Monte-Carlo sample
+    # location on the primary doesn't conflate with downstream analysis.
+    path_length = leg_in
     for sidx in stage_indices[1:]:
-        origins, dirs, vals, seg = _trace_stage(
-            origins, dirs, vals, stages[sidx], obstructions,
+        origins, dirs, vals, seg, opl_internal, new_n = _trace_stage(
+            origins, dirs, vals, current_n, stages[sidx], obstructions,
         )
-        path_length = path_length + seg
+        path_length = path_length + current_n * seg + opl_internal
+        current_n = new_n
     return RayBundle(
-        origins=origins, directions=dirs, values=vals, path_length=path_length,
+        origins=origins, directions=dirs, values=vals,
+        path_length=path_length, n=current_n,
     )
 
 
@@ -289,17 +329,20 @@ def trace_optics(optical_groups, obstruction_groups, ray_origins, ray_directions
 
     origins, dirs, vals = ray_origins, ray_directions, values
     path_length = jnp.zeros(vals.shape[0])
+    current_n = jnp.ones(vals.shape[0])
 
     if stage_indices:
         for stage_idx in stage_indices:
-            origins, dirs, vals, seg = _trace_stage(
-                origins, dirs, vals, stages[stage_idx], obstruction_groups
+            origins, dirs, vals, seg, opl_internal, new_n = _trace_stage(
+                origins, dirs, vals, current_n, stages[stage_idx], obstruction_groups
             )
-            path_length = path_length + seg
+            path_length = path_length + current_n * seg + opl_internal
+            current_n = new_n
 
     return RayBundle(
         origins=origins,
         directions=dirs,
         values=vals,
         path_length=path_length,
+        n=current_n,
     )

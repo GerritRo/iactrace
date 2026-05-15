@@ -32,13 +32,28 @@ class RayBundle(eqx.Module):
         origins: Ray positions in 3D (n_rays, 3)
         directions: Ray direction vectors (n_rays, 3)
         values: Throughput-weighted ray intensities (n_rays,)
-        path_length: Accumulated geometric path length (n_rays,)
+        path_length: Accumulated **optical** path length per ray
+            (n_rays,), in metres. Equal to ``Σ nᵢ · Lᵢ`` along the ray
+            path, *including* the source-to-primary leg. For point
+            sources this leg is the geometric distance from source to
+            primary sample point; for parallel sources it is the
+            signed offset of the sample point from a reference
+            wavefront plane through the world origin (so OPL
+            differences across rays are physical, the absolute value
+            carries a per-source constant offset).
+        n: Per-ray refractive index of the medium each ray is
+            currently propagating in (n_rays,). Carried so downstream
+            consumers (sensor intersection, focal-surface analysis)
+            can weight the final geometric leg correctly. Slab
+            interactions additionally contribute their internal
+            ``n_in · L_internal`` term to ``path_length``.
     """
 
     origins: Array
     directions: Array
     values: Array
     path_length: Array
+    n: Array
 
     def to_frame(self, origin: Array, rotation: Array) -> RayBundle:
         """Express these rays in the local frame given by ``origin`` + Euler ``rotation``.
@@ -52,6 +67,7 @@ class RayBundle(eqx.Module):
             directions=self.directions @ rot,
             values=self.values,
             path_length=self.path_length,
+            n=self.n,
         )
 
 
