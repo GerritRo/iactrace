@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.8.0 (2026-06-11)
+
+### Feat
+
+- **opl**: make opl behave as expected, weighted with index of refraction, add distance to source or initial mirror
+
+### Fix
+
+- **viz**: fixed 3D visualization to correctly handle transparency in jupyter notebooks
+
 ## v0.7.0 (2026-05-12)
 
 ### Feat
