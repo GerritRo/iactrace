@@ -25,7 +25,27 @@ class Interaction(eqx.Module):
     def interaction_type(self) -> InteractionType: ...
 
     @abstractmethod
-    def apply(self, directions, normals, points, element_idx): ...
+    def apply(self, directions, normals, points, element_idx, current_n):
+        """Apply the interaction at hit points.
+
+        Args:
+            directions, normals, points, element_idx: per-ray geometry
+                at the surface hit.
+            current_n: per-ray refractive index of the medium the ray
+                is currently propagating in. Used as the incident-side
+                index for refraction physics, so OPL is exact even
+                through stacked refractive surfaces.
+
+        Returns a 5-tuple ``(new_directions, new_positions, coefficients,
+        opl_internal, new_n)``:
+
+        * ``opl_internal`` is the per-ray optical path length accumulated
+          *inside* the interaction itself (non-zero only for slab /
+          window elements, which carry an internal ``n·L`` segment).
+        * ``new_n`` is the per-ray refractive index of the medium the
+          ray exits into. The render loop uses it to weight the next
+          inter-stage segment.
+        """
 
 
 # Core physics functions
@@ -130,6 +150,9 @@ def refract_slab(direction, normal, position, n_out, n_in, thickness):
         exit_position: Position where ray exits slab (3,).
         transmittance: Combined Fresnel transmission for both surfaces.
         valid: True if ray transmitted (no TIR).
+        opl_inside: Optical path length traversed inside the slab,
+            ``n_in * thickness / cos_to_normal``. Zero when the ray is
+            lost to total internal reflection.
     """
     # Entry refraction
     dir_inside, cos_t_entry, tir_entry = refract(direction, normal, n_out, n_in)
@@ -149,8 +172,9 @@ def refract_slab(direction, normal, position, n_out, n_in, thickness):
 
     valid = ~tir_entry & ~tir_exit
     transmittance = jnp.where(valid, T_entry * T_exit, 0.0)
+    opl_inside = jnp.where(valid, n_in * path_length, 0.0)
 
-    return exit_direction, exit_position, transmittance, valid
+    return exit_direction, exit_position, transmittance, valid, opl_inside
 
 
 # Interaction modules
@@ -168,22 +192,37 @@ class ReflectInteraction(Interaction):
     def interaction_type(self) -> InteractionType:
         return InteractionType.REFLECT
 
-    def apply(self, directions, normals, points, element_idx):
+    def apply(self, directions, normals, points, element_idx, current_n):
         """Apply reflection at hit points.
 
-        Returns:
-            (new_directions, new_positions, coefficients)
+        Reflection does not change the medium — ``new_n == current_n``.
         """
         reflected, _ = jax.vmap(reflect)(directions, normals)
-        return reflected, points, self.reflectivity[element_idx]
+        opl_internal = jnp.zeros(directions.shape[0])
+        return reflected, points, self.reflectivity[element_idx], opl_internal, current_n
 
 
 class RefractInteraction(Interaction):
     """Single-surface refraction interaction for lenses.
 
+    Semantically, this represents the ray crossing a single interface
+    from one medium into another. The incident-side index is the
+    per-ray tracked medium (``current_n``); ``n_inside`` is the index
+    on the far side of this surface. A real glass body (e.g. a
+    biconvex lens) is modelled as two consecutive
+    :class:`RefractInteraction` stages — front then back surface — and
+    the render loop's per-ray medium tracker carries the correct index
+    through the glass interior between them, so OPL is exact.
+
     Attributes:
-        n_inside: Refractive index of material per element (N,).
-        n_outside: Ambient refractive index (scalar).
+        n_inside: Refractive index on the far side of this surface,
+            per element (N,). "Far side" means the medium the ray
+            transmits *into*: for a front surface this is the glass
+            index, for a back surface it is the ambient index.
+        n_outside: Retained for back-compat and (de)serialisation
+            (YAML schema). The render loop ignores it and uses the
+            per-ray tracked medium index instead, so OPL is correct
+            regardless of what was written here.
         transmittance: Bulk transmission coefficient per element (N,).
     """
 
@@ -195,31 +234,40 @@ class RefractInteraction(Interaction):
     def interaction_type(self) -> InteractionType:
         return InteractionType.REFRACT
 
-    def apply(self, directions, normals, points, element_idx):
+    def apply(self, directions, normals, points, element_idx, current_n):
         """Apply refraction at hit points (Snell's law + Fresnel).
 
-        Returns:
-            (new_directions, new_positions, coefficients)
+        Uses ``current_n`` (the per-ray tracked medium index) as the
+        incident-side index and ``self.n_inside[element_idx]`` as the
+        transmitted-side index. Returns ``new_n = n_inside[element_idx]``
+        so the ray's medium follows it through the next segment.
         """
         n_in = self.n_inside[element_idx]
-        n_out = self.n_outside
 
-        def f(d, n, ni):
-            refracted, cos_t, tir = refract(d, n, n_out, ni)
+        def f(d, n, n1, n2):
+            refracted, cos_t, tir = refract(d, n, n1, n2)
             cos_i = jnp.abs(jnp.dot(d, n))
-            _, T = fresnel_unpolarized(cos_i, cos_t, n_out, ni)
+            _, T = fresnel_unpolarized(cos_i, cos_t, n1, n2)
             return refracted, jnp.where(tir, 0.0, T)
 
-        refracted, fresnel_T = jax.vmap(f)(directions, normals, n_in)
-        return refracted, points, self.transmittance[element_idx] * fresnel_T
+        refracted, fresnel_T = jax.vmap(f)(directions, normals, current_n, n_in)
+        opl_internal = jnp.zeros(directions.shape[0])
+        return refracted, points, self.transmittance[element_idx] * fresnel_T, opl_internal, n_in
 
 
 class SlabInteraction(Interaction):
     """Parallel-sided slab (window) interaction.
 
+    The ray enters from its current medium (``current_n``), refracts
+    into the slab material, traverses it, and refracts back out into
+    the *same* medium — slabs assume the ambient is symmetric across
+    them, which is the usual case for a window.
+
     Attributes:
         n_inside: Refractive index of slab material per element (N,).
-        n_outside: Ambient refractive index (scalar).
+        n_outside: Retained for back-compat / (de)serialisation. The
+            render loop ignores it and uses the per-ray tracked medium
+            index for both entry and exit refraction.
         thickness: Slab thickness per element (N,).
         transmittance: Bulk transmission coefficient per element (N,).
     """
@@ -233,19 +281,26 @@ class SlabInteraction(Interaction):
     def interaction_type(self) -> InteractionType:
         return InteractionType.SLAB
 
-    def apply(self, directions, normals, points, element_idx):
+    def apply(self, directions, normals, points, element_idx, current_n):
         """Apply slab refraction (entry + propagation + exit).
 
-        Returns:
-            (new_directions, new_positions, coefficients)
+        ``opl_internal[i] = n_in * thickness / cos(theta_inside)`` is
+        the optical path length traversed inside the slab glass; zero
+        for rays lost to total internal reflection. The slab exits
+        back into the incoming medium, so ``new_n = current_n``.
         """
         n_in = self.n_inside[element_idx]
-        n_out = self.n_outside
         thick = self.thickness[element_idx]
 
-        def f(d, n, pos, ni, th):
-            ed, ep, tc, _ = refract_slab(d, n, pos, n_out, ni, th)
-            return ed, ep, tc
+        def f(d, n, pos, n_amb, ni, th):
+            ed, ep, tc, _, opl = refract_slab(d, n, pos, n_amb, ni, th)
+            return ed, ep, tc, opl
 
-        exit_dirs, exit_pos, tc = jax.vmap(f)(directions, normals, points, n_in, thick)
-        return exit_dirs, exit_pos, self.transmittance[element_idx] * tc
+        exit_dirs, exit_pos, tc, opl_internal = jax.vmap(f)(
+            directions, normals, points, current_n, n_in, thick,
+        )
+        return (
+            exit_dirs, exit_pos,
+            self.transmittance[element_idx] * tc,
+            opl_internal, current_n,
+        )

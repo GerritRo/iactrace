@@ -6,6 +6,25 @@ from ..core import euler_to_matrix
 from ._utils import convex_hull_2d as _convex_hull_2d
 
 
+def _apply_color(mesh, rgba):
+    """Apply RGBA color to a mesh with correct transparency for three.js/glTF rendering.
+
+    glTF materials default to alphaMode='OPAQUE', which causes three.js to ignore
+    the alpha channel even when face colors have alpha < 255. Using PBRMaterial with
+    alphaMode='BLEND' fixes this for semi-transparent colors.
+    """
+    rgba = list(rgba)
+    if rgba[3] < 255:
+        factor = [c / 255.0 for c in rgba]
+        mat = trimesh.visual.material.PBRMaterial(
+            baseColorFactor=factor,
+            alphaMode='BLEND',
+        )
+        mesh.visual = trimesh.visual.TextureVisuals(material=mat)
+    else:
+        mesh.visual.face_colors = rgba
+
+
 def show_telescope(telescope, camera=None, **kwargs):
     """
     Visualize telescope in 3D.
@@ -37,7 +56,7 @@ def show_telescope(telescope, camera=None, **kwargs):
         meshes = _get_mirror_meshes(group)
         if meshes:
             combined = trimesh.util.concatenate(meshes)
-            combined.visual.face_colors = mirror_color
+            _apply_color(combined, mirror_color)
             scene.add_geometry(combined)
 
     # Add lens groups
@@ -45,7 +64,7 @@ def show_telescope(telescope, camera=None, **kwargs):
         meshes = _get_lens_meshes(group)
         if meshes:
             combined = trimesh.util.concatenate(meshes)
-            combined.visual.face_colors = lens_color
+            _apply_color(combined, lens_color)
             scene.add_geometry(combined)
 
     # Add obstruction groups
@@ -53,7 +72,7 @@ def show_telescope(telescope, camera=None, **kwargs):
         meshes = _get_obstruction_meshes(group)
         if meshes:
             combined = trimesh.util.concatenate(meshes)
-            combined.visual.face_colors = obstruction_color
+            _apply_color(combined, obstruction_color)
             scene.add_geometry(combined)
 
     # Add sensors from camera
@@ -65,7 +84,7 @@ def show_telescope(telescope, camera=None, **kwargs):
             meshes = _get_sensor_meshes(sensor_group)
             for mesh in meshes:
                 mesh.apply_transform(cam_transform)
-                mesh.visual.face_colors = sensor_color
+                _apply_color(mesh, sensor_color)
                 scene.add_geometry(mesh)
 
     return scene
