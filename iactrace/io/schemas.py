@@ -48,9 +48,35 @@ class SurfaceSchema(BaseModel):
     aspheric: list[float] = Field(default_factory=list)
 
 
-class BSDFSchema(BaseModel):
-    type: str = "gaussian"
+class GaussianBSDFSchema(BaseModel):
+    """Single-Gaussian surface roughness.
+
+    See :class:`~iactrace.core.bsdf.GaussianBSDF`.
+    """
+
+    type: Literal["gaussian"] = "gaussian"
     scale: float = Field(ge=0, default=0.0)
+
+
+class DoubleGaussianBSDFSchema(BaseModel):
+    """Two-component (narrow + wide) Gaussian roughness mixture.
+
+    See :class:`~iactrace.core.bsdf.DoubleGaussianBSDF`.
+    """
+
+    type: Literal["double_gaussian"] = "double_gaussian"
+    scale_narrow: float = Field(ge=0, default=0.0)
+    scale_wide: float = Field(ge=0, default=0.0)
+    mix_weight: float = Field(ge=0, le=1, default=0.0)
+
+
+# Discriminated on ``type`` so new BSDF models are added by appending a
+# variant here (and a matching arm in the io adapters) — no schema churn
+# elsewhere. Mirrors the ApertureSchema / LensSchema pattern.
+BSDFSchema = Annotated[
+    GaussianBSDFSchema | DoubleGaussianBSDFSchema,
+    Field(discriminator="type"),
+]
 
 
 class TabulatedCurveSchema(BaseModel):
@@ -114,8 +140,7 @@ class MirrorSchema(BaseModel):
     aspheric: list[float] | None = None
     offset: Vec2 = Field(default_factory=lambda: [0.0, 0.0])
     stage: int = Field(ge=0, default=0)
-    bsdf_scale: float | None = None
-    bsdf_type: str | None = None
+    bsdf: BSDFSchema | None = None
     reflectivity: float | None = None
     id: str | None = None
 
