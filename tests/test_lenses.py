@@ -29,7 +29,8 @@ class TestAsphericDiskLensGroup:
         interaction = RefractInteraction(
             n_inside=n_inside_arr,
             n_outside=float(n_outside),
-            transmittance=transmittance_arr,
+            transmittance=None,
+            transmittance_scalar=transmittance_arr,
         )
         return OpticalElementGroup(
             positions=positions,
@@ -106,7 +107,7 @@ class TestAsphericDiskLensGroup:
             n_inside=1.5,
         )
 
-        assert jnp.allclose(lens.interaction_module.transmittance, jnp.array([1.0]))
+        assert jnp.allclose(lens.interaction_module.transmittance_scalar, jnp.array([1.0]))
 
 
 class TestPlanoSlabGroup:
@@ -133,7 +134,8 @@ class TestPlanoSlabGroup:
             n_inside=n_inside_arr,
             n_outside=float(n_outside),
             thickness=thickness_arr,
-            transmittance=transmittance_arr,
+            transmittance=None,
+            transmittance_scalar=transmittance_arr,
         )
         return OpticalElementGroup(
             positions=positions,

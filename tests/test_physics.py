@@ -1,6 +1,12 @@
 import jax.numpy as jnp
 
-from iactrace.core.interactions import fresnel_unpolarized, refract, refract_slab
+from iactrace.core.coatings import fresnel_unpolarized
+from iactrace.core.interactions import refract, refract_slab
+
+
+def _cos_t_from_direction(refracted, normal):
+    """Derive the transmitted-angle cosine from the refracted ray direction."""
+    return jnp.abs(jnp.dot(refracted, normal))
 
 
 class TestRefract:
@@ -12,59 +18,54 @@ class TestRefract:
         normal = jnp.array([0.0, 0.0, 1.0])      # Pointing up
         n1, n2 = 1.0, 1.5
 
-        refracted, cos_t, tir = refract(direction, normal, n1, n2)
+        refracted, cos_i, tir = refract(direction, normal, n1, n2)
 
         # Direction should be unchanged (still pointing down)
         assert jnp.allclose(refracted, direction, atol=1e-10)
-        assert jnp.isclose(cos_t, 1.0, atol=1e-10)
+        assert jnp.isclose(cos_i, 1.0, atol=1e-10)
         assert not tir
 
     def test_snells_law_air_to_glass(self):
         """Verify Snell's law: n1*sin(theta1) = n2*sin(theta2)."""
-        # 45 degree incidence from air (n=1) to glass (n=1.5)
         theta_i = jnp.pi / 4
         direction = jnp.array([jnp.sin(theta_i), 0.0, -jnp.cos(theta_i)])
         normal = jnp.array([0.0, 0.0, 1.0])
         n1, n2 = 1.0, 1.5
 
-        refracted, cos_t, tir = refract(direction, normal, n1, n2)
+        refracted, _, tir = refract(direction, normal, n1, n2)
 
-        # Check Snell's law
         sin_theta_i = jnp.sin(theta_i)
+        cos_t = _cos_t_from_direction(refracted, normal)
         sin_theta_t = jnp.sqrt(1.0 - cos_t**2)
         assert jnp.isclose(n1 * sin_theta_i, n2 * sin_theta_t, rtol=1e-6)
         assert not tir
 
     def test_snells_law_glass_to_air(self):
         """Refraction from glass to air bends ray away from normal."""
-        # 20 degree incidence from glass (n=1.5) to air (n=1)
         theta_i = jnp.deg2rad(20.0)
         direction = jnp.array([jnp.sin(theta_i), 0.0, -jnp.cos(theta_i)])
         normal = jnp.array([0.0, 0.0, 1.0])
         n1, n2 = 1.5, 1.0
 
-        refracted, cos_t, tir = refract(direction, normal, n1, n2)
+        refracted, _, tir = refract(direction, normal, n1, n2)
 
-        # Check Snell's law
         sin_theta_i = jnp.sin(theta_i)
+        cos_t = _cos_t_from_direction(refracted, normal)
         sin_theta_t = jnp.sqrt(1.0 - cos_t**2)
         assert jnp.isclose(n1 * sin_theta_i, n2 * sin_theta_t, rtol=1e-6)
         assert not tir
 
     def test_total_internal_reflection_critical_angle(self):
         """TIR occurs above critical angle when going from dense to less dense."""
-        # Critical angle for glass (n=1.5) to air (n=1) is arcsin(1/1.5) ≈ 41.8°
         n1, n2 = 1.5, 1.0
         theta_critical = jnp.arcsin(n2 / n1)
 
-        # Just below critical angle - should refract
         theta_below = theta_critical - 0.05
         direction_below = jnp.array([jnp.sin(theta_below), 0.0, -jnp.cos(theta_below)])
         normal = jnp.array([0.0, 0.0, 1.0])
         _, _, tir_below = refract(direction_below, normal, n1, n2)
         assert not tir_below
 
-        # Just above critical angle - should have TIR
         theta_above = theta_critical + 0.05
         direction_above = jnp.array([jnp.sin(theta_above), 0.0, -jnp.cos(theta_above)])
         _, _, tir_above = refract(direction_above, normal, n1, n2)
@@ -93,82 +94,76 @@ class TestRefract:
 
     def test_refraction_plane_preserved(self):
         """Refracted ray stays in the plane of incidence."""
-        # Incidence in x-z plane
-        direction = jnp.array([0.5, 0.0, -0.866])  # 30 degrees
+        direction = jnp.array([0.5, 0.0, -0.866])
         direction = direction / jnp.linalg.norm(direction)
         normal = jnp.array([0.0, 0.0, 1.0])
 
         refracted, _, _ = refract(direction, normal, 1.0, 1.5)
 
-        # y component should remain zero
         assert jnp.isclose(refracted[1], 0.0, atol=1e-10)
 
 
 class TestFresnelUnpolarized:
-    """Test Fresnel reflection/transmission coefficients."""
+    """Test Fresnel reflection/transmission coefficients.
+
+    ``fresnel_unpolarized`` derives ``cos_t`` from ``cos_i`` via Snell,
+    so the API takes only the incidence cosine and the two indices.
+    """
 
     def test_normal_incidence_formula(self):
         """At normal incidence, R = ((n1-n2)/(n1+n2))^2."""
         n1, n2 = 1.0, 1.5
-        cos_theta_i = 1.0
-        cos_theta_t = 1.0
-
-        R, T = fresnel_unpolarized(cos_theta_i, cos_theta_t, n1, n2)
+        R, T = fresnel_unpolarized(1.0, n1, n2)
 
         R_expected = ((n1 - n2) / (n1 + n2))**2
         assert jnp.isclose(R, R_expected, rtol=1e-6)
         assert jnp.isclose(R + T, 1.0, atol=1e-10)
 
     def test_energy_conservation(self):
-        """R + T = 1 for all angles."""
+        """R + T = 1 for all angles below TIR."""
         n1, n2 = 1.0, 1.5
         for theta_i in [0.0, 0.2, 0.5, 0.8, 1.0]:
-            cos_i = jnp.cos(theta_i)
-            # Compute transmitted angle from Snell's law
-            sin_t = (n1 / n2) * jnp.sin(theta_i)
-            cos_t = jnp.sqrt(1.0 - sin_t**2)
-
-            R, T = fresnel_unpolarized(cos_i, cos_t, n1, n2)
-
+            R, T = fresnel_unpolarized(jnp.cos(theta_i), n1, n2)
             assert jnp.isclose(R + T, 1.0, atol=1e-10)
 
     def test_reflectance_increases_with_angle(self):
-        """Reflectance generally increases with incidence angle."""
+        """Reflectance grows monotonically with incidence angle."""
         n1, n2 = 1.0, 1.5
-
-        R_values = []
-        for theta_deg in [0, 30, 60, 80]:
-            theta_i = jnp.deg2rad(theta_deg)
-            cos_i = jnp.cos(theta_i)
-            sin_t = (n1 / n2) * jnp.sin(theta_i)
-            cos_t = jnp.sqrt(1.0 - sin_t**2)
-            R, _ = fresnel_unpolarized(cos_i, cos_t, n1, n2)
-            R_values.append(float(R))
-
-        # Each R should be >= previous (monotonic increase)
+        R_values = [
+            float(fresnel_unpolarized(jnp.cos(jnp.deg2rad(theta)), n1, n2)[0])
+            for theta in [0, 30, 60, 80]
+        ]
         for i in range(len(R_values) - 1):
             assert R_values[i] <= R_values[i + 1] + 1e-10
 
     def test_symmetric_indices_same_reflectance(self):
-        """R is the same for n1->n2 and n2->n1 at corresponding angles."""
+        """R is the same from either side at corresponding angles (Stokes)."""
         n1, n2 = 1.0, 1.5
         theta_1 = jnp.deg2rad(30.0)
-
-        # n1 -> n2: compute theta_2 from Snell's law
         sin_2 = (n1 / n2) * jnp.sin(theta_1)
         theta_2 = jnp.arcsin(sin_2)
 
-        # Reflectance from n1 side
-        R_12, _ = fresnel_unpolarized(jnp.cos(theta_1), jnp.cos(theta_2), n1, n2)
-
-        # Reflectance from n2 side (same geometry, different direction)
-        R_21, _ = fresnel_unpolarized(jnp.cos(theta_2), jnp.cos(theta_1), n2, n1)
+        R_12, _ = fresnel_unpolarized(jnp.cos(theta_1), n1, n2)
+        R_21, _ = fresnel_unpolarized(jnp.cos(theta_2), n2, n1)
 
         assert jnp.isclose(R_12, R_21, rtol=1e-6)
 
+    def test_tir_returns_unit_reflectance(self):
+        """Past the critical angle, R = 1 and T = 0."""
+        n1, n2 = 1.5, 1.0
+        theta_above = jnp.arcsin(n2 / n1) + 0.05
+        R, T = fresnel_unpolarized(jnp.cos(theta_above), n1, n2)
+        assert jnp.isclose(R, 1.0, atol=1e-6)
+        assert jnp.isclose(T, 0.0, atol=1e-6)
+
 
 class TestRefractSlab:
-    """Test parallel-sided slab refraction."""
+    """Test parallel-sided slab refraction (pure geometry).
+
+    ``refract_slab`` returns the 4-tuple
+    ``(exit_direction, exit_position, cos_i, valid)``. The Fresnel
+    transmittance, when needed, is computed from ``cos_i`` by the caller.
+    """
 
     def test_normal_incidence_straight_through(self):
         """Ray normal to slab exits with same direction."""
@@ -178,19 +173,18 @@ class TestRefractSlab:
         n_out, n_in = 1.0, 1.5
         thickness = 0.01
 
-        exit_dir, exit_pos, transmittance, valid, opl_inside = refract_slab(
-            direction, normal, position, n_out, n_in, thickness
+        exit_dir, exit_pos, cos_i, valid, path_length = refract_slab(
+            direction, normal, position, n_out, n_in, thickness,
         )
 
-        # Direction should be unchanged
         assert jnp.allclose(exit_dir, direction, atol=1e-10)
-        # Exit position should be displaced by thickness along -z
         assert jnp.isclose(exit_pos[2], -thickness, atol=1e-10)
         assert jnp.isclose(exit_pos[0], 0.0, atol=1e-10)
         assert jnp.isclose(exit_pos[1], 0.0, atol=1e-10)
+        assert jnp.isclose(cos_i, 1.0, atol=1e-10)
         assert valid
-        # OPL inside slab at normal incidence is n_in * thickness
-        assert jnp.isclose(opl_inside, n_in * thickness, atol=1e-10)
+        # Normal incidence: path inside slab = thickness; OPL = n_in × thickness.
+        assert jnp.isclose(path_length, thickness, atol=1e-10)
 
     def test_oblique_incidence_direction_preserved(self):
         """For parallel surfaces, exit direction equals entry direction."""
@@ -201,15 +195,16 @@ class TestRefractSlab:
         n_out, n_in = 1.0, 1.5
         thickness = 0.01
 
-        exit_dir, exit_pos, transmittance, valid, opl_inside = refract_slab(
-            direction, normal, position, n_out, n_in, thickness
+        exit_dir, _, cos_i, valid, path_length = refract_slab(
+            direction, normal, position, n_out, n_in, thickness,
         )
 
-        # Exit direction should match entry direction
         assert jnp.allclose(exit_dir, direction, atol=1e-6)
+        assert jnp.isclose(cos_i, jnp.cos(theta_i), atol=1e-6)
         assert valid
-        # OPL inside is n_in * (thickness / cos_theta_inside) > n_in * thickness
-        assert opl_inside > n_in * thickness
+        # Oblique incidence: path_length > thickness because the ray is
+        # tilted relative to the slab normal inside the glass.
+        assert path_length > thickness
 
     def test_lateral_displacement_increases_with_angle(self):
         """Oblique rays have larger lateral offset than normal rays."""
@@ -218,31 +213,33 @@ class TestRefractSlab:
         n_out, n_in = 1.0, 1.5
         thickness = 0.01
 
-        # Normal incidence
-        dir_normal = jnp.array([0.0, 0.0, -1.0])
-        _, pos_normal, _, _, _ = refract_slab(dir_normal, normal, position, n_out, n_in, thickness)
+        _, pos_normal, *_ = refract_slab(
+            jnp.array([0.0, 0.0, -1.0]),
+            normal, position, n_out, n_in, thickness,
+        )
 
-        # 30 degree incidence
         theta_30 = jnp.deg2rad(30.0)
         dir_30 = jnp.array([jnp.sin(theta_30), 0.0, -jnp.cos(theta_30)])
-        _, pos_30, _, _, _ = refract_slab(dir_30, normal, position, n_out, n_in, thickness)
+        _, pos_30, *_ = refract_slab(
+            dir_30, normal, position, n_out, n_in, thickness,
+        )
 
-        # Lateral offset (in x) should be larger for oblique ray
         assert jnp.abs(pos_30[0]) > jnp.abs(pos_normal[0]) + 1e-10
 
-    def test_slab_fresnel_transmission(self):
-        """Transmittance accounts for Fresnel losses at both surfaces."""
+    def test_slab_fresnel_squared_at_normal_incidence(self):
+        """Caller computes T = T_face² from the cos_i returned by refract_slab."""
         direction = jnp.array([0.0, 0.0, -1.0])
         normal = jnp.array([0.0, 0.0, 1.0])
         position = jnp.array([0.0, 0.0, 0.0])
         n_out, n_in = 1.0, 1.5
         thickness = 0.01
 
-        _, _, transmittance, valid, _ = refract_slab(
-            direction, normal, position, n_out, n_in, thickness
+        _, _, cos_i, valid, _ = refract_slab(
+            direction, normal, position, n_out, n_in, thickness,
         )
+        _, T_face = fresnel_unpolarized(cos_i, n_out, n_in)
+        transmittance = T_face * T_face
 
-        # At normal incidence: T = (1-R)^2 where R = ((n1-n2)/(n1+n2))^2
         R_single = ((n_out - n_in) / (n_out + n_in))**2
         T_expected = (1 - R_single)**2
 
@@ -251,15 +248,16 @@ class TestRefractSlab:
 
     def test_slab_high_angle_no_tir(self):
         """No TIR for moderate angles in typical glass."""
-        theta_i = jnp.deg2rad(40.0)  # Below critical angle
+        theta_i = jnp.deg2rad(40.0)
         direction = jnp.array([jnp.sin(theta_i), 0.0, -jnp.cos(theta_i)])
         normal = jnp.array([0.0, 0.0, 1.0])
         position = jnp.array([0.0, 0.0, 0.0])
         n_out, n_in = 1.0, 1.5
         thickness = 0.01
 
-        _, _, _, valid, _ = refract_slab(direction, normal, position, n_out, n_in, thickness)
-
+        _, _, _, valid, _ = refract_slab(
+            direction, normal, position, n_out, n_in, thickness,
+        )
         assert valid
 
     def test_slab_thickness_affects_offset(self):
@@ -270,23 +268,26 @@ class TestRefractSlab:
         position = jnp.array([0.0, 0.0, 0.0])
         n_out, n_in = 1.0, 1.5
 
-        _, pos_thin, _, _, _ = refract_slab(direction, normal, position, n_out, n_in, thickness=0.01)
-        _, pos_thick, _, _, _ = refract_slab(direction, normal, position, n_out, n_in, thickness=0.02)
+        _, pos_thin, *_ = refract_slab(
+            direction, normal, position, n_out, n_in, thickness=0.01,
+        )
+        _, pos_thick, *_ = refract_slab(
+            direction, normal, position, n_out, n_in, thickness=0.02,
+        )
 
-        # Thicker slab should have larger x offset
         assert jnp.abs(pos_thick[0]) > jnp.abs(pos_thin[0])
 
     def test_slab_z_displacement_equals_thickness(self):
-        """Z displacement through slab equals thickness for normal incidence."""
+        """Z displacement through slab equals thickness at normal incidence."""
         direction = jnp.array([0.0, 0.0, -1.0])
         normal = jnp.array([0.0, 0.0, 1.0])
         position = jnp.array([0.0, 0.0, 0.0])
         n_out, n_in = 1.0, 1.5
         thickness = 0.015
 
-        _, exit_pos, _, _, _ = refract_slab(direction, normal, position, n_out, n_in, thickness)
-
-        # Z displacement should be exactly the thickness
+        _, exit_pos, *_ = refract_slab(
+            direction, normal, position, n_out, n_in, thickness,
+        )
         assert jnp.isclose(exit_pos[2] - position[2], -thickness, atol=1e-10)
 
 

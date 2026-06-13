@@ -53,9 +53,55 @@ class BSDFSchema(BaseModel):
     scale: float = Field(ge=0, default=0.0)
 
 
+class TabulatedCurveSchema(BaseModel):
+    """Inline tabulated angle-dependent coating curve.
+
+    ``angles_deg`` are sample angles in degrees in ``[0, 90]``;
+    ``values`` are the corresponding coefficients in ``[0, 1]``. The
+    two lists must have the same length. Angles need not be sorted —
+    they are reordered into cos-ascending form when loaded. See
+    :class:`~iactrace.core.coatings.TabulatedCoating`.
+    """
+
+    type: Literal["table"] = "table"
+    angles_deg: list[float] = Field(min_length=2)
+    values: list[float] = Field(min_length=2)
+
+    @field_validator("angles_deg")
+    @classmethod
+    def _angles_in_range(cls, v):
+        for a in v:
+            if a < 0.0 or a > 90.0:
+                raise ValueError(
+                    f"angles_deg must lie in [0, 90]; got {a}"
+                )
+        return v
+
+    @field_validator("values")
+    @classmethod
+    def _values_in_range(cls, v):
+        for x in v:
+            if x < 0.0 or x > 1.0:
+                raise ValueError(
+                    f"values must lie in [0, 1]; got {x}"
+                )
+        return v
+
+    @model_validator(mode="after")
+    def _same_length(self) -> TabulatedCurveSchema:
+        if len(self.angles_deg) != len(self.values):
+            raise ValueError(
+                f"angles_deg ({len(self.angles_deg)}) and values "
+                f"({len(self.values)}) must have the same length"
+            )
+        return self
+
+
 class MirrorTemplateSchema(BaseModel):
     surface: SurfaceSchema
     bsdf: BSDFSchema | None = None
+    reflectivity: float | None = None
+    coating: TabulatedCurveSchema | None = None
 
 
 class MirrorSchema(BaseModel):
@@ -70,6 +116,7 @@ class MirrorSchema(BaseModel):
     stage: int = Field(ge=0, default=0)
     bsdf_scale: float | None = None
     bsdf_type: str | None = None
+    reflectivity: float | None = None
     id: str | None = None
 
 
@@ -88,6 +135,7 @@ class AsphericDiskLensSchema(BaseModel):
     aspheric: list[float] = Field(default_factory=list)
     offset: Vec2 = Field(default_factory=lambda: [0.0, 0.0])
     transmittance: float = Field(ge=0, le=1, default=1.0)
+    coating: TabulatedCurveSchema | None = None
     stage: int = Field(ge=0, default=0)
     id: str | None = None
 
@@ -101,6 +149,7 @@ class PlanoSlabSchema(BaseModel):
     n_inside: float = Field(gt=0)
     n_outside: float = Field(gt=0, default=1.0)
     transmittance: float = Field(ge=0, le=1, default=1.0)
+    coating: TabulatedCurveSchema | None = None
     stage: int = Field(ge=0, default=0)
     id: str | None = None
 

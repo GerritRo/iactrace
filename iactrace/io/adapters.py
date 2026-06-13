@@ -12,6 +12,7 @@ from jax import Array
 from ..camera.layout import HexagonalSensorGroup, SquareSensorGroup
 from ..core.apertures import Aperture, DiskAperture, PolygonAperture
 from ..core.bsdf import GaussianBSDF
+from ..core.coatings import Coating, TabulatedCoating
 from ..core.interactions import (
     RefractInteraction,
     SlabInteraction,
@@ -45,6 +46,7 @@ from .schemas import (
     SphereObstructionSchema,
     SquareSensorSchema,
     SurfaceSchema,
+    TabulatedCurveSchema,
     TelescopeConfigSchema,
     TelescopeMetadataSchema,
     TriangleObstructionSchema,
@@ -83,6 +85,8 @@ class _ParsedMirror(NamedTuple):
     stage: int
     aperture: CircularApertureSchema | PolygonApertureSchema
     bsdf_scale: float
+    reflectivity_scalar: float
+    coating_curve: TabulatedCurveSchema | None
 
 
 def _to_float_list(arr: np.ndarray | jnp.ndarray) -> list[float]:
@@ -210,6 +214,98 @@ def _resolve_bsdf_scale(mirror: MirrorSchema, template: MirrorTemplateSchema) ->
     return 0.0
 
 
+def _resolve_reflectivity(
+    mirror: MirrorSchema, template: MirrorTemplateSchema,
+) -> tuple[float, TabulatedCurveSchema | None]:
+    """Resolve (bulk_scalar, coating_curve) from mirror + template.
+
+    Per-mirror scalar overrides the template scalar; the coating lives
+    on the template only.
+    """
+    template_scalar = (
+        template.reflectivity if template.reflectivity is not None else 1.0
+    )
+    scalar = (
+        mirror.reflectivity
+        if mirror.reflectivity is not None
+        else float(template_scalar)
+    )
+    return float(scalar), template.coating
+
+
+def _curves_equal(
+    a: TabulatedCurveSchema, b: TabulatedCurveSchema,
+) -> bool:
+    """Structural equality of two tabulated curve schemas."""
+    return a.angles_deg == b.angles_deg and a.values == b.values
+
+
+def _build_coating_for_bucket(
+    curves: list[TabulatedCurveSchema | None],
+    n_elements: int,
+) -> Coating | None:
+    """Resolve a list of per-element curve schemas into a single coating.
+
+    All ``None`` → ``None`` (caller's default physics applies).
+    One distinct curve → broadcast across all elements.
+    Mixed curves → ``ValueError``.
+    """
+    distinct: list[TabulatedCurveSchema] = []
+    for c in curves:
+        if c is None:
+            continue
+        if not any(_curves_equal(c, d) for d in distinct):
+            distinct.append(c)
+
+    if not distinct:
+        return None
+    if len(distinct) > 1:
+        raise ValueError(
+            "Elements grouped at the same stage with the same aperture "
+            "must share a single coating. Split them across stages or "
+            "harmonize their `coating` fields."
+        )
+
+    curve = distinct[0]
+    return TabulatedCoating.from_degrees(
+        angles_deg=curve.angles_deg,
+        values=curve.values,
+        n_elements=n_elements,
+    )
+
+
+def _coating_to_curve_schema(
+    coating: Coating | None,
+) -> TabulatedCurveSchema | None:
+    """Project a Coating to a serialisable curve, or ``None`` if trivial.
+
+    ``None`` and :class:`ConstantCoating` round-trip as ``None`` so
+    existing YAMLs stay byte-identical. :class:`TabulatedCoating`
+    emits the inline ``{type: table, ...}`` form using the first
+    element's row (the loader broadcasts a shared curve, so rows are
+    identical by construction).
+    """
+    if isinstance(coating, TabulatedCoating):
+        cos_table = np.asarray(coating.cos_table)
+        values_row = np.asarray(coating.values[0])
+        order = np.argsort(-cos_table)  # cos descending -> angles ascending
+        angles_deg = [
+            float(x) for x in np.degrees(np.arccos(cos_table[order]))
+        ]
+        values = [float(x) for x in values_row[order]]
+        return TabulatedCurveSchema(angles_deg=angles_deg, values=values)
+    return None
+
+
+def _curve_schema_to_key(
+    schema: TabulatedCurveSchema | None,
+) -> tuple | None:
+    """Hashable key used by ``mirrors_to_schemas`` to dedup templates."""
+    if schema is None:
+        return None
+    return ("table", tuple(schema.angles_deg), tuple(schema.values))
+
+
 def _rotation_matrix_to_euler(rotation_matrix: np.ndarray) -> list[float]:
     """Convert a 3x3 rotation matrix to Euler angles (degrees)."""
     sy = np.sqrt(rotation_matrix[0, 0] ** 2 + rotation_matrix[1, 0] ** 2)
@@ -248,6 +344,7 @@ def mirrors_from_schemas(
         template = templates[mirror.template]
         curvature, conic, aspheric = _resolve_surface(mirror, template)
         bsdf_scale = _resolve_bsdf_scale(mirror, template)
+        refl_scalar, coating_curve = _resolve_reflectivity(mirror, template)
 
         parsed.append(_ParsedMirror(
             position=mirror.position,
@@ -259,6 +356,8 @@ def mirrors_from_schemas(
             stage=mirror.stage,
             aperture=mirror.aperture,
             bsdf_scale=bsdf_scale,
+            reflectivity_scalar=refl_scalar,
+            coating_curve=coating_curve,
         ))
 
     groups: list[OpticalElementGroup] = []
@@ -298,6 +397,13 @@ def _build_mirror_group(
     scales = jnp.asarray([m.bsdf_scale for m in mirrors])
     bsdf = None if bool(jnp.all(scales == 0)) else GaussianBSDF(scale=scales)
 
+    reflectivity_scalars = jnp.asarray(
+        [m.reflectivity_scalar for m in mirrors]
+    )
+    coating = _build_coating_for_bucket(
+        [m.coating_curve for m in mirrors], n_elements,
+    )
+
     return mirror_group(
         positions=jnp.asarray([m.position for m in mirrors]),
         rotations=jnp.asarray([m.orientation for m in mirrors]),
@@ -306,7 +412,8 @@ def _build_mirror_group(
         aspherics=_pad_aspherics([m.aspheric for m in mirrors]),
         offsets=jnp.asarray([m.offset for m in mirrors]),
         aperture=aperture,
-        reflectivity=jnp.ones(n_elements),
+        reflectivity=reflectivity_scalars,
+        coating=coating,
         bsdf=bsdf,
         sample_key=sample_key,
         optical_stage=stage,
@@ -371,6 +478,11 @@ def _build_aspheric_disk_lens_group(
     """
     from ..telescope.lenses import refractive_group
 
+    n = len(lenses)
+    coating = _build_coating_for_bucket(
+        [lens.coating for lens in lenses], n,
+    )
+
     return refractive_group(
         positions=jnp.asarray([lens.position for lens in lenses]),
         rotations=jnp.asarray([lens.orientation for lens in lenses]),
@@ -382,6 +494,7 @@ def _build_aspheric_disk_lens_group(
         n_inside=jnp.asarray([lens.n_inside for lens in lenses]),
         n_outside=float(lenses[0].n_outside),
         transmittance=jnp.asarray([lens.transmittance for lens in lenses]),
+        coating=coating,
         sample_key=sample_key,
         optical_stage=stage,
     )
@@ -400,6 +513,11 @@ def _build_plano_slab_group(
     """
     from ..telescope.lenses import slab_group
 
+    n = len(lenses)
+    coating = _build_coating_for_bucket(
+        [lens.coating for lens in lenses], n,
+    )
+
     return slab_group(
         positions=jnp.asarray([lens.position for lens in lenses]),
         rotations=jnp.asarray([lens.orientation for lens in lenses]),
@@ -408,6 +526,7 @@ def _build_plano_slab_group(
         n_outside=float(lenses[0].n_outside),
         thickness=jnp.asarray([lens.thickness for lens in lenses]),
         transmittance=jnp.asarray([lens.transmittance for lens in lenses]),
+        coating=coating,
         sample_key=sample_key,
         optical_stage=stage,
     )
@@ -562,13 +681,17 @@ def mirrors_to_schemas(
         if isinstance(group.bsdf, GaussianBSDF):
             bsdf_scales = group.bsdf.scale
 
+        interaction = group.interaction_module
+        coating_schema = _coating_to_curve_schema(interaction.reflectivity)
+        coating_key = _curve_schema_to_key(coating_schema)
+
         for i in range(len(group)):
             curvature = float(group.surface.curvatures[i])
             conic = float(group.surface.conics[i])
             aspheric_raw = _strip_trailing_zeros(_to_float_list(group.surface.aspherics[i]))
 
             bsdf_scale_val = float(bsdf_scales[i]) if bsdf_scales is not None else 0.0
-            surface_key = (curvature, conic, tuple(aspheric_raw))
+            surface_key = (curvature, conic, tuple(aspheric_raw), coating_key)
 
             if surface_key not in surface_to_template:
                 template_name = f"template_{template_counter}"
@@ -586,6 +709,7 @@ def mirrors_to_schemas(
                         aspheric=aspheric_raw if aspheric_raw else [],
                     ),
                     bsdf=bsdf_schema,
+                    coating=coating_schema,
                 )
 
             template_name = surface_to_template[surface_key]
@@ -596,6 +720,7 @@ def mirrors_to_schemas(
             aperture = _aperture_to_schema(group.aperture, i)
 
             offset = _to_float_list(group.surface.offsets[i])
+            scalar = float(interaction.reflectivity_scalar[i])
             mirrors.append(MirrorSchema(
                 position=position,
                 orientation=orientation,
@@ -604,6 +729,7 @@ def mirrors_to_schemas(
                 stage=group.optical_stage,
                 offset=offset,
                 bsdf_scale=bsdf_scale_val if bsdf_scale_val != 0.0 else None,
+                reflectivity=scalar if scalar != 1.0 else None,
                 id=f"M_{len(mirrors)}",
             ))
 
@@ -657,6 +783,7 @@ def _extract_aspheric_disk_lens(
 ) -> AsphericDiskLensSchema:
     """Extract an AsphericDiskLensSchema from element i of a group."""
     aspheric_raw = _strip_trailing_zeros(_to_float_list(group.surface.aspherics[i]))
+    coating_schema = _coating_to_curve_schema(interaction.transmittance)
     return AsphericDiskLensSchema(
         position=_to_float_list(group.positions[i]),
         orientation=_to_float_list(group.rotations[i]),
@@ -667,7 +794,8 @@ def _extract_aspheric_disk_lens(
         n_outside=float(interaction.n_outside),
         aspheric=aspheric_raw,
         offset=_to_float_list(group.surface.offsets[i]),
-        transmittance=float(interaction.transmittance[i]),
+        transmittance=float(interaction.transmittance_scalar[i]),
+        coating=coating_schema,
         stage=group.optical_stage,
         id=f"lens_{counter}",
     )
@@ -680,6 +808,7 @@ def _extract_plano_slab_lens(
     counter: int,
 ) -> PlanoSlabSchema:
     """Extract a PlanoSlabSchema from element i of a group."""
+    coating_schema = _coating_to_curve_schema(interaction.transmittance)
     return PlanoSlabSchema(
         position=_to_float_list(group.positions[i]),
         orientation=_to_float_list(group.rotations[i]),
@@ -687,7 +816,8 @@ def _extract_plano_slab_lens(
         thickness=float(interaction.thickness[i]),
         n_inside=float(interaction.n_inside[i]),
         n_outside=float(interaction.n_outside),
-        transmittance=float(interaction.transmittance[i]),
+        transmittance=float(interaction.transmittance_scalar[i]),
+        coating=coating_schema,
         stage=group.optical_stage,
         id=f"lens_{counter}",
     )

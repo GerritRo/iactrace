@@ -175,7 +175,7 @@ class TestMirrorsDiskArray:
         )
         assert jnp.allclose(m.surface.conics, jnp.zeros(2))
         assert jnp.allclose(m.aperture.inner_radii, jnp.zeros(2))
-        assert jnp.allclose(m.interaction_module.reflectivity, jnp.ones(2))
+        assert jnp.allclose(m.interaction_module.reflectivity_scalar, jnp.ones(2))
 
     def test_shape_mismatch_raises(self, random_key):
         with pytest.raises(ValueError, match="curvatures"):
@@ -284,7 +284,7 @@ class TestLensesPlanoSlab:
         assert jnp.allclose(slab.interaction_module.thickness, jnp.array([0.003]))
         assert jnp.allclose(slab.interaction_module.n_inside, jnp.array([1.52]))
         assert jnp.allclose(
-            slab.interaction_module.transmittance, jnp.array([0.9])
+            slab.interaction_module.transmittance_scalar, jnp.array([0.9])
         )
 
 
@@ -515,8 +515,8 @@ class TestMirrorGroup:
         assert jnp.allclose(sugar.aperture.radii, direct.aperture.radii)
         # Same interaction
         assert jnp.allclose(
-            sugar.interaction_module.reflectivity,
-            direct.interaction_module.reflectivity,
+            sugar.interaction_module.reflectivity_scalar,
+            direct.interaction_module.reflectivity_scalar,
         )
 
 

@@ -169,7 +169,7 @@ class TestMirrorGroupKeys:
             radii=jnp.ones(n_mirrors) * 0.5,
             inner_radii=jnp.zeros(n_mirrors),
         )
-        interaction = ReflectInteraction(reflectivity=jnp.ones(n_mirrors))
+        interaction = ReflectInteraction(reflectivity=None, reflectivity_scalar=jnp.ones(n_mirrors))
         group = OpticalElementGroup(
             positions=jnp.zeros((n_mirrors, 3)),
             rotations=jnp.zeros((n_mirrors, 3)),
@@ -197,7 +197,7 @@ class TestMirrorGroupKeys:
             radii=jnp.ones(n_mirrors) * 0.5,
             inner_radii=jnp.zeros(n_mirrors),
         )
-        interaction = ReflectInteraction(reflectivity=jnp.ones(n_mirrors))
+        interaction = ReflectInteraction(reflectivity=None, reflectivity_scalar=jnp.ones(n_mirrors))
         group = OpticalElementGroup(
             positions=jnp.zeros((n_mirrors, 3)),
             rotations=jnp.zeros((n_mirrors, 3)),

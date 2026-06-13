@@ -403,3 +403,83 @@ class TestRoundTrip:
             assert 1 in stages
         finally:
             filepath.unlink(missing_ok=True)
+    def test_reflectivity_curve_roundtrip(self, n_samples, random_key):
+        """A tabulated R(θ) curve survives save → load."""
+        from iactrace.core.coatings import (
+            TabulatedCoating,
+        )
+
+        config = {
+            "telescope": {
+                "name": "with_curve",
+                "units": "m",
+                "camera_position": [0.0, 0.0, 10.0],
+                "camera_rotation": [0.0, 0.0, 0.0],
+            },
+            "mirror_templates": {
+                "silver": {
+                    "surface": {"curvature": 0.05, "conic": -1.0, "aspheric": []},
+                    "coating": {
+                        "type": "table",
+                        "angles_deg": [0.0, 30.0, 60.0, 80.0],
+                        "values": [0.96, 0.95, 0.90, 0.60],
+                    },
+                },
+            },
+            "mirrors": [
+                {
+                    "template": "silver",
+                    "position": [0.0, 0.0, 0.0],
+                    "orientation": [0.0, 0.0, 0.0],
+                    "aperture": {"type": "circular", "radius": 0.5},
+                    "reflectivity": 0.98,
+                },
+            ],
+            "obstructions": [],
+        }
+        telescope1 = build_telescope_config(config, n_samples, random_key)
+        with tempfile.NamedTemporaryFile(suffix=".yaml", delete=False) as f:
+            filepath = Path(f.name)
+        try:
+            save_telescope(telescope1, filepath)
+            telescope2 = Telescope.from_yaml(filepath, n_samples, key=random_key)
+
+            interaction1 = telescope1.mirror_groups[0].interaction_module
+            interaction2 = telescope2.mirror_groups[0].interaction_module
+
+            # Both have a tabulated curve, byte-identical scalar
+            assert isinstance(interaction1.reflectivity, TabulatedCoating)
+            assert isinstance(interaction2.reflectivity, TabulatedCoating)
+            np.testing.assert_allclose(
+                np.asarray(interaction1.reflectivity.cos_table),
+                np.asarray(interaction2.reflectivity.cos_table),
+                rtol=1e-10,
+            )
+            np.testing.assert_allclose(
+                np.asarray(interaction1.reflectivity.values),
+                np.asarray(interaction2.reflectivity.values),
+                rtol=1e-10,
+            )
+            np.testing.assert_allclose(
+                np.asarray(interaction1.reflectivity_scalar),
+                np.asarray(interaction2.reflectivity_scalar),
+                rtol=1e-10,
+            )
+        finally:
+            filepath.unlink(missing_ok=True)
+
+    def test_default_mirror_yaml_unchanged(
+        self, n_samples, random_key, simple_disk_telescope_config,
+    ):
+        """A mirror without curve information saves WITHOUT the new field."""
+        telescope = build_telescope_config(
+            simple_disk_telescope_config, n_samples, random_key,
+        )
+        d = telescope_to_dict(telescope)
+        # No new fields appear in the round-tripped YAML
+        for tpl in d["mirror_templates"].values():
+            assert "reflectivity" not in tpl
+            assert "coating" not in tpl
+        for m in d["mirrors"]:
+            assert "reflectivity" not in m
+

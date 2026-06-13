@@ -20,7 +20,7 @@ def _make_disk_mirror_group(positions, rotations, curvatures, conics, aspherics,
         offsets=jnp.zeros((n, 2)),
     )
     aperture = DiskAperture(radii=radii, inner_radii=jnp.zeros(n))
-    interaction = ReflectInteraction(reflectivity=jnp.ones(n))
+    interaction = ReflectInteraction(reflectivity=None, reflectivity_scalar=jnp.ones(n))
     return OpticalElementGroup(
         positions=positions,
         rotations=rotations,

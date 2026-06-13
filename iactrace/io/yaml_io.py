@@ -102,14 +102,17 @@ def build_telescope_config(
     except ValidationError as e:
         raise YAMLConfigError(str(e)) from e
 
-    key, mirror_key = jax.random.split(key)
-    mirror_groups = mirrors_from_schemas(
-        schema.mirrors, schema.mirror_templates, n_samples, key=mirror_key
-    )
-    obstruction_groups = obstructions_from_schemas(schema.obstructions)
+    try:
+        key, mirror_key = jax.random.split(key)
+        mirror_groups = mirrors_from_schemas(
+            schema.mirrors, schema.mirror_templates, n_samples, key=mirror_key
+        )
+        obstruction_groups = obstructions_from_schemas(schema.obstructions)
 
-    key, lens_key = jax.random.split(key)
-    lens_groups = lenses_from_schemas(schema.lenses, key=lens_key)
+        key, lens_key = jax.random.split(key)
+        lens_groups = lenses_from_schemas(schema.lenses, key=lens_key)
+    except ValueError as e:
+        raise YAMLConfigError(str(e)) from e
 
     return Telescope(
         mirror_groups=mirror_groups,

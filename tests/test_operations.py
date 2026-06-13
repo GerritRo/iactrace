@@ -21,7 +21,7 @@ def _make_disk_mirror_group(positions, rotations, curvatures, conics, aspherics,
         offsets=jnp.zeros((n, 2)),
     )
     aperture = DiskAperture(radii=radii, inner_radii=jnp.zeros(n))
-    interaction = ReflectInteraction(reflectivity=jnp.ones(n))
+    interaction = ReflectInteraction(reflectivity=None, reflectivity_scalar=jnp.ones(n))
     return OpticalElementGroup(
         positions=positions,
         rotations=rotations,
@@ -298,7 +298,8 @@ def _make_lens_telescope():
         interaction_module=RefractInteraction(
             n_inside=jnp.full(n, 1.5),
             n_outside=1.0,
-            transmittance=jnp.full(n, 0.9),
+            transmittance=None,
+            transmittance_scalar=jnp.full(n, 0.9),
         ),
         sample_key=jax.random.key(1),
         optical_stage=1,
@@ -324,9 +325,9 @@ class TestLensOperations:
     def test_scale_transmittance_clipped(self):
         tel = _make_lens_telescope()
         tel = tel.scale_transmittance(stage=1, factor=0.5)
-        assert jnp.allclose(tel.stage(1).interaction_module.transmittance, 0.45)
+        assert jnp.allclose(tel.stage(1).interaction_module.transmittance_scalar, 0.45)
         tel2 = _make_lens_telescope().scale_transmittance(stage=1, factor=10.0)
-        assert jnp.allclose(tel2.stage(1).interaction_module.transmittance, 1.0)
+        assert jnp.allclose(tel2.stage(1).interaction_module.transmittance_scalar, 1.0)
 
     def test_apply_misalignment_on_lens_stage(self):
         tel = _make_lens_telescope()

@@ -6,6 +6,7 @@ import jax.numpy as jnp
 from jax import Array
 
 from ..core.apertures import Aperture, DiskAperture
+from ..core.coatings import Coating
 from ..core.interactions import RefractInteraction, SlabInteraction
 from ..core.optics import OpticalElementGroup
 from ..core.surfaces import AsphericSurfaceGroup
@@ -45,8 +46,9 @@ def refractive_group(
     aperture: Aperture,
     n_inside: Array,
     n_outside: float,
-    transmittance: Array,
+    transmittance: Array | float = 1.0,
     sample_key: Array,
+    coating: Coating | None = None,
     optical_stage: int = 0,
     n_samples: int = 100,
 ) -> OpticalElementGroup:
@@ -80,7 +82,11 @@ def refractive_group(
     aspherics = jnp.asarray(aspherics)
     offsets = jnp.asarray(offsets)
     n_inside = jnp.asarray(n_inside)
-    transmittance = jnp.asarray(transmittance)
+    n = int(positions.shape[0])
+
+    trans_scalar = jnp.asarray(transmittance)
+    if trans_scalar.ndim == 0:
+        trans_scalar = jnp.full((n,), trans_scalar)
 
     surface = AsphericSurfaceGroup(
         curvatures=curvatures,
@@ -91,7 +97,8 @@ def refractive_group(
     interaction = RefractInteraction(
         n_inside=n_inside,
         n_outside=float(n_outside),
-        transmittance=transmittance,
+        transmittance=coating,
+        transmittance_scalar=trans_scalar,
     )
 
     return OpticalElementGroup(
@@ -114,8 +121,9 @@ def slab_group(
     n_inside: Array,
     n_outside: float,
     thickness: Array,
-    transmittance: Array,
+    transmittance: Array | float = 1.0,
     sample_key: Array,
+    coating: Coating | None = None,
     optical_stage: int = 0,
     n_samples: int = 100,
 ) -> OpticalElementGroup:
@@ -143,9 +151,11 @@ def slab_group(
     rotations = jnp.asarray(rotations)
     n_inside = jnp.asarray(n_inside)
     thickness = jnp.asarray(thickness)
-    transmittance = jnp.asarray(transmittance)
+    n = int(positions.shape[0])
 
-    n = positions.shape[0]
+    trans_scalar = jnp.asarray(transmittance)
+    if trans_scalar.ndim == 0:
+        trans_scalar = jnp.full((n,), trans_scalar)
 
     surface = AsphericSurfaceGroup(
         curvatures=jnp.zeros(n),
@@ -157,7 +167,8 @@ def slab_group(
         n_inside=n_inside,
         n_outside=float(n_outside),
         thickness=thickness,
-        transmittance=transmittance,
+        transmittance=coating,
+        transmittance_scalar=trans_scalar,
     )
 
     return OpticalElementGroup(
@@ -185,6 +196,7 @@ def _single_disk_refractive(
     n_inside,
     n_outside,
     transmittance,
+    coating,
     optical_stage,
     n_samples,
     key,
@@ -211,6 +223,7 @@ def _single_disk_refractive(
         n_inside=jnp.asarray([float(n_inside)]),
         n_outside=float(n_outside),
         transmittance=jnp.asarray([float(transmittance)]),
+        coating=coating,
         sample_key=key,
         optical_stage=optical_stage,
         n_samples=n_samples,
@@ -226,6 +239,7 @@ def thin(
     n_inside: float = 1.5,
     n_outside: float = 1.0,
     transmittance: float = 1.0,
+    coating: Coating | None = None,
     optical_stage: int = 0,
     n_samples: int = 100,
     key: Array,
@@ -262,6 +276,7 @@ def thin(
         n_inside=n_inside,
         n_outside=n_outside,
         transmittance=transmittance,
+        coating=coating,
         optical_stage=optical_stage,
         n_samples=n_samples,
         key=key,
@@ -279,6 +294,7 @@ def aspheric_lens(
     n_inside: float = 1.5,
     n_outside: float = 1.0,
     transmittance: float = 1.0,
+    coating: Coating | None = None,
     optical_stage: int = 0,
     n_samples: int = 100,
     key: Array,
@@ -309,6 +325,7 @@ def aspheric_lens(
         n_inside=n_inside,
         n_outside=n_outside,
         transmittance=transmittance,
+        coating=coating,
         optical_stage=optical_stage,
         n_samples=n_samples,
         key=key,
@@ -324,6 +341,7 @@ def plano_slab(
     n_inside: float = 1.5,
     n_outside: float = 1.0,
     transmittance: float = 1.0,
+    coating: Coating | None = None,
     optical_stage: int = 0,
     n_samples: int = 100,
     key: Array,
@@ -364,6 +382,7 @@ def plano_slab(
         n_outside=float(n_outside),
         thickness=jnp.asarray([float(thickness)]),
         transmittance=jnp.asarray([float(transmittance)]),
+        coating=coating,
         sample_key=key,
         optical_stage=optical_stage,
         n_samples=n_samples,
