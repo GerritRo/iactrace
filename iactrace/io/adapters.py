@@ -266,10 +266,12 @@ def _build_coating_for_bucket(
 
     if not distinct:
         return None
-    if len(distinct) > 1:
+    if any(c is None for c in curves):
         raise ValueError(
             "Elements grouped at the same stage with the same aperture "
-            "must share a single coating. Split them across stages or "
+            "must either all define a `coating` or all omit it; mixing "
+            "coated and uncoated elements would silently apply one "
+            "element's coating to the rest. Split them across stages or "
             "harmonize their `coating` fields."
         )
 

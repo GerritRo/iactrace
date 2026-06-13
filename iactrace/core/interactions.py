@@ -175,7 +175,7 @@ class ReflectInteraction(Interaction):
 
     def apply(self, directions, normals, points, element_idx, current_n):
         reflected, cos_array = jax.vmap(reflect)(directions, normals)
-        cos_i = cos_array.squeeze(-1)
+        cos_i = jnp.abs(cos_array.squeeze(-1))
         scalar = self.reflectivity_scalar[element_idx]
         if self.reflectivity is None:
             coeff = scalar

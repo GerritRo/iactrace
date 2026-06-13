@@ -58,15 +58,17 @@ def intersect_sensor(
         ts = jnp.where(in_b, ts, jnp.inf)
         dx = directions @ rot[:, 0]
         dy = directions @ rot[:, 1]
-        return pts, ts, dx, dy
+        dz = directions @ rot[:, 2]
+        return pts, ts, dx, dy, dz
 
-    all_pts, all_ts, all_dx, all_dy = jax.vmap(f)(jnp.arange(sensor.n_sensors))
+    all_pts, all_ts, all_dx, all_dy, all_dz = jax.vmap(f)(jnp.arange(sensor.n_sensors))
     s_idx = jnp.argmin(all_ts, axis=0)
     idx = jnp.arange(n_rays)
     pts = all_pts[s_idx, idx]
     t_sensor = all_ts[s_idx, idx]
     dx = all_dx[s_idx, idx]
     dy = all_dy[s_idx, idx]
+    dz = all_dz[s_idx, idx]
     s_idx = s_idx.astype(jnp.int32)
 
     hit_mask = t_sensor < 1e10
@@ -74,7 +76,6 @@ def intersect_sensor(
     path_length = ray_bundle.path_length + jnp.where(
         hit_mask, t_sensor * ray_bundle.n, 0.0,
     )
-    dz = jnp.sqrt(jnp.maximum(1.0 - dx**2 - dy**2, 0.0))
 
     sensor_rays = RayBundle(
         origins=jnp.stack([pts[:, 0], pts[:, 1], jnp.zeros(n_rays)], axis=-1),
