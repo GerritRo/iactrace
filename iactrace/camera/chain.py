@@ -51,8 +51,7 @@ class DetectionChain(eqx.Module):
         Optical path length is tracked consistently across the train: the
         concentrator weights its internal leg by its own fill index (see
         :meth:`~iactrace.camera.concentrator.Concentrator.apply`), and the
-        ``gap`` leg is weighted by the ray's medium index ``n`` — the medium the
-        concentrator leaves the rays in (the camera body, usually air).
+        ``gap`` leg is weighted by the ray's medium index ``n``.
         """
         if self.concentrator is not None:
             local_rays = self.concentrator.apply(local_rays)

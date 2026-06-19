@@ -17,7 +17,6 @@ from ..camera.winston_cone import WinstonCone, cpc_wall_tilt
 from ..core.apertures import Aperture, DiskAperture, PolygonAperture
 from ..core.bsdf import BSDF, DoubleGaussianBSDF, GaussianBSDF
 from ..core.coatings import Coating, TabulatedCoating
-
 from ..core.interactions import (
     ReflectInteraction,
     RefractInteraction,
@@ -865,13 +864,6 @@ def mirrors_to_schemas(
                 )
 
             template_name = surface_to_template[surface_key]
-            position = _to_float_list(group.positions[i])
-            orientation = _to_float_list(group.rotations[i])
-
-            # Build aperture schema
-            aperture = _aperture_to_schema(group.aperture, i)
-
-            offset = _to_float_list(group.surface.offsets[i])
             scalar = float(interaction.reflectivity_scalar[i])
             mirrors.append(MirrorSchema(
                 position=_to_float_list(group.positions[i]),
@@ -879,7 +871,7 @@ def mirrors_to_schemas(
                 aperture=_aperture_to_schema(group.aperture, i),
                 template=template_name,
                 stage=group.optical_stage,
-                offset=offset,
+                offset=_to_float_list(group.surface.offsets[i]),
                 bsdf=_bsdf_to_schema(group.bsdf, i),
                 reflectivity=scalar if scalar != 1.0 else None,
                 id=f"M_{len(mirrors)}",
@@ -1120,13 +1112,13 @@ def _extract_hex_group(
 def _concentrator_to_schema(
     concentrator: Concentrator | None,
 ) -> ConcentratorSchema | None:
-    """Serialize a concentrator (``None`` → ``None``).
+    """Serialize a concentrator (``None`` -> ``None``).
 
     Only :class:`WinstonCone` round-trips exactly today; any other
     :class:`~iactrace.camera.concentrator.Concentrator` subclass emits a
     :class:`UserWarning` and is dropped. To support another cone type, add a
     ``case`` here, a converter in :func:`_concentrator_from_schema`, a
-    ``…Schema`` class, and a member to the ``ConcentratorSchema`` alias.
+    ``...Schema`` class, and a member to the ``ConcentratorSchema`` alias.
     """
     match concentrator:
         case None:
@@ -1134,7 +1126,7 @@ def _concentrator_to_schema(
         case WinstonCone():
             # entrance_apothem is the physical mouth at z=length; for a truncated
             # cone the depth reconstructs the wall on load. An untruncated cone is
-            # written as length=None so reload is exact. "Full" ⟺ the mouth equals
+            # written as length=None so reload is exact. "Full" <-> the mouth equals
             # the full-CPC mouth a2/s for the wall tilt s.
             s, _ = cpc_wall_tilt(
                 concentrator.exit_apothem, concentrator.entrance_apothem,
@@ -1166,7 +1158,7 @@ def _concentrator_to_schema(
 def _concentrator_from_schema(
     schema: ConcentratorSchema | None,
 ) -> Concentrator | None:
-    """Rebuild a concentrator from its schema (``None`` → no concentrator)."""
+    """Rebuild a concentrator from its schema (``None`` -> no concentrator)."""
     match schema:
         case None:
             return None
@@ -1193,7 +1185,7 @@ def _photosensor_to_schema(photosensor: PhotoSensor) -> PhotoSensorSchema:
     :class:`~iactrace.camera.photosensor.PhotoSensor` subclass emits a
     :class:`UserWarning` and falls back to a flat ``UniformQE(1.0)``. To support
     another response model, add a ``case`` here and in
-    :func:`_photosensor_from_schema`, a ``…Schema`` class, and a member to the
+    :func:`_photosensor_from_schema`, a ``...Schema`` class, and a member to the
     ``PhotoSensorSchema`` alias.
     """
     match photosensor:
@@ -1210,7 +1202,7 @@ def _photosensor_to_schema(photosensor: PhotoSensor) -> PhotoSensorSchema:
 
 
 def _photosensor_from_schema(schema: PhotoSensorSchema | None) -> PhotoSensor:
-    """Rebuild a photosensor from its schema (``None`` → ``UniformQE(1.0)``)."""
+    """Rebuild a photosensor from its schema (``None`` -> ``UniformQE(1.0)``)."""
     match schema:
         case None:
             return UniformQE(1.0)

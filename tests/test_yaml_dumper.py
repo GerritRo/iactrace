@@ -255,7 +255,7 @@ class TestRoundTrip:
         # The mirror "coating" must survive save/load (was silently reset to 1.0).
         g = self._roundtrip_mirror(bsdf=None, reflectivity=0.83, random_key=random_key)
         np.testing.assert_allclose(
-            np.asarray(g.interaction_module.reflectivity), [0.83], rtol=1e-5
+            np.asarray(g.interaction_module.reflectivity_scalar), [0.83], rtol=1e-5
         )
 
     def test_gaussian_bsdf_roundtrips(self, random_key):
@@ -284,7 +284,7 @@ class TestRoundTrip:
         np.testing.assert_allclose(np.asarray(g.bsdf.scale_wide), [120.0], rtol=1e-5)
         np.testing.assert_allclose(np.asarray(g.bsdf.mix_weight), [0.2], rtol=1e-5)
         np.testing.assert_allclose(
-            np.asarray(g.interaction_module.reflectivity), [0.9], rtol=1e-5
+            np.asarray(g.interaction_module.reflectivity_scalar), [0.9], rtol=1e-5
         )
 
     def test_polygon_mirror_roundtrip(
@@ -687,4 +687,3 @@ class TestRoundTrip:
             assert "coating" not in tpl
         for m in d["mirrors"]:
             assert "reflectivity" not in m
-

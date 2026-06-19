@@ -262,9 +262,7 @@ class TestRotationAlignment:
     """The cone must stay aligned with its pixel under any hex grid rotation.
 
     ``to_pixel_frame`` normalises ``grid_rotation`` away, so the cone (defined in
-    the grid-aligned pixel frame) co-rotates with the layout. Rotating the whole
-    system — hex centres *and* the incoming beam — by theta must therefore leave
-    the transmission unchanged.
+    the grid-aligned pixel frame) co-rotates with the layout.
     """
 
     def _setup(self):
