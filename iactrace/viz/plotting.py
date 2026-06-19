@@ -110,9 +110,6 @@ def _stack_rotations(rotations):
 
 def _square_polygons(image, sensor):
     """Return ``(polys, values)`` for a SquareSensorGroup image.
-
-    ``polys`` has shape ``(n_sensors * height * width, 4, 2)`` — one quad per
-    pixel, in camera-frame xy. ``values`` is the matching flat image array.
     """
     expected_shape = (sensor.n_sensors, sensor.height, sensor.width)
     if image.shape != expected_shape:

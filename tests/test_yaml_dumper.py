@@ -153,9 +153,7 @@ def telescope_with_obstructions_config():
     }
 
 
-# ---------------------------------------------------------------------------
 # Conversion + saving
-# ---------------------------------------------------------------------------
 
 
 class TestTelescopeToDict:
@@ -202,9 +200,7 @@ class TestSaveTelescope:
             filepath.unlink(missing_ok=True)
 
 
-# ---------------------------------------------------------------------------
 # Round-trip
-# ---------------------------------------------------------------------------
 
 
 class TestRoundTrip:
@@ -404,7 +400,7 @@ class TestRoundTrip:
         finally:
             filepath.unlink(missing_ok=True)
     def test_reflectivity_curve_roundtrip(self, n_samples, random_key):
-        """A tabulated R(θ) curve survives save → load."""
+        """A tabulated R(theta) curve survives save -> load."""
         from iactrace.core.coatings import (
             TabulatedCoating,
         )

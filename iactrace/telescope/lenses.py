@@ -14,7 +14,6 @@ from ..core.surfaces import AsphericSurfaceGroup
 __all__ = [
     "refractive_group",
     "slab_group",
-    "thin",
     "aspheric_lens",
     "plano_slab",
 ]
@@ -227,59 +226,6 @@ def _single_disk_refractive(
         sample_key=key,
         optical_stage=optical_stage,
         n_samples=n_samples,
-    )
-
-
-def thin(
-    *,
-    position: Sequence[float],
-    focal_length: float,
-    radius: float,
-    rotation: Sequence[float] = (0.0, 0.0, 0.0),
-    n_inside: float = 1.5,
-    n_outside: float = 1.0,
-    transmittance: float = 1.0,
-    coating: Coating | None = None,
-    optical_stage: int = 0,
-    n_samples: int = 100,
-    key: Array,
-) -> OpticalElementGroup:
-    """Build a thin-lens approximation on a single curved disk surface.
-
-    Uses the single-surface thin-lens formula
-    ``curvature = (n_inside - n_outside) / focal_length``. This is an
-    approximation — a real thin lens consists of two refracting surfaces;
-    but it is sufficient for quick prototyping and matches the
-    ``aspheric_disk`` lens type in the YAML adapter.
-
-    Args:
-        position: Vertex position in world coordinates, shape (3,).
-        focal_length: Paraxial focal length in metres.
-        radius: Outer disk radius in metres.
-        rotation: Euler angles in degrees. Defaults to no rotation.
-        n_inside: Refractive index of the lens material. Defaults to 1.5
-            (typical crown glass).
-        n_outside: Refractive index of the ambient medium. Defaults to 1.0.
-        transmittance: Bulk transmittance in ``[0, 1]``. Defaults to 1.0.
-        optical_stage: Stage index within the Telescope.
-        n_samples: Monte Carlo samples per element per render.
-        key: JAX PRNG key for aperture sampling.
-    """
-    curvature = (float(n_inside) - float(n_outside)) / float(focal_length)
-    return _single_disk_refractive(
-        position=position,
-        rotation=rotation,
-        curvature=curvature,
-        conic=0.0,
-        aspheric_coeffs=None,
-        radius=radius,
-        n_inside=n_inside,
-        n_outside=n_outside,
-        transmittance=transmittance,
-        coating=coating,
-        optical_stage=optical_stage,
-        n_samples=n_samples,
-        key=key,
     )
 
 

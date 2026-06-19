@@ -58,9 +58,9 @@ class BSDF(eqx.Module):
         """Resolve a per-element parameter for the current indexing mode.
 
         Per-ray mode (element_idx provided):
-            ``param[element_idx]`` → ``(n_rays,)``.
+            ``param[element_idx]`` -> ``(n_rays,)``.
         Batch mode (element_idx is None):
-            ``param[:, None]`` → ``(N, 1)``, broadcasts over samples.
+            ``param[:, None]`` -> ``(N, 1)``, broadcasts over samples.
 
         Subclasses call this inside ``_sample_perturbation`` instead of
         writing their own conditional indexing logic.

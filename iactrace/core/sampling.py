@@ -6,8 +6,9 @@ def sample_annulus(key, inner_radius, outer_radius, shape):
     """
     Generate uniform random samples within an annulus (ring).
 
-    For uniform sampling in an annulus, r² must be uniform between
-    inner_radius² and outer_radius², so r = sqrt(inner² + u*(outer² - inner²)).
+    For uniform sampling in an annulus, r^2 must be uniform between
+    inner_radius^2 and outer_radius^2, so
+    r = sqrt(inner^2 + u*(outer^2 - inner^2)).
 
     Args:
         key: JAX random key
@@ -20,7 +21,7 @@ def sample_annulus(key, inner_radius, outer_radius, shape):
     """
     key1, key2 = random.split(key)
 
-    # Uniform in r² space, then sqrt to get r
+    # Uniform in r^2 space, then sqrt to get r
     inner_sq = inner_radius ** 2
     outer_sq = outer_radius ** 2
     r = jnp.sqrt(inner_sq + random.uniform(key1, shape) * (outer_sq - inner_sq))

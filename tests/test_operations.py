@@ -354,7 +354,7 @@ class TestLensOperations:
         assert _make_lens_telescope().n_mirror_elements == 2
 
     def test_set_focal_length_on_lens_uses_refractive_formula(self):
-        # n_inside=1.5, n_outside=1 → c = 1/((n-1)*f)
+        # n_inside=1.5, n_outside=1 -> c = 1/((n-1)*f)
         tel = _make_lens_telescope().set_focal_lengths(
             stage=1, focal_lengths=jnp.full(2, 4.0)
         )

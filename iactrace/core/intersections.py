@@ -208,7 +208,7 @@ def intersect_oriented_box(ray_origin, ray_direction, center, half_extents, rota
 
 def intersect_triangle(ray_origin, ray_direction, v0, v1, v2):
     """
-    Intersect ray with triangle using Möller-Trumbore algorithm.
+    Intersect ray with triangle using Moeller-Trumbore algorithm.
 
     Args:
         ray_origin: Ray origin (3,)
@@ -288,7 +288,7 @@ def intersect_conic(ray_origin, ray_direction, curvature, conic):
     Compute closed-form ray-conic intersection parameter.
 
     The conic surface is defined by the implicit equation:
-        c*(x² + y²) + (1+k)*c*z² - 2*z = 0
+        c*(x^2 + y^2) + (1+k)*c*z^2 - 2*z = 0
 
     where c is curvature and k is the conic constant.
 
@@ -306,8 +306,8 @@ def intersect_conic(ray_origin, ray_direction, curvature, conic):
     c = curvature
     k = conic
 
-    # Quadratic coefficients: A*t² + B*t + C = 0
-    # From substituting ray into: c*(x² + y²) + (1+k)*c*z² - 2*z = 0
+    # Quadratic coefficients: A*t^2 + B*t + C = 0
+    # From substituting ray into: c*(x^2 + y^2) + (1+k)*c*z^2 - 2*z = 0
     A = c * (dx * dx + dy * dy + (1 + k) * dz * dz)
     B = 2 * (c * (ox * dx + oy * dy + (1 + k) * oz * dz) - dz)
     C = c * (ox * ox + oy * oy + (1 + k) * oz * oz) - 2 * oz
@@ -317,7 +317,7 @@ def intersect_conic(ray_origin, ray_direction, curvature, conic):
     t_plane = jnp.where(jnp.abs(dz) > 1e-10, -oz / dz, jnp.inf)
     t_plane = jnp.where(t_plane > 1e-8, t_plane, jnp.inf)
 
-    # Handle linear case (A ≈ 0, e.g., paraboloid on-axis)
+    # Handle linear case (A ~ 0, e.g., paraboloid on-axis)
     is_linear = jnp.abs(A) < 1e-12
     t_linear = jnp.where(jnp.abs(B) > 1e-12, -C / B, jnp.inf)
     t_linear = jnp.where(t_linear > 1e-8, t_linear, jnp.inf)
@@ -341,7 +341,7 @@ def intersect_conic(ray_origin, ray_direction, curvature, conic):
     )
     t_conic = jnp.where(no_intersection, jnp.inf, t_conic)
 
-    # Select: plane → linear → quadratic
+    # Select: plane -> linear -> quadratic
     t_conic = jnp.where(is_linear, t_linear, t_conic)
     return jnp.where(is_plane, t_plane, t_conic)
 

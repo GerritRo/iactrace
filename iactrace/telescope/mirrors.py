@@ -59,10 +59,7 @@ def mirror_group(
 
     Takes pre-shaped per-element arrays plus a pre-built aperture and an
     optional :class:`BSDF` instance, and assembles the surface + interaction
-    + group wiring. This is the single assembly point for every reflective
-    group in the project — the sugar helpers in this module and the YAML
-    adapter both route through it, so any future additions (new BSDF
-    types, new surface fields, ...) only need to be plumbed once.
+    + group wiring.
 
     Args:
         positions: Per-element vertex positions, shape ``(N, 3)``.
@@ -73,8 +70,7 @@ def mirror_group(
             Use ``(N, 0)`` to disable aspherics.
         offsets: Per-element surface decentering, shape ``(N, 2)``. Use
             ``jnp.zeros((N, 2))`` for a centred disk.
-        aperture: Pre-built aperture — either :class:`DiskAperture` or
-            :class:`PolygonAperture` — sized to ``N``.
+        aperture: Pre-built aperture.
         reflectivity: Per-element reflectivity in ``[0, 1]``, shape ``(N,)``.
         sample_key: JAX PRNG key used for aperture sampling and BSDF.
         bsdf: Optional :class:`BSDF` instance. ``None`` leaves the element

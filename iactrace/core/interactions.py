@@ -86,9 +86,9 @@ def refract_slab(direction, normal, position, n_out, n_in, thickness):
         path_length: Geometric distance the ray travels inside the
             slab, in the same units as ``thickness``. Multiplied by
             ``n_in`` by the caller to obtain the OPL contribution
-            ``n_in · L``.
+            ``n_in * L``.
     """
-    # Entry refraction — cos_i is the incidence cosine we'll need downstream
+    # Entry refraction; cos_i is the incidence cosine
     dir_inside, cos_i, tir_entry = refract(direction, normal, n_out, n_in)
 
     # Propagation through the bulk
@@ -152,7 +152,7 @@ class ReflectInteraction(Interaction):
     When ``reflectivity is None`` (the default) the angular factor is
     unity, i.e. an ideal angle-independent mirror with response
     ``reflectivity_scalar``. Provide a :class:`TabulatedCoating` (or
-    any :class:`Coating`) to model a measured R(θ) curve. Reflection
+    any :class:`Coating`) to model a measured R(theta) curve. Reflection
     does not change the medium: ``new_n == current_n``.
 
     Attributes:
@@ -199,7 +199,7 @@ class RefractInteraction(Interaction):
     Semantically, this represents the ray crossing a single interface
     from one medium into another. A real glass body (e.g. a biconvex
     lens) is modelled as two consecutive :class:`RefractInteraction`
-    stages — front then back surface — and the render loop's per-ray
+    stages, front then back surface, and the render loop's per-ray
     medium tracker carries the correct index through the glass
     interior between them, so OPL is exact.
 
@@ -252,19 +252,19 @@ class SlabInteraction(Interaction):
         transmittance_scalar[idx] * angular_response
 
     When ``transmittance is None`` (the default) the angular response
-    is the standard Fresnel product at the two faces — by parallel-slab
+    is the standard Fresnel product at the two faces: by parallel-slab
     symmetry and Stokes reciprocity, both faces share the same
     single-face Fresnel coefficient so the result simplifies to
     ``T_face^2``. Provide a :class:`Coating` to override with a vendor-
-    supplied T(θ) curve for the *complete* slab; the coating fully
+    supplied T(theta) curve for the *complete* slab; the coating fully
     replaces the Fresnel product. The TIR mask from the underlying
     geometry gates out invalid rays either way.
 
     The ray enters from its current medium (``current_n``), refracts
     into the slab material, traverses it, and refracts back out into
-    the *same* medium — slabs assume the ambient is symmetric across
+    the *same* medium; slabs assume the ambient is symmetric across
     them, which is the usual case for a window. ``opl_internal`` is
-    the per-ray ``n_in · L`` inside the slab.
+    the per-ray ``n_in * L`` inside the slab.
 
     Attributes:
         n_inside: Per-element slab refractive index, shape ``(N,)``.

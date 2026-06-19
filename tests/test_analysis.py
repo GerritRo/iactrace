@@ -89,13 +89,13 @@ class TestAsphericFocalSurface:
         hits = aspheric.intersect(bundle)
 
         assert bool(hits.hit_mask[0])
-        # For a sphere with R=2, sag at r=0.4 is 2 - sqrt(2^2 - 0.4^2) ≈ 0.0404
+        # For a sphere with R=2, sag at r=0.4 is 2 - sqrt(2^2 - 0.4^2) ~ 0.0404
         expected_sag = 2.0 - jnp.sqrt(4.0 - 0.16)
         assert jnp.isclose(hits.z_local[0], expected_sag, atol=1e-4)
 
 
 class TestVmapping:
-    """The intersect path is vmapped — ensure multi-ray bundles work."""
+    """The intersect path is vmapped; ensure multi-ray bundles work."""
 
     def test_multiple_rays_independent(self):
         plane = FlatFocalPlane()

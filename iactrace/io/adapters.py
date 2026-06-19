@@ -254,7 +254,7 @@ def _build_coating_for_bucket(
     """Resolve a list of per-element curve schemas into a single coating.
 
     All ``None`` -> ``None`` (caller's default physics applies).
-    One distinct curve → broadcast across all elements.
+    One distinct curve -> broadcast across all elements.
     Coated mixed with uncoated, or several distinct curves -> ``ValueError``.
     """
     distinct: list[TabulatedCurveSchema] = []
@@ -416,7 +416,7 @@ def _build_bsdf_for_bucket(
 ) -> BSDF | None:
     """Reassemble one group's BSDF from per-element schemas.
 
-    All ``None`` → ``None`` (perfect specular). Otherwise every element
+    All ``None`` -> ``None`` (perfect specular). Otherwise every element
     that declares a BSDF must share the same ``type``; per-element
     parameters are stacked into the model's arrays, and elements without
     a BSDF default to zero (specular for that element). Mixed types
@@ -517,8 +517,8 @@ def lenses_from_schemas(
 ) -> list[OpticalElementGroup]:
     """Convert validated lens schemas to OpticalElementGroup domain objects.
 
-    Groups by ``(type, stage, aperture_signature)`` — mirroring how
-    :func:`mirrors_from_schemas` groups mirrors — and constructs one
+    Groups by ``(type, stage, aperture_signature)``; mirroring how
+    :func:`mirrors_from_schemas` groups mirrors and constructs one
     :class:`OpticalElementGroup` per bucket.
     """
     aspheric_disks: list[AsphericDiskLensSchema] = []
@@ -571,7 +571,7 @@ def _resolve_shared_n_outside[
         raise ValueError(
             "Lenses grouped at the same stage with the same aperture must "
             f"share a single n_outside; got {sorted(set(values))}. The "
-            "ambient index is stored per group, not per element — split "
+            "ambient index is stored per group, not per element; split "
             "them across stages, or harmonise n_outside."
         )
     return float(first)
@@ -743,8 +743,7 @@ def sensor_from_schema(
     """Convert a validated sensor schema to a SensorGroup domain object.
 
     The schema ``position`` / ``orientation`` are interpreted as
-    **camera-local** coordinates — the camera file format is the single
-    source of truth and always speaks in the camera's own frame.
+    **camera-local** coordinates.
     """
     positions = [list(p) for p in schema.positions]
     rotations = [list(r) for r in schema.orientations]
@@ -1132,8 +1131,7 @@ def telescope_to_schema(telescope: Telescope) -> TelescopeConfigSchema:
 def camera_to_file_schema(camera: Camera) -> CameraFileSchema:
     """Convert a Camera to a standalone CameraFileSchema.
 
-    Sensor positions are written in the camera-local frame — that is the
-    only frame the camera file format knows about.
+    Sensor positions are written in the camera-local frame.
     """
     sensor_schemas: list[SensorSchemaType] = []
     if camera.sensor_groups:

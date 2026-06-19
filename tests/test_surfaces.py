@@ -165,7 +165,7 @@ class TestConicIntersection:
     """Test ray-conic surface intersection for different surface types."""
 
     def _surface_residual(self, point, c, k):
-        """Check if point lies on conic surface: c*(x²+y²) + (1+k)*c*z² - 2z = 0."""
+        """Check if point lies on conic surface: c*(x^2+y^2) + (1+k)*c*z^2 - 2z = 0."""
         x, y, z = point[0], point[1], point[2]
         return c * (x**2 + y**2) + (1 + k) * c * z**2 - 2 * z
 
@@ -237,7 +237,7 @@ class TestNewtonRaphsonIntersect:
         assert jnp.allclose(hit_xy, jnp.array([3.0, 4.0]))
 
     def test_paraboloid(self):
-        """Paraboloid z = c*(x² + y²) intersection."""
+        """Paraboloid z = c*(x^2 + y^2) intersection."""
         c = 0.1
 
         def sag_fn(x, y):
@@ -251,7 +251,7 @@ class TestNewtonRaphsonIntersect:
         assert jnp.allclose(t, 9.6, atol=1e-6)
 
     def test_spherical_sag(self):
-        """Spherical sag z = c*(x² + y²) / (1 + sqrt(1 - c²*(x² + y²)))."""
+        """Spherical sag z = c*(x^2 + y^2) / (1 + sqrt(1 - c^2*(x^2 + y^2)))."""
         c = 0.05
 
         def sag_fn(x, y):

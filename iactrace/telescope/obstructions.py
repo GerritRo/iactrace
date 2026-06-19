@@ -49,10 +49,6 @@ def cylinder(
 ) -> CylinderGroup:
     """Build a single closed cylinder as a ``CylinderGroup`` of size one.
 
-    Closed cylinders include circular end caps — use this for camera housings,
-    secondary-mirror baffles and similar solid obstructions. For a hollow tube
-    without end caps, see :func:`open_cylinder`.
-
     Args:
         p1: One endpoint of the cylinder axis, shape (3,).
         p2: The other endpoint, shape (3,).
@@ -73,7 +69,10 @@ def open_cylinder(
 ) -> OpenCylinderGroup:
     """Build a single open cylinder (no end caps) as a size-one group.
 
-    Args: see :func:`cylinder`.
+    Args:
+        p1: One endpoint of the cylinder axis, shape (3,).
+        p2: The other endpoint, shape (3,).
+        r: Cylinder radius in metres.
     """
     return OpenCylinderGroup(
         p1=[_as_vec3(p1, "p1")],

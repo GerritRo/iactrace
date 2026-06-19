@@ -229,7 +229,7 @@ class TestBasicRendering:
 
 
 class TestResponseMatrix:
-    """Camera.response_matrix(LazyRayBundle) — fused per-source response."""
+    """Camera.response_matrix(LazyRayBundle)."""
 
     def test_shape_matches_image_with_leading_source_axis(self):
         tel, cam = make_simple_telescope(n_samples=64)

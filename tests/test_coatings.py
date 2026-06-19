@@ -21,7 +21,7 @@ from iactrace.core.interactions import (
 
 
 class TestConstantCoating:
-    """Element-wise constant — angle-independent."""
+    """Constant value."""
 
     def test_returns_per_element_value(self):
         coating = ConstantCoating(values=jnp.array([0.9, 0.85, 0.7]))
@@ -83,7 +83,7 @@ class TestTabulatedCoating:
             )
 
     def test_exact_at_knots(self):
-        # Curve: R(0°) = 0.9, R(60°) = 0.4 (cos = 0.5).
+        # Curve: R(0 deg) = 0.9, R(60 deg) = 0.4 (cos = 0.5).
         coating = TabulatedCoating.from_degrees(
             angles_deg=[0.0, 60.0],
             values=[0.9, 0.4],
@@ -92,13 +92,13 @@ class TestTabulatedCoating:
         # Normal incidence
         out = coating(jnp.array([1.0]), jnp.array([0]))
         assert jnp.allclose(out, 0.9, atol=1e-6)
-        # 60° incidence (cos = 0.5)
+        # 60 deg incidence (cos = 0.5)
         out = coating(jnp.array([0.5]), jnp.array([0]))
         assert jnp.allclose(out, 0.4, atol=1e-6)
 
     def test_linear_interpolation_at_midpoint(self):
         coating = TabulatedCoating.from_degrees(
-            angles_deg=[0.0, 90.0],   # cos 1.0 → 0.0
+            angles_deg=[0.0, 90.0],   # cos 1.0 -> 0.0
             values=[1.0, 0.0],
             n_elements=1,
         )
@@ -211,7 +211,7 @@ class TestAngleDependentReflection:
     """End-to-end check that a coating actually changes the per-ray weight."""
 
     def test_tabulated_curve_changes_with_angle(self):
-        # Define R(theta) dropping from 0.95 at 0° to 0.50 at 80°.
+        # Define R(theta) dropping from 0.95 at 0 deg to 0.50 at 80 deg.
         coating = TabulatedCoating.from_degrees(
             angles_deg=[0.0, 80.0],
             values=[0.95, 0.50],
@@ -257,7 +257,7 @@ class TestAngleDependentReflection:
 
         d = jnp.array([[0.0, 0.0, -1.0]])  # normal incidence
         _, _, c, _, _ = interaction.apply(d, normals, points, idx, jnp.ones(points.shape[0]))
-        # 0.8 × 1.0 = 0.8
+        # 0.8 * 1.0 = 0.8
         assert jnp.allclose(c, 0.8, atol=1e-6)
 
     def test_jit_with_tabulated_reflection(self):
@@ -355,7 +355,7 @@ class TestFactoryFlow:
             reflectivity=0.9,
             sample_key=jax.random.key(0),
         )
-        # No coating → reflectivity is None on the interaction.
+        # No coating -> reflectivity is None on the interaction.
         assert g.interaction_module.reflectivity is None
         assert jnp.allclose(g.interaction_module.reflectivity_scalar, 0.9)
 

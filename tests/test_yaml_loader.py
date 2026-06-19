@@ -31,9 +31,7 @@ def valid_template():
     }
 
 
-# ---------------------------------------------------------------------------
 # Telescope schema errors
-# ---------------------------------------------------------------------------
 
 
 class TestMirrorConfigErrors:
@@ -118,7 +116,7 @@ class TestMirrorConfigErrors:
             build_telescope_config(config, n_samples, random_key)
 
     def test_telescope_rejects_sensors_section(self, n_samples, random_key):
-        """Telescope schema is strict — combined-format sensors are forbidden."""
+        """Telescope schema is strict -- combined-format sensors are forbidden."""
         config = {
             "telescope": {"camera_position": [0, 0, 0], "camera_rotation": [0, 0, 0]},
             "mirrors": [],
@@ -137,7 +135,7 @@ class TestMirrorConfigErrors:
             build_telescope_config(config, n_samples, random_key)
 
     def test_telescope_rejects_camera_section(self, n_samples, random_key):
-        """Telescope schema is strict — combined-format camera block is forbidden."""
+        """Telescope schema is strict -- combined-format camera block is forbidden."""
         config = {
             "telescope": {"camera_position": [0, 0, 0], "camera_rotation": [0, 0, 0]},
             "mirrors": [],
@@ -147,9 +145,7 @@ class TestMirrorConfigErrors:
             build_telescope_config(config, n_samples, random_key)
 
 
-# ---------------------------------------------------------------------------
 # Camera schema errors
-# ---------------------------------------------------------------------------
 
 
 class TestSensorConfigErrors:
@@ -315,7 +311,7 @@ class TestValidConfigs:
         assert float(group.surface.curvatures[0]) == pytest.approx(0.2)
         assert float(group.surface.curvatures[1]) == pytest.approx(0.1)  # template default
 class TestCoatingsFromYaml:
-    """Inline R(θ) / T(θ) curves loaded from YAML."""
+    """Inline R(theta) / T(theta) curves loaded from YAML."""
 
     def test_tabulated_reflectivity_loads(self, n_samples, random_key):
         from iactrace.core.coatings import TabulatedCoating

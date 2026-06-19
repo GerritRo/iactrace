@@ -47,7 +47,7 @@ def transform_to_world(aperture_samples, surface, aperture_data, positions, rota
     surface geometry from aperture samples and surface parameters, then applies
     the per-element rotation and translation.
 
-    The surface module is vmapped over axis 0 — each iteration gets a
+    The surface module is vmapped over axis 0; each iteration gets a
     single-element surface with scalar parameters. This enables any surface
     type (aspheric, freeform, etc.) to be used without changing this function.
 

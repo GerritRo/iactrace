@@ -314,7 +314,6 @@ def set_focal_lengths(
 
     Mirror stages: ``c = 1 / (2 f)``.
     Lens stages (single refracting surface): ``c = 1 / ((n - 1) f)``.
-    Slab stages: not meaningful — raises ``ValueError``.
     """
     group = telescope.stage(stage)
     f = jnp.asarray(focal_lengths)

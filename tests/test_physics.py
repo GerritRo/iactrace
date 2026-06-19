@@ -183,7 +183,7 @@ class TestRefractSlab:
         assert jnp.isclose(exit_pos[1], 0.0, atol=1e-10)
         assert jnp.isclose(cos_i, 1.0, atol=1e-10)
         assert valid
-        # Normal incidence: path inside slab = thickness; OPL = n_in × thickness.
+        # Normal incidence: path inside slab = thickness; OPL = n_in * thickness.
         assert jnp.isclose(path_length, thickness, atol=1e-10)
 
     def test_oblique_incidence_direction_preserved(self):
@@ -227,7 +227,7 @@ class TestRefractSlab:
         assert jnp.abs(pos_30[0]) > jnp.abs(pos_normal[0]) + 1e-10
 
     def test_slab_fresnel_squared_at_normal_incidence(self):
-        """Caller computes T = T_face² from the cos_i returned by refract_slab."""
+        """Caller computes T = T_face^2 from the cos_i returned by refract_slab."""
         direction = jnp.array([0.0, 0.0, -1.0])
         normal = jnp.array([0.0, 0.0, 1.0])
         position = jnp.array([0.0, 0.0, 0.0])

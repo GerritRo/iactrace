@@ -70,9 +70,6 @@ class DoubleGaussianBSDFSchema(BaseModel):
     mix_weight: float = Field(ge=0, le=1, default=0.0)
 
 
-# Discriminated on ``type`` so new BSDF models are added by appending a
-# variant here (and a matching arm in the io adapters) — no schema churn
-# elsewhere. Mirrors the ApertureSchema / LensSchema pattern.
 BSDFSchema = Annotated[
     GaussianBSDFSchema | DoubleGaussianBSDFSchema,
     Field(discriminator="type"),
@@ -84,8 +81,7 @@ class TabulatedCurveSchema(BaseModel):
 
     ``angles_deg`` are sample angles in degrees in ``[0, 90]``;
     ``values`` are the corresponding coefficients in ``[0, 1]``. The
-    two lists must have the same length. Angles need not be sorted —
-    they are reordered into cos-ascending form when loaded. See
+    two lists must have the same length. See
     :class:`~iactrace.core.coatings.TabulatedCoating`.
     """
 

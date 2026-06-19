@@ -31,7 +31,7 @@ def intersect_sensor(
     """Intersect 3D rays with sensor planes.
 
     Accepts either a flat :class:`RayBundle` or a :class:`LazyRayBundle`
-    (which is materialised first — per-ray output cannot be folded).
+    (which is materialised first since per-ray output cannot be folded).
 
     Returns:
         Tuple of ``(sensor_rays, s_idx, hit_mask)`` where *sensor_rays*
@@ -51,9 +51,7 @@ def intersect_sensor(
         rot = euler_to_matrix(sensor.rotations[s_idx])
         pts, ts = jax.vmap(intersect_plane, in_axes=(0, 0, None, None))(
             origins, directions, pos, rot)
-        # Tiles are bounded — mask hits that fall outside this tile's
-        # active footprint so argmin doesn't pick an infinite plane that
-        # the ray crosses before reaching its true tile.
+        # Check if it lands within sensor bounds:
         in_b = sensor.in_bounds(pts[:, 0], pts[:, 1])
         ts = jnp.where(in_b, ts, jnp.inf)
         dx = directions @ rot[:, 0]
@@ -125,7 +123,6 @@ class Camera(eqx.Module):
         camera.image(rb)                  # pixel image (fused, per-element fold)
         camera.response_matrix(rb)        # per-source pixel response (fused)
         camera.collect(rb)                # (pe_vals, pe_times, pix_id, hit_mask)
-                                          # — materialises rays
         rb.materialise()                  # flat camera-frame RayBundle
 
     Attributes:
