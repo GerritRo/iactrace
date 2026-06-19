@@ -101,6 +101,78 @@ def export_mesh(telescope, filename):
     scene = show_telescope(telescope)
     scene.export(filename)
 
+
+def show_sensor_chain(camera, sensor_idx=0, **kwargs):
+    """Visualize a single pixel's detection chain ("train") in 3D.
+
+    Draws, in the canonical pixel-local frame (entrance aperture at ``z = 0``,
+    axis ``+z``): the pixel entrance aperture, the concentrator walls (if a
+    concentrator is present and exposes :meth:`Concentrator.cross_sections`),
+    and the photodetector active area at ``chain.detector_z`` (``= -(length + gap)``).
+
+    Args:
+        camera: Camera object (the selected sensor group and its ``chain`` are read).
+        sensor_idx: Which sensor group to take the pixel geometry and chain from.
+        **kwargs: ``entrance_color`` / ``cone_color`` / ``detector_color`` RGBA.
+
+    Returns:
+        trimesh.Scene
+    """
+    entrance_color = kwargs.get('entrance_color', [255, 0, 0, 128])
+    cone_color = kwargs.get('cone_color', [135, 206, 235, 160])
+    detector_color = kwargs.get('detector_color', [80, 80, 80, 255])
+
+    sensor = camera.sensor_groups[sensor_idx]
+    chain = sensor.chain
+    scene = trimesh.Scene()
+
+    # Entrance aperture polygon at z = 0.
+    entrance = _pixel_outline_2d(sensor)
+    ent_mesh = _make_double_sided(
+        _create_polygon_mesh([0.0, 0.0, 0.0], [0.0, 0.0, 0.0], entrance, sag_fn=None)
+    )
+    if ent_mesh is not None:
+        _apply_color(ent_mesh, entrance_color)
+        scene.add_geometry(ent_mesh)
+
+    # Concentrator walls (optional; skipped if absent or not drawable).
+    if chain.concentrator is not None:
+        cross = chain.concentrator.cross_sections()
+        if cross is not None:
+            z, rings = cross
+            cone = _create_lofted_mesh(z, rings)
+            if cone is not None:
+                _apply_color(cone, cone_color)
+                scene.add_geometry(cone)
+
+    # Detector active area at chain.detector_z = -(length + gap): light enters at
+    # z=0 from +z and the chain runs toward -z (entrance on top, detector below).
+    detector_z = chain.detector_z
+    det_outline = chain.photosensor.outline()
+    if det_outline is None:
+        # No explicit detector geometry (e.g. a scalar-QE photosensor). Draw a
+        # generic ROUND detector (PMT/SiPM-like) sized to the cone exit
+        # aperture; with no concentrator, fall back to the pixel footprint.
+        cross = chain.concentrator.cross_sections() if chain.concentrator is not None else None
+        if cross is not None:
+            exit_ring = np.asarray(cross[1][-1])                 # (M, 2) exit aperture
+            r_det = float(np.max(np.linalg.norm(exit_ring, axis=-1)))
+            ang = np.linspace(0.0, 2.0 * np.pi, 41)[:-1]
+            det_outline = np.column_stack([r_det * np.cos(ang), r_det * np.sin(ang)])
+        else:
+            det_outline = entrance
+    det_mesh = _make_double_sided(
+        _create_polygon_mesh(
+            [0.0, 0.0, detector_z], [0.0, 0.0, 0.0], np.asarray(det_outline), sag_fn=None
+        )
+    )
+    if det_mesh is not None:
+        _apply_color(det_mesh, detector_color)
+        scene.add_geometry(det_mesh)
+
+    return scene
+
+
 def _make_double_sided(mesh):
     """Make mesh visible from both sides by duplicating faces with reversed winding."""
     if mesh is None:
@@ -265,6 +337,60 @@ def _get_sensor_meshes(sensor_group):
                     meshes.append(mesh)
 
     return meshes
+
+
+def _pixel_outline_2d(sensor_group):
+    """Single-pixel boundary polygon ``(M, 2)``, centred at the origin.
+
+    Grid-aligned (the pixel-local frame), so it lines up with a concentrator's
+    ``cross_sections`` and the detector outline drawn by
+    :func:`show_sensor_chain`.
+    """
+    from ..camera import HexagonalSensorGroup, SquareSensorGroup
+
+    if isinstance(sensor_group, SquareSensorGroup):
+        hx, hy = sensor_group.dx / 2.0, sensor_group.dy / 2.0
+        return np.array([[-hx, -hy], [hx, -hy], [hx, hy], [-hx, hy]])
+    if isinstance(sensor_group, HexagonalSensorGroup):
+        r = sensor_group.hex_size
+        angles = np.deg2rad(30.0 + 60.0 * np.arange(6))
+        return np.column_stack([r * np.cos(angles), r * np.sin(angles)])
+    raise TypeError(f"Unsupported sensor group type: {type(sensor_group).__name__}")
+
+
+def _create_lofted_mesh(z, rings):
+    """Loft a stack of polygon cross-sections into a wall mesh.
+
+    Args:
+        z: ``(K,)`` axial heights.
+        rings: ``(K, M, 2)`` polygon vertices per slice (pixel-local frame).
+
+    Builds quads between consecutive rings ``rings[k]`` / ``rings[k+1]`` and
+    returns a double-sided :class:`trimesh.Trimesh` (walls only, no caps).
+    Generalizes :func:`_create_open_cylinder_mesh` to a varying cross-section,
+    so it covers hexagonal, square and (large ``M``) round cones alike.
+    """
+    z = np.asarray(z, dtype=float)
+    rings = np.asarray(rings, dtype=float)
+    if rings.ndim != 3 or rings.shape[0] < 2 or rings.shape[1] < 3:
+        return None
+    k_slices, m_verts = rings.shape[0], rings.shape[1]
+
+    vertices = np.zeros((k_slices * m_verts, 3))
+    vertices[:, :2] = rings.reshape(k_slices * m_verts, 2)
+    vertices[:, 2] = np.repeat(z, m_verts)
+
+    faces = []
+    for k in range(k_slices - 1):
+        base, nxt = k * m_verts, (k + 1) * m_verts
+        for m in range(m_verts):
+            m1 = (m + 1) % m_verts
+            a, b, c, d = base + m, base + m1, nxt + m, nxt + m1
+            faces.append([a, b, d])
+            faces.append([a, d, c])
+
+    mesh = trimesh.Trimesh(vertices=vertices, faces=np.asarray(faces))
+    return _make_double_sided(mesh)
 
 
 def _create_disk_mesh(position, rotation_euler, radius, sag_fn=None,

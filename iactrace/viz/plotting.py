@@ -44,7 +44,7 @@ def show_camera(
     Returns:
         ``ax`` (the axes that received the collection).
     """
-    from ..camera.layout import HexagonalSensorGroup, SquareSensorGroup
+    from ..camera.sensor_group import HexagonalSensorGroup, SquareSensorGroup
 
     image = np.asarray(image)
     if isinstance(sensor, SquareSensorGroup):

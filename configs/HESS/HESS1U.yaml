@@ -1921,7 +1921,7 @@ sensors:
   - -0.345500
   - -0.345500
   - -0.345500
-  id: science_camera
+  id: HESS1U
   orientation:
   - 0.000000
   - 0.000000
@@ -1931,4 +1931,4 @@ sensors:
   - 0.000000
   - 0.000000
   type: hexagonal
-  edge_width: 0.000400
+  edge_width: 0.000500

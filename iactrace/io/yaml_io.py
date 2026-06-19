@@ -155,9 +155,7 @@ def build_camera_config(config: dict[str, Any]) -> Camera:
 
     sensors = [sensor_from_schema(s) for s in schema.sensors]
 
-    return Camera(
-        sensor_groups=sensors,
-    )
+    return Camera(sensor_groups=sensors)
 
 
 # Serialization helpers

@@ -1,7 +1,7 @@
 sensors:
 - id: FlashCam
   type: hexagonal
-  edge_width: 0.000400
+  edge_width: 0.000500
   position:
   - 0.000000
   - 0.000000
