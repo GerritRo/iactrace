@@ -129,8 +129,8 @@ def slab_group(
 ) -> OpticalElementGroup:
     """Canonical builder for parallel-sided slab (window) groups.
 
-    The surface is always zero curvature, conic, and aspheric — a slab is
-    by definition flat — so no surface parameters are exposed. Both the
+    The surface is always zero curvature, conic, and aspheric, a slab is
+    by definition flat, so no surface parameters are exposed. Both the
     user-facing :func:`plano_slab` helper and the YAML adapter delegate
     to this function.
 
@@ -248,8 +248,8 @@ def thin(
 
     Uses the single-surface thin-lens formula
     ``curvature = (n_inside - n_outside) / focal_length``. This is an
-    approximation — a real thin lens consists of two refracting surfaces
-    — but it is sufficient for quick prototyping and matches the
+    approximation — a real thin lens consists of two refracting surfaces;
+    but it is sufficient for quick prototyping and matches the
     ``aspheric_disk`` lens type in the YAML adapter.
 
     Args:
@@ -307,7 +307,7 @@ def aspheric_lens(
 
     Args:
         position: Vertex position in world coordinates, shape (3,).
-        curvature: Surface curvature ``1/R`` in m⁻¹.
+        curvature: Surface curvature ``1/R`` in m^-1.
         radius: Outer disk radius in metres.
         rotation: Euler angles in degrees. Defaults to no rotation.
         conic: Schwarzschild conic constant.

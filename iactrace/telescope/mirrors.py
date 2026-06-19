@@ -355,7 +355,7 @@ def parabolic(
 
     Uses ``c = 1 / (2 * focal_length)`` and ``conic = -1``, matching the
     reference ``configs/BASIC/Cassegrain_telescope.yaml`` primary
-    (``focal_length=0.4`` → ``curvature=1.25``).
+    (``focal_length=0.4`` -> ``curvature=1.25``).
 
     Args: see :func:`spherical`.
     """
@@ -401,7 +401,7 @@ def aspheric(
 
     Args:
         position: Mirror vertex in world coordinates, shape (3,).
-        curvature: Paraxial curvature ``1/R`` in m⁻¹.
+        curvature: Paraxial curvature ``1/R`` in m^-1.
         radius: Outer disk radius in metres.
         rotation: Euler angles in degrees. Defaults to no rotation.
         conic: Schwarzschild conic constant. ``0`` spherical, ``-1``

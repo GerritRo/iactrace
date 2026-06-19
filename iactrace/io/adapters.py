@@ -253,9 +253,9 @@ def _build_coating_for_bucket(
 ) -> Coating | None:
     """Resolve a list of per-element curve schemas into a single coating.
 
-    All ``None`` → ``None`` (caller's default physics applies).
+    All ``None`` -> ``None`` (caller's default physics applies).
     One distinct curve → broadcast across all elements.
-    Mixed curves → ``ValueError``.
+    Coated mixed with uncoated, or several distinct curves -> ``ValueError``.
     """
     distinct: list[TabulatedCurveSchema] = []
     for c in curves:
@@ -273,6 +273,14 @@ def _build_coating_for_bucket(
             "coated and uncoated elements would silently apply one "
             "element's coating to the rest. Split them across stages or "
             "harmonize their `coating` fields."
+        )
+    if len(distinct) > 1:
+        raise ValueError(
+            "Elements grouped at the same stage with the same aperture "
+            "must resolve to a single coating, but multiple distinct "
+            "coating curves were found; broadcasting one would silently "
+            "apply it to the rest. Split them across stages or harmonize "
+            "their `coating` fields."
         )
 
     curve = distinct[0]

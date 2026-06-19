@@ -108,7 +108,7 @@ class TabulatedCoating(Coating):
         """Build a :class:`TabulatedCoating` from human-readable angles.
 
         Args:
-            angles_deg: Sample angles in degrees, shape ``(K,)``. Don't 
+            angles_deg: Sample angles in degrees, shape ``(K,)``. Don't
                 need to be sorted since they are reordered into cos-ascending
                 form internally.
             values: Coefficient values. ``(K,)`` is broadcast to all

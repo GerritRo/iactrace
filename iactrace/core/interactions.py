@@ -1,5 +1,4 @@
 from __future__ import annotations
-import jax.numpy as jnp
 
 import enum
 from abc import abstractmethod
@@ -89,16 +88,15 @@ def refract_slab(direction, normal, position, n_out, n_in, thickness):
             ``n_in`` by the caller to obtain the OPL contribution
             ``n_in · L``.
     """
-    # Entry refraction — cos_i is the incidence cosine we'll need downstream.
+    # Entry refraction — cos_i is the incidence cosine we'll need downstream
     dir_inside, cos_i, tir_entry = refract(direction, normal, n_out, n_in)
 
-    # Propagation through the bulk.
+    # Propagation through the bulk
     cos_to_normal = jnp.maximum(jnp.abs(jnp.dot(dir_inside, normal)), 1e-10)
     path_length = thickness / cos_to_normal
     exit_position = position + path_length * dir_inside
 
-    # Exit refraction — only the direction and TIR flag matter; the
-    # exit cosine is fixed by the parallel-slab geometry (= cos_i).
+    # Exit refraction
     exit_direction, _, tir_exit = refract(dir_inside, -normal, n_in, n_out)
 
     return (
@@ -257,7 +255,7 @@ class SlabInteraction(Interaction):
     is the standard Fresnel product at the two faces — by parallel-slab
     symmetry and Stokes reciprocity, both faces share the same
     single-face Fresnel coefficient so the result simplifies to
-    ``T_face²``. Provide a :class:`Coating` to override with a vendor-
+    ``T_face^2``. Provide a :class:`Coating` to override with a vendor-
     supplied T(θ) curve for the *complete* slab; the coating fully
     replaces the Fresnel product. The TIR mask from the underlying
     geometry gates out invalid rays either way.
