@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import math
+import warnings
 from collections import defaultdict
 from collections.abc import Callable
 from typing import TYPE_CHECKING, NamedTuple
@@ -9,10 +11,13 @@ import jax.numpy as jnp
 import numpy as np
 from jax import Array
 
-from ..camera.layout import HexagonalSensorGroup, SquareSensorGroup
+from ..camera.photosensor import UniformQE
+from ..camera.sensor_group import HexagonalSensorGroup, SquareSensorGroup
+from ..camera.winston_cone import WinstonCone, cpc_wall_tilt
 from ..core.apertures import Aperture, DiskAperture, PolygonAperture
-from ..core.bsdf import GaussianBSDF
+from ..core.bsdf import BSDF, DoubleGaussianBSDF, GaussianBSDF
 from ..core.interactions import (
+    ReflectInteraction,
     RefractInteraction,
     SlabInteraction,
 )
@@ -31,15 +36,18 @@ from .schemas import (
     AsphericDiskLensSchema,
     BoxObstructionSchema,
     BSDFSchema,
-    CameraConfigSchema,
     CameraFileSchema,
     CircularApertureSchema,
+    ConcentratorSchema,
     CylinderObstructionSchema,
+    DoubleGaussianBSDFSchema,
+    GaussianBSDFSchema,
     HexagonalSensorSchema,
     MirrorSchema,
     MirrorTemplateSchema,
     OpenCylinderObstructionSchema,
     OrientedBoxObstructionSchema,
+    PhotoSensorSchema,
     PlanoSlabSchema,
     PolygonApertureSchema,
     SphereObstructionSchema,
@@ -48,11 +56,16 @@ from .schemas import (
     TelescopeConfigSchema,
     TelescopeMetadataSchema,
     TriangleObstructionSchema,
+    UniformQESchema,
+    WinstonConeSchema,
 )
 
 if TYPE_CHECKING:
     from ..camera import Camera
-    from ..camera.layout import SensorGroup
+    from ..camera.chain import DetectionChain
+    from ..camera.concentrator import Concentrator
+    from ..camera.photosensor import PhotoSensor
+    from ..camera.sensor_group import SensorGroup
     from ..telescope import Telescope
 
 # Type aliases
@@ -82,7 +95,8 @@ class _ParsedMirror(NamedTuple):
     offset: list[float]
     stage: int
     aperture: CircularApertureSchema | PolygonApertureSchema
-    bsdf_scale: float
+    reflectivity: float
+    bsdf: BSDFSchema | None
 
 
 def _to_float_list(arr: np.ndarray | jnp.ndarray) -> list[float]:
@@ -201,13 +215,72 @@ def _resolve_surface(
     return curvature, conic, aspheric
 
 
-def _resolve_bsdf_scale(mirror: MirrorSchema, template: MirrorTemplateSchema) -> float:
-    """Resolve BSDF scale from mirror + template."""
-    if mirror.bsdf_scale is not None:
-        return mirror.bsdf_scale
-    if template.bsdf is not None:
-        return template.bsdf.scale
-    return 0.0
+def _bsdf_to_schema(bsdf: BSDF | None, i: int) -> BSDFSchema | None:
+    """Serialize element ``i`` of a group's BSDF (``None`` → perfect specular).
+
+    Only the shipped BSDF models round-trip; an unknown subclass warns and is
+    dropped to specular. To add one: add a ``case`` here, the matching arm in
+    :func:`_bsdf_for_group`, and a ``…BSDFSchema`` member to the discriminated
+    ``BSDFSchema`` union.
+    """
+    match bsdf:
+        case None:
+            return None
+        case GaussianBSDF():
+            scale = float(bsdf.scale[i])
+            # A zero scale is perfectly specular -> omit, like a missing block.
+            return GaussianBSDFSchema(scale=scale) if scale != 0.0 else None
+        case DoubleGaussianBSDF():
+            return DoubleGaussianBSDFSchema(
+                scale_narrow=float(bsdf.scale_narrow[i]),
+                scale_wide=float(bsdf.scale_wide[i]),
+                mix_weight=float(bsdf.mix_weight[i]),
+            )
+        case _:
+            warnings.warn(
+                f"{type(bsdf).__name__} is not representable in telescope YAML; "
+                "the surface will be saved as perfectly specular.",
+                UserWarning,
+                stacklevel=2,
+            )
+            return None
+
+
+def _bsdf_for_group(schemas: list[BSDFSchema | None]) -> BSDF | None:
+    """Rebuild a group's BSDF from its per-element schemas.
+
+    A group carries a single BSDF instance, so every element must share one
+    BSDF type; ``None`` elements become a zero-roughness entry of that type.
+    """
+    present = [s for s in schemas if s is not None]
+    if not present:
+        return None
+    types = {s.type for s in present}
+    if len(types) > 1:
+        raise ValueError(
+            "all mirrors in one optical group must share a BSDF type, "
+            f"got {sorted(types)}"
+        )
+    (kind,) = types
+    match kind:
+        case "gaussian":
+            scale = [
+                s.scale if isinstance(s, GaussianBSDFSchema) else 0.0 for s in schemas
+            ]
+            return GaussianBSDF(scale=jnp.asarray(scale))
+        case "double_gaussian":
+            def _col(attr: str) -> Array:
+                return jnp.asarray([
+                    getattr(s, attr) if isinstance(s, DoubleGaussianBSDFSchema) else 0.0
+                    for s in schemas
+                ])
+            return DoubleGaussianBSDF(
+                scale_narrow=_col("scale_narrow"),
+                scale_wide=_col("scale_wide"),
+                mix_weight=_col("mix_weight"),
+            )
+        case _:
+            raise ValueError(f"unknown BSDF schema type: {kind}")
 
 
 def _rotation_matrix_to_euler(rotation_matrix: np.ndarray) -> list[float]:
@@ -247,7 +320,6 @@ def mirrors_from_schemas(
     for mirror in mirrors:
         template = templates[mirror.template]
         curvature, conic, aspheric = _resolve_surface(mirror, template)
-        bsdf_scale = _resolve_bsdf_scale(mirror, template)
 
         parsed.append(_ParsedMirror(
             position=mirror.position,
@@ -258,7 +330,8 @@ def mirrors_from_schemas(
             offset=mirror.offset,
             stage=mirror.stage,
             aperture=mirror.aperture,
-            bsdf_scale=bsdf_scale,
+            reflectivity=mirror.reflectivity,
+            bsdf=mirror.bsdf,
         ))
 
     groups: list[OpticalElementGroup] = []
@@ -293,11 +366,6 @@ def _build_mirror_group(
     """
     from ..telescope.mirrors import mirror_group
 
-    n_elements = len(mirrors)
-
-    scales = jnp.asarray([m.bsdf_scale for m in mirrors])
-    bsdf = None if bool(jnp.all(scales == 0)) else GaussianBSDF(scale=scales)
-
     return mirror_group(
         positions=jnp.asarray([m.position for m in mirrors]),
         rotations=jnp.asarray([m.orientation for m in mirrors]),
@@ -306,8 +374,8 @@ def _build_mirror_group(
         aspherics=_pad_aspherics([m.aspheric for m in mirrors]),
         offsets=jnp.asarray([m.offset for m in mirrors]),
         aperture=aperture,
-        reflectivity=jnp.ones(n_elements),
-        bsdf=bsdf,
+        reflectivity=jnp.asarray([m.reflectivity for m in mirrors]),
+        bsdf=_bsdf_for_group([m.bsdf for m in mirrors]),
         sample_key=sample_key,
         optical_stage=stage,
         n_samples=n_samples,
@@ -513,10 +581,15 @@ def sensor_from_schema(
 
     The schema ``position`` / ``orientation`` are interpreted as
     **camera-local** coordinates — the camera file format is the single
-    source of truth and always speaks in the camera's own frame.
+    source of truth and always speaks in the camera's own frame. The sensor's
+    detection chain (``concentrator`` / ``gap`` / ``photosensor``) is rebuilt
+    onto the group.
     """
     positions = [list(p) for p in schema.positions]
     rotations = [list(r) for r in schema.orientations]
+    concentrator = _concentrator_from_schema(schema.concentrator)
+    photosensor = _photosensor_from_schema(schema.photosensor)
+    gap = schema.gap
 
     match schema.type:
         case "square":
@@ -528,6 +601,9 @@ def sensor_from_schema(
                 height=schema.height,
                 bounds=(b[0], b[1], b[2], b[3]),
                 edge_width=schema.edge_width,
+                concentrator=concentrator,
+                photosensor=photosensor,
+                gap=gap,
             )
         case "hexagonal":
             return HexagonalSensorGroup(
@@ -537,6 +613,9 @@ def sensor_from_schema(
                     [x, y] for x, y in zip(schema.centers_x, schema.centers_y, strict=False)
                 ],
                 edge_width=schema.edge_width,
+                concentrator=concentrator,
+                photosensor=photosensor,
+                gap=gap,
             )
 
 
@@ -548,9 +627,9 @@ def mirrors_to_schemas(
 ) -> tuple[dict[str, MirrorTemplateSchema], list[MirrorSchema]]:
     """Extract mirror schemas from OpticalElementGroup list.
 
-    Returns templates dict + mirror list. Deduplicates surface params into templates.
-    BSDF is stored per-mirror (not part of the dedup key) since mirrors sharing a
-    surface template can have different BSDF scales.
+    Returns templates dict + mirror list. Surface geometry is deduplicated into
+    templates; the per-element coating (``reflectivity``) and surface scatter
+    (``bsdf``) ride on each mirror.
     """
     templates: dict[str, MirrorTemplateSchema] = {}
     mirrors: list[MirrorSchema] = []
@@ -558,52 +637,38 @@ def mirrors_to_schemas(
     surface_to_template: dict[tuple, str] = {}
 
     for group in groups:
-        bsdf_scales = None
-        if isinstance(group.bsdf, GaussianBSDF):
-            bsdf_scales = group.bsdf.scale
+        interaction = group.interaction_module
+        assert isinstance(interaction, ReflectInteraction)  # mirror groups reflect
+        reflectivity = interaction.reflectivity
 
         for i in range(len(group)):
             curvature = float(group.surface.curvatures[i])
             conic = float(group.surface.conics[i])
             aspheric_raw = _strip_trailing_zeros(_to_float_list(group.surface.aspherics[i]))
-
-            bsdf_scale_val = float(bsdf_scales[i]) if bsdf_scales is not None else 0.0
             surface_key = (curvature, conic, tuple(aspheric_raw))
 
             if surface_key not in surface_to_template:
                 template_name = f"template_{template_counter}"
                 template_counter += 1
                 surface_to_template[surface_key] = template_name
-
-                bsdf_schema = None
-                if bsdf_scale_val != 0.0:
-                    bsdf_schema = BSDFSchema(scale=bsdf_scale_val)
-
                 templates[template_name] = MirrorTemplateSchema(
                     surface=SurfaceSchema(
                         curvature=curvature,
                         conic=conic,
                         aspheric=aspheric_raw if aspheric_raw else [],
                     ),
-                    bsdf=bsdf_schema,
                 )
 
             template_name = surface_to_template[surface_key]
-            position = _to_float_list(group.positions[i])
-            orientation = _to_float_list(group.rotations[i])
-
-            # Build aperture schema
-            aperture = _aperture_to_schema(group.aperture, i)
-
-            offset = _to_float_list(group.surface.offsets[i])
             mirrors.append(MirrorSchema(
-                position=position,
-                orientation=orientation,
-                aperture=aperture,
+                position=_to_float_list(group.positions[i]),
+                orientation=_to_float_list(group.rotations[i]),
+                aperture=_aperture_to_schema(group.aperture, i),
                 template=template_name,
                 stage=group.optical_stage,
-                offset=offset,
-                bsdf_scale=bsdf_scale_val if bsdf_scale_val != 0.0 else None,
+                offset=_to_float_list(group.surface.offsets[i]),
+                reflectivity=float(reflectivity[i]),
+                bsdf=_bsdf_to_schema(group.bsdf, i),
                 id=f"M_{len(mirrors)}",
             ))
 
@@ -802,6 +867,7 @@ def sensors_to_schemas(
 def _extract_square_group(
     group: SquareSensorGroup, counter: int,
 ) -> SquareSensorSchema:
+    concentrator, gap, photosensor = _chain_to_schema_fields(group.chain)
     return SquareSensorSchema(
         positions=[_to_float_list(p) for p in group.positions],
         orientations=[_to_float_list(r) for r in group.rotations],
@@ -809,6 +875,9 @@ def _extract_square_group(
         height=group.height,
         bounds=list(group.bounds),
         edge_width=group.edge_width,
+        concentrator=concentrator,
+        gap=gap,
+        photosensor=photosensor,
         id=f"sensor_{counter}",
     )
 
@@ -817,26 +886,144 @@ def _extract_hex_group(
     group: HexagonalSensorGroup, counter: int,
 ) -> HexagonalSensorSchema:
     hex_centers = np.asarray(group.hex_centers)
+    concentrator, gap, photosensor = _chain_to_schema_fields(group.chain)
     return HexagonalSensorSchema(
         positions=[_to_float_list(p) for p in group.positions],
         orientations=[_to_float_list(r) for r in group.rotations],
         centers_x=_to_float_list(hex_centers[:, 0]),
         centers_y=_to_float_list(hex_centers[:, 1]),
         edge_width=group.edge_width,
+        concentrator=concentrator,
+        gap=gap,
+        photosensor=photosensor,
         id=f"sensor_{counter}",
     )
 
 
-def camera_to_schema(camera: Camera) -> CameraConfigSchema:
-    """Convert a Camera to its schema representation.
+def _concentrator_to_schema(
+    concentrator: Concentrator | None,
+) -> ConcentratorSchema | None:
+    """Serialize a concentrator (``None`` → ``None``).
 
-    Only :class:`~iactrace.camera.photosensor.UniformQE` photosensors
-    round-trip exactly. Any other :class:`~iactrace.camera.photosensor.PhotoSensor`
-    subclass is not yet representable in the camera YAML; ``camera_to_schema``
-    emits a :class:`UserWarning` and falls back to ``quantum_efficiency=1.0``
-    so that ``Camera.to_yaml()`` does not crash mid-save.
+    Only :class:`WinstonCone` round-trips exactly today; any other
+    :class:`~iactrace.camera.concentrator.Concentrator` subclass emits a
+    :class:`UserWarning` and is dropped. To support another cone type, add a
+    ``case`` here, a converter in :func:`_concentrator_from_schema`, a
+    ``…Schema`` class, and a member to the ``ConcentratorSchema`` alias.
     """
-    return CameraConfigSchema()
+    match concentrator:
+        case None:
+            return None
+        case WinstonCone():
+            # entrance_apothem is the physical mouth at z=length; for a truncated
+            # cone the depth reconstructs the wall on load. An untruncated cone is
+            # written as length=None so reload is exact. "Full" ⟺ the mouth equals
+            # the full-CPC mouth a2/s for the wall tilt s.
+            s, _ = cpc_wall_tilt(
+                concentrator.exit_apothem, concentrator.entrance_apothem,
+                concentrator.length,
+            )
+            ideal_mouth = concentrator.exit_apothem / s
+            truncated = not math.isclose(
+                concentrator.entrance_apothem, ideal_mouth, rel_tol=1e-9
+            )
+            return WinstonConeSchema(
+                n_sides=concentrator.n_sides,
+                entrance_apothem=concentrator.entrance_apothem,
+                exit_apothem=concentrator.exit_apothem,
+                length=concentrator.length if truncated else None,
+                reflectivity=concentrator.reflectivity,
+                max_bounces=concentrator.max_bounces,
+                orientation_deg=math.degrees(concentrator.orientation),
+            )
+        case _:
+            warnings.warn(
+                f"{type(concentrator).__name__} is not representable in camera "
+                "YAML; the concentrator will be dropped on save.",
+                UserWarning,
+                stacklevel=2,
+            )
+            return None
+
+
+def _concentrator_from_schema(
+    schema: ConcentratorSchema | None,
+) -> Concentrator | None:
+    """Rebuild a concentrator from its schema (``None`` → no concentrator)."""
+    match schema:
+        case None:
+            return None
+        case WinstonConeSchema():
+            return WinstonCone(
+                n_sides=schema.n_sides,
+                entrance_apothem=schema.entrance_apothem,
+                exit_apothem=schema.exit_apothem,
+                length=schema.length,
+                reflectivity=schema.reflectivity,
+                max_bounces=schema.max_bounces,
+                orientation_deg=schema.orientation_deg,
+            )
+        case _:
+            raise ValueError(
+                f"unknown concentrator schema: {type(schema).__name__}"
+            )
+
+
+def _photosensor_to_schema(photosensor: PhotoSensor) -> PhotoSensorSchema:
+    """Serialize a photosensor.
+
+    Only :class:`UniformQE` round-trips exactly today; any other
+    :class:`~iactrace.camera.photosensor.PhotoSensor` subclass emits a
+    :class:`UserWarning` and falls back to a flat ``UniformQE(1.0)``. To support
+    another response model, add a ``case`` here and in
+    :func:`_photosensor_from_schema`, a ``…Schema`` class, and a member to the
+    ``PhotoSensorSchema`` alias.
+    """
+    match photosensor:
+        case UniformQE():
+            return UniformQESchema(qe=float(photosensor.qe))
+        case _:
+            warnings.warn(
+                f"{type(photosensor).__name__} is not representable in camera "
+                "YAML; saving with a flat quantum efficiency of 1.0.",
+                UserWarning,
+                stacklevel=2,
+            )
+            return UniformQESchema(qe=1.0)
+
+
+def _photosensor_from_schema(schema: PhotoSensorSchema | None) -> PhotoSensor:
+    """Rebuild a photosensor from its schema (``None`` → ``UniformQE(1.0)``)."""
+    match schema:
+        case None:
+            return UniformQE(1.0)
+        case UniformQESchema():
+            return UniformQE(schema.qe)
+        case _:
+            raise ValueError(
+                f"unknown photosensor schema: {type(schema).__name__}"
+            )
+
+
+def _chain_to_schema_fields(
+    chain: DetectionChain,
+) -> tuple[ConcentratorSchema | None, float, PhotoSensorSchema | None]:
+    """Project a detection chain to its ``(concentrator, gap, photosensor)`` schema.
+
+    Only :class:`~iactrace.camera.photosensor.UniformQE` photosensors and
+    :class:`~iactrace.camera.winston_cone.WinstonCone` concentrators round-trip
+    exactly; other subclasses warn and fall back (see ``_photosensor_to_schema``
+    / ``_concentrator_to_schema``) so saving never crashes. The trivial
+    perfect-QE photosensor is emitted as ``None`` so a geometry-only sensor
+    group serializes without a redundant ``photosensor:`` block.
+    """
+    concentrator = _concentrator_to_schema(chain.concentrator)
+    photosensor: PhotoSensorSchema | None
+    if isinstance(chain.photosensor, UniformQE) and float(chain.photosensor.qe) == 1.0:
+        photosensor = None
+    else:
+        photosensor = _photosensor_to_schema(chain.photosensor)
+    return concentrator, float(chain.gap), photosensor
 
 
 def telescope_to_schema(telescope: Telescope) -> TelescopeConfigSchema:
@@ -868,13 +1055,11 @@ def camera_to_file_schema(camera: Camera) -> CameraFileSchema:
     """Convert a Camera to a standalone CameraFileSchema.
 
     Sensor positions are written in the camera-local frame — that is the
-    only frame the camera file format knows about.
+    only frame the camera file format knows about. Each sensor group carries
+    its own detection chain (concentrator / gap / photosensor).
     """
     sensor_schemas: list[SensorSchemaType] = []
     if camera.sensor_groups:
         sensor_schemas = sensors_to_schemas(camera.sensor_groups)
 
-    return CameraFileSchema(
-        camera=camera_to_schema(camera),
-        sensors=sensor_schemas,
-    )
+    return CameraFileSchema(sensors=sensor_schemas)

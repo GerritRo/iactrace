@@ -29,15 +29,36 @@ Sensors live in the camera-local frame and accumulate rays into pixels.
    :undoc-members:
    :show-inheritance:
 
+Detection chain
+---------------
+
+Each :class:`~iactrace.camera.SensorGroup` owns a ``DetectionChain``,
+an optional concentrator, a ``gap``, and a photosensor, applied to every
+pixel of that group. Distinct groups in one camera can therefore carry
+different cones or photosensors. Configure a group's chain at construction
+(``concentrator`` / ``photosensor`` / ``gap`` arguments) or functionally via
+the ``sensor_idx``-keyed ``Camera.set_concentrator`` / ``set_photosensor`` /
+``set_gap``.
+
+.. autoclass:: iactrace.camera.DetectionChain
+   :members:
+   :undoc-members:
+
 Concentrators
 -------------
 
 Optional light concentrators (e.g. Winston cones) sit between the
-incoming rays and the photosensor:
+incoming rays and the photosensor. Optical path length through the guide is
+weighted by the concentrator's fill index (1.0 for an air-filled Winston cone):
 
 .. autoclass:: iactrace.camera.Concentrator
    :members:
    :undoc-members:
+
+.. autoclass:: iactrace.camera.WinstonCone
+   :members:
+   :undoc-members:
+   :show-inheritance:
 
 Photosensors
 ------------

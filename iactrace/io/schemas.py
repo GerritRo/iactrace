@@ -48,14 +48,40 @@ class SurfaceSchema(BaseModel):
     aspheric: list[float] = Field(default_factory=list)
 
 
-class BSDFSchema(BaseModel):
-    type: str = "gaussian"
-    scale: float = Field(ge=0, default=0.0)
+class GaussianBSDFSchema(BaseModel):
+    """Serialized :class:`~iactrace.core.bsdf.GaussianBSDF` (single-Gaussian roughness)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal["gaussian"] = "gaussian"
+    scale: float = Field(ge=0, default=0.0)  # roughness sigma in arcseconds
+
+
+class DoubleGaussianBSDFSchema(BaseModel):
+    """Serialized :class:`~iactrace.core.bsdf.DoubleGaussianBSDF` (narrow + wide)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal["double_gaussian"] = "double_gaussian"
+    scale_narrow: float = Field(ge=0)  # arcseconds
+    scale_wide: float = Field(ge=0)    # arcseconds
+    mix_weight: float = Field(ge=0, le=1)
+
+
+# Discriminated BSDF slot. To add a surface-scatter model: add its domain class,
+# a ``…BSDFSchema`` member here, and the matching arms in ``io/adapters.py``
+# (``_bsdf_to_schema`` / ``_bsdf_for_group``).
+BSDFSchema = Annotated[
+    GaussianBSDFSchema | DoubleGaussianBSDFSchema,
+    Field(discriminator="type"),
+]
 
 
 class MirrorTemplateSchema(BaseModel):
+    """Deduplicated surface geometry shared by mirrors. Per-element coating
+    (``reflectivity``) and ``bsdf`` live on the mirror, not the template."""
+
     surface: SurfaceSchema
-    bsdf: BSDFSchema | None = None
 
 
 class MirrorSchema(BaseModel):
@@ -68,8 +94,8 @@ class MirrorSchema(BaseModel):
     aspheric: list[float] | None = None
     offset: Vec2 = Field(default_factory=lambda: [0.0, 0.0])
     stage: int = Field(ge=0, default=0)
-    bsdf_scale: float | None = None
-    bsdf_type: str | None = None
+    reflectivity: float = Field(ge=0, le=1, default=1.0)
+    bsdf: BSDFSchema | None = None
     id: str | None = None
 
 
@@ -171,6 +197,47 @@ ObstructionSchema = Annotated[
 ]
 
 
+# Detection-chain schemas (per sensor group)
+
+
+class WinstonConeSchema(BaseModel):
+    """Serialized :class:`~iactrace.camera.winston_cone.WinstonCone`.
+
+    ``entrance_apothem`` is the physical mouth at ``z = length`` (the truncated
+    mouth when ``length`` is given, the full CPC mouth when it is omitted). The
+    wall tilt (hence the parabola) is derived from ``(exit_apothem,
+    entrance_apothem, length)``.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal["winston"] = "winston"
+    n_sides: int = Field(gt=2)
+    entrance_apothem: float = Field(gt=0)
+    exit_apothem: float = Field(gt=0)
+    length: float | None = Field(default=None, gt=0)
+    reflectivity: float = Field(ge=0, le=1, default=0.9)
+    max_bounces: int = Field(ge=0, default=10)
+    orientation_deg: float = 0.0
+
+
+class UniformQESchema(BaseModel):
+    """Serialized :class:`~iactrace.camera.photosensor.UniformQE`."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal["uniform"] = "uniform"
+    qe: float = Field(ge=0, le=1, default=1.0)
+
+
+# Discriminated-union slots for the detection chain. Each is a single member
+# today; when a second concrete type is added, turn the alias into
+# ``Annotated[A | B, Field(discriminator="type")]`` (every member already carries
+# a ``type`` literal) and add the matching arms in ``io/adapters.py``.
+ConcentratorSchema = WinstonConeSchema
+PhotoSensorSchema = UniformQESchema
+
+
 # Sensor schemas
 
 
@@ -207,13 +274,19 @@ def _normalize_sensor_placement(data: Any) -> Any:
 def _serialize_placement_singular(
     self: BaseModel, handler: SerializerFunctionWrapHandler
 ) -> dict[str, Any]:
-    """Emit ``position``/``orientation`` for N=1 sensors, plural otherwise."""
+    """Emit ``position``/``orientation`` for N=1 sensors, plural otherwise.
+
+    Also drops a zero ``gap`` so geometry-only sensor groups (no concentrator,
+    no gap, perfect QE) round-trip without spurious detection-chain keys.
+    """
     out = handler(self)
     for singular, plural in (("position", "positions"), ("orientation", "orientations")):
         values = out.get(plural)
         if isinstance(values, list) and len(values) == 1:
             out[singular] = values[0]
             del out[plural]
+    if out.get("gap") == 0.0:
+        out.pop("gap", None)
     return out
 
 
@@ -227,6 +300,9 @@ class SquareSensorSchema(BaseModel):
     height: int = Field(gt=0)
     bounds: Bounds4
     edge_width: float = Field(ge=0, default=0.0)
+    concentrator: ConcentratorSchema | None = None
+    gap: float = Field(ge=0, default=0.0)
+    photosensor: PhotoSensorSchema | None = None
     id: str | None = None
 
     @model_validator(mode="before")
@@ -248,6 +324,9 @@ class HexagonalSensorSchema(BaseModel):
     centers_x: list[float] = Field(min_length=1)
     centers_y: list[float] = Field(min_length=1)
     edge_width: float = Field(ge=0, default=0.0)
+    concentrator: ConcentratorSchema | None = None
+    gap: float = Field(ge=0, default=0.0)
+    photosensor: PhotoSensorSchema | None = None
     id: str | None = None
 
     @field_validator("centers_y")
@@ -271,13 +350,6 @@ SensorSchema = Annotated[
     SquareSensorSchema | HexagonalSensorSchema,
     Field(discriminator="type"),
 ]
-
-
-# Camera schema
-
-
-class CameraConfigSchema(BaseModel):
-    model_config = ConfigDict(extra="forbid")
 
 
 # Top-level telescope schema
@@ -398,6 +470,10 @@ class TelescopeConfigSchema(BaseModel):
 class CameraFileSchema(BaseModel):
     """Top-level schema for a standalone camera YAML file.
 
+    A camera file is a list of ``sensors``; each sensor group carries its own
+    detector geometry **and** detection chain (``concentrator`` / ``gap`` /
+    ``photosensor``), so different groups can run different chains.
+
     **Sensor positions are always in the camera-local frame.** There is no
     world-frame mode: loading interprets every ``sensors[*].position`` as
     an offset from the camera origin, and saving writes them the same way.
@@ -411,5 +487,4 @@ class CameraFileSchema(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    camera: CameraConfigSchema = Field(default_factory=CameraConfigSchema)
     sensors: list[SensorSchema] = Field(default_factory=list)

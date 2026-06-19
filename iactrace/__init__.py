@@ -3,16 +3,18 @@ import jax
 from .camera import (
     Camera,
     Concentrator,
+    DetectionChain,
     HexagonalSensorGroup,
     PhotoSensor,
     SensorGroup,
     SquareSensorGroup,
     UniformQE,
+    WinstonCone,
 )
 from .core import LazyRayBundle, RayBundle
 from .io import save_camera, save_telescope
 from .telescope import Telescope
-from .viz import show_camera, show_telescope
+from .viz import show_camera, show_sensor_chain, show_telescope
 
 __version__ = "0.8.0"
 
@@ -24,6 +26,8 @@ __all__ = [
     "RayBundle",
     "LazyRayBundle",
     "Concentrator",
+    "WinstonCone",
+    "DetectionChain",
     # Sensors
     "SensorGroup",
     "SquareSensorGroup",
@@ -34,6 +38,7 @@ __all__ = [
     # Visualization
     "show_camera",
     "show_telescope",
+    "show_sensor_chain",
     # I/O
     "save_telescope",
     "save_camera",
