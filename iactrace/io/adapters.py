@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import math
+import warnings
 from collections import defaultdict
 from collections.abc import Callable
 from typing import TYPE_CHECKING, NamedTuple
@@ -9,10 +11,13 @@ import jax.numpy as jnp
 import numpy as np
 from jax import Array
 
-from ..camera.layout import HexagonalSensorGroup, SquareSensorGroup
+from ..camera.photosensor import UniformQE
+from ..camera.sensor_group import HexagonalSensorGroup, SquareSensorGroup
+from ..camera.winston_cone import WinstonCone, cpc_wall_tilt
 from ..core.apertures import Aperture, DiskAperture, PolygonAperture
 from ..core.bsdf import BSDF, DoubleGaussianBSDF, GaussianBSDF
 from ..core.coatings import Coating, TabulatedCoating
+
 from ..core.interactions import (
     ReflectInteraction,
     RefractInteraction,
@@ -33,9 +38,9 @@ from .schemas import (
     AsphericDiskLensSchema,
     BoxObstructionSchema,
     BSDFSchema,
-    CameraConfigSchema,
     CameraFileSchema,
     CircularApertureSchema,
+    ConcentratorSchema,
     CylinderObstructionSchema,
     DoubleGaussianBSDFSchema,
     GaussianBSDFSchema,
@@ -44,6 +49,7 @@ from .schemas import (
     MirrorTemplateSchema,
     OpenCylinderObstructionSchema,
     OrientedBoxObstructionSchema,
+    PhotoSensorSchema,
     PlanoSlabSchema,
     PolygonApertureSchema,
     SphereObstructionSchema,
@@ -53,11 +59,16 @@ from .schemas import (
     TelescopeConfigSchema,
     TelescopeMetadataSchema,
     TriangleObstructionSchema,
+    UniformQESchema,
+    WinstonConeSchema,
 )
 
 if TYPE_CHECKING:
     from ..camera import Camera
-    from ..camera.layout import SensorGroup
+    from ..camera.chain import DetectionChain
+    from ..camera.concentrator import Concentrator
+    from ..camera.photosensor import PhotoSensor
+    from ..camera.sensor_group import SensorGroup
     from ..telescope import Telescope
 
 # Type aliases
@@ -492,7 +503,6 @@ def _build_mirror_group(
     coating = _build_coating_for_bucket(
         [m.coating_curve for m in mirrors], n_elements,
     )
-
     return mirror_group(
         positions=jnp.asarray([m.position for m in mirrors]),
         rotations=jnp.asarray([m.orientation for m in mirrors]),
@@ -747,6 +757,9 @@ def sensor_from_schema(
     """
     positions = [list(p) for p in schema.positions]
     rotations = [list(r) for r in schema.orientations]
+    concentrator = _concentrator_from_schema(schema.concentrator)
+    photosensor = _photosensor_from_schema(schema.photosensor)
+    gap = schema.gap
 
     match schema.type:
         case "square":
@@ -758,6 +771,9 @@ def sensor_from_schema(
                 height=schema.height,
                 bounds=(b[0], b[1], b[2], b[3]),
                 edge_width=schema.edge_width,
+                concentrator=concentrator,
+                photosensor=photosensor,
+                gap=gap,
             )
         case "hexagonal":
             return HexagonalSensorGroup(
@@ -767,6 +783,9 @@ def sensor_from_schema(
                     [x, y] for x, y in zip(schema.centers_x, schema.centers_y, strict=False)
                 ],
                 edge_width=schema.edge_width,
+                concentrator=concentrator,
+                photosensor=photosensor,
+                gap=gap,
             )
 
 
@@ -836,7 +855,6 @@ def mirrors_to_schemas(
                 template_name = f"template_{template_counter}"
                 template_counter += 1
                 surface_to_template[surface_key] = template_name
-
                 templates[template_name] = MirrorTemplateSchema(
                     surface=SurfaceSchema(
                         curvature=curvature,
@@ -856,9 +874,9 @@ def mirrors_to_schemas(
             offset = _to_float_list(group.surface.offsets[i])
             scalar = float(interaction.reflectivity_scalar[i])
             mirrors.append(MirrorSchema(
-                position=position,
-                orientation=orientation,
-                aperture=aperture,
+                position=_to_float_list(group.positions[i]),
+                orientation=_to_float_list(group.rotations[i]),
+                aperture=_aperture_to_schema(group.aperture, i),
                 template=template_name,
                 stage=group.optical_stage,
                 offset=offset,
@@ -1066,6 +1084,7 @@ def sensors_to_schemas(
 def _extract_square_group(
     group: SquareSensorGroup, counter: int,
 ) -> SquareSensorSchema:
+    concentrator, gap, photosensor = _chain_to_schema_fields(group.chain)
     return SquareSensorSchema(
         positions=[_to_float_list(p) for p in group.positions],
         orientations=[_to_float_list(r) for r in group.rotations],
@@ -1073,6 +1092,9 @@ def _extract_square_group(
         height=group.height,
         bounds=list(group.bounds),
         edge_width=group.edge_width,
+        concentrator=concentrator,
+        gap=gap,
+        photosensor=photosensor,
         id=f"sensor_{counter}",
     )
 
@@ -1081,26 +1103,144 @@ def _extract_hex_group(
     group: HexagonalSensorGroup, counter: int,
 ) -> HexagonalSensorSchema:
     hex_centers = np.asarray(group.hex_centers)
+    concentrator, gap, photosensor = _chain_to_schema_fields(group.chain)
     return HexagonalSensorSchema(
         positions=[_to_float_list(p) for p in group.positions],
         orientations=[_to_float_list(r) for r in group.rotations],
         centers_x=_to_float_list(hex_centers[:, 0]),
         centers_y=_to_float_list(hex_centers[:, 1]),
         edge_width=group.edge_width,
+        concentrator=concentrator,
+        gap=gap,
+        photosensor=photosensor,
         id=f"sensor_{counter}",
     )
 
 
-def camera_to_schema(camera: Camera) -> CameraConfigSchema:
-    """Convert a Camera to its schema representation.
+def _concentrator_to_schema(
+    concentrator: Concentrator | None,
+) -> ConcentratorSchema | None:
+    """Serialize a concentrator (``None`` → ``None``).
 
-    Only :class:`~iactrace.camera.photosensor.UniformQE` photosensors
-    round-trip exactly. Any other :class:`~iactrace.camera.photosensor.PhotoSensor`
-    subclass is not yet representable in the camera YAML; ``camera_to_schema``
-    emits a :class:`UserWarning` and falls back to ``quantum_efficiency=1.0``
-    so that ``Camera.to_yaml()`` does not crash mid-save.
+    Only :class:`WinstonCone` round-trips exactly today; any other
+    :class:`~iactrace.camera.concentrator.Concentrator` subclass emits a
+    :class:`UserWarning` and is dropped. To support another cone type, add a
+    ``case`` here, a converter in :func:`_concentrator_from_schema`, a
+    ``…Schema`` class, and a member to the ``ConcentratorSchema`` alias.
     """
-    return CameraConfigSchema()
+    match concentrator:
+        case None:
+            return None
+        case WinstonCone():
+            # entrance_apothem is the physical mouth at z=length; for a truncated
+            # cone the depth reconstructs the wall on load. An untruncated cone is
+            # written as length=None so reload is exact. "Full" ⟺ the mouth equals
+            # the full-CPC mouth a2/s for the wall tilt s.
+            s, _ = cpc_wall_tilt(
+                concentrator.exit_apothem, concentrator.entrance_apothem,
+                concentrator.length,
+            )
+            ideal_mouth = concentrator.exit_apothem / s
+            truncated = not math.isclose(
+                concentrator.entrance_apothem, ideal_mouth, rel_tol=1e-9
+            )
+            return WinstonConeSchema(
+                n_sides=concentrator.n_sides,
+                entrance_apothem=concentrator.entrance_apothem,
+                exit_apothem=concentrator.exit_apothem,
+                length=concentrator.length if truncated else None,
+                reflectivity=concentrator.reflectivity,
+                max_bounces=concentrator.max_bounces,
+                orientation_deg=math.degrees(concentrator.orientation),
+            )
+        case _:
+            warnings.warn(
+                f"{type(concentrator).__name__} is not representable in camera "
+                "YAML; the concentrator will be dropped on save.",
+                UserWarning,
+                stacklevel=2,
+            )
+            return None
+
+
+def _concentrator_from_schema(
+    schema: ConcentratorSchema | None,
+) -> Concentrator | None:
+    """Rebuild a concentrator from its schema (``None`` → no concentrator)."""
+    match schema:
+        case None:
+            return None
+        case WinstonConeSchema():
+            return WinstonCone(
+                n_sides=schema.n_sides,
+                entrance_apothem=schema.entrance_apothem,
+                exit_apothem=schema.exit_apothem,
+                length=schema.length,
+                reflectivity=schema.reflectivity,
+                max_bounces=schema.max_bounces,
+                orientation_deg=schema.orientation_deg,
+            )
+        case _:
+            raise ValueError(
+                f"unknown concentrator schema: {type(schema).__name__}"
+            )
+
+
+def _photosensor_to_schema(photosensor: PhotoSensor) -> PhotoSensorSchema:
+    """Serialize a photosensor.
+
+    Only :class:`UniformQE` round-trips exactly today; any other
+    :class:`~iactrace.camera.photosensor.PhotoSensor` subclass emits a
+    :class:`UserWarning` and falls back to a flat ``UniformQE(1.0)``. To support
+    another response model, add a ``case`` here and in
+    :func:`_photosensor_from_schema`, a ``…Schema`` class, and a member to the
+    ``PhotoSensorSchema`` alias.
+    """
+    match photosensor:
+        case UniformQE():
+            return UniformQESchema(qe=float(photosensor.qe))
+        case _:
+            warnings.warn(
+                f"{type(photosensor).__name__} is not representable in camera "
+                "YAML; saving with a flat quantum efficiency of 1.0.",
+                UserWarning,
+                stacklevel=2,
+            )
+            return UniformQESchema(qe=1.0)
+
+
+def _photosensor_from_schema(schema: PhotoSensorSchema | None) -> PhotoSensor:
+    """Rebuild a photosensor from its schema (``None`` → ``UniformQE(1.0)``)."""
+    match schema:
+        case None:
+            return UniformQE(1.0)
+        case UniformQESchema():
+            return UniformQE(schema.qe)
+        case _:
+            raise ValueError(
+                f"unknown photosensor schema: {type(schema).__name__}"
+            )
+
+
+def _chain_to_schema_fields(
+    chain: DetectionChain,
+) -> tuple[ConcentratorSchema | None, float, PhotoSensorSchema | None]:
+    """Project a detection chain to its ``(concentrator, gap, photosensor)`` schema.
+
+    Only :class:`~iactrace.camera.photosensor.UniformQE` photosensors and
+    :class:`~iactrace.camera.winston_cone.WinstonCone` concentrators round-trip
+    exactly; other subclasses warn and fall back (see ``_photosensor_to_schema``
+    / ``_concentrator_to_schema``) so saving never crashes. The trivial
+    perfect-QE photosensor is emitted as ``None`` so a geometry-only sensor
+    group serializes without a redundant ``photosensor:`` block.
+    """
+    concentrator = _concentrator_to_schema(chain.concentrator)
+    photosensor: PhotoSensorSchema | None
+    if isinstance(chain.photosensor, UniformQE) and float(chain.photosensor.qe) == 1.0:
+        photosensor = None
+    else:
+        photosensor = _photosensor_to_schema(chain.photosensor)
+    return concentrator, float(chain.gap), photosensor
 
 
 def telescope_to_schema(telescope: Telescope) -> TelescopeConfigSchema:
@@ -1137,7 +1277,4 @@ def camera_to_file_schema(camera: Camera) -> CameraFileSchema:
     if camera.sensor_groups:
         sensor_schemas = sensors_to_schemas(camera.sensor_groups)
 
-    return CameraFileSchema(
-        camera=camera_to_schema(camera),
-        sensors=sensor_schemas,
-    )
+    return CameraFileSchema(sensors=sensor_schemas)

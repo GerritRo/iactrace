@@ -11,16 +11,17 @@ from ..core.intersections import intersect_plane
 from ..core.ray_bundle import LazyRayBundle, RayBundle
 from ..core.transforms import euler_to_matrix
 from . import operations as _ops
-from .photosensor import PhotoSensor, UniformQE
 
 if TYPE_CHECKING:
     from pathlib import Path
 
     from .concentrator import Concentrator
-    from .layout import SensorGroup
+    from .photosensor import PhotoSensor
+    from .sensor_group import SensorGroup
 
 
 # Pipeline functions
+
 
 
 def intersect_sensor(
@@ -30,8 +31,7 @@ def intersect_sensor(
 ) -> tuple[RayBundle, Array, Array]:
     """Intersect 3D rays with sensor planes.
 
-    Accepts either a flat :class:`RayBundle` or a :class:`LazyRayBundle`
-    (which is materialised first since per-ray output cannot be folded).
+    Accepts either a flat :class:`RayBundle` or a :class:`LazyRayBundle`.
 
     Returns:
         Tuple of ``(sensor_rays, s_idx, hit_mask)`` where *sensor_rays*
@@ -47,37 +47,35 @@ def intersect_sensor(
     n_rays = origins.shape[0]
 
     def f(s_idx):
+        # Calculate intersections with sensor plane
         pos = sensor.positions[s_idx]
         rot = euler_to_matrix(sensor.rotations[s_idx])
         pts, ts = jax.vmap(intersect_plane, in_axes=(0, 0, None, None))(
             origins, directions, pos, rot)
-        # Check if it lands within sensor bounds:
-        in_b = sensor.in_bounds(pts[:, 0], pts[:, 1])
-        ts = jnp.where(in_b, ts, jnp.inf)
-        dx = directions @ rot[:, 0]
-        dy = directions @ rot[:, 1]
-        dz = directions @ rot[:, 2]
-        return pts, ts, dx, dy, dz
+        # Check if intersection is within sensor bound
+        ts = jnp.where(sensor.in_bounds(pts[:, 0], pts[:, 1]), ts, jnp.inf)
+        local_dirs = directions @ rot
+        return pts, ts, local_dirs
 
-    all_pts, all_ts, all_dx, all_dy, all_dz = jax.vmap(f)(jnp.arange(sensor.n_sensors))
-    s_idx = jnp.argmin(all_ts, axis=0)
+    # Map over all sensors in SensorGroup
+    all_pts, all_ts, all_dirs = jax.vmap(f)(jnp.arange(sensor.n_sensors))
+
+    # Get sensor id for minimum sensor and assign correctly
+    s_idx = jnp.argmin(all_ts, axis=0).astype(jnp.int32)
     idx = jnp.arange(n_rays)
     pts = all_pts[s_idx, idx]
     t_sensor = all_ts[s_idx, idx]
-    dx = all_dx[s_idx, idx]
-    dy = all_dy[s_idx, idx]
-    dz = all_dz[s_idx, idx]
-    s_idx = s_idx.astype(jnp.int32)
+    local_dirs = all_dirs[s_idx, idx]
 
-    hit_mask = t_sensor < 1e10
-    # Weight the final geometric leg by the ray's current medium index.
+    # Create hit mask and advance path length
+    hit_mask = jnp.isfinite(t_sensor)
     path_length = ray_bundle.path_length + jnp.where(
         hit_mask, t_sensor * ray_bundle.n, 0.0,
     )
 
     sensor_rays = RayBundle(
         origins=jnp.stack([pts[:, 0], pts[:, 1], jnp.zeros(n_rays)], axis=-1),
-        directions=jnp.stack([dx, dy, dz], axis=-1),
+        directions=local_dirs,
         values=ray_bundle.values,
         path_length=path_length,
         n=ray_bundle.n,
@@ -85,25 +83,28 @@ def intersect_sensor(
     return sensor_rays, s_idx, hit_mask
 
 
-def apply_concentrator(camera: Camera, sensor_rays: RayBundle) -> RayBundle:
-    """Apply concentrator to sensor-local rays if present."""
-    if camera.concentrator is None:
-        return sensor_rays
-    return camera.concentrator.apply(sensor_rays)
+def _run_chain(
+    camera: Camera, ray_bundle: RayBundle, sensor_idx: int,
+) -> tuple[Array, Array, Array, RayBundle, Array]:
+    """
+    Intersect the sensor, translate to pixel-local, run the detection chain.
+    """
+    sensor = camera.sensor_groups[sensor_idx]
+    sensor_rays, s_idx, hit_mask = intersect_sensor(camera, ray_bundle, sensor_idx)
+    x, y = sensor_rays.origins[:, 0], sensor_rays.origins[:, 1]
+    local = sensor.to_pixel_frame(sensor_rays, s_idx)
+    pe_rays = sensor.chain.propagate(local)
+    return s_idx, x, y, pe_rays, hit_mask
 
 
 def _project_to_sensor(
     camera: Camera, rb_cam: RayBundle, sensor_idx: int,
 ) -> tuple[Array, Array, Array, Array]:
-    """Camera-frame rays through sensor plane + concentrator + photosensor.
-
-    Returns ``(s_idx, x, y, pe_vals)`` ready for :meth:`SensorGroup.accumulate`.
     """
-    sensor_rays, s_idx, _ = intersect_sensor(camera, rb_cam, sensor_idx)
-    x, y = sensor_rays.origins[:, 0], sensor_rays.origins[:, 1]
-    sensor_rays = apply_concentrator(camera, sensor_rays)
-    pe = camera.photosensor.apply(sensor_rays.values)
-    return s_idx, x, y, pe
+    Project camera-frame rays through sensor plane + detection chain.
+    """
+    s_idx, x, y, pe_rays, _ = _run_chain(camera, rb_cam, sensor_idx)
+    return s_idx, x, y, pe_rays.values
 
 
 # Camera
@@ -126,28 +127,17 @@ class Camera(eqx.Module):
         rb.materialise()                  # flat camera-frame RayBundle
 
     Attributes:
-        sensor_groups: List of SensorGroup objects defining pixel layout
-        concentrator: Optional light concentrator (Winston cone, etc.)
-        photosensor: Photosensor response model (quantum efficiency)
+        sensor_groups: List of SensorGroup objects. Each group owns its pixel
+            layout and its detection chain (optional concentrator + ``gap``
+            + photosensor), so different groups can carry different cones or
+            photosensors. Configure a group's chain when constructing it, or via
+            :meth:`set_concentrator` / :meth:`set_photosensor` / :meth:`set_gap`.
     """
 
     sensor_groups: list[SensorGroup]
-    concentrator: Concentrator | None
-    photosensor: PhotoSensor
 
-    def __init__(
-        self,
-        sensor_groups: list[SensorGroup],
-        concentrator: Concentrator | None = None,
-        photosensor: PhotoSensor | None = None,
-    ) -> None:
+    def __init__(self, sensor_groups: list[SensorGroup]) -> None:
         self.sensor_groups = list(sensor_groups)
-        self.concentrator = concentrator
-
-        if photosensor is not None:
-            self.photosensor = photosensor
-        else:
-            self.photosensor = UniformQE(1.0)
 
     def _require_sensor_groups(self, sensor_idx: int) -> None:
         """Validate that ``sensor_idx`` references an existing sensor group."""
@@ -163,6 +153,33 @@ class Camera(eqx.Module):
             )
 
     # Pipeline
+
+    def collect(
+        self,
+        ray_bundle: RayBundle | LazyRayBundle,
+        sensor_idx: int = 0,
+    ) -> tuple[Array, Array, Array, Array]:
+        """Per-ray output ``(pe_vals, pe_times, pix_id, hit_mask)``.
+
+        ``hit_mask`` is ``True`` for rays that hit a sensor plane and are
+        not in the edge area defined by edge width.
+        ``False`` for rays that missed every sensor; entries in
+        ``pix_id``/``pe_times`` for missed rays are meaningless and
+        should be filtered with the mask before use.
+
+        Materialises a :class:`LazyRayBundle`: per-ray output cannot be
+        produced incrementally.
+        """
+        self._require_sensor_groups(sensor_idx)
+        if isinstance(ray_bundle, LazyRayBundle):
+            ray_bundle = ray_bundle.materialise()
+        sensor = self.sensor_groups[sensor_idx]
+
+        s_idx, x, y, pe_rays, hit_mask = _run_chain(self, ray_bundle, sensor_idx)
+        pix_id, valid = sensor.pixel_index_and_mask(s_idx, x, y)
+        detected = hit_mask & valid
+        pe_vals = jnp.where(detected, pe_rays.values, 0.0)
+        return pe_vals, pe_rays.path_length, pix_id, detected
 
     def image(
         self,
@@ -191,36 +208,6 @@ class Camera(eqx.Module):
 
         s_idx, x, y, pe = _project_to_sensor(self, ray_bundle, sensor_idx)
         return sensor.accumulate(s_idx, x, y, pe)
-
-    def collect(
-        self,
-        ray_bundle: RayBundle | LazyRayBundle,
-        sensor_idx: int = 0,
-    ) -> tuple[Array, Array, Array, Array]:
-        """Per-ray output ``(pe_vals, pe_times, pix_id, hit_mask)``.
-
-        ``hit_mask`` is ``True`` for rays that hit a sensor plane and
-        ``False`` for rays that missed every sensor; entries in
-        ``pix_id``/``pe_times`` for missed rays are meaningless and
-        should be filtered with the mask before use.
-
-        Materialises a :class:`LazyRayBundle`: per-ray output cannot be
-        produced incrementally.
-        """
-        self._require_sensor_groups(sensor_idx)
-        if isinstance(ray_bundle, LazyRayBundle):
-            ray_bundle = ray_bundle.materialise()
-        sensor = self.sensor_groups[sensor_idx]
-
-        sensor_rays, s_idx, hit_mask = intersect_sensor(
-            self, ray_bundle, sensor_idx,
-        )
-        pix_id = sensor.assign_pixels(
-            s_idx, sensor_rays.origins[:, 0], sensor_rays.origins[:, 1],
-        )
-        sensor_rays = apply_concentrator(self, sensor_rays)
-        pe_vals = self.photosensor.apply(sensor_rays.values)
-        return pe_vals, sensor_rays.path_length, pix_id, hit_mask
 
     def response_matrix(
         self, lazy_bundle: LazyRayBundle, sensor_idx: int = 0,
@@ -276,11 +263,19 @@ class Camera(eqx.Module):
     def set_sensor_rotations(self, sensor_idx: int, rotations: Array) -> Camera:
         return _ops.set_sensor_rotations(self, sensor_idx, rotations)
 
-    def set_concentrator(self, concentrator: Concentrator | None) -> Camera:
-        return _ops.set_concentrator(self, concentrator)
+    def set_concentrator(
+        self, sensor_idx: int, concentrator: Concentrator | None
+    ) -> Camera:
+        """Set/replace the concentrator on sensor group ``sensor_idx``'s chain."""
+        return _ops.set_concentrator(self, sensor_idx, concentrator)
 
-    def set_photosensor(self, photosensor: PhotoSensor) -> Camera:
-        return _ops.set_photosensor(self, photosensor)
+    def set_photosensor(self, sensor_idx: int, photosensor: PhotoSensor) -> Camera:
+        """Set/replace the photosensor on sensor group ``sensor_idx``'s chain."""
+        return _ops.set_photosensor(self, sensor_idx, photosensor)
+
+    def set_gap(self, sensor_idx: int, gap: float) -> Camera:
+        """Set the gap on sensor group ``sensor_idx``'s detection chain."""
+        return _ops.set_gap(self, sensor_idx, gap)
 
     def get_info(self) -> dict[str, Any]:
         return _ops.get_info(self)

@@ -17,6 +17,8 @@ Functions for visualizing telescope geometry:
 
 .. autofunction:: iactrace.viz.show_telescope
 
+.. autofunction:: iactrace.viz.show_sensor_chain
+
 .. autofunction:: iactrace.viz.export_mesh
 
 .. autofunction:: iactrace.viz.add_rays

@@ -6,7 +6,7 @@ telescope:
   - 0.000000
   - 16.000000
   camera_rotation:
-  - 0.000000
+  - 180.000000
   - 0.000000
   - 0.000000
 mirror_templates:

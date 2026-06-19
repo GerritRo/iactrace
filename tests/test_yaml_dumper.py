@@ -5,7 +5,7 @@ import jax
 import numpy as np
 import pytest
 
-from iactrace import Camera, Telescope
+from iactrace import Camera, SquareSensorGroup, Telescope, UniformQE, WinstonCone
 from iactrace.io import (
     build_camera_config,
     build_telescope_config,
@@ -228,6 +228,65 @@ class TestRoundTrip:
         finally:
             filepath.unlink(missing_ok=True)
 
+    def _roundtrip_mirror(self, bsdf, reflectivity, random_key):
+        import jax.numpy as jnp
+
+        from iactrace.core.apertures import DiskAperture
+        from iactrace.telescope.mirrors import mirror_group
+
+        mg = mirror_group(
+            positions=jnp.array([[0.0, 0.0, 0.0]]), rotations=jnp.array([[0.0, 0.0, 0.0]]),
+            curvatures=jnp.array([0.5]), conics=jnp.array([-1.0]), aspherics=jnp.zeros((1, 0)),
+            offsets=jnp.zeros((1, 2)),
+            aperture=DiskAperture(radii=jnp.array([0.1]), inner_radii=jnp.array([0.0])),
+            reflectivity=jnp.array([reflectivity]), bsdf=bsdf,
+            sample_key=random_key, optical_stage=0, n_samples=10,
+        )
+        tel = Telescope(mirror_groups=[mg], camera_position=[0.0, 0.0, 1.0])
+        with tempfile.NamedTemporaryFile(suffix=".yaml", delete=False) as f:
+            filepath = Path(f.name)
+        try:
+            save_telescope(tel, filepath)
+            return Telescope.from_yaml(filepath, 10, key=random_key).mirror_groups[0]
+        finally:
+            filepath.unlink(missing_ok=True)
+
+    def test_mirror_reflectivity_roundtrips(self, random_key):
+        # The mirror "coating" must survive save/load (was silently reset to 1.0).
+        g = self._roundtrip_mirror(bsdf=None, reflectivity=0.83, random_key=random_key)
+        np.testing.assert_allclose(
+            np.asarray(g.interaction_module.reflectivity), [0.83], rtol=1e-5
+        )
+
+    def test_gaussian_bsdf_roundtrips(self, random_key):
+        import jax.numpy as jnp
+
+        from iactrace.core.bsdf import GaussianBSDF
+        g = self._roundtrip_mirror(
+            bsdf=GaussianBSDF(scale=jnp.array([25.0])), reflectivity=1.0, random_key=random_key,
+        )
+        assert isinstance(g.bsdf, GaussianBSDF)
+        np.testing.assert_allclose(np.asarray(g.bsdf.scale), [25.0], rtol=1e-5)
+
+    def test_double_gaussian_bsdf_roundtrips(self, random_key):
+        import jax.numpy as jnp
+
+        from iactrace.core.bsdf import DoubleGaussianBSDF
+        g = self._roundtrip_mirror(
+            bsdf=DoubleGaussianBSDF(
+                scale_narrow=jnp.array([10.0]), scale_wide=jnp.array([120.0]),
+                mix_weight=jnp.array([0.2]),
+            ),
+            reflectivity=0.9, random_key=random_key,
+        )
+        assert isinstance(g.bsdf, DoubleGaussianBSDF)
+        np.testing.assert_allclose(np.asarray(g.bsdf.scale_narrow), [10.0], rtol=1e-5)
+        np.testing.assert_allclose(np.asarray(g.bsdf.scale_wide), [120.0], rtol=1e-5)
+        np.testing.assert_allclose(np.asarray(g.bsdf.mix_weight), [0.2], rtol=1e-5)
+        np.testing.assert_allclose(
+            np.asarray(g.interaction_module.reflectivity), [0.9], rtol=1e-5
+        )
+
     def test_polygon_mirror_roundtrip(
         self, n_samples, random_key, polygon_telescope_config
     ):
@@ -341,7 +400,7 @@ class TestRoundTrip:
             save_camera(camera1, filepath)
             camera2 = Camera.from_yaml(filepath)
 
-            from iactrace.camera.layout import HexagonalSensorGroup
+            from iactrace.camera.sensor_group import HexagonalSensorGroup
             s1 = camera1.sensor_groups[0]
             s2 = camera2.sensor_groups[0]
             assert isinstance(s1, HexagonalSensorGroup)
@@ -353,6 +412,156 @@ class TestRoundTrip:
             )
         finally:
             filepath.unlink(missing_ok=True)
+
+    def _square(self, concentrator=None, photosensor=None, gap=0.0):
+        return SquareSensorGroup(
+            positions=[[0.0, 0.0, 0.0]], rotations=[[0.0, 0.0, 0.0]],
+            width=4, height=4, bounds=(-0.02, 0.02, -0.02, 0.02),
+            concentrator=concentrator, photosensor=photosensor, gap=gap,
+        )
+
+    def test_camera_chain_scalars_roundtrip(self):
+        camera1 = Camera([self._square(photosensor=UniformQE(0.85), gap=0.004)])
+        with tempfile.NamedTemporaryFile(suffix=".yaml", delete=False) as f:
+            filepath = Path(f.name)
+        try:
+            save_camera(camera1, filepath)
+            chain = Camera.from_yaml(filepath).sensor_groups[0].chain
+            assert isinstance(chain.photosensor, UniformQE)
+            assert chain.photosensor.qe == pytest.approx(0.85)
+            assert chain.gap == pytest.approx(0.004)
+            assert chain.concentrator is None
+        finally:
+            filepath.unlink(missing_ok=True)
+
+    def test_camera_winston_cone_roundtrip(self):
+        cone = WinstonCone(
+            n_sides=6, entrance_apothem=0.025, exit_apothem=0.01,
+            reflectivity=0.92, max_bounces=8, orientation_deg=15.0,
+        )
+        camera1 = Camera([self._square(concentrator=cone, gap=0.003)])
+        with tempfile.NamedTemporaryFile(suffix=".yaml", delete=False) as f:
+            filepath = Path(f.name)
+        try:
+            save_camera(camera1, filepath)
+            chain2 = Camera.from_yaml(filepath).sensor_groups[0].chain
+            c1, c2 = camera1.sensor_groups[0].chain.concentrator, chain2.concentrator
+            assert isinstance(c2, WinstonCone)
+            assert c2.n_sides == c1.n_sides
+            assert c2.max_bounces == c1.max_bounces
+            assert c2.exit_apothem == pytest.approx(c1.exit_apothem)
+            assert c2.entrance_apothem == pytest.approx(c1.entrance_apothem)
+            assert c2.length == pytest.approx(c1.length, rel=1e-4)
+            assert c2.reflectivity == pytest.approx(c1.reflectivity)
+            assert c2.orientation == pytest.approx(c1.orientation)
+            assert chain2.gap == pytest.approx(0.003)
+        finally:
+            filepath.unlink(missing_ok=True)
+
+    def test_camera_truncated_winston_cone_roundtrip(self):
+        import math
+
+        import jax.numpy as jnp
+
+        from iactrace.camera.winston_cone import profile_apothem
+
+        # A genuinely truncated cone, specified by its physical mouth at z = L.
+        a2, cutoff_deg, length = 0.01, 20.0, 0.04
+        s, c = math.sin(math.radians(cutoff_deg)), math.cos(math.radians(cutoff_deg))
+        phys = float(profile_apothem(jnp.asarray(length), a2, s, c))
+        cone = WinstonCone(6, entrance_apothem=phys, exit_apothem=a2, length=length)
+        camera1 = Camera([self._square(concentrator=cone)])
+        with tempfile.NamedTemporaryFile(suffix=".yaml", delete=False) as f:
+            filepath = Path(f.name)
+        try:
+            save_camera(camera1, filepath, precision=12)
+            c1 = camera1.sensor_groups[0].chain.concentrator
+            c2 = Camera.from_yaml(filepath).sensor_groups[0].chain.concentrator
+            assert isinstance(c2, WinstonCone)
+            assert c2.entrance_apothem == pytest.approx(c1.entrance_apothem)
+            assert c2.length == pytest.approx(c1.length)
+            assert c2._wall_tilt() == pytest.approx(c1._wall_tilt())
+            assert c2.exit_apothem == pytest.approx(c1.exit_apothem)
+        finally:
+            filepath.unlink(missing_ok=True)
+
+    def test_camera_nonuniform_photosensor_warns_and_falls_back(self):
+        import equinox as eqx
+
+        from iactrace.camera.photosensor import PhotoSensor
+        from iactrace.core.ray_bundle import RayBundle
+
+        class WeirdSensor(PhotoSensor):
+            pde: float = eqx.field(static=True)
+
+            def __init__(self, pde=0.5):
+                self.pde = float(pde)
+
+            def detect(self, local_rays: RayBundle) -> RayBundle:
+                return RayBundle(
+                    origins=local_rays.origins,
+                    directions=local_rays.directions,
+                    values=local_rays.values * self.pde,
+                    path_length=local_rays.path_length,
+                    n=local_rays.n,
+                )
+
+        camera1 = Camera([self._square(photosensor=WeirdSensor(0.5))])
+        with tempfile.NamedTemporaryFile(suffix=".yaml", delete=False) as f:
+            filepath = Path(f.name)
+        try:
+            with pytest.warns(UserWarning):
+                save_camera(camera1, filepath)
+            chain = Camera.from_yaml(filepath).sensor_groups[0].chain
+            assert isinstance(chain.photosensor, UniformQE)
+            assert chain.photosensor.qe == pytest.approx(1.0)
+        finally:
+            filepath.unlink(missing_ok=True)
+
+    def test_sensor_without_chain_keys_backward_compatible(self):
+        # Released camera files are `sensors:`-only with no detection-chain keys;
+        # each group must load with a trivial chain (no cone, perfect QE, no gap).
+        camera = build_camera_config({
+            "sensors": [{
+                "type": "square",
+                "position": [0.0, 0.0, 0.0],
+                "orientation": [0.0, 0.0, 0.0],
+                "width": 4, "height": 4,
+                "bounds": [-0.02, 0.02, -0.02, 0.02],
+            }],
+        })
+        chain = camera.sensor_groups[0].chain
+        assert chain.concentrator is None
+        assert isinstance(chain.photosensor, UniformQE)
+        assert chain.photosensor.qe == pytest.approx(1.0)
+        assert chain.gap == pytest.approx(0.0)
+
+    def test_photosensor_slot_explicit_yaml(self):
+        # The detector response is a first-class discriminated `photosensor:` slot
+        # on each sensor group, alongside its `gap`.
+        camera = build_camera_config({
+            "sensors": [{
+                "type": "square",
+                "position": [0.0, 0.0, 0.0],
+                "orientation": [0.0, 0.0, 0.0],
+                "width": 4, "height": 4,
+                "bounds": [-0.02, 0.02, -0.02, 0.02],
+                "photosensor": {"type": "uniform", "qe": 0.7},
+                "gap": 0.002,
+            }],
+        })
+        chain = camera.sensor_groups[0].chain
+        assert isinstance(chain.photosensor, UniformQE)
+        assert chain.photosensor.qe == pytest.approx(0.7)
+        assert chain.gap == pytest.approx(0.002)
+
+    def test_camera_to_dict_uses_discriminated_slots(self):
+        cone = WinstonCone(n_sides=6, entrance_apothem=0.025, exit_apothem=0.01)
+        cam = Camera([self._square(concentrator=cone, photosensor=UniformQE(0.9))])
+        sensor = cam.to_dict()["sensors"][0]
+        assert sensor["photosensor"]["type"] == "uniform"
+        assert sensor["photosensor"]["qe"] == pytest.approx(0.9)
+        assert sensor["concentrator"]["type"] == "winston"
 
     def test_multiple_stages_preserved(self, n_samples, random_key):
         config = {

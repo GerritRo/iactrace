@@ -1,7 +1,8 @@
 import jax.numpy as jnp
+import pytest
 
-from iactrace import HexagonalSensorGroup, SquareSensorGroup
-from iactrace.camera.layout import SQRT3, _detect_hex_grid
+from iactrace import HexagonalSensorGroup, SquareSensorGroup, UniformQE
+from iactrace.camera._hexgeom import SQRT3, _detect_hex_grid
 from iactrace.core.intersections import intersect_plane
 
 
@@ -262,3 +263,73 @@ class TestPlaneIntersection:
         xy, t = intersect_plane(ray_origin, ray_direction, plane_center, plane_rotation)
 
         assert jnp.isinf(t)
+
+
+class TestValidation:
+    """Constructor input validation across sensor groups, photosensor, camera."""
+
+    def test_square_rejects_bad_positions_shape(self):
+        with pytest.raises(ValueError, match="positions"):
+            SquareSensorGroup(
+                positions=[[0.0, 0.0]],  # (1, 2), not (1, 3)
+                rotations=[[0.0, 0.0, 0.0]],
+                width=4, height=4, bounds=(-1.0, 1.0, -1.0, 1.0),
+            )
+
+    def test_square_rejects_mismatched_n(self):
+        with pytest.raises(ValueError, match="same N"):
+            SquareSensorGroup(
+                positions=[[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]],
+                rotations=[[0.0, 0.0, 0.0]],
+                width=4, height=4, bounds=(-1.0, 1.0, -1.0, 1.0),
+            )
+
+    def test_square_rejects_nonpositive_dims(self):
+        with pytest.raises(ValueError, match="width and height"):
+            SquareSensorGroup(
+                positions=[[0.0, 0.0, 0.0]], rotations=[[0.0, 0.0, 0.0]],
+                width=0, height=4, bounds=(-1.0, 1.0, -1.0, 1.0),
+            )
+
+    def test_square_rejects_degenerate_bounds(self):
+        with pytest.raises(ValueError, match="bounds"):
+            SquareSensorGroup(
+                positions=[[0.0, 0.0, 0.0]], rotations=[[0.0, 0.0, 0.0]],
+                width=4, height=4, bounds=(1.0, 1.0, -1.0, 1.0),
+            )
+
+    def test_square_rejects_negative_edge_width(self):
+        with pytest.raises(ValueError, match="edge_width"):
+            SquareSensorGroup(
+                positions=[[0.0, 0.0, 0.0]], rotations=[[0.0, 0.0, 0.0]],
+                width=4, height=4, bounds=(-1.0, 1.0, -1.0, 1.0),
+                edge_width=-0.1,
+            )
+
+    def test_hex_rejects_empty_centers(self):
+        with pytest.raises(ValueError, match="hex_centers"):
+            HexagonalSensorGroup(
+                positions=[[0.0, 0.0, 0.0]], rotations=[[0.0, 0.0, 0.0]],
+                hex_centers=jnp.zeros((0, 2)),
+            )
+
+    def test_hex_rejects_bad_centers_shape(self):
+        with pytest.raises(ValueError, match="hex_centers"):
+            HexagonalSensorGroup(
+                positions=[[0.0, 0.0, 0.0]], rotations=[[0.0, 0.0, 0.0]],
+                hex_centers=[[0.0, 0.0, 0.0]],  # (1, 3), not (M, 2)
+            )
+
+    def test_hex_accepts_valid_centers(self):
+        centers = make_hex_centers(n_rings=1, hex_size=0.01)
+        sensor = HexagonalSensorGroup(
+            positions=[[0.0, 0.0, 0.0]], rotations=[[0.0, 0.0, 0.0]],
+            hex_centers=centers,
+        )
+        assert sensor.n_pixels == len(centers)
+
+    def test_uniform_qe_rejects_out_of_range(self):
+        with pytest.raises(ValueError, match="qe"):
+            UniformQE(1.5)
+        with pytest.raises(ValueError, match="qe"):
+            UniformQE(-0.1)
