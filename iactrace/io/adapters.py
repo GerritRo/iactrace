@@ -16,6 +16,7 @@ from ..camera.sensor_group import HexagonalSensorGroup, SquareSensorGroup
 from ..camera.winston_cone import WinstonCone, cpc_wall_tilt
 from ..core.apertures import Aperture, DiskAperture, PolygonAperture
 from ..core.bsdf import BSDF, DoubleGaussianBSDF, GaussianBSDF
+from ..core.coatings import Coating, TabulatedCoating
 from ..core.interactions import (
     ReflectInteraction,
     RefractInteraction,
@@ -53,6 +54,7 @@ from .schemas import (
     SphereObstructionSchema,
     SquareSensorSchema,
     SurfaceSchema,
+    TabulatedCurveSchema,
     TelescopeConfigSchema,
     TelescopeMetadataSchema,
     TriangleObstructionSchema,
@@ -95,8 +97,9 @@ class _ParsedMirror(NamedTuple):
     offset: list[float]
     stage: int
     aperture: CircularApertureSchema | PolygonApertureSchema
-    reflectivity: float
     bsdf: BSDFSchema | None
+    reflectivity_scalar: float
+    coating_curve: TabulatedCurveSchema | None
 
 
 def _to_float_list(arr: np.ndarray | jnp.ndarray) -> list[float]:
@@ -215,72 +218,137 @@ def _resolve_surface(
     return curvature, conic, aspheric
 
 
-def _bsdf_to_schema(bsdf: BSDF | None, i: int) -> BSDFSchema | None:
-    """Serialize element ``i`` of a group's BSDF (``None`` → perfect specular).
+def _resolve_bsdf(
+    mirror: MirrorSchema, template: MirrorTemplateSchema,
+) -> BSDFSchema | None:
+    """Resolve the per-mirror BSDF schema (mirror overrides template).
 
-    Only the shipped BSDF models round-trip; an unknown subclass warns and is
-    dropped to specular. To add one: add a ``case`` here, the matching arm in
-    :func:`_bsdf_for_group`, and a ``…BSDFSchema`` member to the discriminated
-    ``BSDFSchema`` union.
+    The template's ``bsdf`` acts as a shared default; a mirror may
+    override it with its own ``bsdf`` block.
     """
-    match bsdf:
-        case None:
-            return None
-        case GaussianBSDF():
-            scale = float(bsdf.scale[i])
-            # A zero scale is perfectly specular -> omit, like a missing block.
-            return GaussianBSDFSchema(scale=scale) if scale != 0.0 else None
-        case DoubleGaussianBSDF():
-            return DoubleGaussianBSDFSchema(
-                scale_narrow=float(bsdf.scale_narrow[i]),
-                scale_wide=float(bsdf.scale_wide[i]),
-                mix_weight=float(bsdf.mix_weight[i]),
-            )
-        case _:
-            warnings.warn(
-                f"{type(bsdf).__name__} is not representable in telescope YAML; "
-                "the surface will be saved as perfectly specular.",
-                UserWarning,
-                stacklevel=2,
-            )
-            return None
+    if mirror.bsdf is not None:
+        return mirror.bsdf
+    return template.bsdf
 
 
-def _bsdf_for_group(schemas: list[BSDFSchema | None]) -> BSDF | None:
-    """Rebuild a group's BSDF from its per-element schemas.
+def _resolve_reflectivity(
+    mirror: MirrorSchema, template: MirrorTemplateSchema,
+) -> tuple[float, TabulatedCurveSchema | None]:
+    """Resolve (bulk_scalar, coating_curve) from mirror + template.
 
-    A group carries a single BSDF instance, so every element must share one
-    BSDF type; ``None`` elements become a zero-roughness entry of that type.
+    Per-mirror scalar overrides the template scalar; the coating lives
+    on the template only.
     """
-    present = [s for s in schemas if s is not None]
-    if not present:
+    template_scalar = (
+        template.reflectivity if template.reflectivity is not None else 1.0
+    )
+    scalar = (
+        mirror.reflectivity
+        if mirror.reflectivity is not None
+        else float(template_scalar)
+    )
+    return float(scalar), template.coating
+
+
+def _curves_equal(
+    a: TabulatedCurveSchema, b: TabulatedCurveSchema,
+) -> bool:
+    """Structural equality of two tabulated curve schemas."""
+    return a.angles_deg == b.angles_deg and a.values == b.values
+
+
+def _build_coating_for_bucket(
+    curves: list[TabulatedCurveSchema | None],
+    n_elements: int,
+) -> Coating | None:
+    """Resolve a list of per-element curve schemas into a single coating.
+
+    All ``None`` -> ``None`` (caller's default physics applies).
+    One distinct curve -> broadcast across all elements.
+    Coated mixed with uncoated, or several distinct curves -> ``ValueError``.
+    """
+    distinct: list[TabulatedCurveSchema] = []
+    for c in curves:
+        if c is None:
+            continue
+        if not any(_curves_equal(c, d) for d in distinct):
+            distinct.append(c)
+
+    if not distinct:
         return None
-    types = {s.type for s in present}
-    if len(types) > 1:
+    if any(c is None for c in curves):
         raise ValueError(
-            "all mirrors in one optical group must share a BSDF type, "
-            f"got {sorted(types)}"
+            "Elements grouped at the same stage with the same aperture "
+            "must either all define a `coating` or all omit it; mixing "
+            "coated and uncoated elements would silently apply one "
+            "element's coating to the rest. Split them across stages or "
+            "harmonize their `coating` fields."
         )
-    (kind,) = types
-    match kind:
-        case "gaussian":
-            scale = [
-                s.scale if isinstance(s, GaussianBSDFSchema) else 0.0 for s in schemas
-            ]
-            return GaussianBSDF(scale=jnp.asarray(scale))
-        case "double_gaussian":
-            def _col(attr: str) -> Array:
-                return jnp.asarray([
-                    getattr(s, attr) if isinstance(s, DoubleGaussianBSDFSchema) else 0.0
-                    for s in schemas
-                ])
-            return DoubleGaussianBSDF(
-                scale_narrow=_col("scale_narrow"),
-                scale_wide=_col("scale_wide"),
-                mix_weight=_col("mix_weight"),
+    if len(distinct) > 1:
+        raise ValueError(
+            "Elements grouped at the same stage with the same aperture "
+            "must resolve to a single coating, but multiple distinct "
+            "coating curves were found; broadcasting one would silently "
+            "apply it to the rest. Split them across stages or harmonize "
+            "their `coating` fields."
+        )
+
+    curve = distinct[0]
+    return TabulatedCoating.from_degrees(
+        angles_deg=curve.angles_deg,
+        values=curve.values,
+        n_elements=n_elements,
+    )
+
+
+def _coating_to_curve_schema(
+    coating: Coating | None,
+) -> TabulatedCurveSchema | None:
+    """Project a Coating to a serialisable curve, or ``None`` if trivial.
+
+    ``None`` and :class:`ConstantCoating` round-trip as ``None`` so
+    existing YAMLs stay byte-identical. A :class:`TabulatedCoating`
+    emits the inline ``{type: table, ...}`` form. The YAML schema holds
+    one shared curve per template, so a per-element coating (rows that
+    differ across elements) raises :class:`ValueError` rather than
+    silently serialising only the first element's row.
+
+    Raises:
+        ValueError: If ``coating`` is a per-element
+            :class:`TabulatedCoating` whose rows are not all equal.
+    """
+    if isinstance(coating, TabulatedCoating):
+        value_rows = np.asarray(coating.values)
+        # YAML expresses one shared curve per template. A per-element
+        # coating (rows differ) cannot be represented; fail loudly rather
+        # than silently serialising only element 0's row. Mirrors the
+        # loader guard in _build_coating_for_bucket.
+        if value_rows.shape[0] > 1 and not np.allclose(
+            value_rows, value_rows[0]
+        ):
+            raise ValueError(
+                "Cannot serialise a per-element TabulatedCoating to YAML: "
+                "all elements in a group must share one curve. Split them "
+                "across groups, or harmonise their rows before saving."
             )
-        case _:
-            raise ValueError(f"unknown BSDF schema type: {kind}")
+        cos_table = np.asarray(coating.cos_table)
+        values_row = value_rows[0]
+        order = np.argsort(-cos_table)  # cos descending -> angles ascending
+        angles_deg = [
+            float(x) for x in np.degrees(np.arccos(cos_table[order]))
+        ]
+        values = [float(x) for x in values_row[order]]
+        return TabulatedCurveSchema(angles_deg=angles_deg, values=values)
+    return None
+
+
+def _curve_schema_to_key(
+    schema: TabulatedCurveSchema | None,
+) -> tuple | None:
+    """Hashable key used by ``mirrors_to_schemas`` to dedup templates."""
+    if schema is None:
+        return None
+    return ("table", tuple(schema.angles_deg), tuple(schema.values))
 
 
 def _rotation_matrix_to_euler(rotation_matrix: np.ndarray) -> list[float]:
@@ -320,6 +388,8 @@ def mirrors_from_schemas(
     for mirror in mirrors:
         template = templates[mirror.template]
         curvature, conic, aspheric = _resolve_surface(mirror, template)
+        bsdf = _resolve_bsdf(mirror, template)
+        refl_scalar, coating_curve = _resolve_reflectivity(mirror, template)
 
         parsed.append(_ParsedMirror(
             position=mirror.position,
@@ -330,8 +400,9 @@ def mirrors_from_schemas(
             offset=mirror.offset,
             stage=mirror.stage,
             aperture=mirror.aperture,
-            reflectivity=mirror.reflectivity,
-            bsdf=mirror.bsdf,
+            bsdf=bsdf,
+            reflectivity_scalar=refl_scalar,
+            coating_curve=coating_curve,
         ))
 
     groups: list[OpticalElementGroup] = []
@@ -350,6 +421,61 @@ def mirrors_from_schemas(
     return groups
 
 
+def _build_bsdf_for_bucket(
+    schemas: list[BSDFSchema | None],
+) -> BSDF | None:
+    """Reassemble one group's BSDF from per-element schemas.
+
+    All ``None`` -> ``None`` (perfect specular). Otherwise every element
+    that declares a BSDF must share the same ``type``; per-element
+    parameters are stacked into the model's arrays, and elements without
+    a BSDF default to zero (specular for that element). Mixed types
+    raise ``ValueError``, mirroring the per-bucket coating guard in
+    :func:`_build_coating_for_bucket`.
+
+    Adding a BSDF model means adding a schema variant in
+    :mod:`iactrace.io.schemas` and one arm here.
+    """
+    present = [s for s in schemas if s is not None]
+    if not present:
+        return None
+
+    types = {s.type for s in present}
+    if len(types) > 1:
+        raise ValueError(
+            "Mirrors grouped at the same stage with the same aperture must "
+            f"share a single BSDF type; got {sorted(types)}. Split them "
+            "across stages, or harmonise their `bsdf.type`."
+        )
+
+    match present[0]:
+        case GaussianBSDFSchema():
+            scale = jnp.asarray([
+                s.scale if isinstance(s, GaussianBSDFSchema) else 0.0
+                for s in schemas
+            ])
+            if bool(jnp.all(scale == 0)):
+                return None
+            return GaussianBSDF(scale=scale)
+        case DoubleGaussianBSDFSchema():
+            def _col(attr: str) -> Array:
+                return jnp.asarray([
+                    getattr(s, attr)
+                    if isinstance(s, DoubleGaussianBSDFSchema) else 0.0
+                    for s in schemas
+                ])
+            return DoubleGaussianBSDF(
+                scale_narrow=_col("scale_narrow"),
+                scale_wide=_col("scale_wide"),
+                mix_weight=_col("mix_weight"),
+            )
+        case _:  # pragma: no cover - unreachable while the union is exhaustive
+            raise ValueError(
+                f"Unhandled BSDF schema {type(present[0]).__name__}; add an "
+                "arm to _build_bsdf_for_bucket."
+            )
+
+
 def _build_mirror_group(
     mirrors: list[_ParsedMirror],
     aperture: Aperture,
@@ -366,6 +492,16 @@ def _build_mirror_group(
     """
     from ..telescope.mirrors import mirror_group
 
+    n_elements = len(mirrors)
+
+    bsdf = _build_bsdf_for_bucket([m.bsdf for m in mirrors])
+
+    reflectivity_scalars = jnp.asarray(
+        [m.reflectivity_scalar for m in mirrors]
+    )
+    coating = _build_coating_for_bucket(
+        [m.coating_curve for m in mirrors], n_elements,
+    )
     return mirror_group(
         positions=jnp.asarray([m.position for m in mirrors]),
         rotations=jnp.asarray([m.orientation for m in mirrors]),
@@ -374,8 +510,9 @@ def _build_mirror_group(
         aspherics=_pad_aspherics([m.aspheric for m in mirrors]),
         offsets=jnp.asarray([m.offset for m in mirrors]),
         aperture=aperture,
-        reflectivity=jnp.asarray([m.reflectivity for m in mirrors]),
-        bsdf=_bsdf_for_group([m.bsdf for m in mirrors]),
+        reflectivity=reflectivity_scalars,
+        coating=coating,
+        bsdf=bsdf,
         sample_key=sample_key,
         optical_stage=stage,
         n_samples=n_samples,
@@ -389,8 +526,8 @@ def lenses_from_schemas(
 ) -> list[OpticalElementGroup]:
     """Convert validated lens schemas to OpticalElementGroup domain objects.
 
-    Groups by ``(type, stage, aperture_signature)`` — mirroring how
-    :func:`mirrors_from_schemas` groups mirrors — and constructs one
+    Groups by ``(type, stage, aperture_signature)``; mirroring how
+    :func:`mirrors_from_schemas` groups mirrors and constructs one
     :class:`OpticalElementGroup` per bucket.
     """
     aspheric_disks: list[AsphericDiskLensSchema] = []
@@ -426,6 +563,29 @@ def _build_lens_groups_by_stage[L: AsphericDiskLensSchema | PlanoSlabSchema](
     return key, groups
 
 
+def _resolve_shared_n_outside[
+    L: AsphericDiskLensSchema | PlanoSlabSchema
+](lenses: list[L]) -> float:
+    """Resolve the single ambient index shared by a lens bucket.
+
+    A group stores one scalar ``n_outside`` for all its elements, so
+    lenses bucketed together (same stage + aperture) must agree on it.
+    Differing values raise rather than silently adopting the first
+    lens's value, mirroring the per-bucket coating guard in
+    :func:`_build_coating_for_bucket`.
+    """
+    values = [lens.n_outside for lens in lenses]
+    first = values[0]
+    if any(v != first for v in values):
+        raise ValueError(
+            "Lenses grouped at the same stage with the same aperture must "
+            f"share a single n_outside; got {sorted(set(values))}. The "
+            "ambient index is stored per group, not per element; split "
+            "them across stages, or harmonise n_outside."
+        )
+    return float(first)
+
+
 def _build_aspheric_disk_lens_group(
     lenses: list[AsphericDiskLensSchema],
     aperture: Aperture,
@@ -439,6 +599,11 @@ def _build_aspheric_disk_lens_group(
     """
     from ..telescope.lenses import refractive_group
 
+    n = len(lenses)
+    coating = _build_coating_for_bucket(
+        [lens.coating for lens in lenses], n,
+    )
+
     return refractive_group(
         positions=jnp.asarray([lens.position for lens in lenses]),
         rotations=jnp.asarray([lens.orientation for lens in lenses]),
@@ -448,8 +613,9 @@ def _build_aspheric_disk_lens_group(
         offsets=jnp.asarray([lens.offset for lens in lenses]),
         aperture=aperture,
         n_inside=jnp.asarray([lens.n_inside for lens in lenses]),
-        n_outside=float(lenses[0].n_outside),
+        n_outside=_resolve_shared_n_outside(lenses),
         transmittance=jnp.asarray([lens.transmittance for lens in lenses]),
+        coating=coating,
         sample_key=sample_key,
         optical_stage=stage,
     )
@@ -468,14 +634,20 @@ def _build_plano_slab_group(
     """
     from ..telescope.lenses import slab_group
 
+    n = len(lenses)
+    coating = _build_coating_for_bucket(
+        [lens.coating for lens in lenses], n,
+    )
+
     return slab_group(
         positions=jnp.asarray([lens.position for lens in lenses]),
         rotations=jnp.asarray([lens.orientation for lens in lenses]),
         aperture=aperture,
         n_inside=jnp.asarray([lens.n_inside for lens in lenses]),
-        n_outside=float(lenses[0].n_outside),
+        n_outside=_resolve_shared_n_outside(lenses),
         thickness=jnp.asarray([lens.thickness for lens in lenses]),
         transmittance=jnp.asarray([lens.transmittance for lens in lenses]),
+        coating=coating,
         sample_key=sample_key,
         optical_stage=stage,
     )
@@ -580,10 +752,7 @@ def sensor_from_schema(
     """Convert a validated sensor schema to a SensorGroup domain object.
 
     The schema ``position`` / ``orientation`` are interpreted as
-    **camera-local** coordinates — the camera file format is the single
-    source of truth and always speaks in the camera's own frame. The sensor's
-    detection chain (``concentrator`` / ``gap`` / ``photosensor``) is rebuilt
-    onto the group.
+    **camera-local** coordinates.
     """
     positions = [list(p) for p in schema.positions]
     rotations = [list(r) for r in schema.orientations]
@@ -622,14 +791,42 @@ def sensor_from_schema(
 # Domain -> Schema (saving)
 
 
+def _bsdf_to_schema(bsdf: BSDF | None, i: int) -> BSDFSchema | None:
+    """Project element ``i`` of a group BSDF to a serialisable schema.
+
+    ``None`` and an all-zero :class:`~iactrace.core.bsdf.GaussianBSDF`
+    element round-trip as ``None`` so default (specular) mirrors stay
+    clean in the YAML. Unhandled BSDF subclasses raise rather than being
+    silently dropped to a partial form.
+    """
+    match bsdf:
+        case None:
+            return None
+        case GaussianBSDF():
+            scale = float(bsdf.scale[i])
+            return None if scale == 0.0 else GaussianBSDFSchema(scale=scale)
+        case DoubleGaussianBSDF():
+            return DoubleGaussianBSDFSchema(
+                scale_narrow=float(bsdf.scale_narrow[i]),
+                scale_wide=float(bsdf.scale_wide[i]),
+                mix_weight=float(bsdf.mix_weight[i]),
+            )
+        case _:
+            raise ValueError(
+                f"BSDF type {type(bsdf).__name__} cannot be serialised to "
+                "YAML; add a schema variant in iactrace.io.schemas and an "
+                "arm in _bsdf_to_schema / _build_bsdf_for_bucket."
+            )
+
+
 def mirrors_to_schemas(
     groups: list[OpticalElementGroup],
 ) -> tuple[dict[str, MirrorTemplateSchema], list[MirrorSchema]]:
     """Extract mirror schemas from OpticalElementGroup list.
 
-    Returns templates dict + mirror list. Surface geometry is deduplicated into
-    templates; the per-element coating (``reflectivity``) and surface scatter
-    (``bsdf``) ride on each mirror.
+    Returns templates dict + mirror list. Deduplicates surface params into templates.
+    BSDF is stored per-mirror (not part of the dedup key) since mirrors sharing a
+    surface template can carry different roughness parameters.
     """
     templates: dict[str, MirrorTemplateSchema] = {}
     mirrors: list[MirrorSchema] = []
@@ -637,15 +834,21 @@ def mirrors_to_schemas(
     surface_to_template: dict[tuple, str] = {}
 
     for group in groups:
-        interaction = group.interaction_module
-        assert isinstance(interaction, ReflectInteraction)  # mirror groups reflect
-        reflectivity = interaction.reflectivity
+        match group.interaction_module:
+            case ReflectInteraction() as interaction:
+                pass
+            case _:
+                continue
+
+        coating_schema = _coating_to_curve_schema(interaction.reflectivity)
+        coating_key = _curve_schema_to_key(coating_schema)
 
         for i in range(len(group)):
             curvature = float(group.surface.curvatures[i])
             conic = float(group.surface.conics[i])
             aspheric_raw = _strip_trailing_zeros(_to_float_list(group.surface.aspherics[i]))
-            surface_key = (curvature, conic, tuple(aspheric_raw))
+
+            surface_key = (curvature, conic, tuple(aspheric_raw), coating_key)
 
             if surface_key not in surface_to_template:
                 template_name = f"template_{template_counter}"
@@ -657,9 +860,11 @@ def mirrors_to_schemas(
                         conic=conic,
                         aspheric=aspheric_raw if aspheric_raw else [],
                     ),
+                    coating=coating_schema,
                 )
 
             template_name = surface_to_template[surface_key]
+            scalar = float(interaction.reflectivity_scalar[i])
             mirrors.append(MirrorSchema(
                 position=_to_float_list(group.positions[i]),
                 orientation=_to_float_list(group.rotations[i]),
@@ -667,8 +872,8 @@ def mirrors_to_schemas(
                 template=template_name,
                 stage=group.optical_stage,
                 offset=_to_float_list(group.surface.offsets[i]),
-                reflectivity=float(reflectivity[i]),
                 bsdf=_bsdf_to_schema(group.bsdf, i),
+                reflectivity=scalar if scalar != 1.0 else None,
                 id=f"M_{len(mirrors)}",
             ))
 
@@ -722,6 +927,7 @@ def _extract_aspheric_disk_lens(
 ) -> AsphericDiskLensSchema:
     """Extract an AsphericDiskLensSchema from element i of a group."""
     aspheric_raw = _strip_trailing_zeros(_to_float_list(group.surface.aspherics[i]))
+    coating_schema = _coating_to_curve_schema(interaction.transmittance)
     return AsphericDiskLensSchema(
         position=_to_float_list(group.positions[i]),
         orientation=_to_float_list(group.rotations[i]),
@@ -732,7 +938,8 @@ def _extract_aspheric_disk_lens(
         n_outside=float(interaction.n_outside),
         aspheric=aspheric_raw,
         offset=_to_float_list(group.surface.offsets[i]),
-        transmittance=float(interaction.transmittance[i]),
+        transmittance=float(interaction.transmittance_scalar[i]),
+        coating=coating_schema,
         stage=group.optical_stage,
         id=f"lens_{counter}",
     )
@@ -745,6 +952,7 @@ def _extract_plano_slab_lens(
     counter: int,
 ) -> PlanoSlabSchema:
     """Extract a PlanoSlabSchema from element i of a group."""
+    coating_schema = _coating_to_curve_schema(interaction.transmittance)
     return PlanoSlabSchema(
         position=_to_float_list(group.positions[i]),
         orientation=_to_float_list(group.rotations[i]),
@@ -752,7 +960,8 @@ def _extract_plano_slab_lens(
         thickness=float(interaction.thickness[i]),
         n_inside=float(interaction.n_inside[i]),
         n_outside=float(interaction.n_outside),
-        transmittance=float(interaction.transmittance[i]),
+        transmittance=float(interaction.transmittance_scalar[i]),
+        coating=coating_schema,
         stage=group.optical_stage,
         id=f"lens_{counter}",
     )
@@ -903,13 +1112,13 @@ def _extract_hex_group(
 def _concentrator_to_schema(
     concentrator: Concentrator | None,
 ) -> ConcentratorSchema | None:
-    """Serialize a concentrator (``None`` → ``None``).
+    """Serialize a concentrator (``None`` -> ``None``).
 
     Only :class:`WinstonCone` round-trips exactly today; any other
     :class:`~iactrace.camera.concentrator.Concentrator` subclass emits a
     :class:`UserWarning` and is dropped. To support another cone type, add a
     ``case`` here, a converter in :func:`_concentrator_from_schema`, a
-    ``…Schema`` class, and a member to the ``ConcentratorSchema`` alias.
+    ``...Schema`` class, and a member to the ``ConcentratorSchema`` alias.
     """
     match concentrator:
         case None:
@@ -917,7 +1126,7 @@ def _concentrator_to_schema(
         case WinstonCone():
             # entrance_apothem is the physical mouth at z=length; for a truncated
             # cone the depth reconstructs the wall on load. An untruncated cone is
-            # written as length=None so reload is exact. "Full" ⟺ the mouth equals
+            # written as length=None so reload is exact. "Full" <-> the mouth equals
             # the full-CPC mouth a2/s for the wall tilt s.
             s, _ = cpc_wall_tilt(
                 concentrator.exit_apothem, concentrator.entrance_apothem,
@@ -949,7 +1158,7 @@ def _concentrator_to_schema(
 def _concentrator_from_schema(
     schema: ConcentratorSchema | None,
 ) -> Concentrator | None:
-    """Rebuild a concentrator from its schema (``None`` → no concentrator)."""
+    """Rebuild a concentrator from its schema (``None`` -> no concentrator)."""
     match schema:
         case None:
             return None
@@ -976,7 +1185,7 @@ def _photosensor_to_schema(photosensor: PhotoSensor) -> PhotoSensorSchema:
     :class:`~iactrace.camera.photosensor.PhotoSensor` subclass emits a
     :class:`UserWarning` and falls back to a flat ``UniformQE(1.0)``. To support
     another response model, add a ``case`` here and in
-    :func:`_photosensor_from_schema`, a ``…Schema`` class, and a member to the
+    :func:`_photosensor_from_schema`, a ``...Schema`` class, and a member to the
     ``PhotoSensorSchema`` alias.
     """
     match photosensor:
@@ -993,7 +1202,7 @@ def _photosensor_to_schema(photosensor: PhotoSensor) -> PhotoSensorSchema:
 
 
 def _photosensor_from_schema(schema: PhotoSensorSchema | None) -> PhotoSensor:
-    """Rebuild a photosensor from its schema (``None`` → ``UniformQE(1.0)``)."""
+    """Rebuild a photosensor from its schema (``None`` -> ``UniformQE(1.0)``)."""
     match schema:
         case None:
             return UniformQE(1.0)
@@ -1054,9 +1263,7 @@ def telescope_to_schema(telescope: Telescope) -> TelescopeConfigSchema:
 def camera_to_file_schema(camera: Camera) -> CameraFileSchema:
     """Convert a Camera to a standalone CameraFileSchema.
 
-    Sensor positions are written in the camera-local frame — that is the
-    only frame the camera file format knows about. Each sensor group carries
-    its own detection chain (concentrator / gap / photosensor).
+    Sensor positions are written in the camera-local frame.
     """
     sensor_schemas: list[SensorSchemaType] = []
     if camera.sensor_groups:

@@ -33,20 +33,13 @@ class RayBundle(eqx.Module):
         directions: Ray direction vectors (n_rays, 3)
         values: Throughput-weighted ray intensities (n_rays,)
         path_length: Accumulated **optical** path length per ray
-            (n_rays,), in metres. Equal to ``Σ nᵢ · Lᵢ`` along the ray
-            path, *including* the source-to-primary leg. For point
-            sources this leg is the geometric distance from source to
-            primary sample point; for parallel sources it is the
-            signed offset of the sample point from a reference
-            wavefront plane through the world origin (so OPL
-            differences across rays are physical, the absolute value
-            carries a per-source constant offset).
+            (n_rays,), in metres.
         n: Per-ray refractive index of the medium each ray is
             currently propagating in (n_rays,). Carried so downstream
             consumers (sensor intersection, focal-surface analysis)
             can weight the final geometric leg correctly. Slab
             interactions additionally contribute their internal
-            ``n_in · L_internal`` term to ``path_length``.
+            ``n_in * L_internal`` term to ``path_length``.
     """
 
     origins: Array
@@ -75,18 +68,17 @@ class LazyRayBundle(eqx.Module):
     """A :class:`RayBundle` described by a render that hasn't run yet.
 
     Self-contained: holds the optics, obstructions, camera frame, and
-    source description needed to evaluate itself. No reference to
-    :class:`Telescope` — it only depends on the data inside one. Output
+    source description needed to evaluate itself. Output
     is delivered in the local frame defined by ``camera_position`` and
     ``camera_rotation``.
 
     Two ways to consume a :class:`LazyRayBundle`:
 
-    * :meth:`fold` — walk per primary-mirror element with an accumulator,
+    * :meth:`fold`: walk per primary-mirror element with an accumulator,
       so the full ``(n_elements * n_sources * n_samples,)`` ray buffer
       is never materialised. The fused path used by
       :meth:`Camera.image` and :meth:`Camera.response_matrix`.
-    * :meth:`materialise` — run the render eagerly and return a flat
+    * :meth:`materialise`: run the render eagerly and return a flat
       :class:`RayBundle`. Use when the per-ray output itself is the
       result (spot diagrams, :meth:`Camera.collect`).
     """

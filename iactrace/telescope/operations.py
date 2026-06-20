@@ -191,33 +191,43 @@ def set_reflectivity(
     if r.ndim == 0:
         r = jnp.full(len(group), r)
     return _update_at_stage(
-        telescope, stage, lambda g: g.interaction_module.reflectivity, r
+        telescope, stage,
+        lambda g: g.interaction_module.reflectivity_scalar, r,
     )
 
 
 def scale_reflectivity(
     telescope: Telescope, stage: int, factor: Array | float
 ) -> Telescope:
-    """Multiply mirror reflectivity by ``factor``. Mirror stages only."""
+    """Multiply mirror reflectivity by ``factor``. Mirror stages only.
+
+    Scales the bulk multiplier ``reflectivity_scalar``; the coating on
+    the interaction is left untouched.
+    """
     group = telescope.stage(stage)
     match group.interaction_module:
-        case ReflectInteraction(reflectivity=reflectivity):
+        case ReflectInteraction(reflectivity_scalar=scalar):
             pass
         case _:
             raise ValueError(f"stage {stage} is {group.kind}; expected mirror")
     factor = jnp.asarray(factor)
     if factor.ndim == 0:
         factor = jnp.full(len(group), factor)
-    new = reflectivity * factor
+    new = scalar * factor
     return _update_at_stage(
-        telescope, stage, lambda g: g.interaction_module.reflectivity, new
+        telescope, stage,
+        lambda g: g.interaction_module.reflectivity_scalar, new,
     )
 
 
 def set_transmittance(
     telescope: Telescope, stage: int, transmittance: Array | float
 ) -> Telescope:
-    """Set per-element bulk transmittance. Lens or slab stages only."""
+    """Set per-element bulk transmittance. Lens or slab stages only.
+
+    Writes the bulk multiplier ``transmittance_scalar``; the coating
+    on the interaction is left untouched.
+    """
     group = telescope.stage(stage)
     match group.interaction_module:
         case RefractInteraction() | SlabInteraction():
@@ -228,7 +238,8 @@ def set_transmittance(
     if t.ndim == 0:
         t = jnp.full(len(group), t)
     return _update_at_stage(
-        telescope, stage, lambda g: g.interaction_module.transmittance,
+        telescope, stage,
+        lambda g: g.interaction_module.transmittance_scalar,
         jnp.clip(t, 0.0, 1.0),
     )
 
@@ -236,19 +247,27 @@ def set_transmittance(
 def scale_transmittance(
     telescope: Telescope, stage: int, factor: Array | float
 ) -> Telescope:
-    """Multiply bulk transmittance by ``factor``. Lens or slab stages only."""
+    """Multiply bulk transmittance by ``factor``. Lens or slab stages only.
+
+    Scales the bulk multiplier ``transmittance_scalar``; the coating
+    on the interaction is left untouched.
+    """
     group = telescope.stage(stage)
     match group.interaction_module:
-        case RefractInteraction(transmittance=transmittance) | SlabInteraction(transmittance=transmittance):
+        case (
+            RefractInteraction(transmittance_scalar=scalar)
+            | SlabInteraction(transmittance_scalar=scalar)
+        ):
             pass
         case _:
             raise ValueError(f"stage {stage} is {group.kind}; expected lens or slab")
     factor = jnp.asarray(factor)
     if factor.ndim == 0:
         factor = jnp.full(len(group), factor)
-    new = jnp.clip(transmittance * factor, 0.0, 1.0)
+    new = jnp.clip(scalar * factor, 0.0, 1.0)
     return _update_at_stage(
-        telescope, stage, lambda g: g.interaction_module.transmittance, new
+        telescope, stage,
+        lambda g: g.interaction_module.transmittance_scalar, new,
     )
 
 
@@ -295,7 +314,6 @@ def set_focal_lengths(
 
     Mirror stages: ``c = 1 / (2 f)``.
     Lens stages (single refracting surface): ``c = 1 / ((n - 1) f)``.
-    Slab stages: not meaningful — raises ``ValueError``.
     """
     group = telescope.stage(stage)
     f = jnp.asarray(focal_lengths)

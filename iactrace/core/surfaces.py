@@ -23,7 +23,7 @@ class SurfaceGroup(eqx.Module):
     example.
     """
 
-    offsets: jax.Array  # (N, 2) — per-element surface offsets
+    offsets: jax.Array  # (N, 2); per-element surface offsets
 
     @abstractmethod
     def compute_sag_and_normal_at(self, x, y):

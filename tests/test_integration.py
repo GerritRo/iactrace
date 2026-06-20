@@ -20,7 +20,7 @@ def _make_disk_mirror_group(positions, rotations, curvatures, conics, aspherics,
         offsets=jnp.zeros((n, 2)),
     )
     aperture = DiskAperture(radii=radii, inner_radii=jnp.zeros(n))
-    interaction = ReflectInteraction(reflectivity=jnp.ones(n))
+    interaction = ReflectInteraction(reflectivity=None, reflectivity_scalar=jnp.ones(n))
     return OpticalElementGroup(
         positions=positions,
         rotations=rotations,
@@ -229,7 +229,7 @@ class TestBasicRendering:
 
 
 class TestResponseMatrix:
-    """Camera.response_matrix(LazyRayBundle) — fused per-source response."""
+    """Camera.response_matrix(LazyRayBundle)."""
 
     def test_shape_matches_image_with_leading_source_axis(self):
         tel, cam = make_simple_telescope(n_samples=64)

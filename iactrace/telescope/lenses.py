@@ -6,6 +6,7 @@ import jax.numpy as jnp
 from jax import Array
 
 from ..core.apertures import Aperture, DiskAperture
+from ..core.coatings import Coating
 from ..core.interactions import RefractInteraction, SlabInteraction
 from ..core.optics import OpticalElementGroup
 from ..core.surfaces import AsphericSurfaceGroup
@@ -13,7 +14,6 @@ from ..core.surfaces import AsphericSurfaceGroup
 __all__ = [
     "refractive_group",
     "slab_group",
-    "thin",
     "aspheric_lens",
     "plano_slab",
 ]
@@ -45,8 +45,9 @@ def refractive_group(
     aperture: Aperture,
     n_inside: Array,
     n_outside: float,
-    transmittance: Array,
+    transmittance: Array | float = 1.0,
     sample_key: Array,
+    coating: Coating | None = None,
     optical_stage: int = 0,
     n_samples: int = 100,
 ) -> OpticalElementGroup:
@@ -80,7 +81,11 @@ def refractive_group(
     aspherics = jnp.asarray(aspherics)
     offsets = jnp.asarray(offsets)
     n_inside = jnp.asarray(n_inside)
-    transmittance = jnp.asarray(transmittance)
+    n = int(positions.shape[0])
+
+    trans_scalar = jnp.asarray(transmittance)
+    if trans_scalar.ndim == 0:
+        trans_scalar = jnp.full((n,), trans_scalar)
 
     surface = AsphericSurfaceGroup(
         curvatures=curvatures,
@@ -91,7 +96,8 @@ def refractive_group(
     interaction = RefractInteraction(
         n_inside=n_inside,
         n_outside=float(n_outside),
-        transmittance=transmittance,
+        transmittance=coating,
+        transmittance_scalar=trans_scalar,
     )
 
     return OpticalElementGroup(
@@ -114,15 +120,16 @@ def slab_group(
     n_inside: Array,
     n_outside: float,
     thickness: Array,
-    transmittance: Array,
+    transmittance: Array | float = 1.0,
     sample_key: Array,
+    coating: Coating | None = None,
     optical_stage: int = 0,
     n_samples: int = 100,
 ) -> OpticalElementGroup:
     """Canonical builder for parallel-sided slab (window) groups.
 
-    The surface is always zero curvature, conic, and aspheric — a slab is
-    by definition flat — so no surface parameters are exposed. Both the
+    The surface is always zero curvature, conic, and aspheric, a slab is
+    by definition flat, so no surface parameters are exposed. Both the
     user-facing :func:`plano_slab` helper and the YAML adapter delegate
     to this function.
 
@@ -143,9 +150,11 @@ def slab_group(
     rotations = jnp.asarray(rotations)
     n_inside = jnp.asarray(n_inside)
     thickness = jnp.asarray(thickness)
-    transmittance = jnp.asarray(transmittance)
+    n = int(positions.shape[0])
 
-    n = positions.shape[0]
+    trans_scalar = jnp.asarray(transmittance)
+    if trans_scalar.ndim == 0:
+        trans_scalar = jnp.full((n,), trans_scalar)
 
     surface = AsphericSurfaceGroup(
         curvatures=jnp.zeros(n),
@@ -157,7 +166,8 @@ def slab_group(
         n_inside=n_inside,
         n_outside=float(n_outside),
         thickness=thickness,
-        transmittance=transmittance,
+        transmittance=coating,
+        transmittance_scalar=trans_scalar,
     )
 
     return OpticalElementGroup(
@@ -185,6 +195,7 @@ def _single_disk_refractive(
     n_inside,
     n_outside,
     transmittance,
+    coating,
     optical_stage,
     n_samples,
     key,
@@ -211,60 +222,10 @@ def _single_disk_refractive(
         n_inside=jnp.asarray([float(n_inside)]),
         n_outside=float(n_outside),
         transmittance=jnp.asarray([float(transmittance)]),
+        coating=coating,
         sample_key=key,
         optical_stage=optical_stage,
         n_samples=n_samples,
-    )
-
-
-def thin(
-    *,
-    position: Sequence[float],
-    focal_length: float,
-    radius: float,
-    rotation: Sequence[float] = (0.0, 0.0, 0.0),
-    n_inside: float = 1.5,
-    n_outside: float = 1.0,
-    transmittance: float = 1.0,
-    optical_stage: int = 0,
-    n_samples: int = 100,
-    key: Array,
-) -> OpticalElementGroup:
-    """Build a thin-lens approximation on a single curved disk surface.
-
-    Uses the single-surface thin-lens formula
-    ``curvature = (n_inside - n_outside) / focal_length``. This is an
-    approximation — a real thin lens consists of two refracting surfaces
-    — but it is sufficient for quick prototyping and matches the
-    ``aspheric_disk`` lens type in the YAML adapter.
-
-    Args:
-        position: Vertex position in world coordinates, shape (3,).
-        focal_length: Paraxial focal length in metres.
-        radius: Outer disk radius in metres.
-        rotation: Euler angles in degrees. Defaults to no rotation.
-        n_inside: Refractive index of the lens material. Defaults to 1.5
-            (typical crown glass).
-        n_outside: Refractive index of the ambient medium. Defaults to 1.0.
-        transmittance: Bulk transmittance in ``[0, 1]``. Defaults to 1.0.
-        optical_stage: Stage index within the Telescope.
-        n_samples: Monte Carlo samples per element per render.
-        key: JAX PRNG key for aperture sampling.
-    """
-    curvature = (float(n_inside) - float(n_outside)) / float(focal_length)
-    return _single_disk_refractive(
-        position=position,
-        rotation=rotation,
-        curvature=curvature,
-        conic=0.0,
-        aspheric_coeffs=None,
-        radius=radius,
-        n_inside=n_inside,
-        n_outside=n_outside,
-        transmittance=transmittance,
-        optical_stage=optical_stage,
-        n_samples=n_samples,
-        key=key,
     )
 
 
@@ -279,6 +240,7 @@ def aspheric_lens(
     n_inside: float = 1.5,
     n_outside: float = 1.0,
     transmittance: float = 1.0,
+    coating: Coating | None = None,
     optical_stage: int = 0,
     n_samples: int = 100,
     key: Array,
@@ -291,7 +253,7 @@ def aspheric_lens(
 
     Args:
         position: Vertex position in world coordinates, shape (3,).
-        curvature: Surface curvature ``1/R`` in m⁻¹.
+        curvature: Surface curvature ``1/R`` in m^-1.
         radius: Outer disk radius in metres.
         rotation: Euler angles in degrees. Defaults to no rotation.
         conic: Schwarzschild conic constant.
@@ -309,6 +271,7 @@ def aspheric_lens(
         n_inside=n_inside,
         n_outside=n_outside,
         transmittance=transmittance,
+        coating=coating,
         optical_stage=optical_stage,
         n_samples=n_samples,
         key=key,
@@ -324,6 +287,7 @@ def plano_slab(
     n_inside: float = 1.5,
     n_outside: float = 1.0,
     transmittance: float = 1.0,
+    coating: Coating | None = None,
     optical_stage: int = 0,
     n_samples: int = 100,
     key: Array,
@@ -364,6 +328,7 @@ def plano_slab(
         n_outside=float(n_outside),
         thickness=jnp.asarray([float(thickness)]),
         transmittance=jnp.asarray([float(transmittance)]),
+        coating=coating,
         sample_key=key,
         optical_stage=optical_stage,
         n_samples=n_samples,

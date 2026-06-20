@@ -31,9 +31,7 @@ from iactrace.core.optics import OpticalElementGroup
 from iactrace.core.surfaces import AsphericSurfaceGroup
 from iactrace.telescope import Telescope, lenses, mirrors, obstructions
 
-# ---------------------------------------------------------------------------
 # mirrors.*
-# ---------------------------------------------------------------------------
 
 
 class TestMirrorsSpherical:
@@ -175,7 +173,7 @@ class TestMirrorsDiskArray:
         )
         assert jnp.allclose(m.surface.conics, jnp.zeros(2))
         assert jnp.allclose(m.aperture.inner_radii, jnp.zeros(2))
-        assert jnp.allclose(m.interaction_module.reflectivity, jnp.ones(2))
+        assert jnp.allclose(m.interaction_module.reflectivity_scalar, jnp.ones(2))
 
     def test_shape_mismatch_raises(self, random_key):
         with pytest.raises(ValueError, match="curvatures"):
@@ -200,37 +198,7 @@ class TestMirrorsDiskArray:
         assert jnp.allclose(m.bsdf.scale, jnp.array([0.0, 30.0]))
 
 
-# ---------------------------------------------------------------------------
 # lenses.*
-# ---------------------------------------------------------------------------
-
-
-class TestLensesThin:
-    def test_uses_refract_interaction(self, random_key):
-        lens = lenses.thin(
-            position=(0.0, 0.0, 0.1),
-            focal_length=0.1,
-            radius=0.02,
-            n_inside=1.5,
-            key=random_key,
-        )
-        assert isinstance(lens.interaction_module, RefractInteraction)
-        assert lens.interaction == InteractionType.REFRACT
-
-    def test_thin_lens_curvature_formula(self, random_key):
-        # c = (n_in - n_out) / f = (1.5 - 1.0) / 0.1 = 5.0
-        lens = lenses.thin(
-            position=(0, 0, 0.1),
-            focal_length=0.1,
-            radius=0.02,
-            n_inside=1.5,
-            n_outside=1.0,
-            key=random_key,
-        )
-        assert jnp.allclose(lens.surface.curvatures, jnp.array([5.0]))
-        assert jnp.allclose(lens.surface.conics, jnp.array([0.0]))
-        assert jnp.allclose(lens.interaction_module.n_inside, jnp.array([1.5]))
-        assert lens.interaction_module.n_outside == 1.0
 
 
 class TestLensesAsphericLens:
@@ -284,13 +252,11 @@ class TestLensesPlanoSlab:
         assert jnp.allclose(slab.interaction_module.thickness, jnp.array([0.003]))
         assert jnp.allclose(slab.interaction_module.n_inside, jnp.array([1.52]))
         assert jnp.allclose(
-            slab.interaction_module.transmittance, jnp.array([0.9])
+            slab.interaction_module.transmittance_scalar, jnp.array([0.9])
         )
 
 
-# ---------------------------------------------------------------------------
 # obstructions.*
-# ---------------------------------------------------------------------------
 
 
 class TestObstructionsPrimitives:
@@ -319,16 +285,14 @@ class TestObstructionsPrimitives:
         assert jnp.allclose(s.radii, jnp.array([0.02]))
 
 
-# ---------------------------------------------------------------------------
 # End-to-end: build a Telescope from helpers and render
-# ---------------------------------------------------------------------------
 
 
 class TestTelescopeEndToEnd:
     def test_build_parabolic_from_helpers_and_render(self):
         """Rebuild configs/BASIC/Parabolic_telescope.yaml via helpers and render.
 
-        We only check that the pipeline runs and produces rays — not that
+        We only check that the pipeline runs and produces rays; not that
         the image matches the YAML render pixel-for-pixel. A tight match
         would duplicate the yaml tests and is unnecessary: the helpers
         delegate to the same core primitives.
@@ -364,7 +328,7 @@ class TestTelescopeEndToEnd:
         assert float(jnp.sum(rb.values)) > 0.0
 
     def test_telescope_with_lens_group(self):
-        """Mirror + slab lens at different optical stages — exercises both."""
+        """Mirror + slab lens at different optical stages."""
         k1, k2 = jax.random.split(jax.random.key(1))
 
         primary = mirrors.parabolic(
@@ -391,7 +355,7 @@ class TestTelescopeEndToEnd:
             camera_position=jnp.array([0.0, 0.0, 0.4]),
         )
 
-        # Two groups at distinct stages — validation must accept this.
+        # Two groups at distinct stages should be okay.
         assert len(tel.optical_groups) == 2
 
         # Full render smoke test.
@@ -401,13 +365,7 @@ class TestTelescopeEndToEnd:
         assert rb.values.shape[0] > 0
 
 
-# ---------------------------------------------------------------------------
 # Low-level canonical builders: mirror_group / refractive_group / slab_group
-# ---------------------------------------------------------------------------
-#
-# These tests cover the features the sugar helpers don't expose: nonzero
-# surface offsets, polygon apertures, custom BSDF subclasses, and the fact
-# that the same function is also called by io.adapters on the YAML path.
 
 
 class TestMirrorGroup:
@@ -433,7 +391,7 @@ class TestMirrorGroup:
 
     def test_accepts_polygon_aperture(self, random_key):
         """mirror_group is the only entry-point that supports hex/polygon
-        apertures — the sugar helpers are disk-only."""
+        apertures"""
         # Equilateral hexagon with circumradius 0.1, centred on origin
         angles = jnp.linspace(0, 2 * jnp.pi, 7)[:-1]
         hex_verts = jnp.stack(
@@ -487,7 +445,7 @@ class TestMirrorGroup:
     def test_sugar_helpers_route_through_mirror_group(self, random_key):
         """The sugar helpers must produce groups that are structurally
         indistinguishable from a direct mirror_group call with the same
-        inputs — that's the whole point of the shared builder."""
+        inputs."""
         sugar = mirrors.parabolic(
             position=(0.0, 0.0, 0.0),
             focal_length=0.4,
@@ -515,8 +473,8 @@ class TestMirrorGroup:
         assert jnp.allclose(sugar.aperture.radii, direct.aperture.radii)
         # Same interaction
         assert jnp.allclose(
-            sugar.interaction_module.reflectivity,
-            direct.interaction_module.reflectivity,
+            sugar.interaction_module.reflectivity_scalar,
+            direct.interaction_module.reflectivity_scalar,
         )
 
 
@@ -541,36 +499,6 @@ class TestRefractiveGroup:
         assert lens.interaction == InteractionType.REFRACT
         assert jnp.allclose(lens.interaction_module.n_inside, jnp.array([1.5]))
         assert lens.interaction_module.n_outside == 1.0
-
-    def test_thin_sugar_matches_refractive_group(self, random_key):
-        """lenses.thin should be observably equivalent to a hand-written
-        refractive_group call with c = (n_in - n_out) / f."""
-        sugar = lenses.thin(
-            position=(0.0, 0.0, 0.1),
-            focal_length=0.1,
-            radius=0.02,
-            n_inside=1.5,
-            key=random_key,
-        )
-        direct = lenses.refractive_group(
-            positions=jnp.array([[0.0, 0.0, 0.1]]),
-            rotations=jnp.zeros((1, 3)),
-            curvatures=jnp.array([5.0]),   # (1.5 - 1.0) / 0.1
-            conics=jnp.array([0.0]),
-            aspherics=jnp.zeros((1, 0)),
-            offsets=jnp.zeros((1, 2)),
-            aperture=DiskAperture(
-                radii=jnp.array([0.02]), inner_radii=jnp.zeros(1),
-            ),
-            n_inside=jnp.array([1.5]),
-            n_outside=1.0,
-            transmittance=jnp.array([1.0]),
-            sample_key=random_key,
-        )
-        assert jnp.allclose(sugar.surface.curvatures, direct.surface.curvatures)
-        assert jnp.allclose(
-            sugar.interaction_module.n_inside, direct.interaction_module.n_inside
-        )
 
 
 class TestSlabGroup:

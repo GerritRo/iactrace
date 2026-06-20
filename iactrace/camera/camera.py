@@ -23,6 +23,7 @@ if TYPE_CHECKING:
 # Pipeline functions
 
 
+
 def intersect_sensor(
     camera: Camera,
     ray_bundle: RayBundle | LazyRayBundle,
@@ -51,9 +52,8 @@ def intersect_sensor(
         rot = euler_to_matrix(sensor.rotations[s_idx])
         pts, ts = jax.vmap(intersect_plane, in_axes=(0, 0, None, None))(
             origins, directions, pos, rot)
-        # Filter for ts values where sensor gets hit within bounds
+        # Check if intersection is within sensor bound
         ts = jnp.where(sensor.in_bounds(pts[:, 0], pts[:, 1]), ts, jnp.inf)
-        # Rotate into local sensor coordinates
         local_dirs = directions @ rot
         return pts, ts, local_dirs
 

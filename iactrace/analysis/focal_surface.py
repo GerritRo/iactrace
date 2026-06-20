@@ -22,7 +22,7 @@ class FocalSurfaceHits(eqx.Module):
 
     All arrays have leading dimension ``n_rays`` and are aligned with the input
     bundle. Missed rays appear with ``hit_mask = False`` and meaningless values
-    in the position/direction arrays — always filter with ``hit_mask`` before
+    in the position/direction arrays: always filter with ``hit_mask`` before
     using ``xy_local`` for plotting or statistics.
 
     Attributes:
@@ -37,12 +37,7 @@ class FocalSurfaceHits(eqx.Module):
             Useful for chief-ray / angle-of-incidence analysis.
         opl: Per-ray optical path length from the source wavefront to the
             focal surface, in metres (n_rays,). Equals
-            ``ray_bundle.path_length + t * ray_bundle.n`` — the final
-            geometric leg from the bundle's origin to the focal surface
-            is weighted by the ray's current medium index. Use directly
-            for OPD / wavefront-error analysis; for a parallel source
-            the absolute value carries a per-source constant offset, so
-            differences across rays are the physical quantity.
+            ``ray_bundle.path_length + t * ray_bundle.n``.
     """
 
     xy_local: Array
@@ -153,7 +148,7 @@ class FlatFocalPlane(FocalSurface):
 class AsphericFocalSurface(FocalSurface):
     """A rotationally-symmetric aspheric focal surface.
 
-    Parameterisation matches :class:`AsphericSurfaceGroup` — the surface sag is
+    Parameterisation matches :class:`AsphericSurfaceGroup`; the surface sag is
 
         z(r) = c r^2 / (1 + sqrt(1 - (1 + k) c^2 r^2))
                + sum_i a_i r^(2i+2)

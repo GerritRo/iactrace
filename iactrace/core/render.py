@@ -32,11 +32,11 @@ def _trace_stage(origins, directions, values, current_n, group, obstructions):
     Returns ``(new_origins, new_directions, new_values, segment_length,
     opl_internal, new_n)``:
 
-    * ``segment_length`` — geometric distance from the previous stage
+    * ``segment_length``: geometric distance from the previous stage
       to this surface (in the medium ``current_n``).
-    * ``opl_internal`` — per-ray OPL accumulated *inside* the
+    * ``opl_internal``: per-ray OPL accumulated *inside* the
       interaction (non-zero only for slabs / windows).
-    * ``new_n`` — per-ray refractive index of the medium the ray is in
+    * ``new_n``: per-ray refractive index of the medium the ray is in
       after this stage, ready to weight the next segment.
 
     Uses lax.scan over elements, keeping only the closest hit per ray.
@@ -137,9 +137,7 @@ def _build_source_rays(points, normals, weights, sources, source_values,
         ``(origins, directions, normals, values, leg_in)`` all shaped
         (n_rays, ...). ``leg_in`` is the optical path length each ray
         already accumulated travelling from the source (or reference
-        wavefront) to its primary sample point — added to
-        ``path_length`` so the Monte-Carlo sampling location on the
-        primary doesn't conflate with downstream OPL analysis.
+        wavefront) to its primary sample point.
     """
     n_sources = sources.shape[0]
     n_samples = points.shape[0]
@@ -266,7 +264,7 @@ def render_optics(optical_groups, obstruction_groups, sources, values, source_ty
 
     Materialises the full ``(n_elements * n_sources * n_samples,)`` ray
     buffer. Use :func:`render_optics_accumulate` when only a small
-    aggregate (image, response matrix, …) is needed.
+    aggregate (image, response matrix, ...) is needed.
     """
     setup = _per_element_scan(
         optical_groups, obstruction_groups, sources, values, source_type,

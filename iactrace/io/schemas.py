@@ -49,32 +49,74 @@ class SurfaceSchema(BaseModel):
 
 
 class GaussianBSDFSchema(BaseModel):
-    """Serialized :class:`~iactrace.core.bsdf.GaussianBSDF` (single-Gaussian roughness)."""
+    """Single-Gaussian surface roughness.
 
-    model_config = ConfigDict(extra="forbid")
+    See :class:`~iactrace.core.bsdf.GaussianBSDF`.
+    """
 
     type: Literal["gaussian"] = "gaussian"
-    scale: float = Field(ge=0, default=0.0)  # roughness sigma in arcseconds
+    scale: float = Field(ge=0, default=0.0)
 
 
 class DoubleGaussianBSDFSchema(BaseModel):
-    """Serialized :class:`~iactrace.core.bsdf.DoubleGaussianBSDF` (narrow + wide)."""
+    """Two-component (narrow + wide) Gaussian roughness mixture.
 
-    model_config = ConfigDict(extra="forbid")
+    See :class:`~iactrace.core.bsdf.DoubleGaussianBSDF`.
+    """
 
     type: Literal["double_gaussian"] = "double_gaussian"
-    scale_narrow: float = Field(ge=0)  # arcseconds
-    scale_wide: float = Field(ge=0)    # arcseconds
-    mix_weight: float = Field(ge=0, le=1)
+    scale_narrow: float = Field(ge=0, default=0.0)
+    scale_wide: float = Field(ge=0, default=0.0)
+    mix_weight: float = Field(ge=0, le=1, default=0.0)
 
 
-# Discriminated BSDF slot. To add a surface-scatter model: add its domain class,
-# a ``…BSDFSchema`` member here, and the matching arms in ``io/adapters.py``
-# (``_bsdf_to_schema`` / ``_bsdf_for_group``).
 BSDFSchema = Annotated[
     GaussianBSDFSchema | DoubleGaussianBSDFSchema,
     Field(discriminator="type"),
 ]
+
+
+class TabulatedCurveSchema(BaseModel):
+    """Inline tabulated angle-dependent coating curve.
+
+    ``angles_deg`` are sample angles in degrees in ``[0, 90]``;
+    ``values`` are the corresponding coefficients in ``[0, 1]``. The
+    two lists must have the same length. See
+    :class:`~iactrace.core.coatings.TabulatedCoating`.
+    """
+
+    type: Literal["table"] = "table"
+    angles_deg: list[float] = Field(min_length=2)
+    values: list[float] = Field(min_length=2)
+
+    @field_validator("angles_deg")
+    @classmethod
+    def _angles_in_range(cls, v):
+        for a in v:
+            if a < 0.0 or a > 90.0:
+                raise ValueError(
+                    f"angles_deg must lie in [0, 90]; got {a}"
+                )
+        return v
+
+    @field_validator("values")
+    @classmethod
+    def _values_in_range(cls, v):
+        for x in v:
+            if x < 0.0 or x > 1.0:
+                raise ValueError(
+                    f"values must lie in [0, 1]; got {x}"
+                )
+        return v
+
+    @model_validator(mode="after")
+    def _same_length(self) -> TabulatedCurveSchema:
+        if len(self.angles_deg) != len(self.values):
+            raise ValueError(
+                f"angles_deg ({len(self.angles_deg)}) and values "
+                f"({len(self.values)}) must have the same length"
+            )
+        return self
 
 
 class MirrorTemplateSchema(BaseModel):
@@ -82,6 +124,9 @@ class MirrorTemplateSchema(BaseModel):
     (``reflectivity``) and ``bsdf`` live on the mirror, not the template."""
 
     surface: SurfaceSchema
+    bsdf: BSDFSchema | None = None
+    reflectivity: float | None = None
+    coating: TabulatedCurveSchema | None = None
 
 
 class MirrorSchema(BaseModel):
@@ -94,8 +139,8 @@ class MirrorSchema(BaseModel):
     aspheric: list[float] | None = None
     offset: Vec2 = Field(default_factory=lambda: [0.0, 0.0])
     stage: int = Field(ge=0, default=0)
-    reflectivity: float = Field(ge=0, le=1, default=1.0)
     bsdf: BSDFSchema | None = None
+    reflectivity: float | None = None
     id: str | None = None
 
 
@@ -114,6 +159,7 @@ class AsphericDiskLensSchema(BaseModel):
     aspheric: list[float] = Field(default_factory=list)
     offset: Vec2 = Field(default_factory=lambda: [0.0, 0.0])
     transmittance: float = Field(ge=0, le=1, default=1.0)
+    coating: TabulatedCurveSchema | None = None
     stage: int = Field(ge=0, default=0)
     id: str | None = None
 
@@ -127,6 +173,7 @@ class PlanoSlabSchema(BaseModel):
     n_inside: float = Field(gt=0)
     n_outside: float = Field(gt=0, default=1.0)
     transmittance: float = Field(ge=0, le=1, default=1.0)
+    coating: TabulatedCurveSchema | None = None
     stage: int = Field(ge=0, default=0)
     id: str | None = None
 

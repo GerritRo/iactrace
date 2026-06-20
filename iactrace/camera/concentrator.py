@@ -27,7 +27,7 @@ class Concentrator(eqx.Module):
         ``1.0`` for hollow / air-filled light guides such as Winston cones.
         Solid dielectric concentrators override this; :meth:`apply` must weight
         the internal geometric path by it when accumulating optical path length
-        (``OPL += index · geometric_length``).
+        (``OPL += index * geometric_length``).
         """
         return 1.0
 
@@ -40,14 +40,9 @@ class Concentrator(eqx.Module):
 
         * attenuate ``values`` by reflection / collection losses,
         * update ``origins`` / ``directions`` to the exit-ray state,
-        * add the **optical** path travelled — ``index · geometric_length`` — to
-          ``path_length`` (so a dielectric guide disperses arrival times by its
-          own refractive index, not the surrounding medium's), and
+        * add the **optical** path travelled, and
         * set ``n`` to the refractive index of the medium **at the exit
-          aperture** (what the downstream ``gap`` is filled with), so the chain's
-          free-flight to the detector weights its leg correctly. A hollow guide
-          in air leaves ``n`` unchanged; a solid guide resets it after the exit
-          refraction.
+          aperture**.
 
         Args:
             local_rays: Rays at the entrance aperture, pixel-local frame.

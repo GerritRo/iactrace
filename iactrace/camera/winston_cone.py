@@ -54,7 +54,7 @@ def cpc_wall_tilt(
 def cpc_full_length(exit_apothem: float, s: float, c: float) -> float:
     """Full (untruncated) CPC length for exit apothem a2 and wall tilt (s, c).
 
-    The full entry is a1 = a2 / s and the full depth is (a1 + a2)·c/s.
+    The full entry is a1 = a2 / s and the full depth is (a1 + a2)*c/s.
     """
     a1 = exit_apothem / s
     return (a1 + exit_apothem) * c / s
@@ -207,13 +207,13 @@ def trace(origins, directions, n_hats, exit_apothem, s, c, length, reflectivity,
 class WinstonCone(Concentrator):
     """Polygonal CPC (Winston cone) light guide with full ray tracing.
 
-    Defined entirely by its physical dimensions — exit apothem, entrance apothem
+    Defined entirely by its physical dimensions; exit apothem, entrance apothem
     and length. The parabolic-wall tilt that fixes the cone is computed directly
     from them (see :func:`cpc_wall_tilt`).
 
     Args:
         n_sides: Number of facets (6 = hexagonal, 4 = square, ...).
-        entrance_apothem: Entrance inradius ``a1`` — the apothem **at the entrance
+        entrance_apothem: Entrance inradius ``a1``; the apothem **at the entrance
             plane** ``z = length``. For a truncated cone this is the actual
             (truncated) entry.
         exit_apothem: Exit aperture inradius ``a2``.

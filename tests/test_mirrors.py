@@ -95,7 +95,9 @@ class TestAnnularAperture:
             radii=jnp.array([1.0]),
             inner_radii=jnp.array([0.3]),
         )
-        interaction = ReflectInteraction(reflectivity=jnp.ones(N))
+        interaction = ReflectInteraction(
+            reflectivity=None, reflectivity_scalar=jnp.ones(N),
+        )
         return OpticalElementGroup(
             positions=jnp.array([[0.0, 0.0, 0.0]]),
             rotations=jnp.array([[0.0, 0.0, 0.0]]),
@@ -176,7 +178,9 @@ class TestMirrorGroupWithHole:
             radii=jnp.array([1.0, 0.5]),
             inner_radii=jnp.zeros(N),
         )
-        interaction = ReflectInteraction(reflectivity=jnp.ones(N))
+        interaction = ReflectInteraction(
+            reflectivity=None, reflectivity_scalar=jnp.ones(N),
+        )
         group = OpticalElementGroup(
             positions=jnp.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]]),
             rotations=jnp.zeros((N, 3)),
@@ -203,7 +207,9 @@ class TestMirrorGroupWithHole:
             radii=jnp.array([1.0, 0.5]),
             inner_radii=jnp.array([0.2, 0.0]),  # First has hole, second is solid
         )
-        interaction = ReflectInteraction(reflectivity=jnp.ones(N))
+        interaction = ReflectInteraction(
+            reflectivity=None, reflectivity_scalar=jnp.ones(N),
+        )
         group = OpticalElementGroup(
             positions=jnp.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]]),
             rotations=jnp.zeros((N, 3)),
@@ -236,7 +242,9 @@ class TestMirrorGroupWithHole:
             radii=jnp.array([1.0]),
             inner_radii=jnp.array([0.3]),
         )
-        interaction = ReflectInteraction(reflectivity=jnp.ones(N))
+        interaction = ReflectInteraction(
+            reflectivity=None, reflectivity_scalar=jnp.ones(N),
+        )
         group = OpticalElementGroup(
             positions=jnp.array([[0.0, 0.0, 0.0]]),
             rotations=jnp.zeros((N, 3)),
@@ -267,7 +275,9 @@ class TestMirrorGroupWithHole:
             radii=jnp.array([outer_r]),
             inner_radii=jnp.array([inner_r]),
         )
-        interaction = ReflectInteraction(reflectivity=jnp.ones(N))
+        interaction = ReflectInteraction(
+            reflectivity=None, reflectivity_scalar=jnp.ones(N),
+        )
         group = OpticalElementGroup(
             positions=jnp.array([[0.0, 0.0, 0.0]]),
             rotations=jnp.zeros((N, 3)),
@@ -367,7 +377,9 @@ class TestAsphericPolygonMirrorGroup:
             vertices=vertices[None, :, :],
             n_vertices=6,
         )
-        interaction = ReflectInteraction(reflectivity=jnp.ones(N))
+        interaction = ReflectInteraction(
+            reflectivity=None, reflectivity_scalar=jnp.ones(N),
+        )
         return OpticalElementGroup(
             positions=jnp.array([[0.0, 0.0, 0.0]]),
             rotations=jnp.zeros((N, 3)),
@@ -410,7 +422,9 @@ class TestMultipleMirrorsInGroup:
             radii=jnp.array([0.5, 0.3]),  # Different radii
             inner_radii=jnp.zeros(N),
         )
-        interaction = ReflectInteraction(reflectivity=jnp.ones(N))
+        interaction = ReflectInteraction(
+            reflectivity=None, reflectivity_scalar=jnp.ones(N),
+        )
         group = OpticalElementGroup(
             positions=jnp.array([[0.0, 0.0, 0.0], [2.0, 0.0, 0.0]]),
             rotations=jnp.zeros((N, 3)),
@@ -447,7 +461,9 @@ class TestMultipleMirrorsInGroup:
             vertices=vertices,
             n_vertices=4,
         )
-        interaction = ReflectInteraction(reflectivity=jnp.ones(N))
+        interaction = ReflectInteraction(
+            reflectivity=None, reflectivity_scalar=jnp.ones(N),
+        )
         group = OpticalElementGroup(
             positions=jnp.array([[0.0, 0.0, 0.0], [2.0, 0.0, 0.0]]),
             rotations=jnp.zeros((N, 3)),

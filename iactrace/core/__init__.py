@@ -1,5 +1,10 @@
 from .apertures import Aperture, DiskAperture, PolygonAperture
 from .bsdf import BSDF, DoubleGaussianBSDF, GaussianBSDF
+from .coatings import (
+    Coating,
+    ConstantCoating,
+    TabulatedCoating,
+)
 from .interactions import (
     Interaction,
     InteractionType,
@@ -37,6 +42,11 @@ __all__ = [
     "ReflectInteraction",
     "RefractInteraction",
     "SlabInteraction",
+
+    # Angular coatings
+    "Coating",
+    "ConstantCoating",
+    "TabulatedCoating",
 
     # Surfaces
     "SurfaceGroup",

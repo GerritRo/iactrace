@@ -64,7 +64,7 @@ def _check_overwrite(filepath: Path, overwrite: bool) -> None:
         logger.debug("Overwriting existing file: %s", filepath)
 
 
-# Loading – telescope only
+# Loading telescope
 
 
 def load_telescope_config(
@@ -102,14 +102,17 @@ def build_telescope_config(
     except ValidationError as e:
         raise YAMLConfigError(str(e)) from e
 
-    key, mirror_key = jax.random.split(key)
-    mirror_groups = mirrors_from_schemas(
-        schema.mirrors, schema.mirror_templates, n_samples, key=mirror_key
-    )
-    obstruction_groups = obstructions_from_schemas(schema.obstructions)
+    try:
+        key, mirror_key = jax.random.split(key)
+        mirror_groups = mirrors_from_schemas(
+            schema.mirrors, schema.mirror_templates, n_samples, key=mirror_key
+        )
+        obstruction_groups = obstructions_from_schemas(schema.obstructions)
 
-    key, lens_key = jax.random.split(key)
-    lens_groups = lenses_from_schemas(schema.lenses, key=lens_key)
+        key, lens_key = jax.random.split(key)
+        lens_groups = lenses_from_schemas(schema.lenses, key=lens_key)
+    except ValueError as e:
+        raise YAMLConfigError(str(e)) from e
 
     return Telescope(
         mirror_groups=mirror_groups,
@@ -121,7 +124,7 @@ def build_telescope_config(
     )
 
 
-# Loading – camera only
+# Loading camera
 
 
 def load_camera_config(filename: str | Path) -> Camera:
@@ -145,8 +148,7 @@ def load_camera_config(filename: str | Path) -> Camera:
 def build_camera_config(config: dict[str, Any]) -> Camera:
     """Build a Camera from a camera configuration dictionary.
 
-    Sensor positions are interpreted as camera-local coordinates — this is
-    the only frame the camera file format speaks.
+    Sensor positions are interpreted as camera-local coordinates.
     """
     try:
         schema = CameraFileSchema.model_validate(config)

@@ -85,7 +85,7 @@ def set_photosensor(
 
 
 def set_gap(camera: Camera, sensor_idx: int, gap: float) -> Camera:
-    """Set the gap (upstream exit → detector spacing) on a group's chain."""
+    """Set the gap (upstream exit -> detector spacing) on a group's chain."""
     chain = camera.sensor_groups[sensor_idx].chain
     return _replace_chain(
         camera, sensor_idx,
