@@ -46,6 +46,12 @@ class FocalSurfaceHits(eqx.Module):
     hit_mask: Array
     directions_local: Array
     opl: Array
+    values: Array
+
+    @property
+    def alive(self) -> Array:
+        """Rays that crossed the surface and carry light (hit_mask & values > 0)."""
+        return self.hit_mask & (self.values > 0)
 
 
 class FocalSurface(eqx.Module):
@@ -110,6 +116,7 @@ class FocalSurface(eqx.Module):
             hit_mask=hit_mask,
             directions_local=d_local,
             opl=opl,
+            values=ray_bundle.values
         )
 
 

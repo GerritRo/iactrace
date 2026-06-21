@@ -4,7 +4,7 @@ import jax.numpy as jnp
 from iactrace import Camera, SquareSensorGroup, Telescope
 from iactrace.core.apertures import DiskAperture
 from iactrace.core.interactions import ReflectInteraction
-from iactrace.core.obstructions import CylinderGroup
+from iactrace.core.obstructions import CylinderGroup, SphereGroup
 from iactrace.core.optics import OpticalElementGroup
 from iactrace.core.surfaces import AsphericSurfaceGroup
 
@@ -135,9 +135,10 @@ def make_telescope_with_obstruction(n_samples=1024, key=None):
         optical_stage=0, n_samples=n_samples,
     )
 
+    # Central obstruction near the aperture:
     obstruction = CylinderGroup(
-        p1=[[0.0, 0.0, 0.1]],
-        p2=[[0.0, 0.0, 0.4]],
+        p1=[[0.0, 0.0, 0.05]],
+        p2=[[0.0, 0.0, 0.2]],
         r=[0.03],
     )
 
@@ -433,3 +434,149 @@ class TestObstructionEffects:
         assert tel.obstruction_groups is not None
         assert len(tel.obstruction_groups) == 1
         assert len(tel.obstruction_groups[0]) == 1
+
+
+class TestFinalLegShadow:
+    """Shadowing of the converging beam on the last-optic -> focal-plane leg."""
+
+    def _two_rays(self):
+        from iactrace.core.ray_bundle import RayBundle
+
+        # Two rays leaving a 'last optic' at z=0 and travelling +z toward a
+        # focal plane at z=1: one on the axis, one offset to x=1.
+        return RayBundle(
+            origins=jnp.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]]),
+            directions=jnp.array([[0.0, 0.0, 1.0], [0.0, 0.0, 1.0]]),
+            values=jnp.array([1.0, 1.0]),
+            path_length=jnp.zeros(2),
+            n=jnp.ones(2),
+        )
+
+    def test_blocks_ray_crossing_obstruction(self):
+        """A ray whose final leg crosses an obstruction is zeroed; a clear
+        ray is left untouched, as are its geometry and path length."""
+        from iactrace.core.render import apply_final_leg_shadow
+
+        rb = self._two_rays()
+        cam_pos = jnp.array([0.0, 0.0, 1.0])   # focal plane at z = 1
+        cam_rot = jnp.zeros(3)
+        # Sphere squarely on the axial ray's leg, clear of the offset ray.
+        sphere = SphereGroup(centers=[[0.0, 0.0, 0.5]], radii=[0.1])
+
+        out = apply_final_leg_shadow(rb, [sphere], cam_pos, cam_rot)
+
+        assert float(out.values[0]) == 0.0   # axial ray blocked
+        assert float(out.values[1]) == 1.0   # offset ray untouched
+        assert jnp.allclose(out.path_length, rb.path_length)
+        assert jnp.allclose(out.origins, rb.origins)
+        assert jnp.allclose(out.directions, rb.directions)
+
+    def test_caps_at_focal_plane(self):
+        """An obstruction past the focal plane must not shadow; the same
+        obstruction is caught once the focal plane is moved beyond it."""
+        from iactrace.core.render import apply_final_leg_shadow
+
+        rb = self._two_rays()
+        cam_rot = jnp.zeros(3)
+        sphere = SphereGroup(centers=[[0.0, 0.0, 1.5]], radii=[0.1])
+
+        # Focal plane at z=1, in front of the sphere -> excluded by the cap.
+        out_near = apply_final_leg_shadow(
+            rb, [sphere], jnp.array([0.0, 0.0, 1.0]), cam_rot)
+        assert float(out_near.values[0]) == 1.0
+
+        # Focal plane at z=2, past the sphere -> now on the leg, so it blocks.
+        out_far = apply_final_leg_shadow(
+            rb, [sphere], jnp.array([0.0, 0.0, 2.0]), cam_rot)
+        assert float(out_far.values[0]) == 0.0
+
+    def test_noop_without_obstructions(self):
+        """With no obstructions the bundle is returned unchanged."""
+        from iactrace.core.render import apply_final_leg_shadow
+
+        rb = self._two_rays()
+        out = apply_final_leg_shadow(
+            rb, [], jnp.array([0.0, 0.0, 1.0]), jnp.zeros(3))
+        assert out is rb
+
+    def test_to_camera_frame_shadows_and_reframes(self):
+        """The handoff method applies the final-leg shadow and the frame
+        transform together."""
+        rb = self._two_rays()
+        cam_pos = jnp.array([0.0, 0.0, 1.0])   # focal plane at z = 1
+        cam_rot = jnp.zeros(3)
+        sphere = SphereGroup(centers=[[0.0, 0.0, 0.5]], radii=[0.1])
+
+        out = rb.to_camera_frame([sphere], cam_pos, cam_rot)
+
+        # Shadowed: axial ray blocked, offset ray kept.
+        assert float(out.values[0]) == 0.0
+        assert float(out.values[1]) == 1.0
+        # Reframed: geometry matches a plain to_frame transform.
+        expected = rb.to_frame(cam_pos, cam_rot)
+        assert jnp.allclose(out.origins, expected.origins)
+        assert jnp.allclose(out.directions, expected.directions)
+
+    def _near_focus_sphere(self):
+        # make_simple_telescope: parabola of curvature 1 -> focus at z=0.5,
+        # aperture radius 0.1. A small sphere just short of the focus sits
+        # deep inside the converging cone but barely clips the incoming beam:
+        # its incoming silhouette can remove at most ~(0.02/0.1)**2 = 4% of
+        # the flux, so a far larger drop can only come from the final leg.
+        return SphereGroup(centers=[[0.0, 0.0, 0.46]], radii=[0.02])
+
+    def test_blocks_converging_cone_in_image(self):
+        """Fold path (Camera.image): near-focus obstruction collapses flux."""
+        key = jax.random.key(0)
+        tel, cam = make_simple_telescope(n_samples=4096, key=key)
+        tel_obs = tel.add_obstruction(self._near_focus_sphere())
+
+        sources = jnp.array([[0.0, 0.0, -1.0]])
+        values = jnp.array([1.0])
+
+        flux_clear = jnp.sum(cam.image(
+            tel.render(sources, values, source_type='parallel')))
+        flux_obs = jnp.sum(cam.image(
+            tel_obs.render(sources, values, source_type='parallel')))
+
+        assert flux_clear > 0
+        assert flux_obs < 0.2 * flux_clear
+
+    def test_blocks_converging_cone_in_collect(self):
+        """Materialise path (Camera.collect): same near-focus collapse."""
+        key = jax.random.key(0)
+        tel, cam = make_simple_telescope(n_samples=4096, key=key)
+        tel_obs = tel.add_obstruction(self._near_focus_sphere())
+
+        sources = jnp.array([[0.0, 0.0, -1.0]])
+        values = jnp.array([1.0])
+
+        pe_clear, _, _, _ = cam.collect(
+            tel.render(sources, values, source_type='parallel'))
+        pe_obs, _, _, _ = cam.collect(
+            tel_obs.render(sources, values, source_type='parallel'))
+
+        flux_clear = jnp.sum(pe_clear)
+        flux_obs = jnp.sum(pe_obs)
+        assert flux_clear > 0
+        assert flux_obs < 0.2 * flux_clear
+
+    def test_blocks_converging_cone_in_trace(self):
+        """Trace path (Telescope.trace): collimated rays reflected into the
+        converging cone are shadowed on the final leg."""
+        key = jax.random.key(0)
+        tel, cam = make_simple_telescope(key=key)
+        tel_obs = tel.add_obstruction(self._near_focus_sphere())
+
+        # Collimated on-axis rays filling the aperture, heading -z onto the
+        # mirror; they reflect into the cone converging toward the focus.
+        r = jnp.linspace(0.0, 0.099, 64)
+        origins = jnp.stack([r, jnp.zeros_like(r), jnp.ones_like(r)], axis=1)
+        directions = jnp.broadcast_to(jnp.array([0.0, 0.0, -1.0]), origins.shape)
+        values = jnp.ones(r.shape[0])
+
+        flux_clear = jnp.sum(tel.trace(origins, directions, values).values)
+        flux_obs = jnp.sum(tel_obs.trace(origins, directions, values).values)
+
+        assert flux_clear > 0
+        assert flux_obs < 0.2 * flux_clear

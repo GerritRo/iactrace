@@ -2,6 +2,7 @@ import jax
 import jax.numpy as jnp
 import jax.random as jr
 
+from .intersections import intersect_plane
 from .ray_bundle import RayBundle
 from .transforms import euler_to_matrix
 
@@ -23,6 +24,29 @@ def _shadow_mask(origins, directions, obstructions, max_t=1e10):
         t = jax.vmap(g.intersect)(origins, directions)
         mask = mask * jnp.where(t < max_t, 0.0, 1.0)
     return mask
+
+def apply_final_leg_shadow(rb, obstruction_groups, camera_position, camera_rotation):
+    """Shadow the converging beam on the final last-optic -> focal-plane leg.
+    ``rb`` must be a world-frame bundle as produced by the render, i.e.
+    *before* :meth:`RayBundle.to_frame`: its ``origins`` lie on the last
+    optic and its ``directions`` point toward the focal plane. Only
+    ``values`` is modified, so the leg's contribution to ``path_length`` is
+    still added later by the sensor intersection.
+    """
+    if not obstruction_groups:
+        return rb
+    rot = euler_to_matrix(camera_rotation)
+    _, t_focal = jax.vmap(intersect_plane, in_axes=(0, 0, None, None))(
+        rb.origins, rb.directions, camera_position, rot,
+    )
+    shadow = _shadow_mask(rb.origins, rb.directions, obstruction_groups, t_focal)
+    return RayBundle(
+        origins=rb.origins,
+        directions=rb.directions,
+        values=rb.values * shadow,
+        path_length=rb.path_length,
+        n=rb.n,
+    )
 
 
 def _trace_stage(origins, directions, values, current_n, group, obstructions):

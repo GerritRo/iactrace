@@ -63,6 +63,26 @@ class RayBundle(eqx.Module):
             n=self.n,
         )
 
+    def to_camera_frame(
+        self,
+        obstruction_groups: list,
+        camera_position: Array,
+        camera_rotation: Array,
+    ) -> RayBundle:
+        """Finalise world-frame render output for the camera (the handoff).
+
+        Also applys shadowing for the final leg from last optical stage to
+        focal plane.
+
+        ``self`` must be a world-frame bundle whose ``origins`` lie on the
+        last optic and whose ``directions`` point toward the focal plane.
+        """
+        from .render import apply_final_leg_shadow
+        shadowed = apply_final_leg_shadow(
+            self, obstruction_groups, camera_position, camera_rotation,
+        )
+        return shadowed.to_frame(camera_position, camera_rotation)
+
 
 class LazyRayBundle(eqx.Module):
     """A :class:`RayBundle` described by a render that hasn't run yet.
@@ -99,9 +119,11 @@ class LazyRayBundle(eqx.Module):
         """
         from .render import render_optics_accumulate
         origin, rotation = self.camera_position, self.camera_rotation
+        obstructions = self.obstruction_groups
 
         def in_local_frame(carry, rb_world):
-            return accumulator(carry, rb_world.to_frame(origin, rotation))
+            rb_local = rb_world.to_camera_frame(obstructions, origin, rotation)
+            return accumulator(carry, rb_local)
 
         return render_optics_accumulate(
             self.optical_groups, self.obstruction_groups,
@@ -116,4 +138,6 @@ class LazyRayBundle(eqx.Module):
             self.optical_groups, self.obstruction_groups,
             self.sources, self.source_values, self.source_type,
         )
-        return rb_world.to_frame(self.camera_position, self.camera_rotation)
+        return rb_world.to_camera_frame(
+            self.obstruction_groups, self.camera_position, self.camera_rotation,
+        )

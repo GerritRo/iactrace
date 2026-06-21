@@ -145,7 +145,9 @@ class Telescope(eqx.Module):
             self.optical_groups, self.obstruction_groups,
             ray_origins, ray_directions, values,
         )
-        return rb.to_frame(self.camera_position, self.camera_rotation)
+        return rb.to_camera_frame(
+            self.obstruction_groups, self.camera_position, self.camera_rotation,
+        )
 
     @classmethod
     def from_yaml(
