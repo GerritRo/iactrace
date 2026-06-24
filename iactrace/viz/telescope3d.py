@@ -32,6 +32,10 @@ def show_telescope(telescope, camera=None, **kwargs):
     In Jupyter notebooks, displays interactive 3D view via three.js (client-side).
     No server-side OpenGL required.
 
+    When a ``camera`` is supplied, each sensor is drawn as a filled face plus a
+    black wireframe of its pixel grid (square cells or hexagons), so the
+    physical pixel layout can be checked against the rest of the optics.
+
     Args:
         telescope: Telescope object
         camera: Optional Camera object (for rendering sensors)
@@ -40,6 +44,9 @@ def show_telescope(telescope, camera=None, **kwargs):
             - obstruction_color: RGBA color for obstructions (default: gray)
             - sensor_color: RGBA color for sensors (default: red)
             - lens_color: RGBA color for lenses (default: light green, semi-transparent)
+            - show_sensor_grid: Draw per-pixel grid lines for each sensor
+              (default: True; only has an effect when ``camera`` is given)
+            - sensor_grid_color: RGBA color for the pixel grid (default: black)
 
     Returns:
         trimesh.Scene
@@ -48,6 +55,8 @@ def show_telescope(telescope, camera=None, **kwargs):
     obstruction_color = kwargs.get('obstruction_color', [128, 128, 128, 255])
     sensor_color = kwargs.get('sensor_color', [255, 0, 0, 128])
     lens_color = kwargs.get('lens_color', [144, 238, 144, 150])  # Light green, semi-transparent
+    show_sensor_grid = kwargs.get('show_sensor_grid', True)
+    sensor_grid_color = kwargs.get('sensor_grid_color', [0, 0, 0, 255])  # Black pixel grid
 
     scene = trimesh.Scene()
 
@@ -86,6 +95,11 @@ def show_telescope(telescope, camera=None, **kwargs):
                 mesh.apply_transform(cam_transform)
                 _apply_color(mesh, sensor_color)
                 scene.add_geometry(mesh)
+
+            if show_sensor_grid:
+                for path in _get_sensor_grid_paths(sensor_group, sensor_grid_color):
+                    path.apply_transform(cam_transform)
+                    scene.add_geometry(path)
 
     return scene
 
@@ -337,6 +351,84 @@ def _get_sensor_meshes(sensor_group):
                     meshes.append(mesh)
 
     return meshes
+
+
+def _sensor_grid_segments_2d(sensor_group):
+    """Pixel-boundary line segments for one sensor, in the sensor-local frame.
+
+    Returns an ``(S, 2, 2)`` array of ``S`` segments (each a start/end 2D
+    point) tracing the pixel grid, or ``None`` for an unsupported group.
+    Square groups yield the full set of grid lines; hexagonal groups yield
+    each pixel's six-edge outline (interior edges are drawn twice, which is
+    fine for a wireframe overlay). The conventions match the filled pixel
+    polygons in :func:`iactrace.viz.plotting.show_camera`.
+    """
+    from ..camera import HexagonalSensorGroup, SquareSensorGroup
+
+    if isinstance(sensor_group, SquareSensorGroup):
+        w, h = sensor_group.width, sensor_group.height
+        xs = sensor_group.x0 + np.arange(w + 1) * sensor_group.dx
+        ys = sensor_group.y0 + np.arange(h + 1) * sensor_group.dy
+        verticals = np.stack([
+            np.column_stack([xs, np.full(w + 1, ys[0])]),
+            np.column_stack([xs, np.full(w + 1, ys[-1])]),
+        ], axis=1)                                              # (w+1, 2, 2)
+        horizontals = np.stack([
+            np.column_stack([np.full(h + 1, xs[0]), ys]),
+            np.column_stack([np.full(h + 1, xs[-1]), ys]),
+        ], axis=1)                                             # (h+1, 2, 2)
+        return np.concatenate([verticals, horizontals], axis=0)
+
+    if isinstance(sensor_group, HexagonalSensorGroup):
+        centers = np.asarray(sensor_group.hex_centers)
+        s = sensor_group.hex_size
+        angles = np.deg2rad(np.arange(30.0, 360.0, 60.0)) + sensor_group.grid_rotation
+        offsets = s * np.stack([np.cos(angles), np.sin(angles)], axis=-1)  # (6, 2)
+        corners = centers[:, None, :] + offsets[None, :, :]                # (n_pix, 6, 2)
+        nxt = np.roll(corners, -1, axis=1)
+        segments = np.stack([corners, nxt], axis=2)                        # (n_pix, 6, 2, 2)
+        return segments.reshape(-1, 2, 2)
+
+    return None
+
+
+def _get_sensor_grid_paths(sensor_group, color):
+    """Build pixel-grid wireframe paths for a sensor group (camera frame).
+
+    Returns one :class:`trimesh.path.Path3D` per sensor, drawing the pixel
+    boundaries as coloured line segments so the physical pixel layout can be
+    inspected alongside the filled sensor faces. The lines are nudged a hair
+    off the sensor plane so they never z-fight with the sensor mesh.
+    """
+    segments_2d = _sensor_grid_segments_2d(sensor_group)
+    if segments_2d is None or len(segments_2d) == 0:
+        return []
+
+    # Offset the wireframe by 0.1% of the sensor extent along the local +Z so
+    # it sits just in front of the filled face (negligible, avoids z-fighting).
+    lift = 1e-3 * float(np.ptp(segments_2d.reshape(-1, 2), axis=0).max())
+
+    n_seg = len(segments_2d)
+    local = np.zeros((n_seg, 2, 3))
+    local[:, :, :2] = segments_2d
+    local[:, :, 2] = lift
+
+    positions = np.asarray(sensor_group.positions)
+    rotations = np.asarray(sensor_group.rotations)
+    colors = np.tile(np.asarray(color, dtype=np.uint8), (n_seg, 1))
+
+    paths = []
+    for i in range(len(sensor_group)):
+        rot = np.asarray(euler_to_matrix(rotations[i]))
+        world = local @ rot.T + positions[i]
+        path = trimesh.path.Path3D(
+            entities=[trimesh.path.entities.Line([2 * k, 2 * k + 1])
+                      for k in range(n_seg)],
+            vertices=world.reshape(-1, 3),
+        )
+        path.colors = colors
+        paths.append(path)
+    return paths
 
 
 def _pixel_outline_2d(sensor_group):
