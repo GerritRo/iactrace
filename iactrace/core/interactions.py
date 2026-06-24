@@ -113,6 +113,7 @@ def refract_slab(direction, normal, position, n_out, n_in, thickness):
 
 class InteractionType(enum.Enum):
     """Type of optical interaction at a surface."""
+
     REFLECT = "reflect"
     REFRACT = "refract"
     SLAB = "slab"
@@ -230,7 +231,10 @@ class RefractInteraction(Interaction):
         n_in = self.n_inside[element_idx]
 
         refracted, cos_i, tir = jax.vmap(refract)(
-            directions, normals, current_n, n_in,
+            directions,
+            normals,
+            current_n,
+            n_in,
         )
 
         if self.transmittance is None:
@@ -294,7 +298,12 @@ class SlabInteraction(Interaction):
 
         exit_dir, exit_pos, cos_i, valid, path_length = jax.vmap(
             lambda d, n, pos, n_amb, ni, th: refract_slab(
-                d, n, pos, n_amb, ni, th,
+                d,
+                n,
+                pos,
+                n_amb,
+                ni,
+                th,
             )
         )(directions, normals, points, current_n, n_in, thick)
 

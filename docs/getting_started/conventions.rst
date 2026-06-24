@@ -13,8 +13,8 @@ pointed towards magnetic north and then up to the zenith.
 
 - **Z-axis** along the optical axis, pointing from the primary mirror
   toward the sky (positive Z is "up", toward incoming light).
-- **X-axis** along the north-south axis
-- **Y-axis** along the west-east axis
+- **X-axis** along the north-south axis (positive x towards north -- meaning down to the ground in normal operation)
+- **Y-axis** along the west-east axis (positive y towards west -- meaning looking at the mirrors from the camera y points towards the right)
 
 The origin is conventionally at the centre of the primary-mirror dish.
 After optics tracing, rays are expressed in the **camera-local frame**

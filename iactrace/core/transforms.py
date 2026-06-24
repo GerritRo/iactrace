@@ -18,23 +18,11 @@ def euler_to_matrix(tip_tilt_rotation):
     rx, ry, rz = jnp.radians(jnp.array([tip, tilt, rotation]))
 
     # Rotation matrices
-    Rx = jnp.array([
-        [1, 0, 0],
-        [0, jnp.cos(rx), -jnp.sin(rx)],
-        [0, jnp.sin(rx), jnp.cos(rx)]
-    ])
+    Rx = jnp.array([[1, 0, 0], [0, jnp.cos(rx), -jnp.sin(rx)], [0, jnp.sin(rx), jnp.cos(rx)]])
 
-    Ry = jnp.array([
-        [jnp.cos(ry), 0, jnp.sin(ry)],
-        [0, 1, 0],
-        [-jnp.sin(ry), 0, jnp.cos(ry)]
-    ])
+    Ry = jnp.array([[jnp.cos(ry), 0, jnp.sin(ry)], [0, 1, 0], [-jnp.sin(ry), 0, jnp.cos(ry)]])
 
-    Rz = jnp.array([
-        [jnp.cos(rz), -jnp.sin(rz), 0],
-        [jnp.sin(rz), jnp.cos(rz), 0],
-        [0, 0, 1]
-    ])
+    Rz = jnp.array([[jnp.cos(rz), -jnp.sin(rz), 0], [jnp.sin(rz), jnp.cos(rz), 0], [0, 0, 1]])
 
     # Apply: Rz * Ry * Rx (extrinsic order)
     return Rz @ Ry @ Rx
@@ -72,9 +60,7 @@ def transform_to_world(aperture_samples, surface, aperture_data, positions, rota
 
     def compute_and_transform_single(xy, surf_single, ap_data, position, rotation):
         x, y = xy[..., 0], xy[..., 1]
-        points, normals = jax.vmap(
-            lambda xi, yi: sag_normal_method(surf_single, xi, yi)
-        )(x, y)
+        points, normals = jax.vmap(lambda xi, yi: sag_normal_method(surf_single, xi, yi))(x, y)
 
         # Compute weights: cos(angle to z-axis) / area * n_samples
         cos_z = jnp.sum(normals * jnp.array([0.0, 0.0, 1.0]), axis=-1, keepdims=True)
@@ -84,11 +70,15 @@ def transform_to_world(aperture_samples, surface, aperture_data, positions, rota
 
         # Transform to world coordinates
         rot = euler_to_matrix(rotation)
-        points_world = jnp.einsum('ij,nj->ni', rot, points) + position
-        normals_world = jnp.einsum('ij,nj->ni', rot, normals)
+        points_world = jnp.einsum("ij,nj->ni", rot, points) + position
+        normals_world = jnp.einsum("ij,nj->ni", rot, normals)
 
         return points_world, normals_world, weights
 
     return jax.vmap(compute_and_transform_single)(
-        aperture_samples, surface, aperture_data, positions, rotations,
+        aperture_samples,
+        surface,
+        aperture_data,
+        positions,
+        rotations,
     )

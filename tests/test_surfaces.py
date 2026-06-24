@@ -60,12 +60,7 @@ class TestSurfaceSag:
         r = 0.7
         coeffs = jnp.array([1.1, -2.3, 3.7, -4.2])  # r^4, r^6, r^8, r^10
         z_computed = sag_raw(r, 0.0, curvature=0.0, conic=0.0, aspheric=coeffs)
-        z_expected = (
-            coeffs[0] * r**4
-            + coeffs[1] * r**6
-            + coeffs[2] * r**8
-            + coeffs[3] * r**10
-        )
+        z_expected = coeffs[0] * r**4 + coeffs[1] * r**6 + coeffs[2] * r**8 + coeffs[3] * r**10
         assert jnp.allclose(z_computed, z_expected, atol=1e-12)
 
     def test_offset_sag_equals_zero_at_offset_point(self):
@@ -212,6 +207,7 @@ class TestConicIntersection:
         t = intersect_conic(jnp.array([0.0, 0.0, 25.0]), jnp.array([0.0, 0.0, 1.0]), 0.1, 0.0)
         assert jnp.isinf(t)
 
+
 class TestNewtonRaphsonIntersect:
     """Test Newton-Raphson ray-surface intersection for z = sag(x, y)."""
 
@@ -227,8 +223,10 @@ class TestNewtonRaphsonIntersect:
 
     def test_flat_plane(self):
         """Flat plane z=0 intersection."""
+
         def sag_fn(x, y):
             return 0.0
+
         origin = jnp.array([3.0, 4.0, 10.0])
         direction = jnp.array([0.0, 0.0, -1.0])
         t, hit_xy, valid = newton_raphson_intersect(sag_fn, origin, direction)
@@ -295,8 +293,10 @@ class TestNewtonRaphsonIntersect:
 
     def test_ray_parallel_misses(self):
         """Ray parallel to flat surface misses."""
+
         def sag_fn(x, y):
             return 0.0
+
         origin = jnp.array([0.0, 0.0, 5.0])
         direction = jnp.array([1.0, 0.0, 0.0])
         t, hit_xy, valid = newton_raphson_intersect(sag_fn, origin, direction)
@@ -304,8 +304,10 @@ class TestNewtonRaphsonIntersect:
 
     def test_ray_pointing_away_misses(self):
         """Ray pointing away from surface misses."""
+
         def sag_fn(x, y):
             return 0.0
+
         origin = jnp.array([0.0, 0.0, 5.0])
         direction = jnp.array([0.0, 0.0, 1.0])
         t, hit_xy, valid = newton_raphson_intersect(sag_fn, origin, direction)
@@ -313,8 +315,10 @@ class TestNewtonRaphsonIntersect:
 
     def test_ray_behind_surface_misses(self):
         """Ray starting behind surface going away misses."""
+
         def sag_fn(x, y):
             return 0.0
+
         origin = jnp.array([0.0, 0.0, -5.0])
         direction = jnp.array([0.0, 0.0, -1.0])
         t, hit_xy, valid = newton_raphson_intersect(sag_fn, origin, direction)
@@ -323,6 +327,7 @@ class TestNewtonRaphsonIntersect:
 
     def test_large_distances(self):
         """Works at large distances."""
+
         def sag_fn(x, y):
             return 0.0
 
@@ -360,6 +365,7 @@ class TestNewtonRaphsonIntersect:
 
     def test_t_is_positive(self):
         """Valid intersection has positive t."""
+
         def sag_fn(x, y):
             return 0.0
 
@@ -371,6 +377,7 @@ class TestNewtonRaphsonIntersect:
 
     def test_hit_xy_matches_ray(self):
         """hit_xy matches ray position at t."""
+
         def sag_fn(x, y):
             return 0.05 * (x**2 + y**2)
 

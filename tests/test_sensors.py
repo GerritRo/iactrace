@@ -26,7 +26,8 @@ class TestSquareSensor:
         sensor = SquareSensorGroup(
             positions=[[0.0, 0.0, 1.0]],
             rotations=[[0.0, 0.0, 0.0]],
-            width=10, height=10,
+            width=10,
+            height=10,
             bounds=(-1.0, 1.0, -1.0, 1.0),
         )
 
@@ -45,7 +46,8 @@ class TestSquareSensor:
         sensor = SquareSensorGroup(
             positions=[[0.0, 0.0, 1.0]],
             rotations=[[0.0, 0.0, 0.0]],
-            width=10, height=10,
+            width=10,
+            height=10,
             bounds=(-1.0, 1.0, -1.0, 1.0),
         )
 
@@ -63,7 +65,8 @@ class TestSquareSensor:
         sensor = SquareSensorGroup(
             positions=[[0.0, 0.0, 1.0]],
             rotations=[[0.0, 0.0, 0.0]],
-            width=10, height=10,
+            width=10,
+            height=10,
             bounds=(-1.0, 1.0, -1.0, 1.0),
         )
 
@@ -128,7 +131,8 @@ class TestEdgeExclusion:
         sensor = SquareSensorGroup(
             positions=[[0.0, 0.0, 1.0]],
             rotations=[[0.0, 0.0, 0.0]],
-            width=10, height=10,
+            width=10,
+            height=10,
             bounds=(-1.0, 1.0, -1.0, 1.0),
             edge_width=0.05,
         )
@@ -153,7 +157,8 @@ class TestMultiSensor:
         sensor = SquareSensorGroup(
             positions=[[0.0, 0.0, 1.0], [0.0, 0.0, 2.0], [0.0, 0.0, 3.0]],
             rotations=[[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]],
-            width=10, height=10,
+            width=10,
+            height=10,
             bounds=(-1.0, 1.0, -1.0, 1.0),
         )
 
@@ -273,7 +278,9 @@ class TestValidation:
             SquareSensorGroup(
                 positions=[[0.0, 0.0]],  # (1, 2), not (1, 3)
                 rotations=[[0.0, 0.0, 0.0]],
-                width=4, height=4, bounds=(-1.0, 1.0, -1.0, 1.0),
+                width=4,
+                height=4,
+                bounds=(-1.0, 1.0, -1.0, 1.0),
             )
 
     def test_square_rejects_mismatched_n(self):
@@ -281,49 +288,63 @@ class TestValidation:
             SquareSensorGroup(
                 positions=[[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]],
                 rotations=[[0.0, 0.0, 0.0]],
-                width=4, height=4, bounds=(-1.0, 1.0, -1.0, 1.0),
+                width=4,
+                height=4,
+                bounds=(-1.0, 1.0, -1.0, 1.0),
             )
 
     def test_square_rejects_nonpositive_dims(self):
         with pytest.raises(ValueError, match="width and height"):
             SquareSensorGroup(
-                positions=[[0.0, 0.0, 0.0]], rotations=[[0.0, 0.0, 0.0]],
-                width=0, height=4, bounds=(-1.0, 1.0, -1.0, 1.0),
+                positions=[[0.0, 0.0, 0.0]],
+                rotations=[[0.0, 0.0, 0.0]],
+                width=0,
+                height=4,
+                bounds=(-1.0, 1.0, -1.0, 1.0),
             )
 
     def test_square_rejects_degenerate_bounds(self):
         with pytest.raises(ValueError, match="bounds"):
             SquareSensorGroup(
-                positions=[[0.0, 0.0, 0.0]], rotations=[[0.0, 0.0, 0.0]],
-                width=4, height=4, bounds=(1.0, 1.0, -1.0, 1.0),
+                positions=[[0.0, 0.0, 0.0]],
+                rotations=[[0.0, 0.0, 0.0]],
+                width=4,
+                height=4,
+                bounds=(1.0, 1.0, -1.0, 1.0),
             )
 
     def test_square_rejects_negative_edge_width(self):
         with pytest.raises(ValueError, match="edge_width"):
             SquareSensorGroup(
-                positions=[[0.0, 0.0, 0.0]], rotations=[[0.0, 0.0, 0.0]],
-                width=4, height=4, bounds=(-1.0, 1.0, -1.0, 1.0),
+                positions=[[0.0, 0.0, 0.0]],
+                rotations=[[0.0, 0.0, 0.0]],
+                width=4,
+                height=4,
+                bounds=(-1.0, 1.0, -1.0, 1.0),
                 edge_width=-0.1,
             )
 
     def test_hex_rejects_empty_centers(self):
         with pytest.raises(ValueError, match="hex_centers"):
             HexagonalSensorGroup(
-                positions=[[0.0, 0.0, 0.0]], rotations=[[0.0, 0.0, 0.0]],
+                positions=[[0.0, 0.0, 0.0]],
+                rotations=[[0.0, 0.0, 0.0]],
                 hex_centers=jnp.zeros((0, 2)),
             )
 
     def test_hex_rejects_bad_centers_shape(self):
         with pytest.raises(ValueError, match="hex_centers"):
             HexagonalSensorGroup(
-                positions=[[0.0, 0.0, 0.0]], rotations=[[0.0, 0.0, 0.0]],
+                positions=[[0.0, 0.0, 0.0]],
+                rotations=[[0.0, 0.0, 0.0]],
                 hex_centers=[[0.0, 0.0, 0.0]],  # (1, 3), not (M, 2)
             )
 
     def test_hex_accepts_valid_centers(self):
         centers = make_hex_centers(n_rings=1, hex_size=0.01)
         sensor = HexagonalSensorGroup(
-            positions=[[0.0, 0.0, 0.0]], rotations=[[0.0, 0.0, 0.0]],
+            positions=[[0.0, 0.0, 0.0]],
+            rotations=[[0.0, 0.0, 0.0]],
             hex_centers=centers,
         )
         assert sensor.n_pixels == len(centers)

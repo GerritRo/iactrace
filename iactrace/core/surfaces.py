@@ -58,8 +58,7 @@ class SurfaceGroup(eqx.Module):
         ...
 
     @abstractmethod
-    def intersect_at(self, element_idx, ray_origin, ray_direction,
-                     max_iter=10, tol=1e-8):
+    def intersect_at(self, element_idx, ray_origin, ray_direction, max_iter=10, tol=1e-8):
         """Intersect a ray with a single element's surface.
 
         Used by the render pipeline for per-ray intersection.
@@ -102,7 +101,7 @@ def sag_raw(x, y, curvature, conic, aspheric):
 
     if aspheric.size > 0:
         powers = jnp.arange(2, 2 + len(aspheric))
-        z = z + jnp.sum(aspheric * r2 ** powers)
+        z = z + jnp.sum(aspheric * r2**powers)
 
     return z
 
@@ -172,9 +171,9 @@ class AsphericSurfaceGroup(SurfaceGroup):
         offsets: Per-element surface offsets (N, 2)
     """
 
-    curvatures: jax.Array   # (N,)
-    conics: jax.Array        # (N,)
-    aspherics: jax.Array     # (N, K)
+    curvatures: jax.Array  # (N,)
+    conics: jax.Array  # (N,)
+    aspherics: jax.Array  # (N, K)
 
     def compute_sag_and_normal_at(self, x, y):
         return compute_sag_and_normal(
@@ -183,13 +182,15 @@ class AsphericSurfaceGroup(SurfaceGroup):
 
     def sag_at(self, element_idx, x, y):
         return sag(
-            x, y, self.offsets[element_idx],
-            self.curvatures[element_idx], self.conics[element_idx],
+            x,
+            y,
+            self.offsets[element_idx],
+            self.curvatures[element_idx],
+            self.conics[element_idx],
             self.aspherics[element_idx],
         )
 
-    def intersect_at(self, element_idx, ray_origin, ray_direction,
-                     max_iter=10, tol=1e-8):
+    def intersect_at(self, element_idx, ray_origin, ray_direction, max_iter=10, tol=1e-8):
         c = self.curvatures[element_idx]
         k = self.conics[element_idx]
         a = self.aspherics[element_idx]
@@ -204,10 +205,19 @@ class AsphericSurfaceGroup(SurfaceGroup):
         # Refine with Newton-Raphson in the offset frame
         t, hit_xy, _ = newton_raphson_intersect(
             lambda x, y: sag(x, y, offset, c, k, a),
-            ray_origin, ray_direction, t_init, max_iter, tol,
+            ray_origin,
+            ray_direction,
+            t_init,
+            max_iter,
+            tol,
         )
 
         point, normal = compute_sag_and_normal(
-            hit_xy[0], hit_xy[1], offset, c, k, a,
+            hit_xy[0],
+            hit_xy[1],
+            offset,
+            c,
+            k,
+            a,
         )
         return t, point, normal

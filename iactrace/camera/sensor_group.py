@@ -62,9 +62,7 @@ def _as_nx3(value: Sequence[Sequence[float]] | Array, name: str) -> Array:
     if arr.ndim == 1:
         arr = arr[None, :]
     if arr.ndim != 2 or arr.shape[1] != 3:
-        raise ValueError(
-            f"{name} must have shape (N, 3) or (3,), got {tuple(arr.shape)}"
-        )
+        raise ValueError(f"{name} must have shape (N, 3) or (3,), got {tuple(arr.shape)}")
     return arr
 
 
@@ -106,9 +104,7 @@ class SensorGroup(eqx.Module):
         raise NotImplementedError
 
     @abstractmethod
-    def pixel_index_and_mask(
-        self, sensor_idx: Array, x: Array, y: Array
-    ) -> tuple[Array, Array]:
+    def pixel_index_and_mask(self, sensor_idx: Array, x: Array, y: Array) -> tuple[Array, Array]:
         """Localize ``(x, y)`` to a flat pixel index plus a validity mask.
 
         The single source of truth shared by :meth:`accumulate` (image path)
@@ -120,16 +116,12 @@ class SensorGroup(eqx.Module):
         raise NotImplementedError
 
     @abstractmethod
-    def accumulate(
-        self, sensor_idx: Array, x: Array, y: Array, values: Array
-    ) -> Array:
+    def accumulate(self, sensor_idx: Array, x: Array, y: Array, values: Array) -> Array:
         """Accumulate values at given positions into pixels across all sensors."""
         raise NotImplementedError
 
     @abstractmethod
-    def assign_pixels(
-        self, sensor_idx: Array, x: Array, y: Array
-    ) -> Array:
+    def assign_pixels(self, sensor_idx: Array, x: Array, y: Array) -> Array:
         """Assign each ray to a pixel index.
 
         Args:
@@ -154,9 +146,7 @@ class SensorGroup(eqx.Module):
         raise NotImplementedError
 
     @abstractmethod
-    def to_pixel_frame(
-        self, sensor_rays: RayBundle, sensor_idx: Array
-    ) -> RayBundle:
+    def to_pixel_frame(self, sensor_rays: RayBundle, sensor_idx: Array) -> RayBundle:
         """Re-express tile-local rays in their assigned pixel's local frame.
 
         A pure isometry: each ray's origin is shifted to the centre of the
@@ -245,9 +235,7 @@ class SquareSensorGroup(SensorGroup):
             raise ValueError(f"edge_width must be >= 0, got {edge_width}")
         xmin, xmax, ymin, ymax = bounds
         if not (xmin < xmax and ymin < ymax):
-            raise ValueError(
-                f"bounds must satisfy x_min < x_max and y_min < y_max, got {bounds}"
-            )
+            raise ValueError(f"bounds must satisfy x_min < x_max and y_min < y_max, got {bounds}")
 
         self.width = int(width)
         self.height = int(height)
@@ -268,9 +256,7 @@ class SquareSensorGroup(SensorGroup):
     def get_accumulator_shape(self) -> tuple[int, int]:
         return (self.height, self.width)
 
-    def pixel_index_and_mask(
-        self, sensor_idx: Array, x: Array, y: Array
-    ) -> tuple[Array, Array]:
+    def pixel_index_and_mask(self, sensor_idx: Array, x: Array, y: Array) -> tuple[Array, Array]:
         x_cont = (x - self.x0) / self.dx
         y_cont = (y - self.y0) / self.dy
 
@@ -286,19 +272,16 @@ class SquareSensorGroup(SensorGroup):
         flat_idx = sensor_idx * (self.height * self.width) + yi * self.width + xi
         return flat_idx, valid
 
-    def accumulate(
-        self, sensor_idx: Array, x: Array, y: Array, values: Array
-    ) -> Array:
+    def accumulate(self, sensor_idx: Array, x: Array, y: Array, values: Array) -> Array:
         flat_idx, valid = self.pixel_index_and_mask(sensor_idx, x, y)
         img_flat = jax.ops.segment_sum(
-            jnp.where(valid, values, 0.0), flat_idx,
+            jnp.where(valid, values, 0.0),
+            flat_idx,
             num_segments=self.n_sensors * self.height * self.width,
         )
         return img_flat.reshape(self.n_sensors, self.height, self.width)
 
-    def assign_pixels(
-        self, sensor_idx: Array, x: Array, y: Array
-    ) -> Array:
+    def assign_pixels(self, sensor_idx: Array, x: Array, y: Array) -> Array:
         return self.pixel_index_and_mask(sensor_idx, x, y)[0]
 
     def in_bounds(self, x: Array, y: Array) -> Array:
@@ -306,9 +289,7 @@ class SquareSensorGroup(SensorGroup):
         y_max = self.y0 + self.dy * self.height
         return (x >= self.x0) & (x <= x_max) & (y >= self.y0) & (y <= y_max)
 
-    def to_pixel_frame(
-        self, sensor_rays: RayBundle, sensor_idx: Array
-    ) -> RayBundle:
+    def to_pixel_frame(self, sensor_rays: RayBundle, sensor_idx: Array) -> RayBundle:
         x = sensor_rays.origins[:, 0]
         y = sensor_rays.origins[:, 1]
         xi = jnp.floor((x - self.x0) / self.dx)
@@ -417,9 +398,7 @@ class HexagonalSensorGroup(SensorGroup):
 
     def _to_grid_coords(self, x: Array, y: Array) -> tuple[Array, Array]:
         """Transform world coordinates to grid-aligned coordinates."""
-        return _rotate(
-            x - self.grid_offset[0], y - self.grid_offset[1], -self.grid_rotation
-        )
+        return _rotate(x - self.grid_offset[0], y - self.grid_offset[1], -self.grid_rotation)
 
     def _lookup_pixels(self, qi: Array, ri: Array) -> tuple[Array, Array]:
         """Look up pixel indices from axial coordinates, handling bounds."""
@@ -440,40 +419,31 @@ class HexagonalSensorGroup(SensorGroup):
         valid = in_bounds & (pixel_idx >= 0)
         return jnp.where(valid, pixel_idx, 0), valid
 
-    def pixel_index_and_mask(
-        self, sensor_idx: Array, x: Array, y: Array
-    ) -> tuple[Array, Array]:
+    def pixel_index_and_mask(self, sensor_idx: Array, x: Array, y: Array) -> tuple[Array, Array]:
         x_grid, y_grid = self._to_grid_coords(x, y)
         q, r = _cartesian_to_axial(x_grid, y_grid, self.hex_size)
         qi, ri = _axial_round(q, r)
 
-        pixel_idx, valid = self._lookup_pixels(
-            qi.astype(jnp.int32), ri.astype(jnp.int32)
-        )
+        pixel_idx, valid = self._lookup_pixels(qi.astype(jnp.int32), ri.astype(jnp.int32))
 
         hex_center_x, hex_center_y = _axial_to_cartesian(qi, ri, self.hex_size)
-        hex_dist = _hex_norm(
-            x_grid - hex_center_x, y_grid - hex_center_y, self.hex_inradius
-        )
+        hex_dist = _hex_norm(x_grid - hex_center_x, y_grid - hex_center_y, self.hex_inradius)
         edge_threshold = 1.0 - self.edge_width / self.hex_inradius
         valid = valid & (hex_dist <= edge_threshold)
 
         flat_idx = sensor_idx * self.n_pixels + pixel_idx
         return flat_idx, valid
 
-    def accumulate(
-        self, sensor_idx: Array, x: Array, y: Array, values: Array
-    ) -> Array:
+    def accumulate(self, sensor_idx: Array, x: Array, y: Array, values: Array) -> Array:
         flat_idx, valid = self.pixel_index_and_mask(sensor_idx, x, y)
         result = jax.ops.segment_sum(
-            jnp.where(valid, values, 0.0), flat_idx,
+            jnp.where(valid, values, 0.0),
+            flat_idx,
             num_segments=self.n_sensors * self.n_pixels,
         )
         return result.reshape(self.n_sensors, self.n_pixels)
 
-    def assign_pixels(
-        self, sensor_idx: Array, x: Array, y: Array
-    ) -> Array:
+    def assign_pixels(self, sensor_idx: Array, x: Array, y: Array) -> Array:
         return self.pixel_index_and_mask(sensor_idx, x, y)[0]
 
     def in_bounds(self, x: Array, y: Array) -> Array:
@@ -483,9 +453,7 @@ class HexagonalSensorGroup(SensorGroup):
         _, valid = self._lookup_pixels(qi.astype(jnp.int32), ri.astype(jnp.int32))
         return valid
 
-    def to_pixel_frame(
-        self, sensor_rays: RayBundle, sensor_idx: Array
-    ) -> RayBundle:
+    def to_pixel_frame(self, sensor_rays: RayBundle, sensor_idx: Array) -> RayBundle:
         x = sensor_rays.origins[:, 0]
         y = sensor_rays.origins[:, 1]
         # Work in the grid-aligned frame: subtract the assigned hex centre

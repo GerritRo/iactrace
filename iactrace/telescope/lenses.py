@@ -34,6 +34,7 @@ def _as_aspheric_row(coeffs: Sequence[float] | None) -> Array:
 
 # Low-level canonical builders
 
+
 def refractive_group(
     *,
     positions: Array,
@@ -183,6 +184,7 @@ def slab_group(
 
 
 # High-level sugar: single-element factories
+
 
 def _single_disk_refractive(
     *,

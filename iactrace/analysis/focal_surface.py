@@ -69,7 +69,9 @@ class FocalSurface(eqx.Module):
 
     @abstractmethod
     def _intersect_local(
-        self, o_local: Array, d_local: Array,
+        self,
+        o_local: Array,
+        d_local: Array,
     ) -> tuple[Array, Array, Array, Array]:
         """Intersect a single local-frame ray with the surface.
 
@@ -87,7 +89,8 @@ class FocalSurface(eqx.Module):
         raise NotImplementedError
 
     def intersect(
-        self, ray_bundle: RayBundle | LazyRayBundle,
+        self,
+        ray_bundle: RayBundle | LazyRayBundle,
     ) -> FocalSurfaceHits:
         """Intersect every ray in ``ray_bundle`` with this focal surface.
 
@@ -102,12 +105,15 @@ class FocalSurface(eqx.Module):
         d_local = ray_bundle.directions @ rot
 
         t, xy_local, z_local, valid = jax.vmap(self._intersect_local)(
-            o_local, d_local,
+            o_local,
+            d_local,
         )
         hit_mask = valid & jnp.isfinite(t)
 
         opl = ray_bundle.path_length + jnp.where(
-            hit_mask, t * ray_bundle.n, 0.0,
+            hit_mask,
+            t * ray_bundle.n,
+            0.0,
         )
         return FocalSurfaceHits(
             xy_local=xy_local,
@@ -116,7 +122,7 @@ class FocalSurface(eqx.Module):
             hit_mask=hit_mask,
             directions_local=d_local,
             opl=opl,
-            values=ray_bundle.values
+            values=ray_bundle.values,
         )
 
 
@@ -133,12 +139,8 @@ class FlatFocalPlane(FocalSurface):
         position: Array | None = None,
         rotation: Array | None = None,
     ) -> None:
-        self.position = (
-            jnp.zeros(3) if position is None else jnp.asarray(position, dtype=float)
-        )
-        self.rotation = (
-            jnp.zeros(3) if rotation is None else jnp.asarray(rotation, dtype=float)
-        )
+        self.position = jnp.zeros(3) if position is None else jnp.asarray(position, dtype=float)
+        self.rotation = jnp.zeros(3) if rotation is None else jnp.asarray(rotation, dtype=float)
 
     def _intersect_local(self, o_local, d_local):
         # In the local frame the plane is centred at the origin with the
@@ -180,18 +182,12 @@ class AsphericFocalSurface(FocalSurface):
         conic: float | Array = 0.0,
         aspherics: Array | None = None,
     ) -> None:
-        self.position = (
-            jnp.zeros(3) if position is None else jnp.asarray(position, dtype=float)
-        )
-        self.rotation = (
-            jnp.zeros(3) if rotation is None else jnp.asarray(rotation, dtype=float)
-        )
+        self.position = jnp.zeros(3) if position is None else jnp.asarray(position, dtype=float)
+        self.rotation = jnp.zeros(3) if rotation is None else jnp.asarray(rotation, dtype=float)
         self.curvature = jnp.asarray(curvature, dtype=float)
         self.conic = jnp.asarray(conic, dtype=float)
         self.aspherics = (
-            jnp.zeros((0,))
-            if aspherics is None
-            else jnp.asarray(aspherics, dtype=float)
+            jnp.zeros((0,)) if aspherics is None else jnp.asarray(aspherics, dtype=float)
         )
 
     def _intersect_local(self, o_local, d_local):
@@ -204,7 +200,9 @@ class AsphericFocalSurface(FocalSurface):
         t_init = intersect_conic(o_local, d_local, c, k)
         t, hit_xy, valid = newton_raphson_intersect(
             lambda x, y: sag_raw(x, y, c, k, a),
-            o_local, d_local, t_init,
+            o_local,
+            d_local,
+            t_init,
         )
         z = sag_raw(hit_xy[0], hit_xy[1], c, k, a)
         return t, hit_xy, z, valid

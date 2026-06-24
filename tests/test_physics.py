@@ -15,7 +15,7 @@ class TestRefract:
     def test_normal_incidence_no_deviation(self):
         """Ray normal to surface passes straight through."""
         direction = jnp.array([0.0, 0.0, -1.0])  # Pointing down
-        normal = jnp.array([0.0, 0.0, 1.0])      # Pointing up
+        normal = jnp.array([0.0, 0.0, 1.0])  # Pointing up
         n1, n2 = 1.0, 1.5
 
         refracted, cos_i, tir = refract(direction, normal, n1, n2)
@@ -115,7 +115,7 @@ class TestFresnelUnpolarized:
         n1, n2 = 1.0, 1.5
         R, T = fresnel_unpolarized(1.0, n1, n2)
 
-        R_expected = ((n1 - n2) / (n1 + n2))**2
+        R_expected = ((n1 - n2) / (n1 + n2)) ** 2
         assert jnp.isclose(R, R_expected, rtol=1e-6)
         assert jnp.isclose(R + T, 1.0, atol=1e-10)
 
@@ -174,7 +174,12 @@ class TestRefractSlab:
         thickness = 0.01
 
         exit_dir, exit_pos, cos_i, valid, path_length = refract_slab(
-            direction, normal, position, n_out, n_in, thickness,
+            direction,
+            normal,
+            position,
+            n_out,
+            n_in,
+            thickness,
         )
 
         assert jnp.allclose(exit_dir, direction, atol=1e-10)
@@ -196,7 +201,12 @@ class TestRefractSlab:
         thickness = 0.01
 
         exit_dir, _, cos_i, valid, path_length = refract_slab(
-            direction, normal, position, n_out, n_in, thickness,
+            direction,
+            normal,
+            position,
+            n_out,
+            n_in,
+            thickness,
         )
 
         assert jnp.allclose(exit_dir, direction, atol=1e-6)
@@ -215,13 +225,22 @@ class TestRefractSlab:
 
         _, pos_normal, *_ = refract_slab(
             jnp.array([0.0, 0.0, -1.0]),
-            normal, position, n_out, n_in, thickness,
+            normal,
+            position,
+            n_out,
+            n_in,
+            thickness,
         )
 
         theta_30 = jnp.deg2rad(30.0)
         dir_30 = jnp.array([jnp.sin(theta_30), 0.0, -jnp.cos(theta_30)])
         _, pos_30, *_ = refract_slab(
-            dir_30, normal, position, n_out, n_in, thickness,
+            dir_30,
+            normal,
+            position,
+            n_out,
+            n_in,
+            thickness,
         )
 
         assert jnp.abs(pos_30[0]) > jnp.abs(pos_normal[0]) + 1e-10
@@ -235,13 +254,18 @@ class TestRefractSlab:
         thickness = 0.01
 
         _, _, cos_i, valid, _ = refract_slab(
-            direction, normal, position, n_out, n_in, thickness,
+            direction,
+            normal,
+            position,
+            n_out,
+            n_in,
+            thickness,
         )
         _, T_face = fresnel_unpolarized(cos_i, n_out, n_in)
         transmittance = T_face * T_face
 
-        R_single = ((n_out - n_in) / (n_out + n_in))**2
-        T_expected = (1 - R_single)**2
+        R_single = ((n_out - n_in) / (n_out + n_in)) ** 2
+        T_expected = (1 - R_single) ** 2
 
         assert jnp.isclose(transmittance, T_expected, rtol=1e-4)
         assert valid
@@ -256,7 +280,12 @@ class TestRefractSlab:
         thickness = 0.01
 
         _, _, _, valid, _ = refract_slab(
-            direction, normal, position, n_out, n_in, thickness,
+            direction,
+            normal,
+            position,
+            n_out,
+            n_in,
+            thickness,
         )
         assert valid
 
@@ -269,10 +298,20 @@ class TestRefractSlab:
         n_out, n_in = 1.0, 1.5
 
         _, pos_thin, *_ = refract_slab(
-            direction, normal, position, n_out, n_in, thickness=0.01,
+            direction,
+            normal,
+            position,
+            n_out,
+            n_in,
+            thickness=0.01,
         )
         _, pos_thick, *_ = refract_slab(
-            direction, normal, position, n_out, n_in, thickness=0.02,
+            direction,
+            normal,
+            position,
+            n_out,
+            n_in,
+            thickness=0.02,
         )
 
         assert jnp.abs(pos_thick[0]) > jnp.abs(pos_thin[0])
@@ -286,7 +325,12 @@ class TestRefractSlab:
         thickness = 0.015
 
         _, exit_pos, *_ = refract_slab(
-            direction, normal, position, n_out, n_in, thickness,
+            direction,
+            normal,
+            position,
+            n_out,
+            n_in,
+            thickness,
         )
         assert jnp.isclose(exit_pos[2] - position[2], -thickness, atol=1e-10)
 

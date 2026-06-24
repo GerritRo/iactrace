@@ -219,7 +219,8 @@ def _resolve_surface(
 
 
 def _resolve_bsdf(
-    mirror: MirrorSchema, template: MirrorTemplateSchema,
+    mirror: MirrorSchema,
+    template: MirrorTemplateSchema,
 ) -> BSDFSchema | None:
     """Resolve the per-mirror BSDF schema (mirror overrides template).
 
@@ -232,26 +233,22 @@ def _resolve_bsdf(
 
 
 def _resolve_reflectivity(
-    mirror: MirrorSchema, template: MirrorTemplateSchema,
+    mirror: MirrorSchema,
+    template: MirrorTemplateSchema,
 ) -> tuple[float, TabulatedCurveSchema | None]:
     """Resolve (bulk_scalar, coating_curve) from mirror + template.
 
     Per-mirror scalar overrides the template scalar; the coating lives
     on the template only.
     """
-    template_scalar = (
-        template.reflectivity if template.reflectivity is not None else 1.0
-    )
-    scalar = (
-        mirror.reflectivity
-        if mirror.reflectivity is not None
-        else float(template_scalar)
-    )
+    template_scalar = template.reflectivity if template.reflectivity is not None else 1.0
+    scalar = mirror.reflectivity if mirror.reflectivity is not None else float(template_scalar)
     return float(scalar), template.coating
 
 
 def _curves_equal(
-    a: TabulatedCurveSchema, b: TabulatedCurveSchema,
+    a: TabulatedCurveSchema,
+    b: TabulatedCurveSchema,
 ) -> bool:
     """Structural equality of two tabulated curve schemas."""
     return a.angles_deg == b.angles_deg and a.values == b.values
@@ -323,9 +320,7 @@ def _coating_to_curve_schema(
         # coating (rows differ) cannot be represented; fail loudly rather
         # than silently serialising only element 0's row. Mirrors the
         # loader guard in _build_coating_for_bucket.
-        if value_rows.shape[0] > 1 and not np.allclose(
-            value_rows, value_rows[0]
-        ):
+        if value_rows.shape[0] > 1 and not np.allclose(value_rows, value_rows[0]):
             raise ValueError(
                 "Cannot serialise a per-element TabulatedCoating to YAML: "
                 "all elements in a group must share one curve. Split them "
@@ -334,9 +329,7 @@ def _coating_to_curve_schema(
         cos_table = np.asarray(coating.cos_table)
         values_row = value_rows[0]
         order = np.argsort(-cos_table)  # cos descending -> angles ascending
-        angles_deg = [
-            float(x) for x in np.degrees(np.arccos(cos_table[order]))
-        ]
+        angles_deg = [float(x) for x in np.degrees(np.arccos(cos_table[order]))]
         values = [float(x) for x in values_row[order]]
         return TabulatedCurveSchema(angles_deg=angles_deg, values=values)
     return None
@@ -391,19 +384,21 @@ def mirrors_from_schemas(
         bsdf = _resolve_bsdf(mirror, template)
         refl_scalar, coating_curve = _resolve_reflectivity(mirror, template)
 
-        parsed.append(_ParsedMirror(
-            position=mirror.position,
-            orientation=mirror.orientation,
-            curvature=curvature,
-            conic=conic,
-            aspheric=aspheric,
-            offset=mirror.offset,
-            stage=mirror.stage,
-            aperture=mirror.aperture,
-            bsdf=bsdf,
-            reflectivity_scalar=refl_scalar,
-            coating_curve=coating_curve,
-        ))
+        parsed.append(
+            _ParsedMirror(
+                position=mirror.position,
+                orientation=mirror.orientation,
+                curvature=curvature,
+                conic=conic,
+                aspheric=aspheric,
+                offset=mirror.offset,
+                stage=mirror.stage,
+                aperture=mirror.aperture,
+                bsdf=bsdf,
+                reflectivity_scalar=refl_scalar,
+                coating_curve=coating_curve,
+            )
+        )
 
     groups: list[OpticalElementGroup] = []
 
@@ -416,7 +411,9 @@ def mirrors_from_schemas(
         for bucket in _bucket_by_aperture_signature(stage_mirrors, lambda m: m.aperture):
             aperture = _aperture_from_schemas([m.aperture for m in bucket])
             key, subkey = jax.random.split(key)
-            groups.append(_build_mirror_group(bucket, aperture, stage, n_samples, sample_key=subkey))
+            groups.append(
+                _build_mirror_group(bucket, aperture, stage, n_samples, sample_key=subkey)
+            )
 
     return groups
 
@@ -450,20 +447,22 @@ def _build_bsdf_for_bucket(
 
     match present[0]:
         case GaussianBSDFSchema():
-            scale = jnp.asarray([
-                s.scale if isinstance(s, GaussianBSDFSchema) else 0.0
-                for s in schemas
-            ])
+            scale = jnp.asarray(
+                [s.scale if isinstance(s, GaussianBSDFSchema) else 0.0 for s in schemas]
+            )
             if bool(jnp.all(scale == 0)):
                 return None
             return GaussianBSDF(scale=scale)
         case DoubleGaussianBSDFSchema():
+
             def _col(attr: str) -> Array:
-                return jnp.asarray([
-                    getattr(s, attr)
-                    if isinstance(s, DoubleGaussianBSDFSchema) else 0.0
-                    for s in schemas
-                ])
+                return jnp.asarray(
+                    [
+                        getattr(s, attr) if isinstance(s, DoubleGaussianBSDFSchema) else 0.0
+                        for s in schemas
+                    ]
+                )
+
             return DoubleGaussianBSDF(
                 scale_narrow=_col("scale_narrow"),
                 scale_wide=_col("scale_wide"),
@@ -496,11 +495,10 @@ def _build_mirror_group(
 
     bsdf = _build_bsdf_for_bucket([m.bsdf for m in mirrors])
 
-    reflectivity_scalars = jnp.asarray(
-        [m.reflectivity_scalar for m in mirrors]
-    )
+    reflectivity_scalars = jnp.asarray([m.reflectivity_scalar for m in mirrors])
     coating = _build_coating_for_bucket(
-        [m.coating_curve for m in mirrors], n_elements,
+        [m.coating_curve for m in mirrors],
+        n_elements,
     )
     return mirror_group(
         positions=jnp.asarray([m.position for m in mirrors]),
@@ -540,7 +538,9 @@ def lenses_from_schemas(
                 plano_slabs.append(lens)
 
     groups: list[OpticalElementGroup] = []
-    key, groups = _build_lens_groups_by_stage(aspheric_disks, _build_aspheric_disk_lens_group, key, groups)
+    key, groups = _build_lens_groups_by_stage(
+        aspheric_disks, _build_aspheric_disk_lens_group, key, groups
+    )
     key, groups = _build_lens_groups_by_stage(plano_slabs, _build_plano_slab_group, key, groups)
     return groups
 
@@ -563,9 +563,9 @@ def _build_lens_groups_by_stage[L: AsphericDiskLensSchema | PlanoSlabSchema](
     return key, groups
 
 
-def _resolve_shared_n_outside[
-    L: AsphericDiskLensSchema | PlanoSlabSchema
-](lenses: list[L]) -> float:
+def _resolve_shared_n_outside[L: AsphericDiskLensSchema | PlanoSlabSchema](
+    lenses: list[L],
+) -> float:
     """Resolve the single ambient index shared by a lens bucket.
 
     A group stores one scalar ``n_outside`` for all its elements, so
@@ -601,7 +601,8 @@ def _build_aspheric_disk_lens_group(
 
     n = len(lenses)
     coating = _build_coating_for_bucket(
-        [lens.coating for lens in lenses], n,
+        [lens.coating for lens in lenses],
+        n,
     )
 
     return refractive_group(
@@ -636,7 +637,8 @@ def _build_plano_slab_group(
 
     n = len(lenses)
     coating = _build_coating_for_bucket(
-        [lens.coating for lens in lenses], n,
+        [lens.coating for lens in lenses],
+        n,
     )
 
     return slab_group(
@@ -865,17 +867,19 @@ def mirrors_to_schemas(
 
             template_name = surface_to_template[surface_key]
             scalar = float(interaction.reflectivity_scalar[i])
-            mirrors.append(MirrorSchema(
-                position=_to_float_list(group.positions[i]),
-                orientation=_to_float_list(group.rotations[i]),
-                aperture=_aperture_to_schema(group.aperture, i),
-                template=template_name,
-                stage=group.optical_stage,
-                offset=_to_float_list(group.surface.offsets[i]),
-                bsdf=_bsdf_to_schema(group.bsdf, i),
-                reflectivity=scalar if scalar != 1.0 else None,
-                id=f"M_{len(mirrors)}",
-            ))
+            mirrors.append(
+                MirrorSchema(
+                    position=_to_float_list(group.positions[i]),
+                    orientation=_to_float_list(group.rotations[i]),
+                    aperture=_aperture_to_schema(group.aperture, i),
+                    template=template_name,
+                    stage=group.optical_stage,
+                    offset=_to_float_list(group.surface.offsets[i]),
+                    bsdf=_bsdf_to_schema(group.bsdf, i),
+                    reflectivity=scalar if scalar != 1.0 else None,
+                    id=f"M_{len(mirrors)}",
+                )
+            )
 
     return templates, mirrors
 
@@ -1006,7 +1010,9 @@ def _extract_cylinder(group: CylinderGroup, i: int, counter: int) -> CylinderObs
     )
 
 
-def _extract_open_cylinder(group: OpenCylinderGroup, i: int, counter: int) -> OpenCylinderObstructionSchema:
+def _extract_open_cylinder(
+    group: OpenCylinderGroup, i: int, counter: int
+) -> OpenCylinderObstructionSchema:
     return OpenCylinderObstructionSchema(
         p1=_to_float_list(group.p1[i]),
         p2=_to_float_list(group.p2[i]),
@@ -1031,7 +1037,9 @@ def _extract_sphere(group: SphereGroup, i: int, counter: int) -> SphereObstructi
     )
 
 
-def _extract_oriented_box(group: OrientedBoxGroup, i: int, counter: int) -> OrientedBoxObstructionSchema:
+def _extract_oriented_box(
+    group: OrientedBoxGroup, i: int, counter: int
+) -> OrientedBoxObstructionSchema:
     rotation_matrix = np.asarray(group.rotations[i])
     euler = _rotation_matrix_to_euler(rotation_matrix)
     return OrientedBoxObstructionSchema(
@@ -1074,7 +1082,8 @@ def sensors_to_schemas(
 
 
 def _extract_square_group(
-    group: SquareSensorGroup, counter: int,
+    group: SquareSensorGroup,
+    counter: int,
 ) -> SquareSensorSchema:
     concentrator, gap, photosensor = _chain_to_schema_fields(group.chain)
     return SquareSensorSchema(
@@ -1092,7 +1101,8 @@ def _extract_square_group(
 
 
 def _extract_hex_group(
-    group: HexagonalSensorGroup, counter: int,
+    group: HexagonalSensorGroup,
+    counter: int,
 ) -> HexagonalSensorSchema:
     hex_centers = np.asarray(group.hex_centers)
     concentrator, gap, photosensor = _chain_to_schema_fields(group.chain)
@@ -1129,13 +1139,12 @@ def _concentrator_to_schema(
             # written as length=None so reload is exact. "Full" <-> the mouth equals
             # the full-CPC mouth a2/s for the wall tilt s.
             s, _ = cpc_wall_tilt(
-                concentrator.exit_apothem, concentrator.entrance_apothem,
+                concentrator.exit_apothem,
+                concentrator.entrance_apothem,
                 concentrator.length,
             )
             ideal_mouth = concentrator.exit_apothem / s
-            truncated = not math.isclose(
-                concentrator.entrance_apothem, ideal_mouth, rel_tol=1e-9
-            )
+            truncated = not math.isclose(concentrator.entrance_apothem, ideal_mouth, rel_tol=1e-9)
             return WinstonConeSchema(
                 n_sides=concentrator.n_sides,
                 entrance_apothem=concentrator.entrance_apothem,
@@ -1173,9 +1182,7 @@ def _concentrator_from_schema(
                 orientation_deg=schema.orientation_deg,
             )
         case _:
-            raise ValueError(
-                f"unknown concentrator schema: {type(schema).__name__}"
-            )
+            raise ValueError(f"unknown concentrator schema: {type(schema).__name__}")
 
 
 def _photosensor_to_schema(photosensor: PhotoSensor) -> PhotoSensorSchema:
@@ -1209,9 +1216,7 @@ def _photosensor_from_schema(schema: PhotoSensorSchema | None) -> PhotoSensor:
         case UniformQESchema():
             return UniformQE(schema.qe)
         case _:
-            raise ValueError(
-                f"unknown photosensor schema: {type(schema).__name__}"
-            )
+            raise ValueError(f"unknown photosensor schema: {type(schema).__name__}")
 
 
 def _chain_to_schema_fields(

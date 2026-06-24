@@ -3,6 +3,7 @@ import jax.numpy as jnp
 
 ### Primitive intersections
 
+
 def intersect_plane(ray_origin, ray_direction, plane_center, plane_rotation):
     """
     Intersect ray with a plane defined by center and rotation matrix.
@@ -77,13 +78,9 @@ def intersect_cylinder(ray_origin, ray_direction, p1, p2, radius):
     perp_top = oc_perp + t_top * rd_perp
 
     t_bottom = jnp.where(
-        (t_bottom > eps) & (jnp.dot(perp_bottom, perp_bottom) <= radius**2),
-        t_bottom, jnp.inf
+        (t_bottom > eps) & (jnp.dot(perp_bottom, perp_bottom) <= radius**2), t_bottom, jnp.inf
     )
-    t_top = jnp.where(
-        (t_top > eps) & (jnp.dot(perp_top, perp_top) <= radius**2),
-        t_top, jnp.inf
-    )
+    t_top = jnp.where((t_top > eps) & (jnp.dot(perp_top, perp_top) <= radius**2), t_top, jnp.inf)
 
     return jnp.min(jnp.array([t1, t2, t_bottom, t_top]))
 
@@ -239,12 +236,7 @@ def intersect_triangle(ray_origin, ray_direction, v0, v1, v2):
     t = f * jnp.dot(edge2, q)
 
     # Check validity: not parallel, barycentric coords valid, t > 0
-    valid = (
-        ~parallel &
-        (u >= 0.0) & (u <= 1.0) &
-        (v >= 0.0) & (u + v <= 1.0) &
-        (t > eps)
-    )
+    valid = ~parallel & (u >= 0.0) & (u <= 1.0) & (v >= 0.0) & (u + v <= 1.0) & (t > eps)
 
     return jnp.where(valid, t, jnp.inf)
 
@@ -337,7 +329,7 @@ def intersect_conic(ray_origin, ray_direction, curvature, conic):
     t_conic = jnp.where(
         t1_valid & t2_valid,
         jnp.minimum(t1, t2),
-        jnp.where(t1_valid, t1, jnp.where(t2_valid, t2, jnp.inf))
+        jnp.where(t1_valid, t1, jnp.where(t2_valid, t2, jnp.inf)),
     )
     t_conic = jnp.where(no_intersection, jnp.inf, t_conic)
 
@@ -347,6 +339,7 @@ def intersect_conic(ray_origin, ray_direction, curvature, conic):
 
 
 ### Newton-Raphson method
+
 
 def newton_raphson_intersect(sag_fn, ray_origin, ray_direction, t_init=None, max_iter=10, tol=1e-8):
     """
@@ -372,11 +365,7 @@ def newton_raphson_intersect(sag_fn, ray_origin, ray_direction, t_init=None, max
 
     # Initial guess: use provided value or intersect with z=0 plane
     if t_init is None:
-        t_init = jnp.where(
-            jnp.abs(dz) > 1e-10,
-            -oz / dz,
-            0.0
-        )
+        t_init = jnp.where(jnp.abs(dz) > 1e-10, -oz / dz, 0.0)
         t_init = jnp.maximum(t_init, 0.0)
 
     def g(t):
@@ -402,12 +391,7 @@ def newton_raphson_intersect(sag_fn, ray_origin, ray_direction, t_init=None, max
 
         return (t_out, new_converged), None
 
-    (t_final, _), _ = jax.lax.scan(
-        newton_step,
-        (t_init, False),
-        None,
-        length=max_iter
-    )
+    (t_final, _), _ = jax.lax.scan(newton_step, (t_init, False), None, length=max_iter)
 
     # Compute hit coordinates
     x_hit = ox + t_final * dx

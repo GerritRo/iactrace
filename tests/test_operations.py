@@ -10,8 +10,9 @@ from iactrace.core.surfaces import AsphericSurfaceGroup
 from iactrace.telescope import operations as ops
 
 
-def _make_disk_mirror_group(positions, rotations, curvatures, conics, aspherics,
-                            radii, optical_stage=0, n_samples=100):
+def _make_disk_mirror_group(
+    positions, rotations, curvatures, conics, aspherics, radii, optical_stage=0, n_samples=100
+):
     """Build an OpticalElementGroup configured as a reflective disk mirror."""
     n = curvatures.shape[0]
     surface = AsphericSurfaceGroup(
@@ -45,15 +46,17 @@ def simple_telescope(random_key):
     radii = jnp.array([0.5, 0.5])
 
     mirror_group = _make_disk_mirror_group(
-        positions, rotations, curvatures, conics, aspherics, radii,
-        optical_stage=0, n_samples=64,
+        positions,
+        rotations,
+        curvatures,
+        conics,
+        aspherics,
+        radii,
+        optical_stage=0,
+        n_samples=64,
     )
 
-    return Telescope(
-        mirror_groups=[mirror_group],
-        obstruction_groups=None,
-        name="test_telescope"
-    )
+    return Telescope(mirror_groups=[mirror_group], obstruction_groups=None, name="test_telescope")
 
 
 class TestMathematicalCorrectness:
@@ -76,9 +79,7 @@ class TestMathematicalCorrectness:
         modified_tel = ops.set_focal_lengths(simple_telescope, 0, focal_lengths)
 
         assert jnp.allclose(
-            modified_tel.mirror_groups[0].surface.curvatures,
-            expected_curvatures,
-            rtol=1e-10
+            modified_tel.mirror_groups[0].surface.curvatures, expected_curvatures, rtol=1e-10
         )
 
     def test_infinite_focal_length_gives_zero_curvature(self, simple_telescope):
@@ -97,10 +98,7 @@ class TestMathematicalCorrectness:
 
         modified_tel = ops.scale_curvatures(simple_telescope, 0, scale)
 
-        assert jnp.allclose(
-            modified_tel.mirror_groups[0].surface.curvatures,
-            original * scale
-        )
+        assert jnp.allclose(modified_tel.mirror_groups[0].surface.curvatures, original * scale)
 
     def test_offset_curvatures_adds_correctly(self, simple_telescope):
         """Offsetting curvatures should add the offset."""
@@ -109,10 +107,7 @@ class TestMathematicalCorrectness:
 
         modified_tel = ops.offset_curvatures(simple_telescope, 0, offset)
 
-        assert jnp.allclose(
-            modified_tel.mirror_groups[0].surface.curvatures,
-            original + offset
-        )
+        assert jnp.allclose(modified_tel.mirror_groups[0].surface.curvatures, original + offset)
 
 
 class TestRandomPerturbations:
@@ -129,14 +124,18 @@ class TestRandomPerturbations:
         radii = jnp.full(n_mirrors, 0.5)
 
         large_group = _make_disk_mirror_group(
-            positions, rotations, curvatures, conics, aspherics, radii,
-            optical_stage=0, n_samples=4,
+            positions,
+            rotations,
+            curvatures,
+            conics,
+            aspherics,
+            radii,
+            optical_stage=0,
+            n_samples=4,
         )
 
         tel = Telescope(
-            mirror_groups=[large_group],
-            obstruction_groups=None,
-            name="large_telescope"
+            mirror_groups=[large_group], obstruction_groups=None, name="large_telescope"
         )
 
         sigma_h = 10.0  # arcseconds
@@ -161,26 +160,19 @@ class TestRandomPerturbations:
         """Z-axis displacement should only affect z coordinates."""
         original_xy = simple_telescope.mirror_groups[0].positions[:, :2].copy()
 
-        modified_tel = ops.apply_displacement(
-            simple_telescope, 0, sigma_z=1.0, key=random_key
-        )
+        modified_tel = ops.apply_displacement(simple_telescope, 0, sigma_z=1.0, key=random_key)
 
-        assert jnp.allclose(
-            modified_tel.mirror_groups[0].positions[:, :2],
-            original_xy
-        )
+        assert jnp.allclose(modified_tel.mirror_groups[0].positions[:, :2], original_xy)
         assert not jnp.allclose(
             modified_tel.mirror_groups[0].positions[:, 2],
-            simple_telescope.mirror_groups[0].positions[:, 2]
+            simple_telescope.mirror_groups[0].positions[:, 2],
         )
 
     def test_conic_error_preserves_mean(self, simple_telescope, random_key):
         """Conic error with zero sigma should preserve original values."""
         original_conics = simple_telescope.mirror_groups[0].surface.conics.copy()
 
-        modified_tel = ops.apply_conic_error(
-            simple_telescope, 0, sigma=0.0, key=random_key
-        )
+        modified_tel = ops.apply_conic_error(simple_telescope, 0, sigma=0.0, key=random_key)
 
         assert jnp.allclose(modified_tel.mirror_groups[0].surface.conics, original_conics)
 
@@ -239,12 +231,10 @@ class TestOperationComposition:
 
         assert jnp.allclose(
             tel.mirror_groups[0].surface.curvatures,
-            simple_telescope.mirror_groups[0].surface.curvatures * 1.5
+            simple_telescope.mirror_groups[0].surface.curvatures * 1.5,
         )
-        assert jnp.allclose(
-            tel.mirror_groups[0].bsdf.scale,
-            jnp.full(2, 10.0)
-        )
+        assert jnp.allclose(tel.mirror_groups[0].bsdf.scale, jnp.full(2, 10.0))
+
 
 class TestGetInfo:
     """Test the get_info utility function."""
@@ -333,7 +323,10 @@ class TestLensOperations:
         tel = _make_lens_telescope()
         original = tel.stage(1).rotations
         tel = tel.apply_misalignment(
-            stage=1, sigma_h=10.0, sigma_v=10.0, key=jax.random.key(7),
+            stage=1,
+            sigma_h=10.0,
+            sigma_v=10.0,
+            key=jax.random.key(7),
         )
         assert not jnp.allclose(original, tel.stage(1).rotations)
 
@@ -355,9 +348,7 @@ class TestLensOperations:
 
     def test_set_focal_length_on_lens_uses_refractive_formula(self):
         # n_inside=1.5, n_outside=1 -> c = 1/((n-1)*f)
-        tel = _make_lens_telescope().set_focal_lengths(
-            stage=1, focal_lengths=jnp.full(2, 4.0)
-        )
+        tel = _make_lens_telescope().set_focal_lengths(stage=1, focal_lengths=jnp.full(2, 4.0))
         # expected curvature = 1 / (0.5 * 4) = 0.5
         assert jnp.allclose(tel.stage(1).surface.curvatures, 0.5)
 

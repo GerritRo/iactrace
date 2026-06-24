@@ -94,9 +94,7 @@ class TabulatedCurveSchema(BaseModel):
     def _angles_in_range(cls, v):
         for a in v:
             if a < 0.0 or a > 90.0:
-                raise ValueError(
-                    f"angles_deg must lie in [0, 90]; got {a}"
-                )
+                raise ValueError(f"angles_deg must lie in [0, 90]; got {a}")
         return v
 
     @field_validator("values")
@@ -104,9 +102,7 @@ class TabulatedCurveSchema(BaseModel):
     def _values_in_range(cls, v):
         for x in v:
             if x < 0.0 or x > 1.0:
-                raise ValueError(
-                    f"values must lie in [0, 1]; got {x}"
-                )
+                raise ValueError(f"values must lie in [0, 1]; got {x}")
         return v
 
     @model_validator(mode="after")
@@ -303,9 +299,7 @@ def _normalize_sensor_placement(data: Any) -> Any:
         has_s = data.get(singular) is not None
         has_p = data.get(plural) is not None
         if has_s == has_p:
-            raise ValueError(
-                f"Sensor entry must set exactly one of `{singular}` or `{plural}`."
-            )
+            raise ValueError(f"Sensor entry must set exactly one of `{singular}` or `{plural}`.")
         if has_s:
             data[plural] = [data.pop(singular)]
         else:
@@ -434,7 +428,11 @@ class TelescopeConfigSchema(BaseModel):
         for i, mirror in enumerate(self.mirrors):
             mirror_id = mirror.id or f"mirror[{i}]"
             if mirror.template not in self.mirror_templates:
-                available = ", ".join(self.mirror_templates.keys()) if self.mirror_templates else "(none defined)"
+                available = (
+                    ", ".join(self.mirror_templates.keys())
+                    if self.mirror_templates
+                    else "(none defined)"
+                )
                 raise ValueError(
                     f"Mirror '{mirror_id}' references undefined template "
                     f"'{mirror.template}'. Available templates: {available}"
@@ -451,6 +449,7 @@ class TelescopeConfigSchema(BaseModel):
         groups for that stage and trip the same check in
         ``Telescope.__init__`` with a far less actionable error.
         """
+
         def _aperture_sig(ap: ApertureSchema) -> tuple[str, int]:
             if isinstance(ap, PolygonApertureSchema):
                 return ("polygon", len(ap.vertices))

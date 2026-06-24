@@ -10,8 +10,18 @@ from iactrace.core.surfaces import AsphericSurfaceGroup
 class TestAsphericDiskLensGroup:
     """Test OpticalElementGroup configured as a curved refractive lens."""
 
-    def _make_lens(self, positions, rotations, curvatures, conics, aspherics,
-                   radii, n_inside, n_outside=1.0, transmittance=None):
+    def _make_lens(
+        self,
+        positions,
+        rotations,
+        curvatures,
+        conics,
+        aspherics,
+        radii,
+        n_inside,
+        n_outside=1.0,
+        transmittance=None,
+    ):
         """Helper to build an OpticalElementGroup with RefractInteraction."""
         n = curvatures.shape[0]
         surface = AsphericSurfaceGroup(
@@ -113,8 +123,9 @@ class TestAsphericDiskLensGroup:
 class TestPlanoSlabGroup:
     """Test OpticalElementGroup configured as a flat parallel-sided slab."""
 
-    def _make_slab(self, positions, rotations, radii, thickness, n_inside,
-                   n_outside=1.0, transmittance=None):
+    def _make_slab(
+        self, positions, rotations, radii, thickness, n_inside, n_outside=1.0, transmittance=None
+    ):
         """Helper to build an OpticalElementGroup with SlabInteraction."""
         n = radii.shape[0]
         surface = AsphericSurfaceGroup(

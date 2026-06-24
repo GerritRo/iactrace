@@ -24,6 +24,7 @@ __all__ = [
 
 # Input-shape helpers
 
+
 def _as_vec3(value, name: str) -> Array:
     arr = jnp.asarray(value)
     if arr.shape != (3,):
@@ -38,6 +39,7 @@ def _as_aspheric_row(coeffs: Sequence[float] | None) -> Array:
 
 
 # Low-level canonical builder
+
 
 def mirror_group(
     *,
@@ -121,6 +123,7 @@ def mirror_group(
 
 # High-level sugar: batched disk-aperture mirror group
 
+
 def disk_array(
     *,
     positions: ArrayLike,
@@ -168,30 +171,22 @@ def disk_array(
     """
     positions_arr = jnp.asarray(positions)
     if positions_arr.ndim != 2 or positions_arr.shape[1] != 3:
-        raise ValueError(
-            f"positions must have shape (N, 3), got {positions_arr.shape}"
-        )
+        raise ValueError(f"positions must have shape (N, 3), got {positions_arr.shape}")
     n = positions_arr.shape[0]
 
     rotations_arr = jnp.asarray(rotations)
     if rotations_arr.shape != (n, 3):
-        raise ValueError(
-            f"rotations must have shape ({n}, 3), got {rotations_arr.shape}"
-        )
+        raise ValueError(f"rotations must have shape ({n}, 3), got {rotations_arr.shape}")
 
     curvatures_arr = jnp.asarray(curvatures)
     if curvatures_arr.shape != (n,):
-        raise ValueError(
-            f"curvatures must have shape ({n},), got {curvatures_arr.shape}"
-        )
+        raise ValueError(f"curvatures must have shape ({n},), got {curvatures_arr.shape}")
 
     radii_arr = jnp.asarray(radii)
     if radii_arr.shape != (n,):
         raise ValueError(f"radii must have shape ({n},), got {radii_arr.shape}")
 
-    conics_arr = (
-        jnp.zeros(n) if conics is None else jnp.asarray(conics)
-    )
+    conics_arr = jnp.zeros(n) if conics is None else jnp.asarray(conics)
     if conics_arr.shape != (n,):
         raise ValueError(f"conics must have shape ({n},), got {conics_arr.shape}")
 
@@ -200,30 +195,19 @@ def disk_array(
     else:
         aspherics_arr = jnp.asarray(aspheric_coeffs)
         if aspherics_arr.ndim != 2 or aspherics_arr.shape[0] != n:
-            raise ValueError(
-                f"aspheric_coeffs must have shape ({n}, K), "
-                f"got {aspherics_arr.shape}"
-            )
+            raise ValueError(f"aspheric_coeffs must have shape ({n}, K), got {aspherics_arr.shape}")
 
-    inner_arr = (
-        jnp.zeros(n) if inner_radii is None else jnp.asarray(inner_radii)
-    )
-    refl_arr = (
-        jnp.ones(n) if reflectivities is None else jnp.asarray(reflectivities)
-    )
+    inner_arr = jnp.zeros(n) if inner_radii is None else jnp.asarray(inner_radii)
+    refl_arr = jnp.ones(n) if reflectivities is None else jnp.asarray(reflectivities)
 
     if offsets is None:
         offsets_arr = jnp.zeros((n, 2))
     else:
         offsets_arr = jnp.asarray(offsets)
         if offsets_arr.shape != (n, 2):
-            raise ValueError(
-                f"offsets must have shape ({n}, 2), got {offsets_arr.shape}"
-            )
+            raise ValueError(f"offsets must have shape ({n}, 2), got {offsets_arr.shape}")
 
-    bsdf_arr = (
-        jnp.zeros(n) if bsdf_scales is None else jnp.asarray(bsdf_scales)
-    )
+    bsdf_arr = jnp.zeros(n) if bsdf_scales is None else jnp.asarray(bsdf_scales)
     bsdf = None if bool(jnp.all(bsdf_arr == 0)) else GaussianBSDF(scale=bsdf_arr)
 
     aperture = DiskAperture(radii=radii_arr, inner_radii=inner_arr)
@@ -246,6 +230,7 @@ def disk_array(
 
 
 # High-level sugar: single-element factories
+
 
 def _single_disk_mirror(
     *,

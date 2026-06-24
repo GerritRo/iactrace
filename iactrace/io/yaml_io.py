@@ -28,10 +28,12 @@ logger = logging.getLogger(__name__)
 
 class YAMLConfigError(Exception):
     """Raised when YAML configuration is invalid."""
+
     pass
 
 
 # YAML helpers
+
 
 def _make_precision_dumper(precision: int) -> type:
     """Return a ``yaml.SafeDumper`` subclass that formats floats to *precision*."""
@@ -40,9 +42,7 @@ def _make_precision_dumper(precision: int) -> type:
         pass
 
     def float_representer(dumper: PrecisionDumper, value: Any) -> yaml.ScalarNode:
-        return dumper.represent_scalar(
-            "tag:yaml.org,2002:float", f"{value:.{precision}f}"
-        )
+        return dumper.represent_scalar("tag:yaml.org,2002:float", f"{value:.{precision}f}")
 
     PrecisionDumper.add_representer(float, float_representer)
     PrecisionDumper.add_representer(np.float64, float_representer)

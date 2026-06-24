@@ -78,8 +78,12 @@ class RayBundle(eqx.Module):
         last optic and whose ``directions`` point toward the focal plane.
         """
         from .render import apply_final_leg_shadow
+
         shadowed = apply_final_leg_shadow(
-            self, obstruction_groups, camera_position, camera_rotation,
+            self,
+            obstruction_groups,
+            camera_position,
+            camera_rotation,
         )
         return shadowed.to_frame(camera_position, camera_rotation)
 
@@ -118,6 +122,7 @@ class LazyRayBundle(eqx.Module):
         transformed into the local frame.
         """
         from .render import render_optics_accumulate
+
         origin, rotation = self.camera_position, self.camera_rotation
         obstructions = self.obstruction_groups
 
@@ -126,18 +131,28 @@ class LazyRayBundle(eqx.Module):
             return accumulator(carry, rb_local)
 
         return render_optics_accumulate(
-            self.optical_groups, self.obstruction_groups,
-            self.sources, self.source_values, self.source_type,
-            in_local_frame, init,
+            self.optical_groups,
+            self.obstruction_groups,
+            self.sources,
+            self.source_values,
+            self.source_type,
+            in_local_frame,
+            init,
         )
 
     def materialise(self) -> RayBundle:
         """Run the render eagerly; return a flat local-frame :class:`RayBundle`."""
         from .render import render_optics
+
         rb_world = render_optics(
-            self.optical_groups, self.obstruction_groups,
-            self.sources, self.source_values, self.source_type,
+            self.optical_groups,
+            self.obstruction_groups,
+            self.sources,
+            self.source_values,
+            self.source_type,
         )
         return rb_world.to_camera_frame(
-            self.obstruction_groups, self.camera_position, self.camera_rotation,
+            self.obstruction_groups,
+            self.camera_position,
+            self.camera_rotation,
         )

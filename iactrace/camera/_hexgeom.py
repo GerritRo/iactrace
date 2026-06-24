@@ -4,8 +4,8 @@ import jax.numpy as jnp
 from jax import Array
 
 SQRT3: float = 1.7320508075688772
-SQRT3_2: float = 0.8660254037844386   # sqrt(3)/2
-SQRT3_3: float = 0.5773502691896257   # 1/sqrt(3)
+SQRT3_2: float = 0.8660254037844386  # sqrt(3)/2
+SQRT3_3: float = 0.5773502691896257  # 1/sqrt(3)
 
 
 def _rotate(x: Array, y: Array, angle: float | Array) -> tuple[Array, Array]:

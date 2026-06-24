@@ -41,6 +41,7 @@ def _as_vec3(value, name: str) -> list[float]:
 
 # Single-primitive factories
 
+
 def cylinder(
     *,
     p1: Sequence[float],

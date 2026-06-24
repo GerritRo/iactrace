@@ -82,7 +82,10 @@ class TestMirrorsSpherical:
 
     def test_bsdf_omitted_when_zero(self, random_key):
         m = mirrors.spherical(
-            position=(0, 0, 0), focal_length=0.4, radius=0.1, key=random_key,
+            position=(0, 0, 0),
+            focal_length=0.4,
+            radius=0.1,
+            key=random_key,
         )
         # Default BSDF is all-zero GaussianBSDF filled in by OpticalElementGroup.
         assert isinstance(m.bsdf, GaussianBSDF)
@@ -251,9 +254,7 @@ class TestLensesPlanoSlab:
         )
         assert jnp.allclose(slab.interaction_module.thickness, jnp.array([0.003]))
         assert jnp.allclose(slab.interaction_module.n_inside, jnp.array([1.52]))
-        assert jnp.allclose(
-            slab.interaction_module.transmittance_scalar, jnp.array([0.9])
-        )
+        assert jnp.allclose(slab.interaction_module.transmittance_scalar, jnp.array([0.9]))
 
 
 # obstructions.*
@@ -381,7 +382,8 @@ class TestMirrorGroup:
             aspherics=jnp.zeros((2, 0)),
             offsets=offsets,
             aperture=DiskAperture(
-                radii=jnp.array([0.1, 0.1]), inner_radii=jnp.zeros(2),
+                radii=jnp.array([0.1, 0.1]),
+                inner_radii=jnp.zeros(2),
             ),
             reflectivity=jnp.ones(2),
             sample_key=random_key,
@@ -394,11 +396,10 @@ class TestMirrorGroup:
         apertures"""
         # Equilateral hexagon with circumradius 0.1, centred on origin
         angles = jnp.linspace(0, 2 * jnp.pi, 7)[:-1]
-        hex_verts = jnp.stack(
-            [0.1 * jnp.cos(angles), 0.1 * jnp.sin(angles)], axis=-1
-        )
+        hex_verts = jnp.stack([0.1 * jnp.cos(angles), 0.1 * jnp.sin(angles)], axis=-1)
         aperture = PolygonAperture(
-            vertices=hex_verts[None, :, :], n_vertices=6,
+            vertices=hex_verts[None, :, :],
+            n_vertices=6,
         )
 
         m = mirrors.mirror_group(
@@ -432,7 +433,8 @@ class TestMirrorGroup:
             aspherics=jnp.zeros((1, 0)),
             offsets=jnp.zeros((1, 2)),
             aperture=DiskAperture(
-                radii=jnp.array([0.1]), inner_radii=jnp.zeros(1),
+                radii=jnp.array([0.1]),
+                inner_radii=jnp.zeros(1),
             ),
             reflectivity=jnp.ones(1),
             bsdf=bsdf,
@@ -460,7 +462,8 @@ class TestMirrorGroup:
             aspherics=jnp.zeros((1, 0)),
             offsets=jnp.zeros((1, 2)),
             aperture=DiskAperture(
-                radii=jnp.array([0.1]), inner_radii=jnp.zeros(1),
+                radii=jnp.array([0.1]),
+                inner_radii=jnp.zeros(1),
             ),
             reflectivity=jnp.ones(1),
             sample_key=random_key,
@@ -488,7 +491,8 @@ class TestRefractiveGroup:
             aspherics=jnp.zeros((1, 0)),
             offsets=jnp.zeros((1, 2)),
             aperture=DiskAperture(
-                radii=jnp.array([0.02]), inner_radii=jnp.zeros(1),
+                radii=jnp.array([0.02]),
+                inner_radii=jnp.zeros(1),
             ),
             n_inside=jnp.array([1.5]),
             n_outside=1.0,
@@ -507,7 +511,8 @@ class TestSlabGroup:
             positions=jnp.array([[0.0, 0.0, 0.39]]),
             rotations=jnp.zeros((1, 3)),
             aperture=DiskAperture(
-                radii=jnp.array([0.05]), inner_radii=jnp.zeros(1),
+                radii=jnp.array([0.05]),
+                inner_radii=jnp.zeros(1),
             ),
             n_inside=jnp.array([1.5]),
             n_outside=1.0,
