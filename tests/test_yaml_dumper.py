@@ -502,9 +502,14 @@ class TestRoundTrip:
         from iactrace import OkumuraCone
 
         cone = OkumuraCone.cubic(
-            n_sides=6, entrance_apothem=0.025, exit_apothem=0.01,
-            p1=(0.39, 0.18), p2=(0.87, 0.36),
-            reflectivity=0.92, max_bounces=8, orientation_deg=15.0,
+            n_sides=6,
+            entrance_apothem=0.025,
+            exit_apothem=0.01,
+            p1=(0.39, 0.18),
+            p2=(0.87, 0.36),
+            reflectivity=0.92,
+            max_bounces=8,
+            orientation_deg=15.0,
         )
         camera1 = Camera([self._square(concentrator=cone, gap=0.003)])
         with tempfile.NamedTemporaryFile(suffix=".yaml", delete=False) as f:

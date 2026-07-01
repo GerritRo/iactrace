@@ -11,9 +11,9 @@ import jax.numpy as jnp
 import numpy as np
 from jax import Array
 
+from ..camera.okumura_cone import OkumuraCone
 from ..camera.photosensor import UniformQE
 from ..camera.sensor_group import HexagonalSensorGroup, SquareSensorGroup
-from ..camera.okumura_cone import OkumuraCone
 from ..camera.winston_cone import WinstonCone, cpc_full_length, cpc_wall_tilt
 from ..core.apertures import Aperture, DiskAperture, PolygonAperture
 from ..core.bsdf import BSDF, DoubleGaussianBSDF, GaussianBSDF
@@ -1140,9 +1140,7 @@ def _concentrator_to_schema(
             s = concentrator.exit_apothem / concentrator.entrance_apothem
             c = math.sqrt(1.0 - s * s)
             default_length = cpc_full_length(concentrator.exit_apothem, s, c)
-            truncated = not math.isclose(
-                concentrator.length, default_length, rel_tol=1e-9
-            )
+            truncated = not math.isclose(concentrator.length, default_length, rel_tol=1e-9)
             return OkumuraConeSchema(
                 n_sides=concentrator.n_sides,
                 entrance_apothem=concentrator.entrance_apothem,
@@ -1159,13 +1157,12 @@ def _concentrator_to_schema(
             # written as length=None so reload is exact. "Full" <-> the mouth equals
             # the full-CPC mouth a2/s for the wall tilt s.
             s, _ = cpc_wall_tilt(
-                concentrator.exit_apothem, concentrator.entrance_apothem,
+                concentrator.exit_apothem,
+                concentrator.entrance_apothem,
                 concentrator.length,
             )
             ideal_mouth = concentrator.exit_apothem / s
-            truncated = not math.isclose(
-                concentrator.entrance_apothem, ideal_mouth, rel_tol=1e-9
-            )
+            truncated = not math.isclose(concentrator.entrance_apothem, ideal_mouth, rel_tol=1e-9)
             return WinstonConeSchema(
                 n_sides=concentrator.n_sides,
                 entrance_apothem=concentrator.entrance_apothem,
@@ -1214,9 +1211,7 @@ def _concentrator_from_schema(
                 orientation_deg=schema.orientation_deg,
             )
         case _:
-            raise ValueError(
-                f"unknown concentrator schema: {type(schema).__name__}"
-            )
+            raise ValueError(f"unknown concentrator schema: {type(schema).__name__}")
 
 
 def _photosensor_to_schema(photosensor: PhotoSensor) -> PhotoSensorSchema:

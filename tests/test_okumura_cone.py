@@ -40,7 +40,7 @@ def _fill_entrance(cone, n, seed=0):
         ok = np.all(xy @ n_hats.T <= a + 1e-12, axis=1)
         good = xy[ok]
         take = min(len(good), n - filled)
-        pts[filled:filled + take] = good[:take]
+        pts[filled : filled + take] = good[:take]
         filled += take
     return pts
 
@@ -52,12 +52,19 @@ def _launch(cone, alpha_deg, n=3000, seed=0):
     phi = rng.uniform(0, 2 * np.pi, n)
     a = math.radians(alpha_deg)
     origins = jnp.asarray(np.concatenate([xy, np.zeros((n, 1))], axis=1))
-    dirs = jnp.asarray(np.stack(
-        [np.sin(a) * np.cos(phi), np.sin(a) * np.sin(phi), np.full(n, -np.cos(a))],
-        axis=1,
-    ))
-    rb = RayBundle(origins=origins, directions=dirs,
-                   values=jnp.ones(n), path_length=jnp.zeros(n), n=jnp.ones(n))
+    dirs = jnp.asarray(
+        np.stack(
+            [np.sin(a) * np.cos(phi), np.sin(a) * np.sin(phi), np.full(n, -np.cos(a))],
+            axis=1,
+        )
+    )
+    rb = RayBundle(
+        origins=origins,
+        directions=dirs,
+        values=jnp.ones(n),
+        path_length=jnp.zeros(n),
+        n=jnp.ones(n),
+    )
     return jax.jit(cone.apply)(rb)
 
 
@@ -117,11 +124,11 @@ class TestGeometry:
 
     def test_invalid_constructions(self):
         with pytest.raises(ValueError):
-            OkumuraCone(6, 0.01, 0.02, [QUAD_P1])          # exit > entrance
+            OkumuraCone(6, 0.01, 0.02, [QUAD_P1])  # exit > entrance
         with pytest.raises(ValueError):
-            OkumuraCone(6, 0.02, 0.01, [])                 # no control point
+            OkumuraCone(6, 0.02, 0.01, [])  # no control point
         with pytest.raises(ValueError):
-            OkumuraCone(6, 0.02, 0.01, [(0.5, -0.3)])      # non-monotonic Z(t)
+            OkumuraCone(6, 0.02, 0.01, [(0.5, -0.3)])  # non-monotonic Z(t)
 
     def test_bezier_power_coeffs(self):
         # Straight control values -> identity B(t) = t; a quadratic through
@@ -138,7 +145,7 @@ class TestAcceptance:
         cone = _quad(0.5, 20.0, reflectivity=1.0, max_bounces=40)
         assert _transmission(cone, 0.0) > 0.95
         assert _transmission(cone, 12.0) > 0.9
-        assert 0.35 < _transmission(cone, 20.0) < 0.8       # ~half at the design angle
+        assert 0.35 < _transmission(cone, 20.0) < 0.8  # ~half at the design angle
         assert _transmission(cone, 28.0) < 0.2
         assert _transmission(cone, 40.0) < 0.03
 
@@ -153,18 +160,16 @@ class TestAcceptance:
         # stray light (theta_max < theta < 1.5 theta_max) than Winston's paraboloid.
         a1, a2, tmax = 0.020, 0.010, 30.0
         win = WinstonCone(6, a1, a2, reflectivity=1.0, max_bounces=60)
-        cub = OkumuraCone.cubic(6, a1, a2, CUBIC_P1, CUBIC_P2,
-                               reflectivity=1.0, max_bounces=60)
+        cub = OkumuraCone.cubic(6, a1, a2, CUBIC_P1, CUBIC_P2, reflectivity=1.0, max_bounces=60)
 
         def band(cone, angles):
-            return float(np.mean([
-                np.asarray(_launch(cone, a, n=2500).values).sum() / 2500
-                for a in angles
-            ]))
+            return float(
+                np.mean([np.asarray(_launch(cone, a, n=2500).values).sum() / 2500 for a in angles])
+            )
 
         signal = np.arange(0.0, tmax, 3.0)
         background = np.arange(tmax, 1.5 * tmax + 0.1, 3.0)
-        assert band(cub, signal) > band(win, signal)          # more signal
+        assert band(cub, signal) > band(win, signal)  # more signal
         assert band(cub, background) < band(win, background)  # less background
 
 
@@ -176,10 +181,10 @@ class TestEnergy:
         cone = _quad(0.5, 20.0, reflectivity=0.9, max_bounces=40)
         out = _launch(cone, 8.0, n=4000)
         v = np.asarray(out.values)
-        assert v.max() <= 1.0 + 1e-9                          # never amplifies
+        assert v.max() <= 1.0 + 1e-9  # never amplifies
         transmitted = v[v > 0]
-        assert transmitted.min() >= 0.9 ** 40 - 1e-12         # >= reflectivity^max_bounces
-        assert transmitted.mean() < 1.0                       # some bounces happened
+        assert transmitted.min() >= 0.9**40 - 1e-12  # >= reflectivity^max_bounces
+        assert transmitted.mean() < 1.0  # some bounces happened
 
     def test_reflectivity_one_keeps_unit_values(self):
         cone = _cubic(0.5, 20.0, reflectivity=1.0, max_bounces=40)
@@ -204,8 +209,13 @@ class TestTracer:
         a = cone.entrance_apothem
         origins = jnp.array([[0.0, 0.0, 0.0], [10 * a, 0.0, 0.0]])
         dirs = jnp.tile(jnp.array([0.0, 0.0, -1.0]), (2, 1))
-        rb = RayBundle(origins=origins, directions=dirs,
-                       values=jnp.ones(2), path_length=jnp.zeros(2), n=jnp.ones(2))
+        rb = RayBundle(
+            origins=origins,
+            directions=dirs,
+            values=jnp.ones(2),
+            path_length=jnp.zeros(2),
+            n=jnp.ones(2),
+        )
         out = cone.apply(rb)
         assert float(out.values[0]) > 0.0
         assert float(out.values[1]) == 0.0
@@ -215,7 +225,9 @@ class TestTracer:
         rb = RayBundle(
             origins=jnp.zeros((5, 3)),
             directions=jnp.tile(jnp.array([0.0, 0.0, -1.0]), (5, 1)),
-            values=jnp.ones(5), path_length=jnp.zeros(5), n=jnp.ones(5),
+            values=jnp.ones(5),
+            path_length=jnp.zeros(5),
+            n=jnp.ones(5),
         )
         out = jax.jit(cone.apply)(rb)
         assert out.values.shape == (5,)
@@ -228,17 +240,29 @@ def _hex_camera(with_cone):
     centers = make_hex_centers(n_rings=2, hex_size=0.02)
     entrance = float(
         HexagonalSensorGroup(
-            positions=[[0.0, 0.0, 0.0]], rotations=[[0.0, 0.0, 0.0]],
+            positions=[[0.0, 0.0, 0.0]],
+            rotations=[[0.0, 0.0, 0.0]],
             hex_centers=centers,
         ).hex_inradius
     )
-    cone = OkumuraCone.quadratic(
-        6, entrance, 0.35 * entrance, QUAD_P1,
-        reflectivity=0.95, max_bounces=20,
-    ) if with_cone else None
+    cone = (
+        OkumuraCone.quadratic(
+            6,
+            entrance,
+            0.35 * entrance,
+            QUAD_P1,
+            reflectivity=0.95,
+            max_bounces=20,
+        )
+        if with_cone
+        else None
+    )
     sensor = HexagonalSensorGroup(
-        positions=[[0.0, 0.0, 0.0]], rotations=[[0.0, 0.0, 0.0]],
-        hex_centers=centers, concentrator=cone, photosensor=UniformQE(0.9),
+        positions=[[0.0, 0.0, 0.0]],
+        rotations=[[0.0, 0.0, 0.0]],
+        hex_centers=centers,
+        concentrator=cone,
+        photosensor=UniformQE(0.9),
     )
     return Camera([sensor]), sensor
 
@@ -248,8 +272,13 @@ def _downward(xy, z=0.05):
     n = xy.shape[0]
     origins = jnp.concatenate([xy, jnp.full((n, 1), z)], axis=1)
     dirs = jnp.tile(jnp.array([0.0, 0.0, -1.0]), (n, 1))
-    return RayBundle(origins=origins, directions=dirs,
-                     values=jnp.ones(n), path_length=jnp.zeros(n), n=jnp.ones(n))
+    return RayBundle(
+        origins=origins,
+        directions=dirs,
+        values=jnp.ones(n),
+        path_length=jnp.zeros(n),
+        n=jnp.ones(n),
+    )
 
 
 class TestChainIntegration:
@@ -272,6 +301,7 @@ class TestChainIntegration:
     def test_show_sensor_chain_smoke(self):
         pytest.importorskip("trimesh")
         from iactrace import show_sensor_chain
+
         cam, _ = _hex_camera(with_cone=True)
         scene = show_sensor_chain(cam)
         assert len(scene.geometry) >= 3
@@ -291,8 +321,12 @@ class TestRotationAlignment:
         centers0 = np.asarray(make_hex_centers(2, size))
         inrad = float(HexagonalSensorGroup([[0, 0, 0]], [[0, 0, 0]], centers0).hex_inradius)
         cone = OkumuraCone.quadratic(
-            6, inrad, np.sin(np.radians(20.0)) * inrad, QUAD_P1,
-            reflectivity=1.0, max_bounces=60,
+            6,
+            inrad,
+            np.sin(np.radians(20.0)) * inrad,
+            QUAD_P1,
+            reflectivity=1.0,
+            max_bounces=60,
         )
         rng = np.random.default_rng(1)
         n = 4000
@@ -306,14 +340,19 @@ class TestRotationAlignment:
 
     def _transmission(self, centers0, cone, o0, d0, n, theta):
         sensor = HexagonalSensorGroup(
-            [[0, 0, 0]], [[0, 0, 0]], _rot2(centers0, theta),
-            concentrator=cone, photosensor=UniformQE(1.0),
+            [[0, 0, 0]],
+            [[0, 0, 0]],
+            _rot2(centers0, theta),
+            concentrator=cone,
+            photosensor=UniformQE(1.0),
         )
         cam = Camera([sensor])
         rb = RayBundle(
             origins=jnp.asarray(np.c_[_rot2(o0[:, :2], theta), o0[:, 2]]),
             directions=jnp.asarray(np.c_[_rot2(d0[:, :2], theta), d0[:, 2]]),
-            values=jnp.ones(n), path_length=jnp.zeros(n), n=jnp.ones(n),
+            values=jnp.ones(n),
+            path_length=jnp.zeros(n),
+            n=jnp.ones(n),
         )
         pe, _t, _pix, _hit = cam.collect(rb)
         return float(np.asarray(pe).sum())
@@ -329,8 +368,13 @@ class TestRotationAlignment:
     def test_orientation_offset_changes_transmission(self):
         centers0, cone, o0, d0, n = self._setup()
         offset = OkumuraCone.quadratic(
-            6, cone.entrance_apothem, cone.exit_apothem, QUAD_P1,
-            reflectivity=1.0, max_bounces=60, orientation_deg=30.0,
+            6,
+            cone.entrance_apothem,
+            cone.exit_apothem,
+            QUAD_P1,
+            reflectivity=1.0,
+            max_bounces=60,
+            orientation_deg=30.0,
         )
         base = self._transmission(centers0, cone, o0, d0, n, 0.0)
         shifted = self._transmission(centers0, offset, o0, d0, n, 0.0)
@@ -342,8 +386,9 @@ class TestRotationAlignment:
 
 class TestRobustness:
     def test_apply_gradients_are_finite(self):
-        cone = OkumuraCone.cubic(6, 0.025, 0.010, CUBIC_P1, CUBIC_P2,
-                                reflectivity=0.9, max_bounces=8)
+        cone = OkumuraCone.cubic(
+            6, 0.025, 0.010, CUBIC_P1, CUBIC_P2, reflectivity=0.9, max_bounces=8
+        )
 
         def loss(o, d):
             m = o.shape[0]
@@ -352,21 +397,22 @@ class TestRobustness:
             return jnp.sum(out.values) + jnp.sum(out.path_length)
 
         o = jnp.array([[0.0, 0.0, 0.0], [0.005, 0.0, 0.0]])
-        d = jnp.array([[1.0, 0.0, 0.0], [0.1, 0.0, -0.99]])   # 1st ray is horizontal
+        d = jnp.array([[1.0, 0.0, 0.0], [0.1, 0.0, -0.99]])  # 1st ray is horizontal
         d = d / jnp.linalg.norm(d, axis=1, keepdims=True)
         go, gd = jax.grad(loss, argnums=(0, 1))(o, d)
         assert bool(jnp.all(jnp.isfinite(go)))
         assert bool(jnp.all(jnp.isfinite(gd)))
 
     def test_small_cone_traces_in_range(self):
-        cone = OkumuraCone.quadratic(6, 1.25e-4, 5e-5, QUAD_P1,
-                                    reflectivity=0.95, max_bounces=12)
+        cone = OkumuraCone.quadratic(6, 1.25e-4, 5e-5, QUAD_P1, reflectivity=0.95, max_bounces=12)
         rng = np.random.default_rng(0)
         xy = rng.uniform(-0.7, 0.7, (1000, 2)) * 1.25e-4
         rb = RayBundle(
             jnp.asarray(np.c_[xy, np.zeros(len(xy))]),
             jnp.tile(jnp.array([0.0, 0.0, -1.0]), (len(xy), 1)),
-            jnp.ones(len(xy)), jnp.zeros(len(xy)), jnp.ones(len(xy)),
+            jnp.ones(len(xy)),
+            jnp.zeros(len(xy)),
+            jnp.ones(len(xy)),
         )
         v = np.asarray(cone.apply(rb).values)
         assert np.all(np.isfinite(v))

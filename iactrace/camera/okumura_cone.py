@@ -14,11 +14,11 @@ from ..core.ray_bundle import RayBundle
 from .concentrator import Concentrator
 from .winston_cone import cpc_full_length
 
-_NUDGE = 1e-5      # off-wall step, scaled by a2
-_T_FLOOR = 1e-6    # spurious-hit rejection floor
-_N_BRACKET = 12    # sub-intervals used to isolate meridian roots on t in [0, 1]
-_N_BISECT = 20     # bisection steps that shrink each bracket
-_N_POLISH = 2      # Newton steps that give the selected root a clean derivative
+_NUDGE = 1e-5  # off-wall step, scaled by a2
+_T_FLOOR = 1e-6  # spurious-hit rejection floor
+_N_BRACKET = 12  # sub-intervals used to isolate meridian roots on t in [0, 1]
+_N_BISECT = 20  # bisection steps that shrink each bracket
+_N_POLISH = 2  # Newton steps that give the selected root a clean derivative
 
 
 def _bezier_power_coeffs(control_values: Sequence[float]) -> list[float]:
@@ -79,17 +79,23 @@ def _meridian_coeffs(
 
 
 def _wall_hit(
-    o: Array, d: Array, n: Array,
-    r_coeffs: Array, z_coeffs: Array, gd_r: Array, gd_z: Array, a2: float,
+    o: Array,
+    d: Array,
+    n: Array,
+    r_coeffs: Array,
+    z_coeffs: Array,
+    gd_r: Array,
+    gd_z: Array,
+    a2: float,
 ) -> tuple[Array, Array]:
     """Smallest forward ray parameter hitting facet ``n`` and its Bezier ``t``.
 
     Returns ``(tau, t)``; ``tau = inf`` when the facet is not hit in front of
     the ray. ``gd_r`` / ``gd_z`` are the derivative coefficients of ``R`` / ``Z``.
     """
-    p = d[0] * n[0] + d[1] * n[1]      
-    q = d[2]                           
-    u0 = o[0] * n[0] + o[1] * n[1]     
+    p = d[0] * n[0] + d[1] * n[1]
+    q = d[2]
+    u0 = o[0] * n[0] + o[1] * n[1]
     z0 = o[2]
 
     # G(t) = q R(t) - p Z(t) + (p z0 - q u0), and its derivative coefficients.
@@ -138,7 +144,8 @@ def _wall_hit(
 
     ok = (
         bracketed
-        & (t >= 0.0) & (t <= 1.0)
+        & (t >= 0.0)
+        & (t <= 1.0)
         & jnp.isfinite(tau)
         & (tau > _T_FLOOR * a2)
         & (jnp.maximum(jnp.abs(p), jnp.abs(q)) > 1e-30)
@@ -162,12 +169,9 @@ def _wall_normal(n: Array, t: Array, gd_r: Array, gd_z: Array) -> Array:
     return nrm / jnp.sqrt(jnp.where(norm_sq > 0.0, norm_sq, 1.0))
 
 
-def _single_step(o, d, value, path, done, n_hats, r_c, z_c, gd_r, gd_z,
-                 a2, length, refl):
+def _single_step(o, d, value, path, done, n_hats, r_c, z_c, gd_r, gd_z, a2, length, refl):
     """One reflection event for one ray (frozen once ``done``)."""
-    tau_all, t_all = jax.vmap(
-        lambda n: _wall_hit(o, d, n, r_c, z_c, gd_r, gd_z, a2)
-    )(n_hats)
+    tau_all, t_all = jax.vmap(lambda n: _wall_hit(o, d, n, r_c, z_c, gd_r, gd_z, a2))(n_hats)
     kbest = jnp.argmin(tau_all)
     t_wall = tau_all[kbest]
     t_bez = t_all[kbest]
@@ -208,8 +212,18 @@ def _single_step(o, d, value, path, done, n_hats, r_c, z_c, gd_r, gd_z,
     )
 
 
-def trace(origins, directions, n_hats, r_coeffs, z_coeffs,
-          entrance_apothem, exit_apothem, length, reflectivity, max_bounces):
+def trace(
+    origins,
+    directions,
+    n_hats,
+    r_coeffs,
+    z_coeffs,
+    entrance_apothem,
+    exit_apothem,
+    length,
+    reflectivity,
+    max_bounces,
+):
     """Trace rays through the Okumura cone in CPC coords (exit z=0, mouth z=length).
 
     Returns ``(exit_origins, exit_directions, value_factor, path_added)``;
@@ -229,7 +243,8 @@ def trace(origins, directions, n_hats, r_coeffs, z_coeffs,
     inside = jnp.all(u_all <= a1 + 1e-9, axis=1)
 
     carry = (
-        origins, directions,
+        origins,
+        directions,
         jnp.where(inside, 1.0, 0.0),
         jnp.zeros(n),
         ~inside,
@@ -245,7 +260,10 @@ def trace(origins, directions, n_hats, r_coeffs, z_coeffs,
         return out, None
 
     (o, d, value, path, done), _ = jax.lax.scan(
-        step, carry, None, length=max_bounces + 1,
+        step,
+        carry,
+        None,
+        length=max_bounces + 1,
     )
     # Rays still bouncing at the end are absorbed.
     value = jnp.where(done, value, 0.0)
@@ -399,10 +417,16 @@ class OkumuraCone(Concentrator):
         o_cpc = jnp.stack([o[:, 0], o[:, 1], jnp.full(o.shape[0], length)], axis=-1)
 
         oe, de, factor, path_add = trace(
-            o_cpc, d, self._wall_normals(),
-            jnp.asarray(self.r_coeffs), jnp.asarray(self.z_coeffs),
-            self.entrance_apothem, self.exit_apothem, length,
-            self.reflectivity, self.max_bounces,
+            o_cpc,
+            d,
+            self._wall_normals(),
+            jnp.asarray(self.r_coeffs),
+            jnp.asarray(self.z_coeffs),
+            self.entrance_apothem,
+            self.exit_apothem,
+            length,
+            self.reflectivity,
+            self.max_bounces,
         )
 
         o_out = jnp.stack([oe[:, 0], oe[:, 1], jnp.full(oe.shape[0], -length)], axis=-1)
@@ -425,8 +449,11 @@ class OkumuraCone(Concentrator):
         apothem = _polyval(r_c, t)
         z_chain = _polyval(z_c, t) - self.length
         corner_r = apothem / jnp.cos(jnp.pi / self.n_sides)
-        ang = (self.orientation + jnp.pi / self.n_sides
-               + 2.0 * jnp.pi * jnp.arange(self.n_sides) / self.n_sides)
-        unit = jnp.stack([jnp.cos(ang), jnp.sin(ang)], axis=-1)        # (N, 2)
-        rings = corner_r[:, None, None] * unit[None, :, :]            # (K, N, 2)
+        ang = (
+            self.orientation
+            + jnp.pi / self.n_sides
+            + 2.0 * jnp.pi * jnp.arange(self.n_sides) / self.n_sides
+        )
+        unit = jnp.stack([jnp.cos(ang), jnp.sin(ang)], axis=-1)  # (N, 2)
+        rings = corner_r[:, None, None] * unit[None, :, :]  # (K, N, 2)
         return z_chain, rings
