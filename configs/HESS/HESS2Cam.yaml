@@ -1,7 +1,17 @@
 sensors:
 - id: HESS2Cam
   type: hexagonal
-  edge_width: 0.0004
+  concentrator:
+    type: winston
+    n_sides: 6
+    entrance_apothem: 0.0205
+    exit_apothem: 0.01025
+    length: 0.053
+    reflectivity: 0.82
+    max_bounces: 10
+    orientation_deg: 0.0
+  gap: 0.001000
+  edge_width: 0.0005
   position:
   - 0.0
   - 0.0
