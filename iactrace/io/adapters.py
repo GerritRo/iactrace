@@ -13,7 +13,8 @@ from jax import Array
 
 from ..camera.photosensor import UniformQE
 from ..camera.sensor_group import HexagonalSensorGroup, SquareSensorGroup
-from ..camera.winston_cone import WinstonCone, cpc_wall_tilt
+from ..camera.okumura_cone import OkumuraCone
+from ..camera.winston_cone import WinstonCone, cpc_full_length, cpc_wall_tilt
 from ..core.apertures import Aperture, DiskAperture, PolygonAperture
 from ..core.bsdf import BSDF, DoubleGaussianBSDF, GaussianBSDF
 from ..core.coatings import Coating, TabulatedCoating
@@ -46,6 +47,7 @@ from .schemas import (
     HexagonalSensorSchema,
     MirrorSchema,
     MirrorTemplateSchema,
+    OkumuraConeSchema,
     OpenCylinderObstructionSchema,
     OrientedBoxObstructionSchema,
     PhotoSensorSchema,
@@ -1124,7 +1126,7 @@ def _concentrator_to_schema(
 ) -> ConcentratorSchema | None:
     """Serialize a concentrator (``None`` -> ``None``).
 
-    Only :class:`WinstonCone` round-trips exactly today; any other
+    :class:`WinstonCone` and :class:`OkumuraCone` round-trip exactly; any other
     :class:`~iactrace.camera.concentrator.Concentrator` subclass emits a
     :class:`UserWarning` and is dropped. To support another cone type, add a
     ``case`` here, a converter in :func:`_concentrator_from_schema`, a
@@ -1133,18 +1135,37 @@ def _concentrator_to_schema(
     match concentrator:
         case None:
             return None
+        case OkumuraCone():
+            # A None length reconstructs the Winston-equivalent depth on load;
+            s = concentrator.exit_apothem / concentrator.entrance_apothem
+            c = math.sqrt(1.0 - s * s)
+            default_length = cpc_full_length(concentrator.exit_apothem, s, c)
+            truncated = not math.isclose(
+                concentrator.length, default_length, rel_tol=1e-9
+            )
+            return OkumuraConeSchema(
+                n_sides=concentrator.n_sides,
+                entrance_apothem=concentrator.entrance_apothem,
+                exit_apothem=concentrator.exit_apothem,
+                control_points=[[r, z] for r, z in concentrator.control_points],
+                length=concentrator.length if truncated else None,
+                reflectivity=concentrator.reflectivity,
+                max_bounces=concentrator.max_bounces,
+                orientation_deg=math.degrees(concentrator.orientation),
+            )
         case WinstonCone():
             # entrance_apothem is the physical mouth at z=length; for a truncated
             # cone the depth reconstructs the wall on load. An untruncated cone is
             # written as length=None so reload is exact. "Full" <-> the mouth equals
             # the full-CPC mouth a2/s for the wall tilt s.
             s, _ = cpc_wall_tilt(
-                concentrator.exit_apothem,
-                concentrator.entrance_apothem,
+                concentrator.exit_apothem, concentrator.entrance_apothem,
                 concentrator.length,
             )
             ideal_mouth = concentrator.exit_apothem / s
-            truncated = not math.isclose(concentrator.entrance_apothem, ideal_mouth, rel_tol=1e-9)
+            truncated = not math.isclose(
+                concentrator.entrance_apothem, ideal_mouth, rel_tol=1e-9
+            )
             return WinstonConeSchema(
                 n_sides=concentrator.n_sides,
                 entrance_apothem=concentrator.entrance_apothem,
@@ -1181,8 +1202,21 @@ def _concentrator_from_schema(
                 max_bounces=schema.max_bounces,
                 orientation_deg=schema.orientation_deg,
             )
+        case OkumuraConeSchema():
+            return OkumuraCone(
+                n_sides=schema.n_sides,
+                entrance_apothem=schema.entrance_apothem,
+                exit_apothem=schema.exit_apothem,
+                control_points=[(r, z) for r, z in schema.control_points],
+                length=schema.length,
+                reflectivity=schema.reflectivity,
+                max_bounces=schema.max_bounces,
+                orientation_deg=schema.orientation_deg,
+            )
         case _:
-            raise ValueError(f"unknown concentrator schema: {type(schema).__name__}")
+            raise ValueError(
+                f"unknown concentrator schema: {type(schema).__name__}"
+            )
 
 
 def _photosensor_to_schema(photosensor: PhotoSensor) -> PhotoSensorSchema:

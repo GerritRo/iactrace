@@ -498,6 +498,37 @@ class TestRoundTrip:
         finally:
             filepath.unlink(missing_ok=True)
 
+    def test_camera_okumura_cone_roundtrip(self):
+        from iactrace import OkumuraCone
+
+        cone = OkumuraCone.cubic(
+            n_sides=6, entrance_apothem=0.025, exit_apothem=0.01,
+            p1=(0.39, 0.18), p2=(0.87, 0.36),
+            reflectivity=0.92, max_bounces=8, orientation_deg=15.0,
+        )
+        camera1 = Camera([self._square(concentrator=cone, gap=0.003)])
+        with tempfile.NamedTemporaryFile(suffix=".yaml", delete=False) as f:
+            filepath = Path(f.name)
+        try:
+            save_camera(camera1, filepath)
+            sensor = camera1.to_dict()["sensors"][0]
+            assert sensor["concentrator"]["type"] == "okumura"
+            chain2 = Camera.from_yaml(filepath).sensor_groups[0].chain
+            c1, c2 = camera1.sensor_groups[0].chain.concentrator, chain2.concentrator
+            assert isinstance(c2, OkumuraCone)
+            assert c2.degree == c1.degree == 3
+            assert c2.control_points == pytest.approx(np.asarray(c1.control_points))
+            assert c2.n_sides == c1.n_sides
+            assert c2.max_bounces == c1.max_bounces
+            assert c2.exit_apothem == pytest.approx(c1.exit_apothem)
+            assert c2.entrance_apothem == pytest.approx(c1.entrance_apothem)
+            assert c2.length == pytest.approx(c1.length, rel=1e-4)
+            assert c2.reflectivity == pytest.approx(c1.reflectivity)
+            assert c2.orientation == pytest.approx(c1.orientation)
+            assert chain2.gap == pytest.approx(0.003)
+        finally:
+            filepath.unlink(missing_ok=True)
+
     def test_camera_nonuniform_photosensor_warns_and_falls_back(self):
         import equinox as eqx
 

@@ -264,6 +264,29 @@ class WinstonConeSchema(BaseModel):
     orientation_deg: float = 0.0
 
 
+class OkumuraConeSchema(BaseModel):
+    """Serialized :class:`~iactrace.camera.okumura_cone.OkumuraCone`.
+
+    The walls follow a quadratic or cubic Bezier meridian instead of Winston's
+    paraboloid. ``control_points`` are the interior Bezier points in the paper's
+    normalized box (exit rim ``(0, 0)``, mouth ``(1, 1)`` implied) -- one point
+    for a quadratic curve, two for a cubic one. ``length`` defaults to the
+    equivalent full Winston-cone depth when omitted.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal["okumura"] = "okumura"
+    n_sides: int = Field(gt=2)
+    entrance_apothem: float = Field(gt=0)
+    exit_apothem: float = Field(gt=0)
+    control_points: list[Vec2] = Field(min_length=1)
+    length: float | None = Field(default=None, gt=0)
+    reflectivity: float = Field(ge=0, le=1, default=0.9)
+    max_bounces: int = Field(ge=0, default=10)
+    orientation_deg: float = 0.0
+
+
 class UniformQESchema(BaseModel):
     """Serialized :class:`~iactrace.camera.photosensor.UniformQE`."""
 
@@ -273,11 +296,11 @@ class UniformQESchema(BaseModel):
     qe: float = Field(ge=0, le=1, default=1.0)
 
 
-# Discriminated-union slots for the detection chain. Each is a single member
-# today; when a second concrete type is added, turn the alias into
-# ``Annotated[A | B, Field(discriminator="type")]`` (every member already carries
-# a ``type`` literal) and add the matching arms in ``io/adapters.py``.
-ConcentratorSchema = WinstonConeSchema
+# Discriminated-union slots for the detection chain.
+ConcentratorSchema = Annotated[
+    WinstonConeSchema | OkumuraConeSchema,
+    Field(discriminator="type"),
+]
 PhotoSensorSchema = UniformQESchema
 
 
