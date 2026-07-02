@@ -74,9 +74,14 @@ class StubPMT(PhotoSensor):
 
 def _square_sensor(concentrator=None, photosensor=None, gap=0.0):
     return SquareSensorGroup(
-        positions=[[0.0, 0.0, 0.0]], rotations=[[0.0, 0.0, 0.0]],
-        width=8, height=8, bounds=(-1.0, 1.0, -1.0, 1.0),
-        concentrator=concentrator, photosensor=photosensor, gap=gap,
+        positions=[[0.0, 0.0, 0.0]],
+        rotations=[[0.0, 0.0, 0.0]],
+        width=8,
+        height=8,
+        bounds=(-1.0, 1.0, -1.0, 1.0),
+        concentrator=concentrator,
+        photosensor=photosensor,
+        gap=gap,
     )
 
 
@@ -85,8 +90,13 @@ def _downward_rays(xy):
     n = xy.shape[0]
     origins = jnp.concatenate([xy, jnp.ones((n, 1))], axis=-1)
     dirs = jnp.tile(jnp.array([0.0, 0.0, -1.0]), (n, 1))
-    return RayBundle(origins=origins, directions=dirs,
-                     values=jnp.ones(n), path_length=jnp.zeros(n), n=jnp.ones(n))
+    return RayBundle(
+        origins=origins,
+        directions=dirs,
+        values=jnp.ones(n),
+        path_length=jnp.zeros(n),
+        n=jnp.ones(n),
+    )
 
 
 # 1. to_pixel_frame correctness
@@ -124,15 +134,15 @@ class TestToPixelFrame:
         centers = make_hex_centers(n_rings=2, hex_size=0.01)
         cx, cy = _rotate(centers[:, 0], centers[:, 1], theta)
         sensor = HexagonalSensorGroup(
-            positions=[[0.0, 0.0, 0.0]], rotations=[[0.0, 0.0, 0.0]],
+            positions=[[0.0, 0.0, 0.0]],
+            rotations=[[0.0, 0.0, 0.0]],
             hex_centers=jnp.stack([cx, cy], axis=-1),
         )
         gr = sensor.grid_rotation
         assert gr > 1e-3  # rotation actually detected
 
         # Ray at the grid origin (a hex centre) with a known in-plane direction.
-        origin = jnp.array([[float(sensor.grid_offset[0]),
-                             float(sensor.grid_offset[1]), 0.0]])
+        origin = jnp.array([[float(sensor.grid_offset[0]), float(sensor.grid_offset[1]), 0.0]])
         rays = RayBundle(
             origins=origin,
             directions=jnp.array([[1.0, 0.0, 0.0]]),
@@ -146,20 +156,25 @@ class TestToPixelFrame:
         # Direction rotated by -grid_rotation: (cos gr, -sin gr).
         assert jnp.allclose(
             local.directions[0, :2],
-            jnp.array([jnp.cos(gr), -jnp.sin(gr)]), atol=1e-6,
+            jnp.array([jnp.cos(gr), -jnp.sin(gr)]),
+            atol=1e-6,
         )
 
     def test_hex_in_pixel_local_radius_bounded(self):
         centers = make_hex_centers(n_rings=2, hex_size=0.01)
         sensor = HexagonalSensorGroup(
-            positions=[[0.0, 0.0, 0.0]], rotations=[[0.0, 0.0, 0.0]],
+            positions=[[0.0, 0.0, 0.0]],
+            rotations=[[0.0, 0.0, 0.0]],
             hex_centers=centers,
         )
         # Ray near a hex centre stays inside the hexagon (hex_norm <= 1).
         offset = jnp.array([[0.3 * sensor.hex_inradius, 0.0, 0.0]])
         rays = RayBundle(
-            origins=offset, directions=jnp.array([[0.0, 0.0, 1.0]]),
-            values=jnp.array([1.0]), path_length=jnp.array([0.0]), n=jnp.ones(1),
+            origins=offset,
+            directions=jnp.array([[0.0, 0.0, 1.0]]),
+            values=jnp.array([1.0]),
+            path_length=jnp.array([0.0]),
+            n=jnp.ones(1),
         )
         local = sensor.to_pixel_frame(rays, jnp.zeros(1, int))
         norm = _hex_norm(local.origins[0, 0], local.origins[0, 1], sensor.hex_inradius)
@@ -178,7 +193,9 @@ class TestBackwardCompat:
 
         sensor_rays, s_idx, _ = intersect_sensor(cam, rays)
         expected = sensor.accumulate(
-            s_idx, sensor_rays.origins[:, 0], sensor_rays.origins[:, 1],
+            s_idx,
+            sensor_rays.origins[:, 0],
+            sensor_rays.origins[:, 1],
             sensor_rays.values * qe,
         )
         assert jnp.allclose(cam.image(rays), expected)
@@ -201,9 +218,13 @@ class TestBackwardCompat:
         # zeroed in the dead-zone) sums to the binned image total.
         qe = 0.8
         sensor = SquareSensorGroup(
-            positions=[[0.0, 0.0, 0.0]], rotations=[[0.0, 0.0, 0.0]],
-            width=8, height=8, bounds=(-1.0, 1.0, -1.0, 1.0),
-            edge_width=0.1, photosensor=UniformQE(qe),
+            positions=[[0.0, 0.0, 0.0]],
+            rotations=[[0.0, 0.0, 0.0]],
+            width=8,
+            height=8,
+            bounds=(-1.0, 1.0, -1.0, 1.0),
+            edge_width=0.1,
+            photosensor=UniformQE(qe),
         )
         cam = Camera([sensor])
         g = jnp.linspace(-0.95, 0.95, 22)
@@ -220,9 +241,7 @@ class TestBackwardCompat:
         # still agree. Off-axis sources avoid the central-pixel boundary
         # pile-up that float rounding would otherwise leak across pixels.
         tel, cam = make_simple_telescope(n_samples=64)
-        sources = jnp.array([[0.0003, 0.0001, -1.0],
-                             [0.0005, 0.0, -1.0],
-                             [-0.0005, 0.0, -1.0]])
+        sources = jnp.array([[0.0003, 0.0001, -1.0], [0.0005, 0.0, -1.0], [-0.0005, 0.0, -1.0]])
         rb = tel.render(sources, jnp.ones(3), source_type="parallel")
         assert jnp.allclose(cam.response_matrix(rb).sum(axis=0), cam.image(rb), atol=1e-5)
 
@@ -232,8 +251,9 @@ class TestBackwardCompat:
 
 class TestDetectionChain:
     def test_propagate_composes_cone_and_pmt(self):
-        chain = DetectionChain(concentrator=StubCone(length=0.05, refl=0.9),
-                               photosensor=StubPMT(pde=0.8), gap=0.01)
+        chain = DetectionChain(
+            concentrator=StubCone(length=0.05, refl=0.9), photosensor=StubPMT(pde=0.8), gap=0.01
+        )
         # Rays travel toward -z (canonical light direction): the cone exits them
         # at z=-length and the chain free-flights a further gap to detector_z.
         rays = RayBundle(
@@ -267,8 +287,9 @@ class TestDetectionChain:
         chain = DetectionChain(concentrator=None, photosensor=UniformQE(1.0), gap=0.02)
         assert jnp.allclose(chain.detector_z, -0.02)
         # With a cone: detector sits at -(length + gap).
-        chain2 = DetectionChain(concentrator=StubCone(length=0.05),
-                                photosensor=UniformQE(1.0), gap=0.02)
+        chain2 = DetectionChain(
+            concentrator=StubCone(length=0.05), photosensor=UniformQE(1.0), gap=0.02
+        )
         assert jnp.allclose(chain2.detector_z, -(0.05 + 0.02))
 
     def test_negative_gap_rejected_everywhere(self):
@@ -298,8 +319,9 @@ class TestDetectionChain:
         assert jnp.allclose(out.path_length, 0.0)
 
     def test_camera_end_to_end_with_chain(self):
-        sensor = _square_sensor(concentrator=StubCone(refl=0.9),
-                                photosensor=StubPMT(pde=0.8), gap=0.01)
+        sensor = _square_sensor(
+            concentrator=StubCone(refl=0.9), photosensor=StubPMT(pde=0.8), gap=0.01
+        )
         cam = Camera([sensor])
         rays = _downward_rays([[0.1, 0.1], [0.3, -0.2]])
         img = cam.image(rays)
@@ -319,8 +341,7 @@ class TestShowSensorChain:
         pytest.importorskip("trimesh")
         from iactrace import show_sensor_chain
 
-        cam = Camera([_square_sensor(concentrator=StubCone(),
-                                     photosensor=StubPMT(), gap=0.01)])
+        cam = Camera([_square_sensor(concentrator=StubCone(), photosensor=StubPMT(), gap=0.01)])
         scene = show_sensor_chain(cam)
         # entrance + cone walls + detector
         assert len(scene.geometry) >= 3
@@ -338,7 +359,8 @@ class TestShowSensorChain:
         from iactrace import show_sensor_chain
 
         sensor = HexagonalSensorGroup(
-            positions=[[0.0, 0.0, 0.0]], rotations=[[0.0, 0.0, 0.0]],
+            positions=[[0.0, 0.0, 0.0]],
+            rotations=[[0.0, 0.0, 0.0]],
             hex_centers=make_hex_centers(n_rings=2, hex_size=0.01),
             concentrator=StubCone(),
         )
@@ -450,7 +472,9 @@ class TestConcentratorIndex:
         rays = RayBundle(
             origins=jnp.zeros((1, 3)),
             directions=jnp.array([[0.0, 0.0, -1.0]]),
-            values=jnp.ones(1), path_length=jnp.zeros(1), n=jnp.ones(1),
+            values=jnp.ones(1),
+            path_length=jnp.zeros(1),
+            n=jnp.ones(1),
         )
         out = SolidStub(length=0.05, n_mat=1.5).apply(rays)
         # OPL = index * geometric length, not the bare geometric 0.05.

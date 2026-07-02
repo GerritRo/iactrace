@@ -26,60 +26,46 @@ def _update_sensor_group(
     return _replace_sensor_group(camera, sensor_idx, new_sensor)
 
 
-def _replace_sensor_group(
-    camera: Camera, sensor_idx: int, new_group: SensorGroup
-) -> Camera:
+def _replace_sensor_group(camera: Camera, sensor_idx: int, new_group: SensorGroup) -> Camera:
     """Swap a whole sensor group into the camera and return the updated Camera."""
     new_groups = list(camera.sensor_groups)
     new_groups[sensor_idx] = new_group
     return eqx.tree_at(lambda c: c.sensor_groups, camera, new_groups)
 
 
-def set_sensor_positions(
-    camera: Camera, sensor_idx: int, positions: Any
-) -> Camera:
+def set_sensor_positions(camera: Camera, sensor_idx: int, positions: Any) -> Camera:
     """Set positions for sensors in a group."""
-    return _update_sensor_group(
-        camera, sensor_idx, lambda s: s.positions, jnp.asarray(positions)
-    )
+    return _update_sensor_group(camera, sensor_idx, lambda s: s.positions, jnp.asarray(positions))
 
 
-def set_sensor_rotations(
-    camera: Camera, sensor_idx: int, rotations: Any
-) -> Camera:
+def set_sensor_rotations(camera: Camera, sensor_idx: int, rotations: Any) -> Camera:
     """Set rotations for sensors in a group."""
-    return _update_sensor_group(
-        camera, sensor_idx, lambda s: s.rotations, jnp.asarray(rotations)
-    )
+    return _update_sensor_group(camera, sensor_idx, lambda s: s.rotations, jnp.asarray(rotations))
 
 
-def _replace_chain(
-    camera: Camera, sensor_idx: int, new_chain: DetectionChain
-) -> Camera:
+def _replace_chain(camera: Camera, sensor_idx: int, new_chain: DetectionChain) -> Camera:
     """Swap a sensor group's detection chain and return the updated Camera."""
     group = camera.sensor_groups[sensor_idx]
     new_group = eqx.tree_at(lambda g: g.chain, group, new_chain)
     return _replace_sensor_group(camera, sensor_idx, new_group)
 
 
-def set_concentrator(
-    camera: Camera, sensor_idx: int, concentrator: Concentrator | None
-) -> Camera:
+def set_concentrator(camera: Camera, sensor_idx: int, concentrator: Concentrator | None) -> Camera:
     """Set or replace the concentrator on a sensor group's detection chain."""
     chain = camera.sensor_groups[sensor_idx].chain
     return _replace_chain(
-        camera, sensor_idx,
+        camera,
+        sensor_idx,
         DetectionChain(concentrator, chain.photosensor, chain.gap),
     )
 
 
-def set_photosensor(
-    camera: Camera, sensor_idx: int, photosensor: PhotoSensor
-) -> Camera:
+def set_photosensor(camera: Camera, sensor_idx: int, photosensor: PhotoSensor) -> Camera:
     """Set or replace the photosensor on a sensor group's detection chain."""
     chain = camera.sensor_groups[sensor_idx].chain
     return _replace_chain(
-        camera, sensor_idx,
+        camera,
+        sensor_idx,
         DetectionChain(chain.concentrator, photosensor, chain.gap),
     )
 
@@ -88,7 +74,8 @@ def set_gap(camera: Camera, sensor_idx: int, gap: float) -> Camera:
     """Set the gap (upstream exit -> detector spacing) on a group's chain."""
     chain = camera.sensor_groups[sensor_idx].chain
     return _replace_chain(
-        camera, sensor_idx,
+        camera,
+        sensor_idx,
         DetectionChain(chain.concentrator, chain.photosensor, float(gap)),
     )
 

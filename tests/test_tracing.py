@@ -23,11 +23,11 @@ class TestRoughnessInTracing:
     def telescope_and_camera(self):
         """Load a test telescope and camera from the split config files."""
         telescope = Telescope.from_yaml(
-            'configs/HESS/CT3.yaml',
+            "configs/HESS/CT3.yaml",
             16,
             key=jax.random.key(42),
         )
-        camera = Camera.from_yaml('configs/HESS/HESS1U.yaml')
+        camera = Camera.from_yaml("configs/HESS/HESS1U.yaml")
         return telescope, camera
 
     @pytest.fixture
@@ -38,11 +38,9 @@ class TestRoughnessInTracing:
         key1, key2 = jax.random.split(key)
         r = 5.0 * jnp.sqrt(jax.random.uniform(key1, (n_rays,)))
         theta = jax.random.uniform(key2, (n_rays,)) * 2 * jnp.pi
-        origins = jnp.stack([
-            r * jnp.cos(theta),
-            r * jnp.sin(theta),
-            jnp.ones(n_rays) * 100.0
-        ], axis=1)
+        origins = jnp.stack(
+            [r * jnp.cos(theta), r * jnp.sin(theta), jnp.ones(n_rays) * 100.0], axis=1
+        )
         directions = jnp.broadcast_to(jnp.array([0.0, 0.0, -1.0]), (n_rays, 3))
         values = jnp.ones(n_rays)
         return origins, directions, values
@@ -51,7 +49,7 @@ class TestRoughnessInTracing:
         """Test that sample_key is properly initialized."""
         telescope, camera = telescope_and_camera
         group = telescope.mirror_groups[0]
-        assert hasattr(group, 'sample_key')
+        assert hasattr(group, "sample_key")
         assert group.sample_key is not None
 
     def test_roughness_increases_psf_spread(self, telescope_and_camera, test_rays):
@@ -77,8 +75,9 @@ class TestRoughnessInTracing:
             std_rough = jnp.std(x_rough[hit_mask_rough])
 
             # Roughness should increase spread
-            assert std_rough > std_clean, \
+            assert std_rough > std_clean, (
                 f"Roughness should increase PSF spread: {std_rough} <= {std_clean}"
+            )
 
     def test_zero_roughness_no_change(self, telescope_and_camera, test_rays):
         """Test that zero roughness doesn't change results."""
@@ -98,7 +97,9 @@ class TestRoughnessInTracing:
         pts_clean = jnp.stack([x_clean, y_clean], axis=1)
         pts_zero = jnp.stack([x_zero, y_zero], axis=1)
         assert jnp.allclose(pts_clean, pts_zero), "Zero roughness should not change results"
-        assert jnp.allclose(rb_clean.values, rb_zero.values), "Zero roughness should not change values"
+        assert jnp.allclose(rb_clean.values, rb_zero.values), (
+            "Zero roughness should not change values"
+        )
 
     def test_roughness_is_deterministic(self, telescope_and_camera, test_rays):
         """Test that roughness produces deterministic results."""
@@ -125,20 +126,20 @@ class TestRoughnessInTracing:
 
         # Create two telescopes with different keys; they share a camera.
         tel1 = Telescope.from_yaml(
-            'configs/HESS/CT3.yaml',
+            "configs/HESS/CT3.yaml",
             16,
             key=jax.random.key(1),
         )
         tel1 = tel1.apply_roughness(0, 30.0)
-        cam1 = Camera.from_yaml('configs/HESS/HESS1U.yaml')
+        cam1 = Camera.from_yaml("configs/HESS/HESS1U.yaml")
 
         tel2 = Telescope.from_yaml(
-            'configs/HESS/CT3.yaml',
+            "configs/HESS/CT3.yaml",
             16,
             key=jax.random.key(2),
         )
         tel2 = tel2.apply_roughness(0, 30.0)
-        cam2 = Camera.from_yaml('configs/HESS/HESS1U.yaml')
+        cam2 = Camera.from_yaml("configs/HESS/HESS1U.yaml")
 
         rb1 = tel1.trace(origins, directions, values)
         rb2 = tel2.trace(origins, directions, values)
@@ -149,8 +150,7 @@ class TestRoughnessInTracing:
         pts2 = jnp.stack([x2, y2], axis=1)
 
         # Results should be different (not exactly equal)
-        assert not jnp.allclose(pts1, pts2), \
-            "Different keys should produce different perturbations"
+        assert not jnp.allclose(pts1, pts2), "Different keys should produce different perturbations"
 
 
 class TestMirrorGroupKeys:
@@ -181,7 +181,7 @@ class TestMirrorGroupKeys:
             n_samples=100,
         )
 
-        assert hasattr(group, 'sample_key')
+        assert hasattr(group, "sample_key")
         assert group.sample_key is not None
 
     def test_bsdf_scale_default_zero(self):
@@ -210,5 +210,4 @@ class TestMirrorGroupKeys:
         )
 
         # bsdf.scale defaults to zero (no roughness effect)
-        assert jnp.all(group.bsdf.scale == 0), \
-            "Default bsdf.scale should be zero"
+        assert jnp.all(group.bsdf.scale == 0), "Default bsdf.scale should be zero"

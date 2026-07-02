@@ -36,7 +36,7 @@ class CylinderGroup(ObstructionGroup):
 
     p1: jax.Array  # (N, 3)
     p2: jax.Array  # (N, 3)
-    r: jax.Array   # (N,)
+    r: jax.Array  # (N,)
 
     def __init__(self, p1, p2, r):
         self.p1 = jnp.asarray(p1)
@@ -64,7 +64,7 @@ class OpenCylinderGroup(ObstructionGroup):
 
     p1: jax.Array  # (N, 3) - first endpoint of axis
     p2: jax.Array  # (N, 3) - second endpoint of axis
-    r: jax.Array   # (N,) - radius
+    r: jax.Array  # (N,) - radius
 
     def __init__(self, p1, p2, r):
         self.p1 = jnp.asarray(p1)
@@ -107,7 +107,7 @@ class SphereGroup(ObstructionGroup):
     """Group of spheres for efficient batched intersection."""
 
     centers: jax.Array  # (N, 3)
-    radii: jax.Array    # (N,)
+    radii: jax.Array  # (N,)
 
     def __init__(self, centers, radii):
         self.centers = jnp.asarray(centers)
@@ -127,9 +127,9 @@ class SphereGroup(ObstructionGroup):
 class OrientedBoxGroup(ObstructionGroup):
     """Group of oriented boxes for efficient batched intersection."""
 
-    centers: jax.Array       # (N, 3)
+    centers: jax.Array  # (N, 3)
     half_extents: jax.Array  # (N, 3)
-    rotations: jax.Array     # (N, 3, 3)
+    rotations: jax.Array  # (N, 3, 3)
 
     def __init__(self, centers, half_extents, rotations):
         self.centers = jnp.asarray(centers)

@@ -9,7 +9,7 @@ from iactrace import Telescope
 # Get absolute path to config files (relative to this benchmark file)
 _BENCHMARK_DIR = Path(__file__).parent.absolute()
 _PROJECT_ROOT = _BENCHMARK_DIR.parent
-_CONFIG_PATH = _PROJECT_ROOT / 'configs' / 'HESS' / 'CT3.yaml'
+_CONFIG_PATH = _PROJECT_ROOT / "configs" / "HESS" / "CT3.yaml"
 
 
 def _block(result):
@@ -30,10 +30,10 @@ class RenderBenchmarks:
     """
 
     params = [
-        [1, 10],      # n_sources
-        [16, 256],     # n_samples (integrator samples per element)
+        [1, 10],  # n_sources
+        [16, 256],  # n_samples (integrator samples per element)
     ]
-    param_names = ['n_sources', 'n_samples']
+    param_names = ["n_sources", "n_samples"]
 
     timeout = 300
 
@@ -48,24 +48,23 @@ class RenderBenchmarks:
         # Create point sources at varying positions
         key = jax.random.key(123)
         self.sources = jax.random.uniform(
-            key, (n_sources, 3),
+            key,
+            (n_sources, 3),
             minval=jnp.array([-5.0, -5.0, 1000.0]),
-            maxval=jnp.array([5.0, 5.0, 2000.0])
+            maxval=jnp.array([5.0, 5.0, 2000.0]),
         )
         self.values = jnp.ones(n_sources)
 
         # Warmup: trigger JIT compilation. Telescope.render returns a
         # LazyRayBundle, so we have to materialise it to actually execute
         # the ray-trace.
-        _ = _block(self.telescope.render(
-            self.sources, self.values, source_type='point'
-        ).materialise())
+        _ = _block(
+            self.telescope.render(self.sources, self.values, source_type="point").materialise()
+        )
 
     def time_render_point_sources(self, n_sources, n_samples):
         """Time rendering point sources."""
-        result = self.telescope.render(
-            self.sources, self.values, source_type='point'
-        ).materialise()
+        result = self.telescope.render(self.sources, self.values, source_type="point").materialise()
         _block(result)
 
 
@@ -76,10 +75,8 @@ class RayTracingBenchmarks:
     trace_rays() traces rays from arbitrary origins.
     """
 
-    params = [
-        [100, 1000]
-    ]
-    param_names = ['n_rays']
+    params = [[100, 1000]]
+    param_names = ["n_rays"]
 
     timeout = 300
 
@@ -99,30 +96,19 @@ class RayTracingBenchmarks:
         r = 5.0 * jnp.sqrt(jax.random.uniform(key1, (n_rays,)))
         theta = jax.random.uniform(key2, (n_rays,)) * 2 * jnp.pi
 
-        self.origins = jnp.stack([
-            r * jnp.cos(theta),
-            r * jnp.sin(theta),
-            jnp.ones(n_rays) * 100.0
-        ], axis=1)
-
-        self.directions = jnp.broadcast_to(
-            jnp.array([0.0, 0.0, -1.0]),
-            (n_rays, 3)
+        self.origins = jnp.stack(
+            [r * jnp.cos(theta), r * jnp.sin(theta), jnp.ones(n_rays) * 100.0], axis=1
         )
+
+        self.directions = jnp.broadcast_to(jnp.array([0.0, 0.0, -1.0]), (n_rays, 3))
         self.values = jnp.ones(n_rays)
 
         # Warmup: trigger JIT compilation
-        _ = _block(self.telescope.trace(
-            self.origins,
-            self.directions,
-            self.values
-        ))
+        _ = _block(self.telescope.trace(self.origins, self.directions, self.values))
 
     def time_trace_rays(self, n_rays):
         """Time classical ray tracing."""
-        result = self.telescope.trace(
-            self.origins, self.directions, self.values
-        )
+        result = self.telescope.trace(self.origins, self.directions, self.values)
         _block(result)
 
 
@@ -134,10 +120,10 @@ class GradientBenchmarks:
     """
 
     params = [
-        [1, 10],       # n_sources
-        [16, 64],      # n_samples
+        [1, 10],  # n_sources
+        [16, 64],  # n_samples
     ]
-    param_names = ['n_sources', 'n_samples']
+    param_names = ["n_sources", "n_samples"]
 
     timeout = 600
 
@@ -151,9 +137,10 @@ class GradientBenchmarks:
 
         key = jax.random.key(111)
         self.sources = jax.random.uniform(
-            key, (n_sources, 3),
+            key,
+            (n_sources, 3),
             minval=jnp.array([-2.0, -2.0, 1000.0]),
-            maxval=jnp.array([2.0, 2.0, 1500.0])
+            maxval=jnp.array([2.0, 2.0, 1500.0]),
         )
         self.values = jnp.ones(n_sources)
 
@@ -165,9 +152,11 @@ class GradientBenchmarks:
         def loss_fn(trainable, static):
             tel = eqx.combine(trainable, static)
             rays = tel.render(
-                self.sources, self.values, source_type='point',
+                self.sources,
+                self.values,
+                source_type="point",
             ).materialise()
-            return jnp.sum(rays.directions ** 2)
+            return jnp.sum(rays.directions**2)
 
         self.loss_fn = loss_fn
         self.grad_fn = eqx.filter_value_and_grad(loss_fn)
@@ -175,7 +164,6 @@ class GradientBenchmarks:
         # Warmup: trigger JIT compilation for both forward and backward
         _ = _block(self.loss_fn(self.trainable, self.static))
         _ = _block(self.grad_fn(self.trainable, self.static))
-
 
     def time_gradient(self, n_sources, n_samples):
         """Time gradient computation (includes forward pass)."""
@@ -190,7 +178,7 @@ class TelescopeLoadingBenchmarks:
     """
 
     params = [[256]]
-    param_names = ['n_samples']
+    param_names = ["n_samples"]
 
     timeout = 120
 

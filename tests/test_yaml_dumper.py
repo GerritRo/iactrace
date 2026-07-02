@@ -132,9 +132,7 @@ def telescope_with_obstructions_config():
             "camera_rotation": [0.0, 0.0, 0.0],
         },
         "mirror_templates": {
-            "primary": {
-                "surface": {"curvature": 0.05, "conic": -1.0, "aspheric": []}
-            }
+            "primary": {"surface": {"curvature": 0.05, "conic": -1.0, "aspheric": []}}
         },
         "mirrors": [
             {
@@ -146,7 +144,13 @@ def telescope_with_obstructions_config():
             },
         ],
         "obstructions": [
-            {"id": "cylinder_0", "type": "cylinder", "p1": [0.0, 0.0, 0.0], "p2": [0.0, 0.0, 5.0], "r": 0.1},
+            {
+                "id": "cylinder_0",
+                "type": "cylinder",
+                "p1": [0.0, 0.0, 0.0],
+                "p2": [0.0, 0.0, 5.0],
+                "r": 0.1,
+            },
             {"id": "box_0", "type": "box", "p1": [-0.5, -0.5, 2.0], "p2": [0.5, 0.5, 2.5]},
             {"id": "sphere_0", "type": "sphere", "center": [1.0, 0.0, 3.0], "r": 0.2},
         ],
@@ -175,9 +179,7 @@ class TestTelescopeToDict:
 
 
 class TestSaveTelescope:
-    def test_save_creates_file(
-        self, n_samples, random_key, simple_disk_telescope_config
-    ):
+    def test_save_creates_file(self, n_samples, random_key, simple_disk_telescope_config):
         telescope = build_telescope_config(simple_disk_telescope_config, n_samples, random_key)
         with tempfile.NamedTemporaryFile(suffix=".yaml", delete=False) as f:
             filepath = Path(f.name)
@@ -187,9 +189,7 @@ class TestSaveTelescope:
         finally:
             filepath.unlink(missing_ok=True)
 
-    def test_save_overwrite_false_raises(
-        self, n_samples, random_key, simple_disk_telescope_config
-    ):
+    def test_save_overwrite_false_raises(self, n_samples, random_key, simple_disk_telescope_config):
         telescope = build_telescope_config(simple_disk_telescope_config, n_samples, random_key)
         with tempfile.NamedTemporaryFile(suffix=".yaml", delete=False) as f:
             filepath = Path(f.name)
@@ -204,9 +204,7 @@ class TestSaveTelescope:
 
 
 class TestRoundTrip:
-    def test_disk_mirror_roundtrip(
-        self, n_samples, random_key, simple_disk_telescope_config
-    ):
+    def test_disk_mirror_roundtrip(self, n_samples, random_key, simple_disk_telescope_config):
         telescope1 = build_telescope_config(simple_disk_telescope_config, n_samples, random_key)
         with tempfile.NamedTemporaryFile(suffix=".yaml", delete=False) as f:
             filepath = Path(f.name)
@@ -216,9 +214,7 @@ class TestRoundTrip:
 
             assert telescope1.name == telescope2.name
             assert len(telescope1.mirror_groups) == len(telescope2.mirror_groups)
-            for g1, g2 in zip(
-                telescope1.mirror_groups, telescope2.mirror_groups, strict=False
-            ):
+            for g1, g2 in zip(telescope1.mirror_groups, telescope2.mirror_groups, strict=False):
                 np.testing.assert_allclose(
                     np.asarray(g1.positions), np.asarray(g2.positions), rtol=1e-5
                 )
@@ -235,12 +231,18 @@ class TestRoundTrip:
         from iactrace.telescope.mirrors import mirror_group
 
         mg = mirror_group(
-            positions=jnp.array([[0.0, 0.0, 0.0]]), rotations=jnp.array([[0.0, 0.0, 0.0]]),
-            curvatures=jnp.array([0.5]), conics=jnp.array([-1.0]), aspherics=jnp.zeros((1, 0)),
+            positions=jnp.array([[0.0, 0.0, 0.0]]),
+            rotations=jnp.array([[0.0, 0.0, 0.0]]),
+            curvatures=jnp.array([0.5]),
+            conics=jnp.array([-1.0]),
+            aspherics=jnp.zeros((1, 0)),
             offsets=jnp.zeros((1, 2)),
             aperture=DiskAperture(radii=jnp.array([0.1]), inner_radii=jnp.array([0.0])),
-            reflectivity=jnp.array([reflectivity]), bsdf=bsdf,
-            sample_key=random_key, optical_stage=0, n_samples=10,
+            reflectivity=jnp.array([reflectivity]),
+            bsdf=bsdf,
+            sample_key=random_key,
+            optical_stage=0,
+            n_samples=10,
         )
         tel = Telescope(mirror_groups=[mg], camera_position=[0.0, 0.0, 1.0])
         with tempfile.NamedTemporaryFile(suffix=".yaml", delete=False) as f:
@@ -262,8 +264,11 @@ class TestRoundTrip:
         import jax.numpy as jnp
 
         from iactrace.core.bsdf import GaussianBSDF
+
         g = self._roundtrip_mirror(
-            bsdf=GaussianBSDF(scale=jnp.array([25.0])), reflectivity=1.0, random_key=random_key,
+            bsdf=GaussianBSDF(scale=jnp.array([25.0])),
+            reflectivity=1.0,
+            random_key=random_key,
         )
         assert isinstance(g.bsdf, GaussianBSDF)
         np.testing.assert_allclose(np.asarray(g.bsdf.scale), [25.0], rtol=1e-5)
@@ -272,12 +277,15 @@ class TestRoundTrip:
         import jax.numpy as jnp
 
         from iactrace.core.bsdf import DoubleGaussianBSDF
+
         g = self._roundtrip_mirror(
             bsdf=DoubleGaussianBSDF(
-                scale_narrow=jnp.array([10.0]), scale_wide=jnp.array([120.0]),
+                scale_narrow=jnp.array([10.0]),
+                scale_wide=jnp.array([120.0]),
                 mix_weight=jnp.array([0.2]),
             ),
-            reflectivity=0.9, random_key=random_key,
+            reflectivity=0.9,
+            random_key=random_key,
         )
         assert isinstance(g.bsdf, DoubleGaussianBSDF)
         np.testing.assert_allclose(np.asarray(g.bsdf.scale_narrow), [10.0], rtol=1e-5)
@@ -287,9 +295,7 @@ class TestRoundTrip:
             np.asarray(g.interaction_module.reflectivity_scalar), [0.9], rtol=1e-5
         )
 
-    def test_polygon_mirror_roundtrip(
-        self, n_samples, random_key, polygon_telescope_config
-    ):
+    def test_polygon_mirror_roundtrip(self, n_samples, random_key, polygon_telescope_config):
         telescope1 = build_telescope_config(polygon_telescope_config, n_samples, random_key)
         with tempfile.NamedTemporaryFile(suffix=".yaml", delete=False) as f:
             filepath = Path(f.name)
@@ -298,11 +304,10 @@ class TestRoundTrip:
             telescope2 = Telescope.from_yaml(filepath, n_samples, key=random_key)
 
             from iactrace.core.apertures import PolygonAperture
-            for g1, g2 in zip(
-                telescope1.mirror_groups, telescope2.mirror_groups, strict=False
-            ):
-                if isinstance(getattr(g1, 'aperture', None), PolygonAperture):
-                    assert isinstance(getattr(g2, 'aperture', None), PolygonAperture)
+
+            for g1, g2 in zip(telescope1.mirror_groups, telescope2.mirror_groups, strict=False):
+                if isinstance(getattr(g1, "aperture", None), PolygonAperture):
+                    assert isinstance(getattr(g2, "aperture", None), PolygonAperture)
                     np.testing.assert_allclose(
                         np.asarray(g1.aperture.vertices),
                         np.asarray(g2.aperture.vertices),
@@ -364,9 +369,7 @@ class TestRoundTrip:
             save_telescope(telescope1, filepath, precision=12)
             telescope2 = Telescope.from_yaml(filepath, n_samples, key=random_key)
 
-            for g1, g2 in zip(
-                telescope1.mirror_groups, telescope2.mirror_groups, strict=False
-            ):
+            for g1, g2 in zip(telescope1.mirror_groups, telescope2.mirror_groups, strict=False):
                 np.testing.assert_allclose(
                     np.asarray(g1.surface.curvatures),
                     np.asarray(g2.surface.curvatures),
@@ -401,6 +404,7 @@ class TestRoundTrip:
             camera2 = Camera.from_yaml(filepath)
 
             from iactrace.camera.sensor_group import HexagonalSensorGroup
+
             s1 = camera1.sensor_groups[0]
             s2 = camera2.sensor_groups[0]
             assert isinstance(s1, HexagonalSensorGroup)
@@ -415,9 +419,14 @@ class TestRoundTrip:
 
     def _square(self, concentrator=None, photosensor=None, gap=0.0):
         return SquareSensorGroup(
-            positions=[[0.0, 0.0, 0.0]], rotations=[[0.0, 0.0, 0.0]],
-            width=4, height=4, bounds=(-0.02, 0.02, -0.02, 0.02),
-            concentrator=concentrator, photosensor=photosensor, gap=gap,
+            positions=[[0.0, 0.0, 0.0]],
+            rotations=[[0.0, 0.0, 0.0]],
+            width=4,
+            height=4,
+            bounds=(-0.02, 0.02, -0.02, 0.02),
+            concentrator=concentrator,
+            photosensor=photosensor,
+            gap=gap,
         )
 
     def test_camera_chain_scalars_roundtrip(self):
@@ -436,8 +445,12 @@ class TestRoundTrip:
 
     def test_camera_winston_cone_roundtrip(self):
         cone = WinstonCone(
-            n_sides=6, entrance_apothem=0.025, exit_apothem=0.01,
-            reflectivity=0.92, max_bounces=8, orientation_deg=15.0,
+            n_sides=6,
+            entrance_apothem=0.025,
+            exit_apothem=0.01,
+            reflectivity=0.92,
+            max_bounces=8,
+            orientation_deg=15.0,
         )
         camera1 = Camera([self._square(concentrator=cone, gap=0.003)])
         with tempfile.NamedTemporaryFile(suffix=".yaml", delete=False) as f:
@@ -485,6 +498,42 @@ class TestRoundTrip:
         finally:
             filepath.unlink(missing_ok=True)
 
+    def test_camera_okumura_cone_roundtrip(self):
+        from iactrace import OkumuraCone
+
+        cone = OkumuraCone.cubic(
+            n_sides=6,
+            entrance_apothem=0.025,
+            exit_apothem=0.01,
+            p1=(0.39, 0.18),
+            p2=(0.87, 0.36),
+            reflectivity=0.92,
+            max_bounces=8,
+            orientation_deg=15.0,
+        )
+        camera1 = Camera([self._square(concentrator=cone, gap=0.003)])
+        with tempfile.NamedTemporaryFile(suffix=".yaml", delete=False) as f:
+            filepath = Path(f.name)
+        try:
+            save_camera(camera1, filepath)
+            sensor = camera1.to_dict()["sensors"][0]
+            assert sensor["concentrator"]["type"] == "okumura"
+            chain2 = Camera.from_yaml(filepath).sensor_groups[0].chain
+            c1, c2 = camera1.sensor_groups[0].chain.concentrator, chain2.concentrator
+            assert isinstance(c2, OkumuraCone)
+            assert c2.degree == c1.degree == 3
+            assert c2.control_points == pytest.approx(np.asarray(c1.control_points))
+            assert c2.n_sides == c1.n_sides
+            assert c2.max_bounces == c1.max_bounces
+            assert c2.exit_apothem == pytest.approx(c1.exit_apothem)
+            assert c2.entrance_apothem == pytest.approx(c1.entrance_apothem)
+            assert c2.length == pytest.approx(c1.length, rel=1e-4)
+            assert c2.reflectivity == pytest.approx(c1.reflectivity)
+            assert c2.orientation == pytest.approx(c1.orientation)
+            assert chain2.gap == pytest.approx(0.003)
+        finally:
+            filepath.unlink(missing_ok=True)
+
     def test_camera_nonuniform_photosensor_warns_and_falls_back(self):
         import equinox as eqx
 
@@ -521,15 +570,20 @@ class TestRoundTrip:
     def test_sensor_without_chain_keys_backward_compatible(self):
         # Released camera files are `sensors:`-only with no detection-chain keys;
         # each group must load with a trivial chain (no cone, perfect QE, no gap).
-        camera = build_camera_config({
-            "sensors": [{
-                "type": "square",
-                "position": [0.0, 0.0, 0.0],
-                "orientation": [0.0, 0.0, 0.0],
-                "width": 4, "height": 4,
-                "bounds": [-0.02, 0.02, -0.02, 0.02],
-            }],
-        })
+        camera = build_camera_config(
+            {
+                "sensors": [
+                    {
+                        "type": "square",
+                        "position": [0.0, 0.0, 0.0],
+                        "orientation": [0.0, 0.0, 0.0],
+                        "width": 4,
+                        "height": 4,
+                        "bounds": [-0.02, 0.02, -0.02, 0.02],
+                    }
+                ],
+            }
+        )
         chain = camera.sensor_groups[0].chain
         assert chain.concentrator is None
         assert isinstance(chain.photosensor, UniformQE)
@@ -539,17 +593,22 @@ class TestRoundTrip:
     def test_photosensor_slot_explicit_yaml(self):
         # The detector response is a first-class discriminated `photosensor:` slot
         # on each sensor group, alongside its `gap`.
-        camera = build_camera_config({
-            "sensors": [{
-                "type": "square",
-                "position": [0.0, 0.0, 0.0],
-                "orientation": [0.0, 0.0, 0.0],
-                "width": 4, "height": 4,
-                "bounds": [-0.02, 0.02, -0.02, 0.02],
-                "photosensor": {"type": "uniform", "qe": 0.7},
-                "gap": 0.002,
-            }],
-        })
+        camera = build_camera_config(
+            {
+                "sensors": [
+                    {
+                        "type": "square",
+                        "position": [0.0, 0.0, 0.0],
+                        "orientation": [0.0, 0.0, 0.0],
+                        "width": 4,
+                        "height": 4,
+                        "bounds": [-0.02, 0.02, -0.02, 0.02],
+                        "photosensor": {"type": "uniform", "qe": 0.7},
+                        "gap": 0.002,
+                    }
+                ],
+            }
+        )
         chain = camera.sensor_groups[0].chain
         assert isinstance(chain.photosensor, UniformQE)
         assert chain.photosensor.qe == pytest.approx(0.7)
@@ -608,6 +667,7 @@ class TestRoundTrip:
             assert 1 in stages
         finally:
             filepath.unlink(missing_ok=True)
+
     def test_reflectivity_curve_roundtrip(self, n_samples, random_key):
         """A tabulated R(theta) curve survives save -> load."""
         from iactrace.core.coatings import (
@@ -674,11 +734,16 @@ class TestRoundTrip:
             filepath.unlink(missing_ok=True)
 
     def test_default_mirror_yaml_unchanged(
-        self, n_samples, random_key, simple_disk_telescope_config,
+        self,
+        n_samples,
+        random_key,
+        simple_disk_telescope_config,
     ):
         """A mirror without curve information saves WITHOUT the new field."""
         telescope = build_telescope_config(
-            simple_disk_telescope_config, n_samples, random_key,
+            simple_disk_telescope_config,
+            n_samples,
+            random_key,
         )
         d = telescope_to_dict(telescope)
         # No new fields appear in the round-tripped YAML

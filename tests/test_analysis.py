@@ -69,10 +69,12 @@ class TestAsphericFocalSurface:
         """With c=0 and no aspherics, the surface degenerates to a plane."""
         flat = FlatFocalPlane()
         aspheric = AsphericFocalSurface(curvature=0.0)
-        bundle = _downward_bundle([
-            [0.0, 0.0, 1.0],
-            [0.1, -0.05, 1.0],
-        ])
+        bundle = _downward_bundle(
+            [
+                [0.0, 0.0, 1.0],
+                [0.1, -0.05, 1.0],
+            ]
+        )
 
         flat_hits = flat.intersect(bundle)
         asph_hits = aspheric.intersect(bundle)
@@ -99,11 +101,13 @@ class TestVmapping:
 
     def test_multiple_rays_independent(self):
         plane = FlatFocalPlane()
-        bundle = _downward_bundle([
-            [0.0, 0.0, 1.0],
-            [0.5, 0.0, 1.0],
-            [0.0, 0.5, 1.0],
-        ])
+        bundle = _downward_bundle(
+            [
+                [0.0, 0.0, 1.0],
+                [0.5, 0.0, 1.0],
+                [0.0, 0.5, 1.0],
+            ]
+        )
         hits = plane.intersect(bundle)
 
         assert hits.hit_mask.shape == (3,)

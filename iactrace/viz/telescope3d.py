@@ -18,7 +18,7 @@ def _apply_color(mesh, rgba):
         factor = [c / 255.0 for c in rgba]
         mat = trimesh.visual.material.PBRMaterial(
             baseColorFactor=factor,
-            alphaMode='BLEND',
+            alphaMode="BLEND",
         )
         mesh.visual = trimesh.visual.TextureVisuals(material=mat)
     else:
@@ -32,6 +32,10 @@ def show_telescope(telescope, camera=None, **kwargs):
     In Jupyter notebooks, displays interactive 3D view via three.js (client-side).
     No server-side OpenGL required.
 
+    When a ``camera`` is supplied, each sensor is drawn as a filled face plus a
+    black wireframe of its pixel grid (square cells or hexagons), so the
+    physical pixel layout can be checked against the rest of the optics.
+
     Args:
         telescope: Telescope object
         camera: Optional Camera object (for rendering sensors)
@@ -40,14 +44,19 @@ def show_telescope(telescope, camera=None, **kwargs):
             - obstruction_color: RGBA color for obstructions (default: gray)
             - sensor_color: RGBA color for sensors (default: red)
             - lens_color: RGBA color for lenses (default: light green, semi-transparent)
+            - show_sensor_grid: Draw per-pixel grid lines for each sensor
+              (default: True; only has an effect when ``camera`` is given)
+            - sensor_grid_color: RGBA color for the pixel grid (default: black)
 
     Returns:
         trimesh.Scene
     """
-    mirror_color = kwargs.get('mirror_color', [135, 206, 235, 200])
-    obstruction_color = kwargs.get('obstruction_color', [128, 128, 128, 255])
-    sensor_color = kwargs.get('sensor_color', [255, 0, 0, 128])
-    lens_color = kwargs.get('lens_color', [144, 238, 144, 150])  # Light green, semi-transparent
+    mirror_color = kwargs.get("mirror_color", [135, 206, 235, 200])
+    obstruction_color = kwargs.get("obstruction_color", [128, 128, 128, 255])
+    sensor_color = kwargs.get("sensor_color", [255, 0, 0, 128])
+    lens_color = kwargs.get("lens_color", [144, 238, 144, 150])  # Light green, semi-transparent
+    show_sensor_grid = kwargs.get("show_sensor_grid", True)
+    sensor_grid_color = kwargs.get("sensor_grid_color", [0, 0, 0, 255])  # Black pixel grid
 
     scene = trimesh.Scene()
 
@@ -87,6 +96,11 @@ def show_telescope(telescope, camera=None, **kwargs):
                 _apply_color(mesh, sensor_color)
                 scene.add_geometry(mesh)
 
+            if show_sensor_grid:
+                for path in _get_sensor_grid_paths(sensor_group, sensor_grid_color):
+                    path.apply_transform(cam_transform)
+                    scene.add_geometry(path)
+
     return scene
 
 
@@ -118,9 +132,9 @@ def show_sensor_chain(camera, sensor_idx=0, **kwargs):
     Returns:
         trimesh.Scene
     """
-    entrance_color = kwargs.get('entrance_color', [255, 0, 0, 128])
-    cone_color = kwargs.get('cone_color', [135, 206, 235, 160])
-    detector_color = kwargs.get('detector_color', [80, 80, 80, 255])
+    entrance_color = kwargs.get("entrance_color", [255, 0, 0, 128])
+    cone_color = kwargs.get("cone_color", [135, 206, 235, 160])
+    detector_color = kwargs.get("detector_color", [80, 80, 80, 255])
 
     sensor = camera.sensor_groups[sensor_idx]
     chain = sensor.chain
@@ -155,7 +169,7 @@ def show_sensor_chain(camera, sensor_idx=0, **kwargs):
         # aperture; with no concentrator, fall back to the pixel footprint.
         cross = chain.concentrator.cross_sections() if chain.concentrator is not None else None
         if cross is not None:
-            exit_ring = np.asarray(cross[1][-1])                 # (M, 2) exit aperture
+            exit_ring = np.asarray(cross[1][-1])  # (M, 2) exit aperture
             r_det = float(np.max(np.linalg.norm(exit_ring, axis=-1)))
             ang = np.linspace(0.0, 2.0 * np.pi, 41)[:-1]
             det_outline = np.column_stack([r_det * np.cos(ang), r_det * np.sin(ang)])
@@ -181,6 +195,7 @@ def _make_double_sided(mesh):
     mesh.faces = np.vstack([mesh.faces, faces_reversed])
     return mesh
 
+
 def _get_mirror_meshes(group):
     """Get list of mirror meshes from group.
 
@@ -188,10 +203,13 @@ def _get_mirror_meshes(group):
     """
     meshes = []
     for i in range(len(group)):
+
         def sag_fn(x, y, _i=i):
             return group.surface.sag_at(_i, x, y)
-        mesh = _aperture_face_mesh(group.positions[i], group.rotations[i],
-                                   group.aperture, i, sag_fn=sag_fn)
+
+        mesh = _aperture_face_mesh(
+            group.positions[i], group.rotations[i], group.aperture, i, sag_fn=sag_fn
+        )
         if mesh is None:
             continue
         meshes.append(_make_double_sided(mesh))
@@ -212,10 +230,13 @@ def _get_lens_meshes(group):
 
     if isinstance(group.interaction_module, RefractInteraction):
         for i in range(len(group)):
+
             def sag_fn(x, y, _i=i):
                 return group.surface.sag_at(_i, x, y)
-            mesh = _aperture_face_mesh(group.positions[i], group.rotations[i],
-                                       group.aperture, i, sag_fn=sag_fn)
+
+            mesh = _aperture_face_mesh(
+                group.positions[i], group.rotations[i], group.aperture, i, sag_fn=sag_fn
+            )
             if mesh is None:
                 continue
             meshes.append(_make_double_sided(mesh))
@@ -223,8 +244,9 @@ def _get_lens_meshes(group):
     elif isinstance(group.interaction_module, SlabInteraction):
         thickness = np.asarray(group.interaction_module.thickness)
         for i in range(len(group)):
-            mesh = _aperture_slab_mesh(group.positions[i], group.rotations[i],
-                                       group.aperture, i, float(thickness[i]))
+            mesh = _aperture_slab_mesh(
+                group.positions[i], group.rotations[i], group.aperture, i, float(thickness[i])
+            )
             if mesh is not None:
                 meshes.append(mesh)
 
@@ -339,6 +361,89 @@ def _get_sensor_meshes(sensor_group):
     return meshes
 
 
+def _sensor_grid_segments_2d(sensor_group):
+    """Pixel-boundary line segments for one sensor, in the sensor-local frame.
+
+    Returns an ``(S, 2, 2)`` array of ``S`` segments (each a start/end 2D
+    point) tracing the pixel grid, or ``None`` for an unsupported group.
+    Square groups yield the full set of grid lines; hexagonal groups yield
+    each pixel's six-edge outline (interior edges are drawn twice, which is
+    fine for a wireframe overlay). The conventions match the filled pixel
+    polygons in :func:`iactrace.viz.plotting.show_camera`.
+    """
+    from ..camera import HexagonalSensorGroup, SquareSensorGroup
+
+    if isinstance(sensor_group, SquareSensorGroup):
+        w, h = sensor_group.width, sensor_group.height
+        xs = sensor_group.x0 + np.arange(w + 1) * sensor_group.dx
+        ys = sensor_group.y0 + np.arange(h + 1) * sensor_group.dy
+        verticals = np.stack(
+            [
+                np.column_stack([xs, np.full(w + 1, ys[0])]),
+                np.column_stack([xs, np.full(w + 1, ys[-1])]),
+            ],
+            axis=1,
+        )  # (w+1, 2, 2)
+        horizontals = np.stack(
+            [
+                np.column_stack([np.full(h + 1, xs[0]), ys]),
+                np.column_stack([np.full(h + 1, xs[-1]), ys]),
+            ],
+            axis=1,
+        )  # (h+1, 2, 2)
+        return np.concatenate([verticals, horizontals], axis=0)
+
+    if isinstance(sensor_group, HexagonalSensorGroup):
+        centers = np.asarray(sensor_group.hex_centers)
+        s = sensor_group.hex_size
+        angles = np.deg2rad(np.arange(30.0, 360.0, 60.0)) + sensor_group.grid_rotation
+        offsets = s * np.stack([np.cos(angles), np.sin(angles)], axis=-1)  # (6, 2)
+        corners = centers[:, None, :] + offsets[None, :, :]  # (n_pix, 6, 2)
+        nxt = np.roll(corners, -1, axis=1)
+        segments = np.stack([corners, nxt], axis=2)  # (n_pix, 6, 2, 2)
+        return segments.reshape(-1, 2, 2)
+
+    return None
+
+
+def _get_sensor_grid_paths(sensor_group, color):
+    """Build pixel-grid wireframe paths for a sensor group (camera frame).
+
+    Returns one :class:`trimesh.path.Path3D` per sensor, drawing the pixel
+    boundaries as coloured line segments so the physical pixel layout can be
+    inspected alongside the filled sensor faces. The lines are nudged a hair
+    off the sensor plane so they never z-fight with the sensor mesh.
+    """
+    segments_2d = _sensor_grid_segments_2d(sensor_group)
+    if segments_2d is None or len(segments_2d) == 0:
+        return []
+
+    # Offset the wireframe by 0.1% of the sensor extent along the local +Z so
+    # it sits just in front of the filled face (negligible, avoids z-fighting).
+    lift = 1e-3 * float(np.ptp(segments_2d.reshape(-1, 2), axis=0).max())
+
+    n_seg = len(segments_2d)
+    local = np.zeros((n_seg, 2, 3))
+    local[:, :, :2] = segments_2d
+    local[:, :, 2] = lift
+
+    positions = np.asarray(sensor_group.positions)
+    rotations = np.asarray(sensor_group.rotations)
+    colors = np.tile(np.asarray(color, dtype=np.uint8), (n_seg, 1))
+
+    paths = []
+    for i in range(len(sensor_group)):
+        rot = np.asarray(euler_to_matrix(rotations[i]))
+        world = local @ rot.T + positions[i]
+        path = trimesh.path.Path3D(
+            entities=[trimesh.path.entities.Line([2 * k, 2 * k + 1]) for k in range(n_seg)],
+            vertices=world.reshape(-1, 3),
+        )
+        path.colors = colors
+        paths.append(path)
+    return paths
+
+
 def _pixel_outline_2d(sensor_group):
     """Single-pixel boundary polygon ``(M, 2)``, centred at the origin.
 
@@ -393,8 +498,15 @@ def _create_lofted_mesh(z, rings):
     return _make_double_sided(mesh)
 
 
-def _create_disk_mesh(position, rotation_euler, radius, sag_fn=None,
-                      inner_radius=0.0, resolution=32, radial_resolution=8):
+def _create_disk_mesh(
+    position,
+    rotation_euler,
+    radius,
+    sag_fn=None,
+    inner_radius=0.0,
+    resolution=32,
+    radial_resolution=8,
+):
     """Create disk mesh with surface curvature.
 
     Args:
@@ -412,7 +524,7 @@ def _create_disk_mesh(position, rotation_euler, radius, sag_fn=None,
         radii_vals = np.linspace(inner_radius, radius, radial_resolution + 1)
 
         # Create ring vertex coordinates (no center vertex)
-        r_grid, t_grid = np.meshgrid(radii_vals, theta, indexing='ij')
+        r_grid, t_grid = np.meshgrid(radii_vals, theta, indexing="ij")
         x_all = (r_grid * np.cos(t_grid)).ravel()
         y_all = (r_grid * np.sin(t_grid)).ravel()
 
@@ -441,7 +553,7 @@ def _create_disk_mesh(position, rotation_euler, radius, sag_fn=None,
         radii_vals = np.linspace(0, radius, radial_resolution + 1)
 
         # Create ring vertex coordinates
-        r_grid, t_grid = np.meshgrid(radii_vals[1:], theta, indexing='ij')
+        r_grid, t_grid = np.meshgrid(radii_vals[1:], theta, indexing="ij")
         x_ring = (r_grid * np.cos(t_grid)).ravel()
         y_ring = (r_grid * np.sin(t_grid)).ravel()
 
@@ -482,8 +594,7 @@ def _create_disk_mesh(position, rotation_euler, radius, sag_fn=None,
     return trimesh.Trimesh(vertices=world_vertices, faces=faces)
 
 
-def _create_polygon_mesh(position, rotation_euler, vertices_2d, sag_fn=None,
-                         grid_resolution=8):
+def _create_polygon_mesh(position, rotation_euler, vertices_2d, sag_fn=None, grid_resolution=8):
     """Create polygon mesh with optional surface curvature.
 
     Args:
@@ -523,6 +634,7 @@ def _create_polygon_mesh(position, rotation_euler, vertices_2d, sag_fn=None,
         # Delaunay triangulation
         try:
             from scipy.spatial import Delaunay  # type: ignore[import-untyped]
+
             tri = Delaunay(all_points_2d)
 
             # Filter triangles to those inside polygon
@@ -597,11 +709,7 @@ def _create_cylinder_mesh(p1, p2, radius, sections=16):
         v = np.cross(z_axis, direction_norm)
         s = np.linalg.norm(v)
         c = np.dot(z_axis, direction_norm)
-        vx = np.array([
-            [0, -v[2], v[1]],
-            [v[2], 0, -v[0]],
-            [-v[1], v[0], 0]
-        ])
+        vx = np.array([[0, -v[2], v[1]], [v[2], 0, -v[0]], [-v[1], v[0], 0]])
         rotation = np.eye(3) + vx + vx @ vx * (1 - c) / (s * s)
 
     center = (p1 + p2) / 2
@@ -648,8 +756,8 @@ def _create_open_cylinder_mesh(p1, p2, radius, sections=16):
     x = radius * np.cos(theta)
     y = radius * np.sin(theta)
 
-    bottom_verts = np.column_stack([x, y, np.full(sections, -height/2)])
-    top_verts = np.column_stack([x, y, np.full(sections, height/2)])
+    bottom_verts = np.column_stack([x, y, np.full(sections, -height / 2)])
+    top_verts = np.column_stack([x, y, np.full(sections, height / 2)])
     vertices = np.vstack([bottom_verts, top_verts])
 
     # Create faces for the curved surface (quads split into triangles)
@@ -681,11 +789,7 @@ def _create_open_cylinder_mesh(p1, p2, radius, sections=16):
         v = np.cross(z_axis, direction_norm)
         s = np.linalg.norm(v)
         c = np.dot(z_axis, direction_norm)
-        vx = np.array([
-            [0, -v[2], v[1]],
-            [v[2], 0, -v[0]],
-            [-v[1], v[0], 0]
-        ])
+        vx = np.array([[0, -v[2], v[1]], [v[2], 0, -v[0]], [-v[1], v[0], 0]])
         rotation = np.eye(3) + vx + vx @ vx * (1 - c) / (s * s)
 
     center = (p1 + p2) / 2
@@ -756,14 +860,16 @@ def _aperture_face_mesh(position, rotation_euler, aperture, i, sag_fn=None):
 
     if isinstance(aperture, DiskAperture):
         return _create_disk_mesh(
-            position, rotation_euler,
+            position,
+            rotation_euler,
             radius=float(aperture.radii[i]),
             sag_fn=sag_fn,
             inner_radius=float(aperture.inner_radii[i]),
         )
     if isinstance(aperture, PolygonAperture):
         return _create_polygon_mesh(
-            position, rotation_euler,
+            position,
+            rotation_euler,
             vertices_2d=np.asarray(aperture.vertices[i]),
             sag_fn=sag_fn,
         )

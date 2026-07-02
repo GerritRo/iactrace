@@ -54,6 +54,7 @@ class TestCylinderGroup:
 
         assert jnp.isinf(t)
 
+
 class TestOpenCylinderGroup:
     """Test open cylinder (no caps) obstruction group."""
 
@@ -139,6 +140,7 @@ class TestBoxGroup:
 
         assert jnp.isinf(t)
 
+
 class TestSphereGroup:
     """Test sphere obstruction group."""
 
@@ -179,6 +181,7 @@ class TestSphereGroup:
         t = sphere.intersect(ray_origin, ray_direction)
 
         assert jnp.isinf(t)
+
 
 class TestTriangleGroup:
     """Test triangle obstruction group."""
@@ -258,11 +261,13 @@ class TestOrientedBoxGroup:
     def test_rotated_box_changes_intersection(self):
         """Box rotated 45 degrees has different intersection distance."""
         angle = jnp.pi / 4
-        rotation = jnp.array([
-            [jnp.cos(angle), -jnp.sin(angle), 0.0],
-            [jnp.sin(angle), jnp.cos(angle), 0.0],
-            [0.0, 0.0, 1.0]
-        ])
+        rotation = jnp.array(
+            [
+                [jnp.cos(angle), -jnp.sin(angle), 0.0],
+                [jnp.sin(angle), jnp.cos(angle), 0.0],
+                [0.0, 0.0, 1.0],
+            ]
+        )
 
         box = OrientedBoxGroup(
             centers=[[0, 0, 0]],
@@ -299,4 +304,3 @@ class TestMultipleObstructions:
 
         # Hits larger cylinder (r=2) first at t=3
         assert jnp.isclose(t, 3.0, atol=1e-6)
-

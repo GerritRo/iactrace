@@ -60,6 +60,11 @@ weighted by the concentrator's fill index (1.0 for an air-filled Winston cone):
    :undoc-members:
    :show-inheritance:
 
+.. autoclass:: iactrace.camera.OkumuraCone
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 Photosensors
 ------------
 

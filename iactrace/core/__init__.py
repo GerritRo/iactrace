@@ -31,43 +31,34 @@ __all__ = [
     # Optical element group
     "InteractionType",
     "OpticalElementGroup",
-
     # Aperture modules
     "Aperture",
     "DiskAperture",
     "PolygonAperture",
-
     # Interaction modules
     "Interaction",
     "ReflectInteraction",
     "RefractInteraction",
     "SlabInteraction",
-
     # Angular coatings
     "Coating",
     "ConstantCoating",
     "TabulatedCoating",
-
     # Surfaces
     "SurfaceGroup",
     "AsphericSurfaceGroup",
-
     # BSDF
     "BSDF",
     "GaussianBSDF",
     "DoubleGaussianBSDF",
-
     # Transforms
     "euler_to_matrix",
-
     # Ray bundle
     "RayBundle",
     "LazyRayBundle",
-
     # Render engine
     "render_optics",
     "trace_optics",
-
     # Obstructions
     "ObstructionGroup",
     "CylinderGroup",

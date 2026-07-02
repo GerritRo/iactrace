@@ -23,7 +23,6 @@ if TYPE_CHECKING:
 # Pipeline functions
 
 
-
 def intersect_sensor(
     camera: Camera,
     ray_bundle: RayBundle | LazyRayBundle,
@@ -51,7 +50,8 @@ def intersect_sensor(
         pos = sensor.positions[s_idx]
         rot = euler_to_matrix(sensor.rotations[s_idx])
         pts, ts = jax.vmap(intersect_plane, in_axes=(0, 0, None, None))(
-            origins, directions, pos, rot)
+            origins, directions, pos, rot
+        )
         # Check if intersection is within sensor bound
         ts = jnp.where(sensor.in_bounds(pts[:, 0], pts[:, 1]), ts, jnp.inf)
         local_dirs = directions @ rot
@@ -70,7 +70,9 @@ def intersect_sensor(
     # Create hit mask and advance path length
     hit_mask = jnp.isfinite(t_sensor)
     path_length = ray_bundle.path_length + jnp.where(
-        hit_mask, t_sensor * ray_bundle.n, 0.0,
+        hit_mask,
+        t_sensor * ray_bundle.n,
+        0.0,
     )
 
     sensor_rays = RayBundle(
@@ -84,7 +86,9 @@ def intersect_sensor(
 
 
 def _run_chain(
-    camera: Camera, ray_bundle: RayBundle, sensor_idx: int,
+    camera: Camera,
+    ray_bundle: RayBundle,
+    sensor_idx: int,
 ) -> tuple[Array, Array, Array, RayBundle, Array]:
     """
     Intersect the sensor, translate to pixel-local, run the detection chain.
@@ -98,7 +102,9 @@ def _run_chain(
 
 
 def _project_to_sensor(
-    camera: Camera, rb_cam: RayBundle, sensor_idx: int,
+    camera: Camera,
+    rb_cam: RayBundle,
+    sensor_idx: int,
 ) -> tuple[Array, Array, Array, Array]:
     """
     Project camera-frame rays through sensor plane + detection chain.
@@ -143,8 +149,7 @@ class Camera(eqx.Module):
         """Validate that ``sensor_idx`` references an existing sensor group."""
         if not self.sensor_groups:
             raise ValueError(
-                "Camera has no sensor groups. Add a SensorGroup before "
-                "calling collect()/image()."
+                "Camera has no sensor groups. Add a SensorGroup before calling collect()/image()."
             )
         if not 0 <= sensor_idx < len(self.sensor_groups):
             raise IndexError(
@@ -210,7 +215,9 @@ class Camera(eqx.Module):
         return sensor.accumulate(s_idx, x, y, pe)
 
     def response_matrix(
-        self, lazy_bundle: LazyRayBundle, sensor_idx: int = 0,
+        self,
+        lazy_bundle: LazyRayBundle,
+        sensor_idx: int = 0,
     ) -> Array:
         """Per-source pixel response, shape ``(n_sources, n_sensors, *pixel_shape)``.
 
@@ -238,18 +245,21 @@ class Camera(eqx.Module):
         n_sources = lazy_bundle.sources.shape[0]
 
         sensor = self.sensor_groups[sensor_idx]
-        init = jnp.zeros(
-            (n_sources, sensor.n_sensors) + sensor.get_accumulator_shape()
-        )
+        init = jnp.zeros((n_sources, sensor.n_sensors) + sensor.get_accumulator_shape())
 
         def accumulate(matrix, rb_cam):
             s_idx, x, y, pe = _project_to_sensor(self, rb_cam, sensor_idx)
+
             # Per-element rays are source-major (see _build_source_rays):
             # the first n_samples rays belong to source 0, etc.
             def per_source(a):
                 return a.reshape(n_sources, n_samples)
+
             contrib = jax.vmap(sensor.accumulate)(
-                per_source(s_idx), per_source(x), per_source(y), per_source(pe),
+                per_source(s_idx),
+                per_source(x),
+                per_source(y),
+                per_source(pe),
             )
             return matrix + contrib
 
@@ -263,9 +273,7 @@ class Camera(eqx.Module):
     def set_sensor_rotations(self, sensor_idx: int, rotations: Array) -> Camera:
         return _ops.set_sensor_rotations(self, sensor_idx, rotations)
 
-    def set_concentrator(
-        self, sensor_idx: int, concentrator: Concentrator | None
-    ) -> Camera:
+    def set_concentrator(self, sensor_idx: int, concentrator: Concentrator | None) -> Camera:
         """Set/replace the concentrator on sensor group ``sensor_idx``'s chain."""
         return _ops.set_concentrator(self, sensor_idx, concentrator)
 

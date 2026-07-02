@@ -64,9 +64,7 @@ class TestTabulatedCoating:
         assert jnp.allclose(coating.values[0], coating.values[2])
 
     def test_from_degrees_per_element(self):
-        per_elem = jnp.array(
-            [[1.0, 0.7, 0.2], [0.9, 0.5, 0.1], [0.95, 0.6, 0.15]]
-        )
+        per_elem = jnp.array([[1.0, 0.7, 0.2], [0.9, 0.5, 0.1], [0.95, 0.6, 0.15]])
         coating = TabulatedCoating.from_degrees(
             angles_deg=[0.0, 45.0, 90.0],
             values=per_elem,
@@ -98,7 +96,7 @@ class TestTabulatedCoating:
 
     def test_linear_interpolation_at_midpoint(self):
         coating = TabulatedCoating.from_degrees(
-            angles_deg=[0.0, 90.0],   # cos 1.0 -> 0.0
+            angles_deg=[0.0, 90.0],  # cos 1.0 -> 0.0
             values=[1.0, 0.0],
             n_elements=1,
         )
@@ -112,7 +110,7 @@ class TestTabulatedCoating:
             n_elements=1,
         )
         c2 = TabulatedCoating.from_degrees(
-            angles_deg=[90.0, 0.0, 45.0],     # shuffled
+            angles_deg=[90.0, 0.0, 45.0],  # shuffled
             values=[0.2, 1.0, 0.7],
             n_elements=1,
         )
@@ -142,20 +140,21 @@ class TestDefaults:
         n = 3
         bulk = jnp.array([0.9, 0.85, 0.7])
         interaction = ReflectInteraction(
-            reflectivity=None, reflectivity_scalar=bulk,
+            reflectivity=None,
+            reflectivity_scalar=bulk,
         )
         assert interaction.reflectivity is None
         assert jnp.allclose(interaction.reflectivity_scalar, bulk)
 
-        directions = jnp.array(
-            [[0.0, 0.0, -1.0], [0.1, 0.0, -0.995], [0.0, 0.2, -0.98]]
-        )
+        directions = jnp.array([[0.0, 0.0, -1.0], [0.1, 0.0, -0.995], [0.0, 0.2, -0.98]])
         directions = directions / jnp.linalg.norm(directions, axis=-1, keepdims=True)
         normals = jnp.tile(jnp.array([0.0, 0.0, 1.0]), (n, 1))
         points = jnp.zeros((n, 3))
         idx = jnp.array([0, 1, 2])
 
-        _, _, coeffs, _, _ = interaction.apply(directions, normals, points, idx, jnp.ones(points.shape[0]))
+        _, _, coeffs, _, _ = interaction.apply(
+            directions, normals, points, idx, jnp.ones(points.shape[0])
+        )
         assert jnp.allclose(coeffs, bulk, atol=1e-10)
 
     def test_refract_none_coating_uses_fresnel(self):
@@ -173,13 +172,16 @@ class TestDefaults:
 
         theta = jnp.deg2rad(30.0)
         directions = jnp.tile(
-            jnp.array([jnp.sin(theta), 0.0, -jnp.cos(theta)]), (n, 1),
+            jnp.array([jnp.sin(theta), 0.0, -jnp.cos(theta)]),
+            (n, 1),
         )
         normals = jnp.tile(jnp.array([0.0, 0.0, 1.0]), (n, 1))
         points = jnp.zeros((n, 3))
         idx = jnp.array([0, 1])
 
-        _, _, coeffs, _, _ = interaction.apply(directions, normals, points, idx, jnp.ones(points.shape[0]))
+        _, _, coeffs, _, _ = interaction.apply(
+            directions, normals, points, idx, jnp.ones(points.shape[0])
+        )
 
         _, T = fresnel_unpolarized(jnp.cos(theta), n_outside, 1.5)
         expected = trans_bulk * T
@@ -200,10 +202,12 @@ class TestDefaults:
         points = jnp.zeros((1, 3))
         idx = jnp.array([0])
 
-        _, _, coeffs, _, _ = interaction.apply(directions, normals, points, idx, jnp.ones(points.shape[0]))
+        _, _, coeffs, _, _ = interaction.apply(
+            directions, normals, points, idx, jnp.ones(points.shape[0])
+        )
         # Normal incidence: T_face = 1 - ((1-1.5)/(1+1.5))^2 = 0.96
         # Two faces: T_total = 0.96^2 = 0.9216
-        T_face = 1.0 - ((1.0 - 1.5) / (1.0 + 1.5))**2
+        T_face = 1.0 - ((1.0 - 1.5) / (1.0 + 1.5)) ** 2
         assert jnp.allclose(coeffs, T_face**2, atol=1e-6)
 
 
@@ -227,7 +231,9 @@ class TestAngleDependentReflection:
         idx = jnp.array([0])
 
         d_normal = jnp.array([[0.0, 0.0, -1.0]])
-        _, _, c_normal, _, _ = interaction.apply(d_normal, normals, points, idx, jnp.ones(points.shape[0]))
+        _, _, c_normal, _, _ = interaction.apply(
+            d_normal, normals, points, idx, jnp.ones(points.shape[0])
+        )
 
         theta = jnp.deg2rad(60.0)
         d_60 = jnp.array([[jnp.sin(theta), 0.0, -jnp.cos(theta)]])
@@ -245,7 +251,9 @@ class TestAngleDependentReflection:
 
     def test_scalar_and_curve_compose_multiplicatively(self):
         coating = TabulatedCoating.from_degrees(
-            angles_deg=[0.0, 90.0], values=[1.0, 0.5], n_elements=1,
+            angles_deg=[0.0, 90.0],
+            values=[1.0, 0.5],
+            n_elements=1,
         )
         interaction = ReflectInteraction(
             reflectivity=coating,
@@ -282,7 +290,12 @@ class TestAngleDependentReflection:
         idx = jnp.array([0, 1])
 
         _, _, coeffs, _, _ = apply(
-            interaction, d, normals, points, idx, jnp.ones(2),
+            interaction,
+            d,
+            normals,
+            points,
+            idx,
+            jnp.ones(2),
         )
         assert jnp.allclose(coeffs[0], 1.0, atol=1e-6)
         cos_30 = jnp.cos(jnp.deg2rad(30.0))
@@ -316,7 +329,9 @@ class TestFactoryFlow:
         from iactrace.telescope.mirrors import mirror_group
 
         coating = TabulatedCoating.from_degrees(
-            angles_deg=[0.0, 90.0], values=[0.95, 0.5], n_elements=2,
+            angles_deg=[0.0, 90.0],
+            values=[0.95, 0.5],
+            n_elements=2,
         )
         g = mirror_group(
             positions=jnp.array([[0.0, 0.0, 0.0], [0.1, 0.0, 0.0]]),
@@ -335,7 +350,8 @@ class TestFactoryFlow:
         )
         assert isinstance(g.interaction_module.reflectivity, TabulatedCoating)
         assert jnp.allclose(
-            g.interaction_module.reflectivity_scalar, jnp.full(2, 0.95),
+            g.interaction_module.reflectivity_scalar,
+            jnp.full(2, 0.95),
         )
 
     def test_mirror_group_no_coating(self):
@@ -350,7 +366,8 @@ class TestFactoryFlow:
             aspherics=jnp.zeros((1, 0)),
             offsets=jnp.zeros((1, 2)),
             aperture=DiskAperture(
-                radii=jnp.array([0.05]), inner_radii=jnp.zeros(1),
+                radii=jnp.array([0.05]),
+                inner_radii=jnp.zeros(1),
             ),
             reflectivity=0.9,
             sample_key=jax.random.key(0),
@@ -371,7 +388,8 @@ class TestFactoryFlow:
             aspherics=jnp.zeros((1, 0)),
             offsets=jnp.zeros((1, 2)),
             aperture=DiskAperture(
-                radii=jnp.array([0.02]), inner_radii=jnp.zeros(1),
+                radii=jnp.array([0.02]),
+                inner_radii=jnp.zeros(1),
             ),
             n_inside=jnp.array([1.5]),
             n_outside=1.0,
@@ -379,7 +397,8 @@ class TestFactoryFlow:
         )
         assert g.interaction_module.transmittance is None
         assert jnp.allclose(
-            g.interaction_module.transmittance_scalar, jnp.ones(1),
+            g.interaction_module.transmittance_scalar,
+            jnp.ones(1),
         )
 
     def test_refractive_group_with_coating(self):
@@ -387,7 +406,9 @@ class TestFactoryFlow:
         from iactrace.telescope.lenses import refractive_group
 
         coating = TabulatedCoating.from_degrees(
-            angles_deg=[0.0, 90.0], values=[0.99, 0.0], n_elements=1,
+            angles_deg=[0.0, 90.0],
+            values=[0.99, 0.0],
+            n_elements=1,
         )
         g = refractive_group(
             positions=jnp.array([[0.0, 0.0, 0.1]]),
@@ -397,7 +418,8 @@ class TestFactoryFlow:
             aspherics=jnp.zeros((1, 0)),
             offsets=jnp.zeros((1, 2)),
             aperture=DiskAperture(
-                radii=jnp.array([0.02]), inner_radii=jnp.zeros(1),
+                radii=jnp.array([0.02]),
+                inner_radii=jnp.zeros(1),
             ),
             n_inside=jnp.array([1.5]),
             n_outside=1.0,
@@ -407,7 +429,8 @@ class TestFactoryFlow:
         )
         assert isinstance(g.interaction_module.transmittance, TabulatedCoating)
         assert jnp.allclose(
-            g.interaction_module.transmittance_scalar, jnp.array([1.0]),
+            g.interaction_module.transmittance_scalar,
+            jnp.array([1.0]),
         )
 
 

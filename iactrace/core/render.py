@@ -25,6 +25,7 @@ def _shadow_mask(origins, directions, obstructions, max_t=1e10):
         mask = mask * jnp.where(t < max_t, 0.0, 1.0)
     return mask
 
+
 def apply_final_leg_shadow(rb, obstruction_groups, camera_position, camera_rotation):
     """Shadow the converging beam on the final last-optic -> focal-plane leg.
     ``rb`` must be a world-frame bundle as produced by the render, i.e.
@@ -37,7 +38,10 @@ def apply_final_leg_shadow(rb, obstruction_groups, camera_position, camera_rotat
         return rb
     rot = euler_to_matrix(camera_rotation)
     _, t_focal = jax.vmap(intersect_plane, in_axes=(0, 0, None, None))(
-        rb.origins, rb.directions, camera_position, rot,
+        rb.origins,
+        rb.directions,
+        camera_position,
+        rot,
     )
     shadow = _shadow_mask(rb.origins, rb.directions, obstruction_groups, t_focal)
     return RayBundle(
@@ -72,24 +76,24 @@ def _trace_stage(origins, directions, values, current_n, group, obstructions):
         pos = group.positions[eidx]
         rot = euler_to_matrix(group.rotations[eidx])
 
-        o_loc = jnp.einsum('ij,nj->ni', rot.T, origins - pos)
-        d_loc = jnp.einsum('ij,nj->ni', rot.T, directions)
+        o_loc = jnp.einsum("ij,nj->ni", rot.T, origins - pos)
+        d_loc = jnp.einsum("ij,nj->ni", rot.T, directions)
 
-        ts, pts_loc, norms_loc = jax.vmap(
-            lambda o, d: group.surface.intersect_at(eidx, o, d)
-        )(o_loc, d_loc)
+        ts, pts_loc, norms_loc = jax.vmap(lambda o, d: group.surface.intersect_at(eidx, o, d))(
+            o_loc, d_loc
+        )
 
         aperture = group.check_aperture(pts_loc[:, 0], pts_loc[:, 1], eidx)
         ts = jnp.where(aperture, ts, jnp.inf)
 
-        pts_w = jnp.einsum('ij,nj->ni', rot, pts_loc) + pos
-        norms_w = jnp.einsum('ij,nj->ni', rot, norms_loc)
+        pts_w = jnp.einsum("ij,nj->ni", rot, pts_loc) + pos
+        norms_w = jnp.einsum("ij,nj->ni", rot, norms_loc)
         return ts, pts_w, norms_w
 
     init_carry = (
-        jnp.full(n_rays, jnp.inf),          # best_t
-        jnp.zeros((n_rays, 3)),              # best_pts
-        jnp.zeros((n_rays, 3)),              # best_norms
+        jnp.full(n_rays, jnp.inf),  # best_t
+        jnp.zeros((n_rays, 3)),  # best_pts
+        jnp.zeros((n_rays, 3)),  # best_norms
         jnp.zeros(n_rays, dtype=jnp.int32),  # best_elem
     )
 
@@ -109,14 +113,16 @@ def _trace_stage(origins, directions, values, current_n, group, obstructions):
 
     # Apply surface roughness via BSDF module
     hit = best_t < 1e10
-    safe_norms = jnp.where(hit[:, None], best_norms, jnp.array([0., 0., 1.]))
+    safe_norms = jnp.where(hit[:, None], best_norms, jnp.array([0.0, 0.0, 1.0]))
     roughness_key = jr.fold_in(group.sample_key, 0xB5DF01)
     best_norms = group.bsdf.perturb_normals(safe_norms, roughness_key, best_elem)
 
-    new_dirs, new_origins, coeffs, opl_internal, new_n = (
-        group.interaction_module.apply(
-            directions, best_norms, best_pts, best_elem, current_n,
-        )
+    new_dirs, new_origins, coeffs, opl_internal, new_n = group.interaction_module.apply(
+        directions,
+        best_norms,
+        best_pts,
+        best_elem,
+        current_n,
     )
 
     shadow = _shadow_mask(origins, directions, obstructions, best_t)
@@ -125,8 +131,12 @@ def _trace_stage(origins, directions, values, current_n, group, obstructions):
     # Rays that missed keep their medium; only rays that interacted update it.
     new_n = jnp.where(hit, new_n, current_n)
     return (
-        new_origins, new_dirs, values * hit * shadow * coeffs,
-        segment, opl_internal, new_n,
+        new_origins,
+        new_dirs,
+        values * hit * shadow * coeffs,
+        segment,
+        opl_internal,
+        new_n,
     )
 
 
@@ -143,8 +153,9 @@ def _build_primary_geometry(group):
     return points, normals, weights
 
 
-def _build_source_rays(points, normals, weights, sources, source_values,
-                       source_type, obstruction_groups):
+def _build_source_rays(
+    points, normals, weights, sources, source_values, source_type, obstruction_groups
+):
     """Generate flat ray arrays from sources aimed at one primary element.
 
     Args:
@@ -167,7 +178,7 @@ def _build_source_rays(points, normals, weights, sources, source_values,
     n_samples = points.shape[0]
     n_rays = n_sources * n_samples
 
-    if source_type == 'point':
+    if source_type == "point":
         deltas = points[None, :, :] - sources[:, None, :]
         lengths = jnp.linalg.norm(deltas, axis=-1)
         dirs = deltas / lengths[..., None]
@@ -182,27 +193,26 @@ def _build_source_rays(points, normals, weights, sources, source_values,
         leg_in = (points[None, :, :] * dirs).sum(axis=-1)
 
     dirs_flat = dirs.reshape(n_rays, 3)
-    origins_flat = jnp.broadcast_to(
-        points[None, :, :], (n_sources, n_samples, 3)
-    ).reshape(n_rays, 3)
-    normals_flat = jnp.broadcast_to(
-        normals[None, :, :], (n_sources, n_samples, 3)
-    ).reshape(n_rays, 3)
+    origins_flat = jnp.broadcast_to(points[None, :, :], (n_sources, n_samples, 3)).reshape(
+        n_rays, 3
+    )
+    normals_flat = jnp.broadcast_to(normals[None, :, :], (n_sources, n_samples, 3)).reshape(
+        n_rays, 3
+    )
     leg_in_flat = leg_in.reshape(n_rays)
 
     shadow = _shadow_mask(origins_flat, -dirs_flat, obstruction_groups)
-    weights_flat = jnp.broadcast_to(
-        weights[:, 0][None, :], (n_sources, n_samples)
-    ).reshape(n_rays)
-    vals = jnp.broadcast_to(
-        source_values[:, None], (n_sources, n_samples)
-    ).reshape(n_rays) / weights_flat * shadow
+    weights_flat = jnp.broadcast_to(weights[:, 0][None, :], (n_sources, n_samples)).reshape(n_rays)
+    vals = (
+        jnp.broadcast_to(source_values[:, None], (n_sources, n_samples)).reshape(n_rays)
+        / weights_flat
+        * shadow
+    )
 
     return origins_flat, dirs_flat, normals_flat, vals, leg_in_flat
 
 
-def _apply_primary_interaction(group, element_idx, origins, directions,
-                               normals, values, current_n):
+def _apply_primary_interaction(group, element_idx, origins, directions, normals, values, current_n):
     """Apply stage-0 physics: interaction + cos-theta weighting.
 
     Returns:
@@ -211,10 +221,12 @@ def _apply_primary_interaction(group, element_idx, origins, directions,
     n_rays = origins.shape[0]
     elem_indices = jnp.full((n_rays,), element_idx, dtype=jnp.int32)
 
-    new_dirs, new_origins, coeffs, _opl_internal, new_n = (
-        group.interaction_module.apply(
-            directions, normals, origins, elem_indices, current_n,
-        )
+    new_dirs, new_origins, coeffs, _opl_internal, new_n = group.interaction_module.apply(
+        directions,
+        normals,
+        origins,
+        elem_indices,
+        current_n,
     )
 
     cos_theta = jnp.abs(jnp.sum(directions * normals, axis=-1))
@@ -224,13 +236,17 @@ def _apply_primary_interaction(group, element_idx, origins, directions,
 def _empty_bundle() -> RayBundle:
     z = jnp.zeros(0)
     return RayBundle(
-        origins=jnp.zeros((0, 3)), directions=jnp.zeros((0, 3)),
-        values=z, path_length=z, n=z,
+        origins=jnp.zeros((0, 3)),
+        directions=jnp.zeros((0, 3)),
+        values=z,
+        path_length=z,
+        n=z,
     )
 
 
-def _trace_one_element(stages, stage_indices, geom, sources, values,
-                       source_type, obstructions, eidx):
+def _trace_one_element(
+    stages, stage_indices, geom, sources, values, source_type, obstructions, eidx
+):
     """Trace rays from sources through one stage-0 element of the optics.
 
     Returns a per-element :class:`RayBundle` of length ``n_sources * n_samples``
@@ -238,25 +254,44 @@ def _trace_one_element(stages, stage_indices, geom, sources, values,
     """
     s0_points, s0_normals, s0_weights = geom
     origins, dirs, normals, vals, leg_in = _build_source_rays(
-        s0_points[eidx], s0_normals[eidx], s0_weights[eidx],
-        sources, values, source_type, obstructions,
+        s0_points[eidx],
+        s0_normals[eidx],
+        s0_weights[eidx],
+        sources,
+        values,
+        source_type,
+        obstructions,
     )
     current_n = jnp.ones(vals.shape[0])
     origins, dirs, vals, current_n = _apply_primary_interaction(
-        stages[0], eidx, origins, dirs, normals, vals, current_n,
+        stages[0],
+        eidx,
+        origins,
+        dirs,
+        normals,
+        vals,
+        current_n,
     )
     # Seed OPL with the source-to-primary leg so the Monte-Carlo sample
     # location on the primary doesn't conflate with downstream analysis.
     path_length = leg_in
     for sidx in stage_indices[1:]:
         origins, dirs, vals, seg, opl_internal, new_n = _trace_stage(
-            origins, dirs, vals, current_n, stages[sidx], obstructions,
+            origins,
+            dirs,
+            vals,
+            current_n,
+            stages[sidx],
+            obstructions,
         )
         path_length = path_length + current_n * seg + opl_internal
         current_n = new_n
     return RayBundle(
-        origins=origins, directions=dirs, values=vals,
-        path_length=path_length, n=current_n,
+        origins=origins,
+        directions=dirs,
+        values=vals,
+        path_length=path_length,
+        n=current_n,
     )
 
 
@@ -276,8 +311,14 @@ def _per_element_scan(optical_groups, obstructions, sources, values, source_type
 
     def trace_one(eidx):
         return _trace_one_element(
-            stages, stage_indices, geom,
-            sources, values, source_type, obstructions, eidx,
+            stages,
+            stage_indices,
+            geom,
+            sources,
+            values,
+            source_type,
+            obstructions,
+            eidx,
         )
 
     return trace_one, n_elements
@@ -291,23 +332,35 @@ def render_optics(optical_groups, obstruction_groups, sources, values, source_ty
     aggregate (image, response matrix, ...) is needed.
     """
     setup = _per_element_scan(
-        optical_groups, obstruction_groups, sources, values, source_type,
+        optical_groups,
+        obstruction_groups,
+        sources,
+        values,
+        source_type,
     )
     if setup is None:
         return _empty_bundle()
     trace_one, n_elements = setup
 
     _, per_el = jax.lax.scan(
-        lambda _c, e: (None, trace_one(e)), None, jnp.arange(n_elements),
+        lambda _c, e: (None, trace_one(e)),
+        None,
+        jnp.arange(n_elements),
     )
     return jax.tree_util.tree_map(
-        lambda a: a.reshape((-1,) + a.shape[2:]), per_el,
+        lambda a: a.reshape((-1,) + a.shape[2:]),
+        per_el,
     )
 
 
 def render_optics_accumulate(
-    optical_groups, obstruction_groups, sources, values, source_type,
-    accumulator, init,
+    optical_groups,
+    obstruction_groups,
+    sources,
+    values,
+    source_type,
+    accumulator,
+    init,
 ):
     """Carry-folding render: walk stage-0 elements with an accumulator.
 
@@ -320,7 +373,11 @@ def render_optics_accumulate(
     rays belong to ``sources[0]``).
     """
     setup = _per_element_scan(
-        optical_groups, obstruction_groups, sources, values, source_type,
+        optical_groups,
+        obstruction_groups,
+        sources,
+        values,
+        source_type,
     )
     if setup is None:
         return init

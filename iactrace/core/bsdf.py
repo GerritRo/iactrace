@@ -11,6 +11,7 @@ _ARCSEC_TO_RAD = jnp.pi / (180.0 * 3600.0)
 
 # Shared perturbation helper
 
+
 def _apply_perturbation(normals, angles, scale):
     """Perturb normals by random angles along a tangent basis.
 
@@ -28,8 +29,8 @@ def _apply_perturbation(normals, angles, scale):
     theta1 = angles[..., 0]
     theta2 = angles[..., 1]
 
-    ref_z = jnp.array([0., 0., 1.])
-    ref_x = jnp.array([1., 0., 0.])
+    ref_z = jnp.array([0.0, 0.0, 1.0])
+    ref_x = jnp.array([1.0, 0.0, 0.0])
     dot_z = jnp.abs(jnp.sum(normals * ref_z, axis=-1, keepdims=True))
     ref = jnp.where(dot_z > 0.9, ref_x, ref_z)
 
@@ -43,6 +44,7 @@ def _apply_perturbation(normals, angles, scale):
 
 
 # Base class
+
 
 class BSDF(eqx.Module):
     """Abstract base for surface scattering models.
@@ -105,6 +107,7 @@ class BSDF(eqx.Module):
 
 # Gaussian BSDF
 
+
 class GaussianBSDF(BSDF):
     """Single-Gaussian surface roughness model.
 
@@ -126,6 +129,7 @@ class GaussianBSDF(BSDF):
 
 # Double-Gaussian BSDF
 
+
 class DoubleGaussianBSDF(BSDF):
     """Mixture of two Gaussians for surfaces with multi-scale roughness.
 
@@ -143,8 +147,8 @@ class DoubleGaussianBSDF(BSDF):
     """
 
     scale_narrow: Array  # (N,) in arcseconds
-    scale_wide: Array    # (N,) in arcseconds
-    mix_weight: Array    # (N,)
+    scale_wide: Array  # (N,) in arcseconds
+    mix_weight: Array  # (N,)
 
     def _sample_perturbation(self, key, shape, element_idx):
         k_angles, k_select = jr.split(key)

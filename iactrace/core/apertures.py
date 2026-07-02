@@ -21,6 +21,7 @@ def _point_in_convex_polygon(x, y, vertices, n_vertices):
     Returns:
         Boolean mask, True if inside polygon
     """
+
     def edge_check(carry, i):
         v1, v2 = vertices[i], vertices[(i + 1) % n_vertices]
         cross = (v2[0] - v1[0]) * (y - v1[1]) - (v2[1] - v1[1]) * (x - v1[0])
@@ -70,13 +71,13 @@ class DiskAperture(Aperture):
         inner_radii: Inner radius per element (N,), 0 for solid disk
     """
 
-    radii: Array          # (N,)
-    inner_radii: Array    # (N,)
+    radii: Array  # (N,)
+    inner_radii: Array  # (N,)
 
     def check(self, x, y, element_idx):
         """Check if point (x, y) is within the aperture of the given element."""
         r_sq = x**2 + y**2
-        return (r_sq >= self.inner_radii[element_idx]**2) & (r_sq <= self.radii[element_idx]**2)
+        return (r_sq >= self.inner_radii[element_idx] ** 2) & (r_sq <= self.radii[element_idx] ** 2)
 
     def sample(self, key, n_samples):
         """Sample uniform 2D points on each element's annular aperture.
@@ -89,6 +90,7 @@ class DiskAperture(Aperture):
             (N, n_samples, 2) array of 2D sample points
         """
         from .sampling import sample_annulus
+
         keys = jax.random.split(key, self.radii.shape[0])
         return jax.vmap(
             lambda k, inner_r, outer_r: sample_annulus(k, inner_r, outer_r, (n_samples,))
@@ -111,7 +113,7 @@ class DiskAperture(Aperture):
         Returns:
             Annular area (scalar)
         """
-        return jnp.pi * (data[1]**2 - data[0]**2)
+        return jnp.pi * (data[1] ** 2 - data[0] ** 2)
 
 
 class PolygonAperture(Aperture):
@@ -125,7 +127,7 @@ class PolygonAperture(Aperture):
         n_vertices: Number of vertices per polygon (static, same for all)
     """
 
-    vertices: Array       # (N, K, 2)
+    vertices: Array  # (N, K, 2)
     n_vertices: int = eqx.field(static=True)
 
     def check(self, x, y, element_idx):
@@ -143,10 +145,11 @@ class PolygonAperture(Aperture):
             (N, n_samples, 2) array of 2D sample points
         """
         from .sampling import sample_polygon
+
         keys = jax.random.split(key, self.vertices.shape[0])
-        return jax.vmap(
-            lambda k, verts: sample_polygon(k, verts, (n_samples,))
-        )(keys, self.vertices)
+        return jax.vmap(lambda k, verts: sample_polygon(k, verts, (n_samples,)))(
+            keys, self.vertices
+        )
 
     def get_area_data(self):
         """Return per-element data for area computation, vmapped over elements.

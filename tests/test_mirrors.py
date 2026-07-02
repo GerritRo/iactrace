@@ -23,7 +23,7 @@ class TestSampleAnnulus:
         n_samples = 10000
 
         samples = sample_annulus(random_key, inner_r, outer_r, (n_samples,))
-        radii = jnp.sqrt(samples[:, 0]**2 + samples[:, 1]**2)
+        radii = jnp.sqrt(samples[:, 0] ** 2 + samples[:, 1] ** 2)
 
         assert jnp.all(radii >= inner_r - 1e-10), "Samples inside inner radius"
         assert jnp.all(radii <= outer_r + 1e-10), "Samples outside outer radius"
@@ -34,7 +34,7 @@ class TestSampleAnnulus:
         n_samples = 50000
 
         samples = sample_annulus(random_key, inner_r, outer_r, (n_samples,))
-        radii = jnp.sqrt(samples[:, 0]**2 + samples[:, 1]**2)
+        radii = jnp.sqrt(samples[:, 0] ** 2 + samples[:, 1] ** 2)
 
         # For uniform area distribution, P(r < R) = (R^2 - inner^2) / (outer^2 - inner^2)
         # Split annulus into inner and outer halves by area
@@ -56,10 +56,10 @@ class TestSampleAnnulus:
         angles = jnp.arctan2(samples[:, 1], samples[:, 0])
 
         # Check samples in each quadrant (should be ~25% each)
-        q1 = jnp.sum((angles >= 0) & (angles < jnp.pi/2)) / n_samples
-        q2 = jnp.sum((angles >= jnp.pi/2) & (angles < jnp.pi)) / n_samples
-        q3 = jnp.sum((angles >= -jnp.pi) & (angles < -jnp.pi/2)) / n_samples
-        q4 = jnp.sum((angles >= -jnp.pi/2) & (angles < 0)) / n_samples
+        q1 = jnp.sum((angles >= 0) & (angles < jnp.pi / 2)) / n_samples
+        q2 = jnp.sum((angles >= jnp.pi / 2) & (angles < jnp.pi)) / n_samples
+        q3 = jnp.sum((angles >= -jnp.pi) & (angles < -jnp.pi / 2)) / n_samples
+        q4 = jnp.sum((angles >= -jnp.pi / 2) & (angles < 0)) / n_samples
 
         for q, name in [(q1, "Q1"), (q2, "Q2"), (q3, "Q3"), (q4, "Q4")]:
             assert 0.23 < q < 0.27, f"Angular distribution not uniform in {name}: {q:.3f}"
@@ -71,10 +71,10 @@ class TestSampleAnnulus:
 
         annulus_samples = sample_annulus(random_key, 0.0, outer_r, (n_samples,))
 
-        annulus_radii = jnp.sqrt(annulus_samples[:, 0]**2 + annulus_samples[:, 1]**2)
+        annulus_radii = jnp.sqrt(annulus_samples[:, 0] ** 2 + annulus_samples[:, 1] ** 2)
 
         # Mean radius for uniform disk: 2/3 * R
-        expected_mean = 2/3 * outer_r
+        expected_mean = 2 / 3 * outer_r
         assert jnp.isclose(jnp.mean(annulus_radii), expected_mean, rtol=0.05)
 
 
@@ -96,7 +96,8 @@ class TestAnnularAperture:
             inner_radii=jnp.array([0.3]),
         )
         interaction = ReflectInteraction(
-            reflectivity=None, reflectivity_scalar=jnp.ones(N),
+            reflectivity=None,
+            reflectivity_scalar=jnp.ones(N),
         )
         return OpticalElementGroup(
             positions=jnp.array([[0.0, 0.0, 0.0]]),
@@ -179,7 +180,8 @@ class TestMirrorGroupWithHole:
             inner_radii=jnp.zeros(N),
         )
         interaction = ReflectInteraction(
-            reflectivity=None, reflectivity_scalar=jnp.ones(N),
+            reflectivity=None,
+            reflectivity_scalar=jnp.ones(N),
         )
         group = OpticalElementGroup(
             positions=jnp.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]]),
@@ -208,7 +210,8 @@ class TestMirrorGroupWithHole:
             inner_radii=jnp.array([0.2, 0.0]),  # First has hole, second is solid
         )
         interaction = ReflectInteraction(
-            reflectivity=None, reflectivity_scalar=jnp.ones(N),
+            reflectivity=None,
+            reflectivity_scalar=jnp.ones(N),
         )
         group = OpticalElementGroup(
             positions=jnp.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]]),
@@ -243,7 +246,8 @@ class TestMirrorGroupWithHole:
             inner_radii=jnp.array([0.3]),
         )
         interaction = ReflectInteraction(
-            reflectivity=None, reflectivity_scalar=jnp.ones(N),
+            reflectivity=None,
+            reflectivity_scalar=jnp.ones(N),
         )
         group = OpticalElementGroup(
             positions=jnp.array([[0.0, 0.0, 0.0]]),
@@ -276,7 +280,8 @@ class TestMirrorGroupWithHole:
             inner_radii=jnp.array([inner_r]),
         )
         interaction = ReflectInteraction(
-            reflectivity=None, reflectivity_scalar=jnp.ones(N),
+            reflectivity=None,
+            reflectivity_scalar=jnp.ones(N),
         )
         group = OpticalElementGroup(
             positions=jnp.array([[0.0, 0.0, 0.0]]),
@@ -378,7 +383,8 @@ class TestAsphericPolygonMirrorGroup:
             n_vertices=6,
         )
         interaction = ReflectInteraction(
-            reflectivity=None, reflectivity_scalar=jnp.ones(N),
+            reflectivity=None,
+            reflectivity_scalar=jnp.ones(N),
         )
         return OpticalElementGroup(
             positions=jnp.array([[0.0, 0.0, 0.0]]),
@@ -423,7 +429,8 @@ class TestMultipleMirrorsInGroup:
             inner_radii=jnp.zeros(N),
         )
         interaction = ReflectInteraction(
-            reflectivity=None, reflectivity_scalar=jnp.ones(N),
+            reflectivity=None,
+            reflectivity_scalar=jnp.ones(N),
         )
         group = OpticalElementGroup(
             positions=jnp.array([[0.0, 0.0, 0.0], [2.0, 0.0, 0.0]]),
@@ -445,10 +452,12 @@ class TestMultipleMirrorsInGroup:
     def test_polygon_group_multiple_mirrors(self):
         """Polygon group with multiple mirrors."""
         # Two square mirrors
-        vertices = jnp.array([
-            [[-0.5, -0.5], [0.5, -0.5], [0.5, 0.5], [-0.5, 0.5]],
-            [[-0.3, -0.3], [0.3, -0.3], [0.3, 0.3], [-0.3, 0.3]],
-        ])
+        vertices = jnp.array(
+            [
+                [[-0.5, -0.5], [0.5, -0.5], [0.5, 0.5], [-0.5, 0.5]],
+                [[-0.3, -0.3], [0.3, -0.3], [0.3, 0.3], [-0.3, 0.3]],
+            ]
+        )
 
         N = 2
         surface = AsphericSurfaceGroup(
@@ -462,7 +471,8 @@ class TestMultipleMirrorsInGroup:
             n_vertices=4,
         )
         interaction = ReflectInteraction(
-            reflectivity=None, reflectivity_scalar=jnp.ones(N),
+            reflectivity=None,
+            reflectivity_scalar=jnp.ones(N),
         )
         group = OpticalElementGroup(
             positions=jnp.array([[0.0, 0.0, 0.0], [2.0, 0.0, 0.0]]),

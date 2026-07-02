@@ -37,12 +37,12 @@ def fresnel_unpolarized(cos_theta_i, n1, n2):
     rs_num = n1 * cos_theta_i - n2 * cos_theta_t
     rs_den = n1 * cos_theta_i + n2 * cos_theta_t
     rs_den = jnp.where(jnp.abs(rs_den) < 1e-10, 1e-10, rs_den)
-    rs = (rs_num / rs_den)**2
+    rs = (rs_num / rs_den) ** 2
 
     rp_num = n2 * cos_theta_i - n1 * cos_theta_t
     rp_den = n2 * cos_theta_i + n1 * cos_theta_t
     rp_den = jnp.where(jnp.abs(rp_den) < 1e-10, 1e-10, rp_den)
-    rp = (rp_num / rp_den)**2
+    rp = (rp_num / rp_den) ** 2
 
     R = 0.5 * (rs + rp)
     return R, 1.0 - R
@@ -90,13 +90,11 @@ class TabulatedCoating(Coating):
     """
 
     cos_table: Array  # (K,)
-    values: Array     # (N, K)
+    values: Array  # (N, K)
 
     def __call__(self, cos_theta_i, element_idx):
         rows = self.values[element_idx]  # (n_rays, K)
-        return jax.vmap(
-            lambda c, r: jnp.interp(c, self.cos_table, r)
-        )(cos_theta_i, rows)
+        return jax.vmap(lambda c, r: jnp.interp(c, self.cos_table, r))(cos_theta_i, rows)
 
     @classmethod
     def from_degrees(
@@ -131,12 +129,9 @@ class TabulatedCoating(Coating):
         elif v.ndim == 2:
             if v.shape[0] != n_elements:
                 raise ValueError(
-                    f"values first axis ({v.shape[0]}) must match "
-                    f"n_elements ({n_elements})"
+                    f"values first axis ({v.shape[0]}) must match n_elements ({n_elements})"
                 )
         else:
-            raise ValueError(
-                f"values must be 1D (K,) or 2D (N, K), got shape {v.shape}"
-            )
+            raise ValueError(f"values must be 1D (K,) or 2D (N, K), got shape {v.shape}")
         v = v[:, order]
         return cls(cos_table=cos_table, values=v)

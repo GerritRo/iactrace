@@ -9,8 +9,9 @@ from iactrace.core.optics import OpticalElementGroup
 from iactrace.core.surfaces import AsphericSurfaceGroup
 
 
-def _make_disk_mirror_group(positions, rotations, curvatures, conics, aspherics,
-                            radii, optical_stage=0, n_samples=100):
+def _make_disk_mirror_group(
+    positions, rotations, curvatures, conics, aspherics, radii, optical_stage=0, n_samples=100
+):
     """Build an OpticalElementGroup configured as a reflective disk mirror."""
     n = curvatures.shape[0]
     surface = AsphericSurfaceGroup(
@@ -46,8 +47,14 @@ def make_simple_telescope(curvature=1.0, n_samples=1024, key=None):
     radii = jnp.array([0.1])
 
     mirror_group = _make_disk_mirror_group(
-        positions, rotations, curvatures, conics, aspherics, radii,
-        optical_stage=0, n_samples=n_samples,
+        positions,
+        rotations,
+        curvatures,
+        conics,
+        aspherics,
+        radii,
+        optical_stage=0,
+        n_samples=n_samples,
     )
 
     focal_length = 1.0 / (2.0 * curvature) if curvature != 0 else 1000.0
@@ -84,7 +91,8 @@ def make_two_stage_telescope(n_samples=512, key=None):
         conics=jnp.array([0.0]),
         aspherics=jnp.zeros((1, 1)),
         radii=jnp.array([0.1]),
-        optical_stage=0, n_samples=n_samples,
+        optical_stage=0,
+        n_samples=n_samples,
     )
 
     second = _make_disk_mirror_group(
@@ -94,7 +102,8 @@ def make_two_stage_telescope(n_samples=512, key=None):
         conics=jnp.array([0.0]),
         aspherics=jnp.zeros((1, 1)),
         radii=jnp.array([0.2]),
-        optical_stage=1, n_samples=n_samples,
+        optical_stage=1,
+        n_samples=n_samples,
     )
 
     sensor = SquareSensorGroup(
@@ -131,8 +140,14 @@ def make_telescope_with_obstruction(n_samples=1024, key=None):
     radii = jnp.array([0.1])
 
     mirror_group = _make_disk_mirror_group(
-        positions, rotations, curvatures, conics, aspherics, radii,
-        optical_stage=0, n_samples=n_samples,
+        positions,
+        rotations,
+        curvatures,
+        conics,
+        aspherics,
+        radii,
+        optical_stage=0,
+        n_samples=n_samples,
     )
 
     # Central obstruction near the aperture:
@@ -172,7 +187,7 @@ class TestBasicRendering:
         sources = jnp.array([[0.0, 0.0, 1e6]])
         values = jnp.array([1.0])
 
-        rb = tel.render(sources, values, source_type='point')
+        rb = tel.render(sources, values, source_type="point")
         assert isinstance(rb, LazyRayBundle)
 
         # Calling materialise() once and inspecting the result.
@@ -188,7 +203,7 @@ class TestBasicRendering:
         sources = jnp.array([[0.0, 0.0, 1e6]])
         values = jnp.array([1.0])
 
-        image = cam.image(tel.render(sources, values, source_type='point'))
+        image = cam.image(tel.render(sources, values, source_type="point"))
 
         assert image.shape == (1, 100, 100)
 
@@ -197,7 +212,7 @@ class TestBasicRendering:
         sources = jnp.array([[0.0, 0.0, 1e6]])
         values = jnp.array([1.0])
 
-        image = cam.image(tel.render(sources, values, source_type='point'))
+        image = cam.image(tel.render(sources, values, source_type="point"))
 
         assert jnp.sum(image) > 0
 
@@ -207,7 +222,7 @@ class TestBasicRendering:
 
         tel, cam = make_simple_telescope()
         sources = jnp.array([[0.0, 0.0, -1.0]])
-        rb = tel.render(sources, jnp.array([1.0]), source_type='parallel')
+        rb = tel.render(sources, jnp.array([1.0]), source_type="parallel")
         sensor_rays, _, _ = intersect_sensor(cam, rb.materialise())
 
         assert jnp.std(sensor_rays.origins[:, 0]) < 1e-8
@@ -219,7 +234,7 @@ class TestBasicRendering:
         sources = jnp.array([[0.0, 0.0, 1e6]])
         values = jnp.array([1.0])
 
-        rb = tel.render(sources, values, source_type='point')
+        rb = tel.render(sources, values, source_type="point")
         pe_vals, pe_times, pix_id, hit_mask = cam.collect(rb)
 
         n_rays = pe_vals.shape[0]
@@ -234,14 +249,16 @@ class TestResponseMatrix:
 
     def test_shape_matches_image_with_leading_source_axis(self):
         tel, cam = make_simple_telescope(n_samples=64)
-        sources = jnp.array([
-            [0.0, 0.0, -1.0],
-            [0.001, 0.0, -1.0],
-            [-0.001, 0.0, -1.0],
-        ])
-        single = cam.image(tel.render(sources[:1], jnp.ones(1), source_type='parallel'))
+        sources = jnp.array(
+            [
+                [0.0, 0.0, -1.0],
+                [0.001, 0.0, -1.0],
+                [-0.001, 0.0, -1.0],
+            ]
+        )
+        single = cam.image(tel.render(sources[:1], jnp.ones(1), source_type="parallel"))
 
-        rm = cam.response_matrix(tel.render(sources, jnp.ones(3), source_type='parallel'))
+        rm = cam.response_matrix(tel.render(sources, jnp.ones(3), source_type="parallel"))
 
         assert rm.shape == (sources.shape[0],) + single.shape
 
@@ -251,19 +268,21 @@ class TestResponseMatrix:
         # boundary that would otherwise leak across pixels under pure
         # float-rounding differences between batched and single-source
         # renders. Total throughput matches exactly either way.
-        sources = jnp.array([
-            [0.0003, 0.0001, -1.0],
-            [0.0005, 0.0, -1.0],
-            [-0.0005, 0.0, -1.0],
-        ])
+        sources = jnp.array(
+            [
+                [0.0003, 0.0001, -1.0],
+                [0.0005, 0.0, -1.0],
+                [-0.0005, 0.0, -1.0],
+            ]
+        )
 
         rm = cam.response_matrix(
-            tel.render(sources, jnp.ones(3), source_type='parallel'),
+            tel.render(sources, jnp.ones(3), source_type="parallel"),
         )
 
         for i in range(sources.shape[0]):
             img_i = cam.image(
-                tel.render(sources[i:i + 1], jnp.ones(1), source_type='parallel'),
+                tel.render(sources[i : i + 1], jnp.ones(1), source_type="parallel"),
             )
             assert jnp.allclose(rm[i], img_i, atol=1e-5), (
                 f"Response matrix row {i} disagrees with single-source render."
@@ -271,16 +290,18 @@ class TestResponseMatrix:
 
     def test_values_weight_rows(self):
         tel, cam = make_simple_telescope(n_samples=64)
-        sources = jnp.array([
-            [0.0, 0.0, -1.0],
-            [0.0005, 0.0, -1.0],
-        ])
+        sources = jnp.array(
+            [
+                [0.0, 0.0, -1.0],
+                [0.0005, 0.0, -1.0],
+            ]
+        )
 
         unit = cam.response_matrix(
-            tel.render(sources, jnp.ones(2), source_type='parallel'),
+            tel.render(sources, jnp.ones(2), source_type="parallel"),
         )
         weighted = cam.response_matrix(
-            tel.render(sources, jnp.array([2.0, 3.0]), source_type='parallel'),
+            tel.render(sources, jnp.array([2.0, 3.0]), source_type="parallel"),
         )
 
         assert jnp.allclose(weighted[0], 2.0 * unit[0], atol=1e-5)
@@ -293,7 +314,7 @@ class TestResponseMatrix:
         tel, cam = make_simple_telescope(n_samples=64)
         rb_eager = tel.trace(
             jnp.zeros((10, 3)).at[:, 2].set(50),
-            jnp.broadcast_to(jnp.array([0., 0., -1.]), (10, 3)),
+            jnp.broadcast_to(jnp.array([0.0, 0.0, -1.0]), (10, 3)),
             jnp.ones(10),
         )
         with pytest.raises(TypeError, match="LazyRayBundle"):
@@ -305,12 +326,14 @@ class TestRenderLinearity:
 
     def test_response_matrix_rows_sum_equals_image(self):
         tel, cam = make_simple_telescope(n_samples=64)
-        sources = jnp.array([
-            [0.0003, 0.0001, -1.0],
-            [0.0005, 0.0, -1.0],
-            [-0.0005, 0.0, -1.0],
-        ])
-        rb = tel.render(sources, jnp.ones(3), source_type='parallel')
+        sources = jnp.array(
+            [
+                [0.0003, 0.0001, -1.0],
+                [0.0005, 0.0, -1.0],
+                [-0.0005, 0.0, -1.0],
+            ]
+        )
+        rb = tel.render(sources, jnp.ones(3), source_type="parallel")
 
         assert jnp.allclose(
             cam.response_matrix(rb).sum(axis=0),
@@ -320,12 +343,14 @@ class TestRenderLinearity:
 
     def test_lazy_image_matches_materialised_image(self):
         tel, cam = make_simple_telescope(n_samples=64)
-        sources = jnp.array([
-            [0.0003, 0.0001, -1.0],
-            [0.0005, 0.0, -1.0],
-            [-0.0005, 0.0, -1.0],
-        ])
-        rb = tel.render(sources, jnp.ones(3), source_type='parallel')
+        sources = jnp.array(
+            [
+                [0.0003, 0.0001, -1.0],
+                [0.0005, 0.0, -1.0],
+                [-0.0005, 0.0, -1.0],
+            ]
+        )
+        rb = tel.render(sources, jnp.ones(3), source_type="parallel")
 
         # Lazy fused fold == eager scatter on the materialised flat bundle.
         assert jnp.allclose(cam.image(rb), cam.image(rb.materialise()), atol=1e-5)
@@ -342,8 +367,8 @@ class TestEnergyConservation:
         values1 = jnp.array([1.0])
         values2 = jnp.array([3.0])
 
-        image1 = cam.image(tel.render(sources, values1, source_type='point'))
-        image2 = cam.image(tel.render(sources, values2, source_type='point'))
+        image1 = cam.image(tel.render(sources, values1, source_type="point"))
+        image2 = cam.image(tel.render(sources, values2, source_type="point"))
 
         ratio = jnp.sum(image2) / jnp.sum(image1)
         assert jnp.isclose(ratio, 3.0, rtol=0.01)
@@ -354,7 +379,7 @@ class TestEnergyConservation:
         sources = jnp.array([[0.0, 0.0, 1e6]])
         values = jnp.array([1.0])
 
-        image = cam.image(tel.render(sources, values, source_type='point'))
+        image = cam.image(tel.render(sources, values, source_type="point"))
         total_flux = jnp.sum(image)
 
         mirror_area = jnp.pi * 0.1**2
@@ -369,11 +394,11 @@ class TestEnergyConservation:
         sources = jnp.array([[0.0, 0.0, 1e6]])
         values = jnp.array([1.0])
 
-        image_full = cam.image(tel.render(sources, values, source_type='point'))
+        image_full = cam.image(tel.render(sources, values, source_type="point"))
         flux_full = jnp.sum(image_full)
 
         tel_scaled = tel.scale_reflectivity(0, 3)
-        image_scaled = cam.image(tel_scaled.render(sources, values, source_type='point'))
+        image_scaled = cam.image(tel_scaled.render(sources, values, source_type="point"))
         flux_scaled = jnp.sum(image_scaled)
 
         assert jnp.isclose(flux_scaled / flux_full, 3.0, rtol=0.01)
@@ -397,7 +422,7 @@ class TestMultiStageRendering:
         sources = jnp.array([[0.0, 0.0, -1.0]])
         values = jnp.array([1.0])
 
-        image = cam.image(tel.render(sources, values, source_type='parallel'))
+        image = cam.image(tel.render(sources, values, source_type="parallel"))
         assert jnp.sum(image) > 0
 
 
@@ -414,11 +439,9 @@ class TestObstructionEffects:
         sources = jnp.array([[0.0, 0.0, -1.0]])
         values = jnp.array([1.0])
 
-        image_clear = cam_clear.image(
-            tel_clear.render(sources, values, source_type='parallel')
-        )
+        image_clear = cam_clear.image(tel_clear.render(sources, values, source_type="parallel"))
         image_obstructed = cam_obstructed.image(
-            tel_obstructed.render(sources, values, source_type='parallel')
+            tel_obstructed.render(sources, values, source_type="parallel")
         )
 
         flux_clear = jnp.sum(image_clear)
@@ -458,15 +481,15 @@ class TestFinalLegShadow:
         from iactrace.core.render import apply_final_leg_shadow
 
         rb = self._two_rays()
-        cam_pos = jnp.array([0.0, 0.0, 1.0])   # focal plane at z = 1
+        cam_pos = jnp.array([0.0, 0.0, 1.0])  # focal plane at z = 1
         cam_rot = jnp.zeros(3)
         # Sphere squarely on the axial ray's leg, clear of the offset ray.
         sphere = SphereGroup(centers=[[0.0, 0.0, 0.5]], radii=[0.1])
 
         out = apply_final_leg_shadow(rb, [sphere], cam_pos, cam_rot)
 
-        assert float(out.values[0]) == 0.0   # axial ray blocked
-        assert float(out.values[1]) == 1.0   # offset ray untouched
+        assert float(out.values[0]) == 0.0  # axial ray blocked
+        assert float(out.values[1]) == 1.0  # offset ray untouched
         assert jnp.allclose(out.path_length, rb.path_length)
         assert jnp.allclose(out.origins, rb.origins)
         assert jnp.allclose(out.directions, rb.directions)
@@ -481,13 +504,11 @@ class TestFinalLegShadow:
         sphere = SphereGroup(centers=[[0.0, 0.0, 1.5]], radii=[0.1])
 
         # Focal plane at z=1, in front of the sphere -> excluded by the cap.
-        out_near = apply_final_leg_shadow(
-            rb, [sphere], jnp.array([0.0, 0.0, 1.0]), cam_rot)
+        out_near = apply_final_leg_shadow(rb, [sphere], jnp.array([0.0, 0.0, 1.0]), cam_rot)
         assert float(out_near.values[0]) == 1.0
 
         # Focal plane at z=2, past the sphere -> now on the leg, so it blocks.
-        out_far = apply_final_leg_shadow(
-            rb, [sphere], jnp.array([0.0, 0.0, 2.0]), cam_rot)
+        out_far = apply_final_leg_shadow(rb, [sphere], jnp.array([0.0, 0.0, 2.0]), cam_rot)
         assert float(out_far.values[0]) == 0.0
 
     def test_noop_without_obstructions(self):
@@ -495,15 +516,14 @@ class TestFinalLegShadow:
         from iactrace.core.render import apply_final_leg_shadow
 
         rb = self._two_rays()
-        out = apply_final_leg_shadow(
-            rb, [], jnp.array([0.0, 0.0, 1.0]), jnp.zeros(3))
+        out = apply_final_leg_shadow(rb, [], jnp.array([0.0, 0.0, 1.0]), jnp.zeros(3))
         assert out is rb
 
     def test_to_camera_frame_shadows_and_reframes(self):
         """The handoff method applies the final-leg shadow and the frame
         transform together."""
         rb = self._two_rays()
-        cam_pos = jnp.array([0.0, 0.0, 1.0])   # focal plane at z = 1
+        cam_pos = jnp.array([0.0, 0.0, 1.0])  # focal plane at z = 1
         cam_rot = jnp.zeros(3)
         sphere = SphereGroup(centers=[[0.0, 0.0, 0.5]], radii=[0.1])
 
@@ -534,10 +554,8 @@ class TestFinalLegShadow:
         sources = jnp.array([[0.0, 0.0, -1.0]])
         values = jnp.array([1.0])
 
-        flux_clear = jnp.sum(cam.image(
-            tel.render(sources, values, source_type='parallel')))
-        flux_obs = jnp.sum(cam.image(
-            tel_obs.render(sources, values, source_type='parallel')))
+        flux_clear = jnp.sum(cam.image(tel.render(sources, values, source_type="parallel")))
+        flux_obs = jnp.sum(cam.image(tel_obs.render(sources, values, source_type="parallel")))
 
         assert flux_clear > 0
         assert flux_obs < 0.2 * flux_clear
@@ -551,10 +569,8 @@ class TestFinalLegShadow:
         sources = jnp.array([[0.0, 0.0, -1.0]])
         values = jnp.array([1.0])
 
-        pe_clear, _, _, _ = cam.collect(
-            tel.render(sources, values, source_type='parallel'))
-        pe_obs, _, _, _ = cam.collect(
-            tel_obs.render(sources, values, source_type='parallel'))
+        pe_clear, _, _, _ = cam.collect(tel.render(sources, values, source_type="parallel"))
+        pe_obs, _, _, _ = cam.collect(tel_obs.render(sources, values, source_type="parallel"))
 
         flux_clear = jnp.sum(pe_clear)
         flux_obs = jnp.sum(pe_obs)

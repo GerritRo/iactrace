@@ -29,8 +29,8 @@ class OpticalElementGroup(eqx.Module):
     """
 
     # Transform
-    positions: Array           # (N, 3)
-    rotations: Array           # (N, 3) euler angles in degrees
+    positions: Array  # (N, 3)
+    rotations: Array  # (N, 3) euler angles in degrees
 
     # Composable modules
     surface: AsphericSurfaceGroup
@@ -39,7 +39,7 @@ class OpticalElementGroup(eqx.Module):
     bsdf: BSDF
 
     # PRNG state for sampling and roughness
-    sample_key: Array          # PRNGKey
+    sample_key: Array  # PRNGKey
 
     n_samples: int = eqx.field(static=True)
     optical_stage: int = eqx.field(static=True)
@@ -114,6 +114,10 @@ class OpticalElementGroup(eqx.Module):
         aperture_data = self.aperture.get_area_data()
         area_fn = self.aperture.area_fn
         return transform_to_world(
-            aperture_samples, self.surface, aperture_data,
-            self.positions, self.rotations, area_fn=area_fn,
+            aperture_samples,
+            self.surface,
+            aperture_data,
+            self.positions,
+            self.rotations,
+            area_fn=area_fn,
         )

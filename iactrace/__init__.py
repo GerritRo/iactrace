@@ -5,6 +5,7 @@ from .camera import (
     Concentrator,
     DetectionChain,
     HexagonalSensorGroup,
+    OkumuraCone,
     PhotoSensor,
     SensorGroup,
     SquareSensorGroup,
@@ -27,6 +28,7 @@ __all__ = [
     "LazyRayBundle",
     "Concentrator",
     "WinstonCone",
+    "OkumuraCone",
     "DetectionChain",
     # Sensors
     "SensorGroup",

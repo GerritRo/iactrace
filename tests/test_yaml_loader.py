@@ -310,6 +310,8 @@ class TestValidConfigs:
         # Check per-mirror curvatures
         assert float(group.surface.curvatures[0]) == pytest.approx(0.2)
         assert float(group.surface.curvatures[1]) == pytest.approx(0.1)  # template default
+
+
 class TestCoatingsFromYaml:
     """Inline R(theta) / T(theta) curves loaded from YAML."""
 

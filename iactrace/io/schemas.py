@@ -94,9 +94,7 @@ class TabulatedCurveSchema(BaseModel):
     def _angles_in_range(cls, v):
         for a in v:
             if a < 0.0 or a > 90.0:
-                raise ValueError(
-                    f"angles_deg must lie in [0, 90]; got {a}"
-                )
+                raise ValueError(f"angles_deg must lie in [0, 90]; got {a}")
         return v
 
     @field_validator("values")
@@ -104,9 +102,7 @@ class TabulatedCurveSchema(BaseModel):
     def _values_in_range(cls, v):
         for x in v:
             if x < 0.0 or x > 1.0:
-                raise ValueError(
-                    f"values must lie in [0, 1]; got {x}"
-                )
+                raise ValueError(f"values must lie in [0, 1]; got {x}")
         return v
 
     @model_validator(mode="after")
@@ -268,6 +264,29 @@ class WinstonConeSchema(BaseModel):
     orientation_deg: float = 0.0
 
 
+class OkumuraConeSchema(BaseModel):
+    """Serialized :class:`~iactrace.camera.okumura_cone.OkumuraCone`.
+
+    The walls follow a quadratic or cubic Bezier meridian instead of Winston's
+    paraboloid. ``control_points`` are the interior Bezier points in the paper's
+    normalized box (exit rim ``(0, 0)``, mouth ``(1, 1)`` implied) -- one point
+    for a quadratic curve, two for a cubic one. ``length`` defaults to the
+    equivalent full Winston-cone depth when omitted.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal["okumura"] = "okumura"
+    n_sides: int = Field(gt=2)
+    entrance_apothem: float = Field(gt=0)
+    exit_apothem: float = Field(gt=0)
+    control_points: list[Vec2] = Field(min_length=1)
+    length: float | None = Field(default=None, gt=0)
+    reflectivity: float = Field(ge=0, le=1, default=0.9)
+    max_bounces: int = Field(ge=0, default=10)
+    orientation_deg: float = 0.0
+
+
 class UniformQESchema(BaseModel):
     """Serialized :class:`~iactrace.camera.photosensor.UniformQE`."""
 
@@ -277,11 +296,11 @@ class UniformQESchema(BaseModel):
     qe: float = Field(ge=0, le=1, default=1.0)
 
 
-# Discriminated-union slots for the detection chain. Each is a single member
-# today; when a second concrete type is added, turn the alias into
-# ``Annotated[A | B, Field(discriminator="type")]`` (every member already carries
-# a ``type`` literal) and add the matching arms in ``io/adapters.py``.
-ConcentratorSchema = WinstonConeSchema
+# Discriminated-union slots for the detection chain.
+ConcentratorSchema = Annotated[
+    WinstonConeSchema | OkumuraConeSchema,
+    Field(discriminator="type"),
+]
 PhotoSensorSchema = UniformQESchema
 
 
@@ -303,9 +322,7 @@ def _normalize_sensor_placement(data: Any) -> Any:
         has_s = data.get(singular) is not None
         has_p = data.get(plural) is not None
         if has_s == has_p:
-            raise ValueError(
-                f"Sensor entry must set exactly one of `{singular}` or `{plural}`."
-            )
+            raise ValueError(f"Sensor entry must set exactly one of `{singular}` or `{plural}`.")
         if has_s:
             data[plural] = [data.pop(singular)]
         else:
@@ -434,7 +451,11 @@ class TelescopeConfigSchema(BaseModel):
         for i, mirror in enumerate(self.mirrors):
             mirror_id = mirror.id or f"mirror[{i}]"
             if mirror.template not in self.mirror_templates:
-                available = ", ".join(self.mirror_templates.keys()) if self.mirror_templates else "(none defined)"
+                available = (
+                    ", ".join(self.mirror_templates.keys())
+                    if self.mirror_templates
+                    else "(none defined)"
+                )
                 raise ValueError(
                     f"Mirror '{mirror_id}' references undefined template "
                     f"'{mirror.template}'. Available templates: {available}"
@@ -451,6 +472,7 @@ class TelescopeConfigSchema(BaseModel):
         groups for that stage and trip the same check in
         ``Telescope.__init__`` with a far less actionable error.
         """
+
         def _aperture_sig(ap: ApertureSchema) -> tuple[str, int]:
             if isinstance(ap, PolygonApertureSchema):
                 return ("polygon", len(ap.vertices))

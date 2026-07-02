@@ -12,8 +12,8 @@ from ..core.interactions import reflect
 from ..core.ray_bundle import RayBundle
 from .concentrator import Concentrator
 
-_NUDGE = 1e-5     # off-wall step, scaled by a2
-_T_FLOOR = 1e-6   # spurious-hit rejection floor
+_NUDGE = 1e-5  # off-wall step, scaled by a2
+_T_FLOOR = 1e-6  # spurious-hit rejection floor
 
 
 def cpc_wall_tilt(
@@ -27,9 +27,7 @@ def cpc_wall_tilt(
     """
     a2, a1, length = float(exit_apothem), float(entrance_apothem), float(length)
     if not 0.0 < a2 < a1:
-        raise ValueError(
-            f"require 0 < exit_apothem < entrance_apothem, got a2={a2}, a1={a1}"
-        )
+        raise ValueError(f"require 0 < exit_apothem < entrance_apothem, got a2={a2}, a1={a1}")
     if length <= 0.0:
         raise ValueError(f"length must be > 0, got {length}")
     b = a2 - a1
@@ -37,9 +35,7 @@ def cpc_wall_tilt(
     d = math.hypot(a1 + a2, length) - 2.0 * a2
     disc = r2 - d * d
     if disc < 0.0:
-        raise ValueError(
-            f"(exit={a2}, entrance={a1}, length={length}) is not a realizable "
-        )
+        raise ValueError(f"(exit={a2}, entrance={a1}, length={length}) is not a realizable ")
     sq = math.sqrt(disc)
     s = (b * d + length * sq) / r2
     c = (length * d - b * sq) / r2
@@ -75,8 +71,7 @@ def profile_apothem(z: Array, exit_apothem: float, s: float, c: float) -> Array:
     return (-B + jnp.sqrt(disc)) / (2.0 * A)
 
 
-def _wall_t(o: Array, d: Array, n: Array, a2: float, s: float, c: float,
-            k: float) -> Array:
+def _wall_t(o: Array, d: Array, n: Array, a2: float, s: float, c: float, k: float) -> Array:
     """Smallest forward ray parameter hitting wall n (inf if none)."""
     p = d[0] * n[0] + d[1] * n[1]
     q = d[2]
@@ -103,8 +98,7 @@ def _wall_t(o: Array, d: Array, n: Array, a2: float, s: float, c: float,
     return jnp.where(bad, jnp.inf, t)
 
 
-def _wall_normal(P: Array, n: Array, a2: float, s: float, c: float,
-                 k: float) -> Array:
+def _wall_normal(P: Array, n: Array, a2: float, s: float, c: float, k: float) -> Array:
     """Unit normal of wall n at point P."""
     u = P[0] * n[0] + P[1] * n[1]
     z = P[2]
@@ -159,9 +153,7 @@ def _single_step(o, d, value, path, done, n_hats, a2, s, c, k, length, refl):
     )
 
 
-
-def trace(origins, directions, n_hats, exit_apothem, s, c, length, reflectivity,
-          max_bounces):
+def trace(origins, directions, n_hats, exit_apothem, s, c, length, reflectivity, max_bounces):
     """Trace rays through the cone in CPC coords (exit at z=0, entrance at z=length).
 
     Returns ``(exit_origins, exit_directions, value_factor, path_added)``;
@@ -179,7 +171,8 @@ def trace(origins, directions, n_hats, exit_apothem, s, c, length, reflectivity,
     inside = jnp.all(u_all <= ent_apothem + 1e-9, axis=1)
 
     carry = (
-        origins, directions,
+        origins,
+        directions,
         jnp.where(inside, 1.0, 0.0),
         jnp.zeros(n),
         ~inside,
@@ -195,11 +188,15 @@ def trace(origins, directions, n_hats, exit_apothem, s, c, length, reflectivity,
         return out, None
 
     (o, d, value, path, done), _ = jax.lax.scan(
-        step, carry, None, length=max_bounces + 1,
+        step,
+        carry,
+        None,
+        length=max_bounces + 1,
     )
     # Rays still bouncing at the end are absorbed.
     value = jnp.where(done, value, 0.0)
     return o, d, value, path
+
 
 # WinstonCone concentrator
 
@@ -230,7 +227,7 @@ class WinstonCone(Concentrator):
     entrance_apothem: float = eqx.field(static=True)
     reflectivity: float = eqx.field(static=True)
     max_bounces: int = eqx.field(static=True)
-    orientation: float = eqx.field(static=True) # radians
+    orientation: float = eqx.field(static=True)  # radians
     length: float = eqx.field(static=True)
 
     def __init__(
@@ -290,8 +287,15 @@ class WinstonCone(Concentrator):
 
         s, c = self._wall_tilt()
         oe, de, factor, path_add = trace(
-            o_cpc, d_cpc, self._wall_normals(), self.exit_apothem,
-            s, c, length, self.reflectivity, self.max_bounces,
+            o_cpc,
+            d_cpc,
+            self._wall_normals(),
+            self.exit_apothem,
+            s,
+            c,
+            length,
+            self.reflectivity,
+            self.max_bounces,
         )
 
         o_out = jnp.stack([oe[:, 0], oe[:, 1], jnp.full(oe.shape[0], -length)], axis=-1)
@@ -312,8 +316,11 @@ class WinstonCone(Concentrator):
         s, c = self._wall_tilt()
         apothem = profile_apothem(self.length + z_chain, self.exit_apothem, s, c)
         corner_r = apothem / jnp.cos(jnp.pi / self.n_sides)
-        ang = (self.orientation + jnp.pi / self.n_sides
-               + 2.0 * jnp.pi * jnp.arange(self.n_sides) / self.n_sides)
-        unit = jnp.stack([jnp.cos(ang), jnp.sin(ang)], axis=-1)        # (N, 2)
-        rings = corner_r[:, None, None] * unit[None, :, :]            # (K, N, 2)
+        ang = (
+            self.orientation
+            + jnp.pi / self.n_sides
+            + 2.0 * jnp.pi * jnp.arange(self.n_sides) / self.n_sides
+        )
+        unit = jnp.stack([jnp.cos(ang), jnp.sin(ang)], axis=-1)  # (N, 2)
+        rings = corner_r[:, None, None] * unit[None, :, :]  # (K, N, 2)
         return z_chain, rings

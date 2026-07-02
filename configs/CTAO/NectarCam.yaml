@@ -1,6 +1,17 @@
 sensors:
 - id: NectarCAM
   type: hexagonal
+  concentrator:
+    type: winston
+    n_sides: 6
+    entrance_apothem: 0.0245
+    exit_apothem: 0.0122
+    length: 0.054
+    reflectivity: 0.90
+    max_bounces: 10
+    orientation_deg: 0.0
+  gap: 0.001000
+  edge_width: 0.0005
   position:
   - 0.000000
   - 0.000000

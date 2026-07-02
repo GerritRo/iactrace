@@ -35,8 +35,8 @@ class Telescope(eqx.Module):
     mirror_groups: list[OpticalElementGroup]
     lens_groups: list[OpticalElementGroup]
     obstruction_groups: list[ObstructionGroup]
-    camera_position: Array   # (3,) camera origin in world frame
-    camera_rotation: Array   # (3,) Euler angles (degrees) for camera orientation
+    camera_position: Array  # (3,) camera origin in world frame
+    camera_rotation: Array  # (3,) Euler angles (degrees) for camera orientation
     name: str = eqx.field(static=True)
 
     def __init__(
@@ -142,11 +142,16 @@ class Telescope(eqx.Module):
             Pass to ``camera.collect()`` or ``camera.image()`` for detection.
         """
         rb = trace_optics(
-            self.optical_groups, self.obstruction_groups,
-            ray_origins, ray_directions, values,
+            self.optical_groups,
+            self.obstruction_groups,
+            ray_origins,
+            ray_directions,
+            values,
         )
         return rb.to_camera_frame(
-            self.obstruction_groups, self.camera_position, self.camera_rotation,
+            self.obstruction_groups,
+            self.camera_position,
+            self.camera_rotation,
         )
 
     @classmethod
