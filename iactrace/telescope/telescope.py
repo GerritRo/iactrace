@@ -8,7 +8,7 @@ from jax import Array
 from jax.typing import ArrayLike
 
 from ..core.ray_bundle import LazyRayBundle, RayBundle
-from ..core.render import trace_optics
+from ..core.render import apply_final_leg_shadow, trace_optics
 from ..core.transforms import euler_to_matrix
 from . import operations as _ops
 
@@ -35,8 +35,8 @@ class Telescope(eqx.Module):
     mirror_groups: list[OpticalElementGroup]
     lens_groups: list[OpticalElementGroup]
     obstruction_groups: list[ObstructionGroup]
-    camera_position: Array  # (3,) camera origin in world frame
-    camera_rotation: Array  # (3,) Euler angles (degrees) for camera orientation
+    camera_position: Array   # (3,) camera origin in world frame
+    camera_rotation: Array   # (3,) Euler angles (degrees) for camera orientation
     name: str = eqx.field(static=True)
 
     def __init__(
@@ -148,11 +148,14 @@ class Telescope(eqx.Module):
             ray_directions,
             values,
         )
-        return rb.to_camera_frame(
+        # Handoff = shadow the final leg (explicit), then a pure reframe.
+        rb = apply_final_leg_shadow(
+            rb,
             self.obstruction_groups,
             self.camera_position,
             self.camera_rotation,
         )
+        return rb.to_frame(self.camera_position, self.camera_rotation)
 
     @classmethod
     def from_yaml(
@@ -289,6 +292,18 @@ class Telescope(eqx.Module):
 
     def apply_aspheric_error(self, stage: int, sigmas: Array, key: Array) -> Telescope:
         return _ops.apply_aspheric_error(self, stage, sigmas, key)
+
+    def apply_zernike_error(self, stage: int, sigmas: Array, key: Array) -> Telescope:
+        return _ops.apply_zernike_error(self, stage, sigmas, key)
+
+    def apply_astigmatism(self, stage: int, sigma: float, key: Array) -> Telescope:
+        return _ops.apply_astigmatism(self, stage, sigma, key)
+
+    def apply_coma(self, stage: int, sigma: float, key: Array) -> Telescope:
+        return _ops.apply_coma(self, stage, sigma, key)
+
+    def apply_trefoil(self, stage: int, sigma: float, key: Array) -> Telescope:
+        return _ops.apply_trefoil(self, stage, sigma, key)
 
     def resample(self, stage: int, key: Array) -> Telescope:
         return _ops.resample(self, stage, key)

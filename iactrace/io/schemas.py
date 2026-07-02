@@ -48,6 +48,19 @@ class SurfaceSchema(BaseModel):
     aspheric: list[float] = Field(default_factory=list)
 
 
+class ZernikeSchema(BaseModel):
+    """Per-element Zernike figure error summed onto the aspheric surface.
+    ``coeffs`` are RMS-normalized Noll coefficients in metres, indexed from
+    ``Z1`` (``coeffs[0]`` = piston). At most 11 terms (Z1..Z11) are supported.
+    ``r_norm`` is the normalization radius, with ``rho = 1`` at this radius.
+    See :class:`~iactrace.core.surfaces.ZernikeSurfaceGroup`. Presence of this
+    block makes the element's surface an asphere + Zernike
+    :class:`~iactrace.core.surfaces.SumSurfaceGroup`.
+    """
+    coeffs: list[float] = Field(min_length=1, max_length=11)
+    r_norm: float = Field(gt=0)
+
+
 class GaussianBSDFSchema(BaseModel):
     """Single-Gaussian surface roughness.
 
@@ -137,6 +150,7 @@ class MirrorSchema(BaseModel):
     stage: int = Field(ge=0, default=0)
     bsdf: BSDFSchema | None = None
     reflectivity: float | None = None
+    zernike: ZernikeSchema | None = None
     id: str | None = None
 
 
@@ -156,6 +170,7 @@ class AsphericDiskLensSchema(BaseModel):
     offset: Vec2 = Field(default_factory=lambda: [0.0, 0.0])
     transmittance: float = Field(ge=0, le=1, default=1.0)
     coating: TabulatedCurveSchema | None = None
+    zernike: ZernikeSchema | None = None
     stage: int = Field(ge=0, default=0)
     id: str | None = None
 

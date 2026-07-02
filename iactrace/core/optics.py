@@ -15,7 +15,7 @@ from .interactions import (
     RefractInteraction,
     SlabInteraction,
 )
-from .surfaces import AsphericSurfaceGroup
+from .surfaces import SurfaceGroup
 from .transforms import transform_to_world
 
 InteractionModule = ReflectInteraction | RefractInteraction | SlabInteraction
@@ -33,7 +33,7 @@ class OpticalElementGroup(eqx.Module):
     rotations: Array  # (N, 3) euler angles in degrees
 
     # Composable modules
-    surface: AsphericSurfaceGroup
+    surface: SurfaceGroup
     aperture: Aperture
     interaction_module: InteractionModule
     bsdf: BSDF

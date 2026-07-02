@@ -519,23 +519,34 @@ class TestFinalLegShadow:
         out = apply_final_leg_shadow(rb, [], jnp.array([0.0, 0.0, 1.0]), jnp.zeros(3))
         assert out is rb
 
-    def test_to_camera_frame_shadows_and_reframes(self):
-        """The handoff method applies the final-leg shadow and the frame
-        transform together."""
+    def test_to_frame_is_pure_and_handoff_composes(self):
+        """to_frame is a pure reframe (values untouched); the explicit
+        shadow-then-reframe handoff reproduces the old coupled behaviour.
+
+        The final-leg shadow is no longer a side effect of the frame
+        transform -- it is an explicit ``apply_final_leg_shadow`` step the
+        render/trace entry points run before ``to_frame``.
+        """
+        from iactrace.core.render import apply_final_leg_shadow
+
         rb = self._two_rays()
         cam_pos = jnp.array([0.0, 0.0, 1.0])  # focal plane at z = 1
         cam_rot = jnp.zeros(3)
         sphere = SphereGroup(centers=[[0.0, 0.0, 0.5]], radii=[0.1])
 
-        out = rb.to_camera_frame([sphere], cam_pos, cam_rot)
+        # Pure reframe: geometry moves, values are left alone.
+        reframed = rb.to_frame(cam_pos, cam_rot)
+        assert jnp.allclose(reframed.values, rb.values)
+
+        # Explicit handoff: shadow the final leg, then reframe.
+        out = apply_final_leg_shadow(rb, [sphere], cam_pos, cam_rot).to_frame(cam_pos, cam_rot)
 
         # Shadowed: axial ray blocked, offset ray kept.
         assert float(out.values[0]) == 0.0
         assert float(out.values[1]) == 1.0
-        # Reframed: geometry matches a plain to_frame transform.
-        expected = rb.to_frame(cam_pos, cam_rot)
-        assert jnp.allclose(out.origins, expected.origins)
-        assert jnp.allclose(out.directions, expected.directions)
+        # Reframed identically to a plain to_frame transform.
+        assert jnp.allclose(out.origins, reframed.origins)
+        assert jnp.allclose(out.directions, reframed.directions)
 
     def _near_focus_sphere(self):
         # make_simple_telescope: parabola of curvature 1 -> focus at z=0.5,

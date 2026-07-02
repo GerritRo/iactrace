@@ -6,6 +6,7 @@ from collections import defaultdict
 from collections.abc import Callable
 from typing import TYPE_CHECKING, NamedTuple
 
+import equinox as eqx
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -33,6 +34,11 @@ from ..core.obstructions import (
     TriangleGroup,
 )
 from ..core.optics import OpticalElementGroup
+from ..core.surfaces import (
+    AsphericSurfaceGroup,
+    SumSurfaceGroup,
+    ZernikeSurfaceGroup,
+)
 from ..core.transforms import euler_to_matrix
 from .schemas import (
     AsphericDiskLensSchema,
@@ -62,6 +68,7 @@ from .schemas import (
     TriangleObstructionSchema,
     UniformQESchema,
     WinstonConeSchema,
+    ZernikeSchema,
 )
 
 if TYPE_CHECKING:
@@ -102,6 +109,7 @@ class _ParsedMirror(NamedTuple):
     bsdf: BSDFSchema | None
     reflectivity_scalar: float
     coating_curve: TabulatedCurveSchema | None
+    zernike: ZernikeSchema | None
 
 
 def _to_float_list(arr: np.ndarray | jnp.ndarray) -> list[float]:
@@ -399,6 +407,7 @@ def mirrors_from_schemas(
                 bsdf=bsdf,
                 reflectivity_scalar=refl_scalar,
                 coating_curve=coating_curve,
+                zernike=mirror.zernike,
             )
         )
 
@@ -502,7 +511,7 @@ def _build_mirror_group(
         [m.coating_curve for m in mirrors],
         n_elements,
     )
-    return mirror_group(
+    group = mirror_group(
         positions=jnp.asarray([m.position for m in mirrors]),
         rotations=jnp.asarray([m.orientation for m in mirrors]),
         curvatures=jnp.asarray([m.curvature for m in mirrors]),
@@ -517,6 +526,45 @@ def _build_mirror_group(
         optical_stage=stage,
         n_samples=n_samples,
     )
+    return _maybe_add_zernike(group, [m.zernike for m in mirrors])
+
+def _build_zernike_for_bucket(
+    schemas: list[ZernikeSchema | None],
+) -> ZernikeSurfaceGroup | None:
+    """Reassemble one group's Zernike term from per-element schemas, or ``None``.
+    All ``None`` -> ``None`` (no figure error). Otherwise every element's
+    coefficients are padded to a common width and stacked; elements without a
+    ``zernike`` block contribute zero coefficients (and a placeholder ``r_norm``
+    of 1.0, which is irrelevant since their contribution is zero).
+    """
+    present = [z for z in schemas if z is not None]
+    if not present:
+        return None
+    width = max(len(z.coeffs) for z in present)
+    coeffs: list[list[float]] = []
+    r_norms: list[float] = []
+    for z in schemas:
+        if z is None:
+            coeffs.append([0.0] * width)
+            r_norms.append(1.0)
+        else:
+            coeffs.append(list(z.coeffs) + [0.0] * (width - len(z.coeffs)))
+            r_norms.append(z.r_norm)
+    return ZernikeSurfaceGroup(
+        coeffs=jnp.asarray(coeffs), r_norm=jnp.asarray(r_norms),
+    )
+
+
+def _maybe_add_zernike(
+    group: OpticalElementGroup,
+    schemas: list[ZernikeSchema | None],
+) -> OpticalElementGroup:
+    """Wrap the group's aspheric surface in a Sum + Zernike term if any present."""
+    zernike = _build_zernike_for_bucket(schemas)
+    if zernike is None:
+        return group
+    new_surface = SumSurfaceGroup([group.surface, zernike])
+    return eqx.tree_at(lambda g: g.surface, group, new_surface)
 
 
 def lenses_from_schemas(
@@ -607,7 +655,7 @@ def _build_aspheric_disk_lens_group(
         n,
     )
 
-    return refractive_group(
+    group = refractive_group(
         positions=jnp.asarray([lens.position for lens in lenses]),
         rotations=jnp.asarray([lens.orientation for lens in lenses]),
         curvatures=jnp.asarray([lens.curvature for lens in lenses]),
@@ -622,6 +670,7 @@ def _build_aspheric_disk_lens_group(
         sample_key=sample_key,
         optical_stage=stage,
     )
+    return _maybe_add_zernike(group, [lens.zernike for lens in lenses])
 
 
 def _build_plano_slab_group(
@@ -823,14 +872,96 @@ def _bsdf_to_schema(bsdf: BSDF | None, i: int) -> BSDFSchema | None:
             )
 
 
+def _surface_components(
+    surface,
+) -> tuple[AsphericSurfaceGroup | None, ZernikeSurfaceGroup | None]:
+    """Split a surface into its aspheric and Zernike parts for serialization.
+    Accepts a bare :class:`AsphericSurfaceGroup`, a standalone
+    :class:`ZernikeSurfaceGroup`, or a :class:`SumSurfaceGroup` composing one of
+    each. Either part may be ``None``. Raises if the surface contains anything
+    else, more than one of either type, or a non-zero decenter on the composite
+    or the Zernike term (the flat per-element schema keeps the decenter on the
+    asphere only).
+    """
+    if isinstance(surface, AsphericSurfaceGroup):
+        return surface, None
+    if isinstance(surface, ZernikeSurfaceGroup):
+        if not np.allclose(np.asarray(surface.offsets), 0.0):
+            raise ValueError(
+                "cannot serialise a Zernike surface with a non-zero decenter"
+            )
+        return None, surface
+    if isinstance(surface, SumSurfaceGroup):
+        if not np.allclose(np.asarray(surface.offsets), 0.0):
+            raise ValueError(
+                "cannot serialise a SumSurfaceGroup with a non-zero composite "
+                "decenter; keep the decenter on the aspheric component"
+            )
+        asph: AsphericSurfaceGroup | None = None
+        zern: ZernikeSurfaceGroup | None = None
+        for c in surface.components:
+            if isinstance(c, AsphericSurfaceGroup) and asph is None:
+                asph = c
+            elif isinstance(c, ZernikeSurfaceGroup) and zern is None:
+                zern = c
+            else:
+                raise ValueError(
+                    f"cannot serialise a SumSurfaceGroup containing "
+                    f"{type(c).__name__}; only one AsphericSurfaceGroup and one "
+                    "ZernikeSurfaceGroup are supported"
+                )
+        if zern is not None and not np.allclose(np.asarray(zern.offsets), 0.0):
+            raise ValueError(
+                "cannot serialise a Zernike term with a non-zero decenter"
+            )
+        return asph, zern
+    raise ValueError(
+        f"cannot serialise surface type {type(surface).__name__}"
+    )
+
+
+def _zernike_to_schema(
+    zernike: ZernikeSurfaceGroup | None, i: int
+) -> ZernikeSchema | None:
+    """Project element ``i`` of a Zernike term to a schema, or ``None``.
+    Elements whose coefficients are all zero round-trip as ``None`` so default
+    (figure-error-free) elements stay clean in the YAML.
+    """
+    if zernike is None:
+        return None
+    coeffs = _strip_trailing_zeros(_to_float_list(zernike.coeffs[i]))
+    if not coeffs:
+        return None
+    return ZernikeSchema(coeffs=coeffs, r_norm=float(zernike.r_norm[i]))
+
+
+def _asphere_surface_arrays(
+    surface, n: int
+) -> tuple[AsphericSurfaceGroup | None, ZernikeSurfaceGroup | None, Array]:
+    """Return ``(asphere, zernike, offsets)`` for a group's surface.
+    For a standalone Zernike surface (no aspheric base) the curvature / conic /
+    aspheric default to a flat surface and the decenter is taken from the
+    Zernike term.
+    """
+    asph, zern = _surface_components(surface)
+    if asph is not None:
+        offsets = asph.offsets
+    elif zern is not None:
+        offsets = zern.offsets
+    else:  # pragma: no cover - _surface_components never returns (None, None)
+        offsets = jnp.zeros((n, 2))
+    return asph, zern, offsets
+
+
 def mirrors_to_schemas(
     groups: list[OpticalElementGroup],
 ) -> tuple[dict[str, MirrorTemplateSchema], list[MirrorSchema]]:
     """Extract mirror schemas from OpticalElementGroup list.
 
     Returns templates dict + mirror list. Deduplicates surface params into templates.
-    BSDF is stored per-mirror (not part of the dedup key) since mirrors sharing a
-    surface template can carry different roughness parameters.
+    BSDF and the per-element Zernike figure error are stored per-mirror (not part
+    of the dedup key) since mirrors sharing a surface template can carry different
+    roughness / figure parameters.
     """
     templates: dict[str, MirrorTemplateSchema] = {}
     mirrors: list[MirrorSchema] = []
@@ -846,11 +977,15 @@ def mirrors_to_schemas(
 
         coating_schema = _coating_to_curve_schema(interaction.reflectivity)
         coating_key = _curve_schema_to_key(coating_schema)
+        asph, zern, offsets = _asphere_surface_arrays(group.surface, len(group))
 
         for i in range(len(group)):
-            curvature = float(group.surface.curvatures[i])
-            conic = float(group.surface.conics[i])
-            aspheric_raw = _strip_trailing_zeros(_to_float_list(group.surface.aspherics[i]))
+            if asph is not None:
+                curvature = float(asph.curvatures[i])
+                conic = float(asph.conics[i])
+                aspheric_raw = _strip_trailing_zeros(_to_float_list(asph.aspherics[i]))
+            else:
+                curvature, conic, aspheric_raw = 0.0, 0.0, []
 
             surface_key = (curvature, conic, tuple(aspheric_raw), coating_key)
 
@@ -876,9 +1011,10 @@ def mirrors_to_schemas(
                     aperture=_aperture_to_schema(group.aperture, i),
                     template=template_name,
                     stage=group.optical_stage,
-                    offset=_to_float_list(group.surface.offsets[i]),
+                    offset=_to_float_list(offsets[i]),
                     bsdf=_bsdf_to_schema(group.bsdf, i),
                     reflectivity=scalar if scalar != 1.0 else None,
+                    zernike=_zernike_to_schema(zern, i),
                     id=f"M_{len(mirrors)}",
                 )
             )
@@ -915,9 +1051,17 @@ def lenses_to_schemas(
     for group in groups:
         match group.interaction_module:
             case RefractInteraction() as interaction:
+                asph, zern, offsets = _asphere_surface_arrays(group.surface, len(group))
                 for i in range(len(group)):
-                    lenses.append(_extract_aspheric_disk_lens(group, interaction, i, len(lenses)))
+                    lenses.append(_extract_aspheric_disk_lens(
+                        group, interaction, i, len(lenses), asph, zern, offsets,
+                    ))
             case SlabInteraction() as interaction:
+                _, slab_zern = _surface_components(group.surface)
+                if slab_zern is not None:
+                    raise ValueError(
+                        "cannot serialise a Zernike figure error on a plano slab"
+                    )
                 for i in range(len(group)):
                     lenses.append(_extract_plano_slab_lens(group, interaction, i, len(lenses)))
             case _:
@@ -930,22 +1074,31 @@ def _extract_aspheric_disk_lens(
     interaction: RefractInteraction,
     i: int,
     counter: int,
+    asph: AsphericSurfaceGroup | None,
+    zern: ZernikeSurfaceGroup | None,
+    offsets: Array,
 ) -> AsphericDiskLensSchema:
     """Extract an AsphericDiskLensSchema from element i of a group."""
-    aspheric_raw = _strip_trailing_zeros(_to_float_list(group.surface.aspherics[i]))
+    if asph is not None:
+        curvature = float(asph.curvatures[i])
+        conic = float(asph.conics[i])
+        aspheric_raw = _strip_trailing_zeros(_to_float_list(asph.aspherics[i]))
+    else:
+        curvature, conic, aspheric_raw = 0.0, 0.0, []
     coating_schema = _coating_to_curve_schema(interaction.transmittance)
     return AsphericDiskLensSchema(
         position=_to_float_list(group.positions[i]),
         orientation=_to_float_list(group.rotations[i]),
         aperture=_aperture_to_schema(group.aperture, i),
-        curvature=float(group.surface.curvatures[i]),
-        conic=float(group.surface.conics[i]),
+        curvature=curvature,
+        conic=conic,
         n_inside=float(interaction.n_inside[i]),
         n_outside=float(interaction.n_outside),
         aspheric=aspheric_raw,
-        offset=_to_float_list(group.surface.offsets[i]),
+        offset=_to_float_list(offsets[i]),
         transmittance=float(interaction.transmittance_scalar[i]),
         coating=coating_schema,
+        zernike=_zernike_to_schema(zern, i),
         stage=group.optical_stage,
         id=f"lens_{counter}",
     )

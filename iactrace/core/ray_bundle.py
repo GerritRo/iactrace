@@ -37,9 +37,7 @@ class RayBundle(eqx.Module):
         n: Per-ray refractive index of the medium each ray is
             currently propagating in (n_rays,). Carried so downstream
             consumers (sensor intersection, focal-surface analysis)
-            can weight the final geometric leg correctly. Slab
-            interactions additionally contribute their internal
-            ``n_in * L_internal`` term to ``path_length``.
+            can weight the final geometric leg correctly.
     """
 
     origins: Array
@@ -53,6 +51,10 @@ class RayBundle(eqx.Module):
 
         ``origin`` is the new frame's position in the current frame;
         ``rotation`` are XYZ Euler angles in degrees.
+
+        This is a **pure coordinate transform**: it moves ``origins`` and
+        ``directions`` and leaves ``values`` / ``path_length`` / ``n``
+        untouched.
         """
         rot = euler_to_matrix(rotation)
         return RayBundle(
@@ -62,30 +64,6 @@ class RayBundle(eqx.Module):
             path_length=self.path_length,
             n=self.n,
         )
-
-    def to_camera_frame(
-        self,
-        obstruction_groups: list,
-        camera_position: Array,
-        camera_rotation: Array,
-    ) -> RayBundle:
-        """Finalise world-frame render output for the camera (the handoff).
-
-        Also applys shadowing for the final leg from last optical stage to
-        focal plane.
-
-        ``self`` must be a world-frame bundle whose ``origins`` lie on the
-        last optic and whose ``directions`` point toward the focal plane.
-        """
-        from .render import apply_final_leg_shadow
-
-        shadowed = apply_final_leg_shadow(
-            self,
-            obstruction_groups,
-            camera_position,
-            camera_rotation,
-        )
-        return shadowed.to_frame(camera_position, camera_rotation)
 
 
 class LazyRayBundle(eqx.Module):
@@ -121,14 +99,15 @@ class LazyRayBundle(eqx.Module):
         ``rb_local`` is one element's :class:`RayBundle` already
         transformed into the local frame.
         """
-        from .render import render_optics_accumulate
+        from .render import apply_final_leg_shadow, render_optics_accumulate
 
         origin, rotation = self.camera_position, self.camera_rotation
         obstructions = self.obstruction_groups
 
         def in_local_frame(carry, rb_world):
-            rb_local = rb_world.to_camera_frame(obstructions, origin, rotation)
-            return accumulator(carry, rb_local)
+            # Handoff = shadow the final leg (explicit), then a pure reframe.
+            rb_world = apply_final_leg_shadow(rb_world, obstructions, origin, rotation)
+            return accumulator(carry, rb_world.to_frame(origin, rotation))
 
         return render_optics_accumulate(
             self.optical_groups,
@@ -142,7 +121,7 @@ class LazyRayBundle(eqx.Module):
 
     def materialise(self) -> RayBundle:
         """Run the render eagerly; return a flat local-frame :class:`RayBundle`."""
-        from .render import render_optics
+        from .render import apply_final_leg_shadow, render_optics
 
         rb_world = render_optics(
             self.optical_groups,
@@ -151,8 +130,11 @@ class LazyRayBundle(eqx.Module):
             self.source_values,
             self.source_type,
         )
-        return rb_world.to_camera_frame(
+        # Handoff = shadow the final leg (explicit), then a pure reframe.
+        rb_world = apply_final_leg_shadow(
+            rb_world,
             self.obstruction_groups,
             self.camera_position,
             self.camera_rotation,
         )
+        return rb_world.to_frame(self.camera_position, self.camera_rotation)
