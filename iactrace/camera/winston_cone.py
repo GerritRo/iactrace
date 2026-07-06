@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Callable
+from typing import NamedTuple
 
 import equinox as eqx
 import jax
@@ -198,6 +199,61 @@ def trace(origins, directions, n_hats, exit_apothem, s, c, length, reflectivity,
     return o, d, value, path
 
 
+# Wall provider for the shared detection tracer
+
+
+class ConeWalls(NamedTuple):
+    """Reflecting-wall geometry of a polygonal CPC, extracted for the tracer.
+
+    The wall-provider half of the "cone provides walls, tracer owns the loop"
+    split (see :func:`~iactrace.camera.chain.trace_chain`): it answers the
+    nearest cavity-clamped wall hit for one ray and reflects the ray off it.
+    Built by :meth:`WinstonCone.walls`; all coordinates are the cone (CPC)
+    frame (exit ``z = 0``, entrance ``z = length``).
+    """
+
+    n_hats: Array  # (M, 2) inward wall plane normals
+    exit_apothem: float
+    s: float  # sin(wall tilt)
+    c: float  # cos(wall tilt)
+    k: float  # meridian offset a2 * (2 + s)
+    length: float
+    reflectivity: float
+
+    def nearest_hit(self, o: Array, d: Array) -> tuple[Array, Array]:
+        """Nearest forward wall hit for one ray, clamped to ``z in [0, length]``.
+
+        Returns ``(t, normal)`` with ``t = inf`` when the nearest wall root falls
+        outside the cavity -- e.g. the ray has dropped below the exit, where the
+        infinite wall quadric would otherwise give a spurious root.
+        """
+        t_all = jax.vmap(lambda nh: _wall_t(o, d, nh, self.exit_apothem, self.s, self.c, self.k))(
+            self.n_hats
+        )
+        kbest = jnp.argmin(t_all)
+        t = t_all[kbest]
+        z_hit = o[2] + t * d[2]
+        inside = (z_hit >= -1e-9) & (z_hit <= self.length + 1e-9)
+        t = jnp.where(jnp.isfinite(t) & inside, t, jnp.inf)
+        p = o + jnp.where(jnp.isfinite(t), t, 0.0) * d
+        normal = _wall_normal(p, self.n_hats[kbest], self.exit_apothem, self.s, self.c, self.k)
+        return t, normal
+
+    def reflect_ray(
+        self, o: Array, d: Array, t: Array, normal: Array
+    ) -> tuple[Array, Array, Array]:
+        """Reflect one ray off a wall hit at parameter ``t``.
+
+        Returns ``(new_origin, new_direction, path_added)``. The new origin is
+        nudged just off the wall along the reflected ray so the next intersection
+        test sees this wall behind it; the nudge lies on the outgoing ray, so it
+        is added back to the optical path and the geometry stays exact.
+        """
+        refl_d, _ = reflect(d, normal)
+        nudge = _NUDGE * self.exit_apothem
+        return o + t * d + nudge * refl_d, refl_d, t + nudge
+
+
 # WinstonCone concentrator
 
 
@@ -274,6 +330,26 @@ class WinstonCone(Concentrator):
         """(sin, cos) of the wall tilt, from the cone's physical dimensions."""
         return cpc_wall_tilt(self.exit_apothem, self.entrance_apothem, self.length)
 
+    def walls(self) -> ConeWalls:
+        """Expose the reflecting walls as a provider for the shared tracer.
+
+        Returns a :class:`ConeWalls` carrying the wall geometry (normals, tilt,
+        meridian offset, length, reflectivity) that
+        :func:`~iactrace.camera.chain.trace_chain` needs. This is the
+        wall-provider half of the "cone provides walls, tracer owns the loop"
+        split; the cone keeps :meth:`apply` for the flat fast path.
+        """
+        s, c = self._wall_tilt()
+        return ConeWalls(
+            n_hats=self._wall_normals(),
+            exit_apothem=self.exit_apothem,
+            s=s,
+            c=c,
+            k=self.exit_apothem * (2.0 + s),
+            length=self.length,
+            reflectivity=self.reflectivity,
+        )
+
     def _wall_normals(self) -> Array:
         a = self.orientation + 2.0 * jnp.pi * jnp.arange(self.n_sides) / self.n_sides
         return jnp.stack([jnp.cos(a), jnp.sin(a)], axis=-1)
@@ -307,6 +383,7 @@ class WinstonCone(Concentrator):
             values=local_rays.values * factor,
             path_length=local_rays.path_length + self.index * path_add,
             n=local_rays.n,
+            alive=local_rays.alive,
         )
 
     def cross_sections(self) -> tuple[Array, Array]:

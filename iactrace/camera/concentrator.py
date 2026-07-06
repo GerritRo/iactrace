@@ -52,6 +52,19 @@ class Concentrator(eqx.Module):
         """
         raise NotImplementedError
 
+    def walls(self):
+        """Optional wall provider for the joint detection tracer.
+
+        Concentrators that can be traced jointly with a
+        :class:`~iactrace.camera.photosensor.StopSurface` (e.g. a
+        :class:`~iactrace.camera.winston_cone.WinstonCone`) return a wall
+        provider whose ``nearest_hit`` / ``reflect_ray`` /``length`` /
+        ``reflectivity`` :func:`~iactrace.camera.chain.trace_chain` consumes.
+        The default returns ``None`` ("not jointly traceable"), in which case a
+        ``StopSurface`` is traced on its own after :meth:`apply`.
+        """
+        return None
+
     def cross_sections(self) -> tuple[Array, Array] | None:
         """Optional geometry for :func:`iactrace.viz.show_sensor_chain`.
 

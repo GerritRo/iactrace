@@ -5,11 +5,11 @@ import pytest
 from iactrace import (
     Camera,
     Concentrator,
+    ConstantQE,
     DetectionChain,
     HexagonalSensorGroup,
     PhotoSensor,
     SquareSensorGroup,
-    UniformQE,
 )
 from iactrace.camera._hexgeom import _hex_norm, _rotate
 from iactrace.camera.camera import intersect_sensor
@@ -58,7 +58,7 @@ class StubPMT(PhotoSensor):
     def __init__(self, pde: float = 0.8) -> None:
         self.pde = float(pde)
 
-    def detect(self, local_rays: RayBundle) -> RayBundle:
+    def detect(self, local_rays: RayBundle, normals=None) -> RayBundle:
         return RayBundle(
             origins=local_rays.origins,
             directions=local_rays.directions,
@@ -181,13 +181,13 @@ class TestToPixelFrame:
         assert float(norm) <= 1.0
 
 
-# 2. Backward compatibility: no concentrator + UniformQE
+# 2. Backward compatibility: no concentrator + ConstantQE
 
 
 class TestBackwardCompat:
     def test_image_matches_entrance_binning(self):
         qe = 0.42
-        sensor = _square_sensor(photosensor=UniformQE(qe))
+        sensor = _square_sensor(photosensor=ConstantQE(qe))
         cam = Camera([sensor])
         rays = _downward_rays([[0.1, 0.1], [0.3, -0.2], [-0.5, 0.4], [5.0, 5.0]])
 
@@ -202,7 +202,7 @@ class TestBackwardCompat:
 
     def test_collect_times_and_values_unchanged(self):
         qe = 0.6
-        sensor = _square_sensor(photosensor=UniformQE(qe))
+        sensor = _square_sensor(photosensor=ConstantQE(qe))
         cam = Camera([sensor])
         rays = _downward_rays([[0.1, 0.1], [0.3, -0.2], [5.0, 5.0]])
 
@@ -224,7 +224,7 @@ class TestBackwardCompat:
             height=8,
             bounds=(-1.0, 1.0, -1.0, 1.0),
             edge_width=0.1,
-            photosensor=UniformQE(qe),
+            photosensor=ConstantQE(qe),
         )
         cam = Camera([sensor])
         g = jnp.linspace(-0.95, 0.95, 22)
@@ -284,29 +284,29 @@ class TestDetectionChain:
 
     def test_detector_z_single_source_of_truth(self):
         # No concentrator: detector sits at -gap.
-        chain = DetectionChain(concentrator=None, photosensor=UniformQE(1.0), gap=0.02)
+        chain = DetectionChain(concentrator=None, photosensor=ConstantQE(1.0), gap=0.02)
         assert jnp.allclose(chain.detector_z, -0.02)
         # With a cone: detector sits at -(length + gap).
         chain2 = DetectionChain(
-            concentrator=StubCone(length=0.05), photosensor=UniformQE(1.0), gap=0.02
+            concentrator=StubCone(length=0.05), photosensor=ConstantQE(1.0), gap=0.02
         )
         assert jnp.allclose(chain2.detector_z, -(0.05 + 0.02))
 
     def test_negative_gap_rejected_everywhere(self):
         # __check_init__ on DetectionChain guards every construction path.
         with pytest.raises(ValueError, match="gap"):
-            DetectionChain(concentrator=None, photosensor=UniformQE(1.0), gap=-0.5)
+            DetectionChain(concentrator=None, photosensor=ConstantQE(1.0), gap=-0.5)
         with pytest.raises(ValueError, match="gap"):
             _square_sensor(gap=-0.5)
         with pytest.raises(ValueError, match="gap"):
             Camera([_square_sensor()]).set_gap(0, -0.5)
         # gap == 0.0 stays valid
-        assert DetectionChain(concentrator=None, photosensor=UniformQE(1.0), gap=0.0).gap == 0.0
+        assert DetectionChain(concentrator=None, photosensor=ConstantQE(1.0), gap=0.0).gap == 0.0
 
     def test_advance_is_finite_for_parallel_rays(self):
         # A ray parallel to the detector plane (dz=0) never reaches it; the chain
         # leaves it in place so path_length stays finite (it is masked later).
-        chain = DetectionChain(concentrator=None, photosensor=UniformQE(1.0), gap=0.02)
+        chain = DetectionChain(concentrator=None, photosensor=ConstantQE(1.0), gap=0.02)
         rays = RayBundle(
             origins=jnp.array([[0.0, 0.0, 0.0]]),
             directions=jnp.array([[1.0, 0.0, 0.0]]),
@@ -350,7 +350,7 @@ class TestShowSensorChain:
         pytest.importorskip("trimesh")
         from iactrace import show_sensor_chain
 
-        cam = Camera([_square_sensor()])  # no cone, UniformQE
+        cam = Camera([_square_sensor()])  # no cone, ConstantQE
         scene = show_sensor_chain(cam)
         assert len(scene.geometry) >= 1  # entrance (+ detector), no crash
 
@@ -412,7 +412,7 @@ class TestSetters:
     def test_per_group_chains_are_independent(self):
         # Two groups in one camera carry different chains (set at construction).
         g_cone = _square_sensor(concentrator=StubCone(), photosensor=StubPMT(pde=0.7))
-        g_plain = _square_sensor(photosensor=UniformQE(0.5))
+        g_plain = _square_sensor(photosensor=ConstantQE(0.5))
         cam = Camera([g_cone, g_plain])
         assert cam.sensor_groups[0].chain.concentrator is not None
         assert cam.sensor_groups[1].chain.concentrator is None

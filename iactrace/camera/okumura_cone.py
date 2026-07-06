@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Callable, Sequence
+from typing import NamedTuple
 
 import equinox as eqx
 import jax
@@ -270,6 +271,68 @@ def trace(
     return o, d, value, path
 
 
+# Wall provider for the shared detection tracer
+
+
+class OkumuraConeWalls(NamedTuple):
+    """Reflecting-wall geometry of an Okumura (Bezier-meridian) cone, for the tracer.
+
+    The wall-provider half of the "cone provides walls, tracer owns the loop"
+    split (see :func:`~iactrace.camera.chain.trace_chain`), mirroring
+    :class:`~iactrace.camera.winston_cone.ConeWalls` but backed by the cubic /
+    quadratic Bezier meridian instead of a paraboloid: it answers the nearest
+    cavity-clamped wall hit for one ray and reflects the ray off it. Built by
+    :meth:`OkumuraCone.walls`; all coordinates are the cone frame (exit ``z = 0``,
+    mouth ``z = length``).
+    """
+
+    n_hats: Array  # (M, 2) inward wall plane normals
+    r_c: Array  # meridian R(t) power-basis coefficients
+    z_c: Array  # meridian Z(t) power-basis coefficients
+    gd_r: Array  # dR/dt coefficients
+    gd_z: Array  # dZ/dt coefficients
+    exit_apothem: float
+    length: float
+    reflectivity: float
+
+    def nearest_hit(self, o: Array, d: Array) -> tuple[Array, Array]:
+        """Nearest forward wall hit for one ray, clamped to ``z in [0, length]``.
+
+        Returns ``(t, normal)`` with ``t = inf`` when no facet is hit in front of
+        the ray or the nearest root falls outside the cavity. Mirrors
+        :meth:`ConeWalls.nearest_hit`, resolving the per-facet Bezier intersection
+        with :func:`_wall_hit` and its meridian normal with :func:`_wall_normal`.
+        """
+        tau_all, t_all = jax.vmap(
+            lambda nh: _wall_hit(
+                o, d, nh, self.r_c, self.z_c, self.gd_r, self.gd_z, self.exit_apothem
+            )
+        )(self.n_hats)
+        kbest = jnp.argmin(tau_all)
+        t = tau_all[kbest]
+        t_bez = t_all[kbest]
+        z_hit = o[2] + t * d[2]
+        inside = (z_hit >= -1e-9) & (z_hit <= self.length + 1e-9)
+        t = jnp.where(jnp.isfinite(t) & inside, t, jnp.inf)
+        normal = _wall_normal(self.n_hats[kbest], t_bez, self.gd_r, self.gd_z)
+        return t, normal
+
+    def reflect_ray(
+        self, o: Array, d: Array, t: Array, normal: Array
+    ) -> tuple[Array, Array, Array]:
+        """Reflect one ray off a wall hit at parameter ``t``.
+
+        Returns ``(new_origin, new_direction, path_added)``. The new origin is
+        nudged just off the wall along the reflected ray so the next intersection
+        test sees this wall behind it -- identical book-keeping to
+        :meth:`ConeWalls.reflect_ray` (the nudge lies on the outgoing ray, so it is
+        added back to the optical path and the geometry stays exact).
+        """
+        refl_d, _ = reflect(d, normal)
+        nudge = _NUDGE * self.exit_apothem
+        return o + t * d + nudge * refl_d, refl_d, t + nudge
+
+
 # OkumuraCone concentrator
 
 
@@ -410,6 +473,30 @@ class OkumuraCone(Concentrator):
         a = self.orientation + 2.0 * jnp.pi * jnp.arange(self.n_sides) / self.n_sides
         return jnp.stack([jnp.cos(a), jnp.sin(a)], axis=-1)
 
+    def walls(self) -> OkumuraConeWalls:
+        """Expose the Bezier walls as a provider for the shared detection tracer.
+
+        Returns an :class:`OkumuraConeWalls` carrying the meridian coefficients and
+        wall normals that :func:`~iactrace.camera.chain.trace_chain` consumes, so a
+        curved photocathode (a :class:`~iactrace.camera.photosensor.StopSurface`
+        peeking into the cavity or sitting in a gap below the exit) is traced
+        jointly with the walls -- the same treatment
+        :meth:`~iactrace.camera.winston_cone.WinstonCone.walls` gives the CPC. The
+        cone keeps :meth:`apply` as the flat fast path.
+        """
+        r_c = jnp.asarray(self.r_coeffs)
+        z_c = jnp.asarray(self.z_coeffs)
+        return OkumuraConeWalls(
+            n_hats=self._wall_normals(),
+            r_c=r_c,
+            z_c=z_c,
+            gd_r=_polyder(r_c),
+            gd_z=_polyder(z_c),
+            exit_apothem=self.exit_apothem,
+            length=self.length,
+            reflectivity=self.reflectivity,
+        )
+
     def apply(self, local_rays: RayBundle) -> RayBundle:
         length = self.length
         o, d = local_rays.origins, local_rays.directions
@@ -437,6 +524,7 @@ class OkumuraCone(Concentrator):
             values=local_rays.values * factor,
             path_length=local_rays.path_length + self.index * path_add,
             n=local_rays.n,
+            alive=local_rays.alive,
         )
 
     def cross_sections(self) -> tuple[Array, Array]:

@@ -5,7 +5,7 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from iactrace import Camera, HexagonalSensorGroup, OkumuraCone, UniformQE, WinstonCone
+from iactrace import Camera, ConstantQE, HexagonalSensorGroup, OkumuraCone, WinstonCone
 from iactrace.camera.okumura_cone import _bezier_power_coeffs, _polyval
 from iactrace.core.ray_bundle import RayBundle
 
@@ -262,7 +262,7 @@ def _hex_camera(with_cone):
         rotations=[[0.0, 0.0, 0.0]],
         hex_centers=centers,
         concentrator=cone,
-        photosensor=UniformQE(0.9),
+        photosensor=ConstantQE(0.9),
     )
     return Camera([sensor]), sensor
 
@@ -344,7 +344,7 @@ class TestRotationAlignment:
             [[0, 0, 0]],
             _rot2(centers0, theta),
             concentrator=cone,
-            photosensor=UniformQE(1.0),
+            photosensor=ConstantQE(1.0),
         )
         cam = Camera([sensor])
         rb = RayBundle(
@@ -418,3 +418,208 @@ class TestRobustness:
         assert np.all(np.isfinite(v))
         assert v.max() <= 1.0 + 1e-6
         assert v.mean() > 0.0
+
+
+# 6. Joint cone + stopping-surface tracer (walls() provider)
+
+
+def _mouth_rays(cone, alpha_deg=0.0, n=2000, seed=3):
+    """(xy, dirs) for ``n`` rays entering strictly inside the mouth at incidence
+    ``alpha_deg``. Staying inside the mouth means apply()'s entry mask and the
+    joint tracer see the same population, so their per-ray results must agree."""
+    rng = np.random.default_rng(seed)
+    xy = _fill_entrance(cone, n, seed)
+    phi = rng.uniform(0, 2 * np.pi, n)
+    a = math.radians(alpha_deg)
+    dirs = np.stack(
+        [np.sin(a) * np.cos(phi), np.sin(a) * np.sin(phi), np.full(n, -np.cos(a))],
+        axis=1,
+    )
+    return jnp.asarray(xy), jnp.asarray(dirs)
+
+
+def _cone_frame_rays(cone, xy, dirs):
+    """Lift entrance ``(xy, dirs)`` into the CPC frame (mouth at ``z = length``)."""
+    n = xy.shape[0]
+    return RayBundle(
+        origins=jnp.concatenate([xy, jnp.full((n, 1), cone.length)], axis=1),
+        directions=dirs,
+        values=jnp.ones(n),
+        path_length=jnp.zeros(n),
+        n=jnp.ones(n),
+    )
+
+
+class TestWallsTracer:
+    """OkumuraCone.walls() must give the shared tracer the same guarantees the
+    WinstonCone provider does -- these mirror tests/test_tracer.py at the
+    Okumura cone's (small, metre-scale) dimensions, so the Okumura cone is a
+    genuine drop-in wherever a Winston cone is jointly traced with a curved
+    StopSurface / PMT photocathode."""
+
+    def test_walls_provider_shape(self):
+        cone = _cubic(0.01, 25.0, reflectivity=0.8, max_bounces=9)
+        walls = cone.walls()
+        assert walls.length == pytest.approx(cone.length)
+        assert walls.reflectivity == pytest.approx(cone.reflectivity)
+        assert np.asarray(walls.n_hats).shape == (cone.n_sides, 2)
+
+    @pytest.mark.parametrize("alpha", [0.0, 10.0, 20.0])
+    def test_flat_exit_stop_matches_apply(self, alpha):
+        # A flat plane stop at the exit (chain z=-length -> cone z=0) reproduces
+        # OkumuraCone.apply ray by ray: walls() feeds the same Bezier wall math
+        # into the shared tracer, so structure changes but physics does not.
+        from iactrace import StopSurface
+        from iactrace.camera import trace_chain
+
+        cone = _quad(0.01, 25.0, reflectivity=0.9, max_bounces=14)
+        xy, dirs = _mouth_rays(cone, alpha)
+        n = xy.shape[0]
+
+        chain_rays = RayBundle(
+            origins=jnp.concatenate([xy, jnp.zeros((n, 1))], axis=1),
+            directions=dirs,
+            values=jnp.ones(n),
+            path_length=jnp.zeros(n),
+            n=jnp.ones(n),
+        )
+        old = cone.apply(chain_rays)
+        new = trace_chain(
+            cone.walls(),
+            StopSurface(vertex_z=-cone.length, curvature=0.0, radius=1e4),
+            _cone_frame_rays(cone, xy, dirs),
+            max_bounces=14,
+        )
+
+        assert jnp.allclose(old.values, new.rays.values, atol=1e-6)
+        # Every in-mouth ray that apply() transmits lands on the full-aperture stop.
+        transmitted = np.asarray(old.values) > 0
+        assert np.all(np.asarray(new.hit_stop)[transmitted])
+
+    def test_stop_below_exit_receives_rays(self):
+        # A photocathode in the gap below the exit still collects; landings sit at
+        # cone-frame z < 0 (below the exit plane), reached by free flight.
+        from iactrace import StopSurface
+        from iactrace.camera import trace_chain
+
+        cone = _quad(0.01, 25.0, reflectivity=0.95, max_bounces=16)
+        a2 = cone.exit_apothem
+        xy, dirs = _mouth_rays(cone, 0.0)
+        stop = StopSurface(
+            vertex_z=-cone.length - 0.2 * a2, curvature=-1.0 / (1.2 * a2), radius=1.1 * a2
+        )
+        tr = trace_chain(cone.walls(), stop, _cone_frame_rays(cone, xy, dirs), max_bounces=16)
+        landed = np.asarray(tr.hit_stop)
+        assert landed.mean() > 0.4
+        land_z = np.asarray(tr.trajectory[-1, :, 2])[landed]
+        assert np.all(land_z < 0.0)
+
+    def test_peeking_dome_lands_inside_cavity(self):
+        # A dome whose apex peeks above the exit plane is hit *inside* the cavity:
+        # some landings have cone-frame z > 0 -- the whole point of "peeking".
+        from iactrace import StopSurface
+        from iactrace.camera import trace_chain
+
+        cone = _quad(0.01, 25.0, reflectivity=0.95, max_bounces=16)
+        a2 = cone.exit_apothem
+        xy, dirs = _mouth_rays(cone, 0.0)
+        stop = StopSurface(
+            vertex_z=-cone.length + 0.4 * a2, curvature=-1.0 / (1.4 * a2), radius=0.9 * a2
+        )
+        tr = trace_chain(cone.walls(), stop, _cone_frame_rays(cone, xy, dirs), max_bounces=16)
+        landed = np.asarray(tr.hit_stop)
+        assert landed.sum() > 0
+        land_z = np.asarray(tr.trajectory[-1, :, 2])[landed]
+        assert np.any(land_z > 0.0), "peeking dome should catch rays inside the cavity"
+
+    def test_wall_bounces_clamped_to_cavity(self):
+        # With the stop below the exit, no wall bounce may sit below it: the only
+        # sub-exit points are terminal landings. Otherwise the extended Bezier wall
+        # would hand back a spurious root below z = 0.
+        from iactrace import StopSurface
+        from iactrace.camera import trace_chain
+
+        cone = _quad(0.01, 25.0, reflectivity=0.95, max_bounces=16)
+        a2, length = cone.exit_apothem, cone.length
+        xy, dirs = _mouth_rays(cone, 18.0)
+        stop = StopSurface(vertex_z=-length - 0.3 * a2, curvature=0.0, radius=1e4)
+        tr = trace_chain(cone.walls(), stop, _cone_frame_rays(cone, xy, dirs), max_bounces=16)
+        traj = np.asarray(tr.trajectory)  # (steps+1, N, 3)
+        final_z = traj[-1, :, 2]
+        # No vertex ever rises above the mouth plane.
+        assert np.all(traj[:, :, 2] <= length + 1e-4 * length)
+        # Any vertex below the exit must be that ray's terminal landing point.
+        below = traj[:, :, 2] < -1e-4 * a2
+        at_landing = np.abs(traj[:, :, 2] - final_z[None, :]) < 1e-4 * a2
+        assert np.all(~below | at_landing), "a wall bounce leaked below the exit plane"
+
+    @pytest.mark.parametrize("radius_frac", [0.4, 0.7, 1.1])
+    @pytest.mark.parametrize("alpha", [0.0, 12.0])
+    def test_aperture_bounds_landings(self, radius_frac, alpha):
+        # A PMT has a limited diameter: no ray may land outside the StopSurface
+        # aperture radius, at any incidence.
+        from iactrace import StopSurface
+        from iactrace.camera import trace_chain
+
+        cone = _quad(0.01, 25.0, reflectivity=0.95, max_bounces=16)
+        a2 = cone.exit_apothem
+        radius = radius_frac * a2
+        xy, dirs = _mouth_rays(cone, alpha, n=1200)
+        stop = StopSurface(
+            vertex_z=-cone.length - 0.2 * a2, curvature=-1.0 / (1.2 * a2), radius=radius
+        )
+        tr = trace_chain(cone.walls(), stop, _cone_frame_rays(cone, xy, dirs), max_bounces=16)
+        pts = np.asarray(tr.trajectory[-1])[np.asarray(tr.hit_stop)]
+        r = np.hypot(pts[:, 0], pts[:, 1]) if len(pts) else np.array([0.0])
+        assert r.max() <= radius + 1e-6
+
+    def test_smaller_aperture_collects_less(self):
+        from iactrace import StopSurface
+        from iactrace.camera import trace_chain
+
+        cone = _quad(0.01, 25.0, reflectivity=0.95, max_bounces=16)
+        a2 = cone.exit_apothem
+        xy, dirs = _mouth_rays(cone, 0.0, n=1200)
+
+        def coll(radius):
+            stop = StopSurface(
+                vertex_z=-cone.length - 0.2 * a2, curvature=-1.0 / (1.2 * a2), radius=radius
+            )
+            tr = trace_chain(cone.walls(), stop, _cone_frame_rays(cone, xy, dirs), max_bounces=16)
+            return float(jnp.mean(tr.hit_stop))
+
+        assert coll(0.4 * a2) < coll(0.7 * a2) < coll(1.1 * a2)
+
+    def test_rays_conserved_and_bounded(self):
+        from iactrace import StopSurface
+        from iactrace.camera import trace_chain
+
+        cone = _quad(0.01, 25.0, reflectivity=0.9, max_bounces=16)
+        a2 = cone.exit_apothem
+        stop = StopSurface(
+            vertex_z=-cone.length - 0.2 * a2, curvature=-1.0 / (1.2 * a2), radius=1.1 * a2
+        )
+        for alpha in (0.0, 15.0, 30.0):
+            xy, dirs = _mouth_rays(cone, alpha)
+            tr = trace_chain(cone.walls(), stop, _cone_frame_rays(cone, xy, dirs), max_bounces=16)
+            v = np.asarray(tr.rays.values)
+            assert not np.isnan(v).any()
+            assert np.all(v <= 1.0 + 1e-6) and np.all(v >= 0.0)
+            hit = np.asarray(tr.hit_stop)
+            assert hit.sum() + (~hit).sum() == v.size
+
+    def test_trace_chain_is_jittable(self):
+        import jax
+
+        from iactrace import StopSurface
+        from iactrace.camera import trace_chain
+
+        cone = _quad(0.01, 25.0, reflectivity=0.9, max_bounces=16)
+        a2 = cone.exit_apothem
+        walls = cone.walls()
+        stop = StopSurface(
+            vertex_z=-cone.length - 0.2 * a2, curvature=-1.0 / (1.2 * a2), radius=1.1 * a2
+        )
+        rays = _cone_frame_rays(cone, *_mouth_rays(cone, 5.0))
+        fn = jax.jit(lambda r: trace_chain(walls, stop, r, max_bounces=16).rays.values)
+        assert np.isfinite(np.asarray(fn(rays))).all()

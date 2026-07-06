@@ -4,7 +4,7 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from iactrace import Camera, HexagonalSensorGroup, UniformQE, WinstonCone
+from iactrace import Camera, ConstantQE, HexagonalSensorGroup, WinstonCone
 from iactrace.camera.winston_cone import cpc_full_length, cpc_wall_tilt, profile_apothem
 from iactrace.core.ray_bundle import RayBundle
 
@@ -237,7 +237,7 @@ def _hex_camera(with_cone):
         rotations=[[0.0, 0.0, 0.0]],
         hex_centers=centers,
         concentrator=cone,
-        photosensor=UniformQE(0.9),
+        photosensor=ConstantQE(0.9),
     )
     return Camera([sensor]), sensor
 
@@ -324,7 +324,7 @@ class TestRotationAlignment:
             [[0, 0, 0]],
             _rot2(centers0, theta),
             concentrator=cone,
-            photosensor=UniformQE(1.0),
+            photosensor=ConstantQE(1.0),
         )
         cam = Camera([sensor])
         rb = RayBundle(

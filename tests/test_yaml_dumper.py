@@ -5,7 +5,7 @@ import jax
 import numpy as np
 import pytest
 
-from iactrace import Camera, SquareSensorGroup, Telescope, UniformQE, WinstonCone
+from iactrace import Camera, ConstantQE, SquareSensorGroup, Telescope, WinstonCone
 from iactrace.io import (
     build_camera_config,
     build_telescope_config,
@@ -430,13 +430,13 @@ class TestRoundTrip:
         )
 
     def test_camera_chain_scalars_roundtrip(self):
-        camera1 = Camera([self._square(photosensor=UniformQE(0.85), gap=0.004)])
+        camera1 = Camera([self._square(photosensor=ConstantQE(0.85), gap=0.004)])
         with tempfile.NamedTemporaryFile(suffix=".yaml", delete=False) as f:
             filepath = Path(f.name)
         try:
             save_camera(camera1, filepath)
             chain = Camera.from_yaml(filepath).sensor_groups[0].chain
-            assert isinstance(chain.photosensor, UniformQE)
+            assert isinstance(chain.photosensor, ConstantQE)
             assert chain.photosensor.qe == pytest.approx(0.85)
             assert chain.gap == pytest.approx(0.004)
             assert chain.concentrator is None
@@ -546,7 +546,7 @@ class TestRoundTrip:
             def __init__(self, pde=0.5):
                 self.pde = float(pde)
 
-            def detect(self, local_rays: RayBundle) -> RayBundle:
+            def detect(self, local_rays: RayBundle, normals=None) -> RayBundle:
                 return RayBundle(
                     origins=local_rays.origins,
                     directions=local_rays.directions,
@@ -562,7 +562,7 @@ class TestRoundTrip:
             with pytest.warns(UserWarning):
                 save_camera(camera1, filepath)
             chain = Camera.from_yaml(filepath).sensor_groups[0].chain
-            assert isinstance(chain.photosensor, UniformQE)
+            assert isinstance(chain.photosensor, ConstantQE)
             assert chain.photosensor.qe == pytest.approx(1.0)
         finally:
             filepath.unlink(missing_ok=True)
@@ -586,7 +586,7 @@ class TestRoundTrip:
         )
         chain = camera.sensor_groups[0].chain
         assert chain.concentrator is None
-        assert isinstance(chain.photosensor, UniformQE)
+        assert isinstance(chain.photosensor, ConstantQE)
         assert chain.photosensor.qe == pytest.approx(1.0)
         assert chain.gap == pytest.approx(0.0)
 
@@ -603,22 +603,22 @@ class TestRoundTrip:
                         "width": 4,
                         "height": 4,
                         "bounds": [-0.02, 0.02, -0.02, 0.02],
-                        "photosensor": {"type": "uniform", "qe": 0.7},
+                        "photosensor": {"type": "constant", "qe": 0.7},
                         "gap": 0.002,
                     }
                 ],
             }
         )
         chain = camera.sensor_groups[0].chain
-        assert isinstance(chain.photosensor, UniformQE)
+        assert isinstance(chain.photosensor, ConstantQE)
         assert chain.photosensor.qe == pytest.approx(0.7)
         assert chain.gap == pytest.approx(0.002)
 
     def test_camera_to_dict_uses_discriminated_slots(self):
         cone = WinstonCone(n_sides=6, entrance_apothem=0.025, exit_apothem=0.01)
-        cam = Camera([self._square(concentrator=cone, photosensor=UniformQE(0.9))])
+        cam = Camera([self._square(concentrator=cone, photosensor=ConstantQE(0.9))])
         sensor = cam.to_dict()["sensors"][0]
-        assert sensor["photosensor"]["type"] == "uniform"
+        assert sensor["photosensor"]["type"] == "constant"
         assert sensor["photosensor"]["qe"] == pytest.approx(0.9)
         assert sensor["concentrator"]["type"] == "winston"
 

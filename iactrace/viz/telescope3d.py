@@ -1,8 +1,10 @@
 import jax
+import jax.numpy as jnp
 import numpy as np
 import trimesh
 
 from ..core import euler_to_matrix
+from ..core.surfaces import sag_raw
 from ._utils import convex_hull_2d as _convex_hull_2d
 
 
@@ -121,13 +123,20 @@ def show_sensor_chain(camera, sensor_idx=0, **kwargs):
 
     Draws, in the canonical pixel-local frame (entrance aperture at ``z = 0``,
     axis ``+z``): the pixel entrance aperture, the concentrator walls (if a
-    concentrator is present and exposes :meth:`Concentrator.cross_sections`),
-    and the photodetector active area at ``chain.detector_z`` (``= -(length + gap)``).
+    concentrator is present and exposes :meth:`Concentrator.cross_sections`), and
+    the photosensor's stopping surface -- its actual photocathode geometry, drawn
+    curved when the photosensor owns a curved :class:`StopSurface`, otherwise a
+    flat active-area polygon at ``chain.detector_z``.
+
+    If the photosensor exposes a 3D envelope (:meth:`PhotoSensor.envelope`, e.g.
+    a :class:`~iactrace.camera.photosensor.PMT`), its glass body is lofted around
+    the detector plane as well.
 
     Args:
         camera: Camera object (the selected sensor group and its ``chain`` are read).
         sensor_idx: Which sensor group to take the pixel geometry and chain from.
-        **kwargs: ``entrance_color`` / ``cone_color`` / ``detector_color`` RGBA.
+        **kwargs: ``entrance_color`` / ``cone_color`` / ``detector_color`` /
+            ``sensor_color`` RGBA.
 
     Returns:
         trimesh.Scene
@@ -135,6 +144,7 @@ def show_sensor_chain(camera, sensor_idx=0, **kwargs):
     entrance_color = kwargs.get("entrance_color", [255, 0, 0, 128])
     cone_color = kwargs.get("cone_color", [135, 206, 235, 160])
     detector_color = kwargs.get("detector_color", [80, 80, 80, 255])
+    sensor_color = kwargs.get("sensor_color", [200, 200, 255, 90])
 
     sensor = camera.sensor_groups[sensor_idx]
     chain = sensor.chain
@@ -159,30 +169,60 @@ def show_sensor_chain(camera, sensor_idx=0, **kwargs):
                 _apply_color(cone, cone_color)
                 scene.add_geometry(cone)
 
-    # Detector active area at chain.detector_z = -(length + gap): light enters at
-    # z=0 from +z and the chain runs toward -z (entrance on top, detector below).
-    detector_z = chain.detector_z
-    det_outline = chain.photosensor.outline()
-    if det_outline is None:
-        # No explicit detector geometry (e.g. a scalar-QE photosensor). Draw a
-        # generic ROUND detector (PMT/SiPM-like) sized to the cone exit
-        # aperture; with no concentrator, fall back to the pixel footprint.
-        cross = chain.concentrator.cross_sections() if chain.concentrator is not None else None
-        if cross is not None:
-            exit_ring = np.asarray(cross[1][-1])  # (M, 2) exit aperture
-            r_det = float(np.max(np.linalg.norm(exit_ring, axis=-1)))
-            ang = np.linspace(0.0, 2.0 * np.pi, 41)[:-1]
-            det_outline = np.column_stack([r_det * np.cos(ang), r_det * np.sin(ang)])
-        else:
-            det_outline = entrance
-    det_mesh = _make_double_sided(
-        _create_polygon_mesh(
-            [0.0, 0.0, detector_z], [0.0, 0.0, 0.0], np.asarray(det_outline), sag_fn=None
+    # Photocathode stopping surface, at its own vertex position (light enters at
+    # z=0 from +z and the chain runs toward -z; the surface sits near the detector
+    # plane and may bulge up into a cone). The photosensor owns this geometry.
+    surface = chain._effective_surface()
+    if surface.is_flat:
+        # Flat detector: draw the active-area polygon (outline / fallback ring).
+        det_outline = chain.photosensor.outline()
+        if det_outline is None:
+            cross = chain.concentrator.cross_sections() if chain.concentrator is not None else None
+            if cross is not None:
+                exit_ring = np.asarray(cross[1][-1])  # (M, 2) exit aperture
+                r_det = float(np.max(np.linalg.norm(exit_ring, axis=-1)))
+                ang = np.linspace(0.0, 2.0 * np.pi, 41)[:-1]
+                det_outline = np.column_stack([r_det * np.cos(ang), r_det * np.sin(ang)])
+            else:
+                det_outline = entrance
+        det_mesh = _make_double_sided(
+            _create_polygon_mesh(
+                [0.0, 0.0, surface.vertex_z], [0.0, 0.0, 0.0], np.asarray(det_outline), sag_fn=None
+            )
         )
-    )
+    else:
+        # Curved photocathode: draw the actual conic surface of revolution.
+        r_det = surface.radius
+        if not np.isfinite(r_det):
+            cross = chain.concentrator.cross_sections() if chain.concentrator is not None else None
+            r_det = (
+                float(np.max(np.linalg.norm(np.asarray(cross[1][-1]), axis=-1)))
+                if cross is not None
+                else float(np.max(np.linalg.norm(np.asarray(entrance), axis=-1)))
+            )
+        c, k = surface.curvature, surface.conic
+
+        def _sag(x, y):
+            return sag_raw(x, y, c, k, jnp.asarray([]))
+
+        det_mesh = _make_double_sided(
+            _create_disk_mesh(
+                [0.0, 0.0, surface.vertex_z], [0.0, 0.0, 0.0], float(r_det), sag_fn=_sag
+            )
+        )
     if det_mesh is not None:
         _apply_color(det_mesh, detector_color)
         scene.add_geometry(det_mesh)
+
+    # Optional 3D photosensor body (e.g. a PMT tube behind the photocathode),
+    # lofted below the detector plane; mirrors the concentrator cross_sections path.
+    envelope = chain.photosensor.envelope()
+    if envelope is not None:
+        z_env, rings_env = envelope
+        body = _create_lofted_mesh(np.asarray(z_env) + chain.detector_z, np.asarray(rings_env))
+        if body is not None:
+            _apply_color(body, sensor_color)
+            scene.add_geometry(body)
 
     return scene
 

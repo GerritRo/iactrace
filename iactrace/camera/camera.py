@@ -70,7 +70,9 @@ def intersect_sensor(
     t_sensor = all_ts[s_idx, idx]
     local_dirs = all_dirs[s_idx, idx]
 
-    # A ray missing every sensor plane terminates (geometry loss)
+    # A ray missing every sensor plane terminates (geometry loss); combine
+    # with the liveness the bundle already carries so upstream-dead rays
+    # (shadowed, off-aperture, absorbed geometry) stay dead here too.
     hit = jnp.isfinite(t_sensor)
     alive = ray_bundle.alive & hit
     path_length = ray_bundle.path_length + jnp.where(

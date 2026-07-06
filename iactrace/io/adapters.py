@@ -13,7 +13,7 @@ import numpy as np
 from jax import Array
 
 from ..camera.okumura_cone import OkumuraCone
-from ..camera.photosensor import UniformQE
+from ..camera.photosensor import ConstantQE
 from ..camera.sensor_group import HexagonalSensorGroup, SquareSensorGroup
 from ..camera.winston_cone import WinstonCone, cpc_full_length, cpc_wall_tilt
 from ..core.apertures import Aperture, DiskAperture, PolygonAperture
@@ -47,6 +47,7 @@ from .schemas import (
     CameraFileSchema,
     CircularApertureSchema,
     ConcentratorSchema,
+    ConstantQESchema,
     CylinderObstructionSchema,
     DoubleGaussianBSDFSchema,
     GaussianBSDFSchema,
@@ -66,7 +67,6 @@ from .schemas import (
     TelescopeConfigSchema,
     TelescopeMetadataSchema,
     TriangleObstructionSchema,
-    UniformQESchema,
     WinstonConeSchema,
     ZernikeSchema,
 )
@@ -528,6 +528,7 @@ def _build_mirror_group(
     )
     return _maybe_add_zernike(group, [m.zernike for m in mirrors])
 
+
 def _build_zernike_for_bucket(
     schemas: list[ZernikeSchema | None],
 ) -> ZernikeSurfaceGroup | None:
@@ -551,7 +552,8 @@ def _build_zernike_for_bucket(
             coeffs.append(list(z.coeffs) + [0.0] * (width - len(z.coeffs)))
             r_norms.append(z.r_norm)
     return ZernikeSurfaceGroup(
-        coeffs=jnp.asarray(coeffs), r_norm=jnp.asarray(r_norms),
+        coeffs=jnp.asarray(coeffs),
+        r_norm=jnp.asarray(r_norms),
     )
 
 
@@ -887,9 +889,7 @@ def _surface_components(
         return surface, None
     if isinstance(surface, ZernikeSurfaceGroup):
         if not np.allclose(np.asarray(surface.offsets), 0.0):
-            raise ValueError(
-                "cannot serialise a Zernike surface with a non-zero decenter"
-            )
+            raise ValueError("cannot serialise a Zernike surface with a non-zero decenter")
         return None, surface
     if isinstance(surface, SumSurfaceGroup):
         if not np.allclose(np.asarray(surface.offsets), 0.0):
@@ -911,18 +911,12 @@ def _surface_components(
                     "ZernikeSurfaceGroup are supported"
                 )
         if zern is not None and not np.allclose(np.asarray(zern.offsets), 0.0):
-            raise ValueError(
-                "cannot serialise a Zernike term with a non-zero decenter"
-            )
+            raise ValueError("cannot serialise a Zernike term with a non-zero decenter")
         return asph, zern
-    raise ValueError(
-        f"cannot serialise surface type {type(surface).__name__}"
-    )
+    raise ValueError(f"cannot serialise surface type {type(surface).__name__}")
 
 
-def _zernike_to_schema(
-    zernike: ZernikeSurfaceGroup | None, i: int
-) -> ZernikeSchema | None:
+def _zernike_to_schema(zernike: ZernikeSurfaceGroup | None, i: int) -> ZernikeSchema | None:
     """Project element ``i`` of a Zernike term to a schema, or ``None``.
     Elements whose coefficients are all zero round-trip as ``None`` so default
     (figure-error-free) elements stay clean in the YAML.
@@ -1053,15 +1047,21 @@ def lenses_to_schemas(
             case RefractInteraction() as interaction:
                 asph, zern, offsets = _asphere_surface_arrays(group.surface, len(group))
                 for i in range(len(group)):
-                    lenses.append(_extract_aspheric_disk_lens(
-                        group, interaction, i, len(lenses), asph, zern, offsets,
-                    ))
+                    lenses.append(
+                        _extract_aspheric_disk_lens(
+                            group,
+                            interaction,
+                            i,
+                            len(lenses),
+                            asph,
+                            zern,
+                            offsets,
+                        )
+                    )
             case SlabInteraction() as interaction:
                 _, slab_zern = _surface_components(group.surface)
                 if slab_zern is not None:
-                    raise ValueError(
-                        "cannot serialise a Zernike figure error on a plano slab"
-                    )
+                    raise ValueError("cannot serialise a Zernike figure error on a plano slab")
                 for i in range(len(group)):
                     lenses.append(_extract_plano_slab_lens(group, interaction, i, len(lenses)))
             case _:
@@ -1370,16 +1370,16 @@ def _concentrator_from_schema(
 def _photosensor_to_schema(photosensor: PhotoSensor) -> PhotoSensorSchema:
     """Serialize a photosensor.
 
-    Only :class:`UniformQE` round-trips exactly today; any other
+    Only :class:`ConstantQE` round-trips exactly today; any other
     :class:`~iactrace.camera.photosensor.PhotoSensor` subclass emits a
-    :class:`UserWarning` and falls back to a flat ``UniformQE(1.0)``. To support
+    :class:`UserWarning` and falls back to a flat ``ConstantQE(1.0)``. To support
     another response model, add a ``case`` here and in
     :func:`_photosensor_from_schema`, a ``...Schema`` class, and a member to the
     ``PhotoSensorSchema`` alias.
     """
     match photosensor:
-        case UniformQE():
-            return UniformQESchema(qe=float(photosensor.qe))
+        case ConstantQE():
+            return ConstantQESchema(qe=float(photosensor.qe))
         case _:
             warnings.warn(
                 f"{type(photosensor).__name__} is not representable in camera "
@@ -1387,16 +1387,16 @@ def _photosensor_to_schema(photosensor: PhotoSensor) -> PhotoSensorSchema:
                 UserWarning,
                 stacklevel=2,
             )
-            return UniformQESchema(qe=1.0)
+            return ConstantQESchema(qe=1.0)
 
 
 def _photosensor_from_schema(schema: PhotoSensorSchema | None) -> PhotoSensor:
-    """Rebuild a photosensor from its schema (``None`` -> ``UniformQE(1.0)``)."""
+    """Rebuild a photosensor from its schema (``None`` -> ``ConstantQE(1.0)``)."""
     match schema:
         case None:
-            return UniformQE(1.0)
-        case UniformQESchema():
-            return UniformQE(schema.qe)
+            return ConstantQE(1.0)
+        case ConstantQESchema():
+            return ConstantQE(schema.qe)
         case _:
             raise ValueError(f"unknown photosensor schema: {type(schema).__name__}")
 
@@ -1406,7 +1406,7 @@ def _chain_to_schema_fields(
 ) -> tuple[ConcentratorSchema | None, float, PhotoSensorSchema | None]:
     """Project a detection chain to its ``(concentrator, gap, photosensor)`` schema.
 
-    Only :class:`~iactrace.camera.photosensor.UniformQE` photosensors and
+    Only :class:`~iactrace.camera.photosensor.ConstantQE` photosensors and
     :class:`~iactrace.camera.winston_cone.WinstonCone` concentrators round-trip
     exactly; other subclasses warn and fall back (see ``_photosensor_to_schema``
     / ``_concentrator_to_schema``) so saving never crashes. The trivial
@@ -1415,7 +1415,7 @@ def _chain_to_schema_fields(
     """
     concentrator = _concentrator_to_schema(chain.concentrator)
     photosensor: PhotoSensorSchema | None
-    if isinstance(chain.photosensor, UniformQE) and float(chain.photosensor.qe) == 1.0:
+    if isinstance(chain.photosensor, ConstantQE) and float(chain.photosensor.qe) == 1.0:
         photosensor = None
     else:
         photosensor = _photosensor_to_schema(chain.photosensor)

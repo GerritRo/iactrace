@@ -57,6 +57,7 @@ class ZernikeSchema(BaseModel):
     block makes the element's surface an asphere + Zernike
     :class:`~iactrace.core.surfaces.SumSurfaceGroup`.
     """
+
     coeffs: list[float] = Field(min_length=1, max_length=11)
     r_norm: float = Field(gt=0)
 
@@ -302,21 +303,24 @@ class OkumuraConeSchema(BaseModel):
     orientation_deg: float = 0.0
 
 
-class UniformQESchema(BaseModel):
-    """Serialized :class:`~iactrace.camera.photosensor.UniformQE`."""
+class ConstantQESchema(BaseModel):
+    """Serialized :class:`~iactrace.camera.photosensor.ConstantQE`."""
 
     model_config = ConfigDict(extra="forbid")
 
-    type: Literal["uniform"] = "uniform"
+    type: Literal["constant"] = "constant"
     qe: float = Field(ge=0, le=1, default=1.0)
 
 
-# Discriminated-union slots for the detection chain.
+# Discriminated-union slots for the detection chain. ``ConcentratorSchema`` now
+# carries two concrete members (Winston + Okumura), keyed on the ``type`` literal;
+# ``io/adapters.py`` has the matching build/dump arms. The photosensor slot stays
+# a single member (``ConstantQE``) until a second concrete type joins it.
 ConcentratorSchema = Annotated[
     WinstonConeSchema | OkumuraConeSchema,
     Field(discriminator="type"),
 ]
-PhotoSensorSchema = UniformQESchema
+PhotoSensorSchema = ConstantQESchema
 
 
 # Sensor schemas

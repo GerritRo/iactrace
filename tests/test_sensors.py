@@ -1,7 +1,7 @@
 import jax.numpy as jnp
 import pytest
 
-from iactrace import HexagonalSensorGroup, SquareSensorGroup, UniformQE
+from iactrace import ConstantQE, HexagonalSensorGroup, SquareSensorGroup
 from iactrace.camera._hexgeom import SQRT3, _detect_hex_grid
 from iactrace.core.intersections import intersect_plane
 
@@ -349,8 +349,8 @@ class TestValidation:
         )
         assert sensor.n_pixels == len(centers)
 
-    def test_uniform_qe_rejects_out_of_range(self):
+    def test_constant_qe_rejects_out_of_range(self):
         with pytest.raises(ValueError, match="qe"):
-            UniformQE(1.5)
+            ConstantQE(1.5)
         with pytest.raises(ValueError, match="qe"):
-            UniformQE(-0.1)
+            ConstantQE(-0.1)

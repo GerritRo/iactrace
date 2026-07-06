@@ -338,6 +338,44 @@ def intersect_conic(ray_origin, ray_direction, curvature, conic):
     return jnp.where(is_plane, t_plane, t_conic)
 
 
+def intersect_conic_normal(ray_origin, ray_direction, curvature, conic):
+    """Ray-conic intersection with the analytic surface normal.
+
+    Wraps :func:`intersect_conic` (vertex at the origin, axis ``+z``) and adds
+    the closed-form normal from the gradient of the implicit conic
+    ``F = c*(x^2 + y^2) + (1+k)*c*z^2 - 2*z``. Cheaper and branch-free compared
+    with the sag-graph autodiff normal in
+    :func:`~iactrace.core.surfaces.compute_sag_and_normal`, and it works directly
+    from the 3D hit point, so it suits ray-traced stopping/detector surfaces.
+
+    Args:
+        ray_origin: Ray origin ``(3,)`` in the surface's vertex frame.
+        ray_direction: Ray direction ``(3,)``, normalized.
+        curvature: ``c = 1 / R``. ``0`` -> flat plane.
+        conic: Conic constant ``k`` (``0`` -> sphere).
+
+    Returns:
+        ``(t, point, normal)``: ray parameter (``inf`` on a miss), hit point
+        ``(3,)``, and unit normal ``(3,)`` oriented toward ``+z`` at the vertex.
+        ``point`` / ``normal`` are sanitized to finite values on a miss so a
+        downstream ``vmap`` stays grad-safe.
+    """
+    t = intersect_conic(ray_origin, ray_direction, curvature, conic)
+    t_safe = jnp.where(jnp.isfinite(t), t, 0.0)
+    point = ray_origin + t_safe * ray_direction
+
+    # Outward (light-facing) normal is -grad(F); grad(F) at the vertex is
+    # (0, 0, -2), so -grad points to +z there.
+    grad = jnp.array([
+        2.0 * curvature * point[0],
+        2.0 * curvature * point[1],
+        2.0 * curvature * (1.0 + conic) * point[2] - 2.0,
+    ])
+    normal = -grad
+    normal = normal / jnp.maximum(jnp.linalg.norm(normal), 1e-12)
+    return t, point, normal
+
+
 ### Newton-Raphson method
 
 

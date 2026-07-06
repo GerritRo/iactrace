@@ -21,7 +21,7 @@ from ._hexgeom import (
     _rotate,
 )
 from .chain import DetectionChain
-from .photosensor import UniformQE
+from .photosensor import ConstantQE
 
 if TYPE_CHECKING:
     from .concentrator import Concentrator
@@ -38,13 +38,13 @@ def _build_chain(
 ) -> DetectionChain:
     """Assemble a :class:`DetectionChain`, defaulting to a perfect flat QE.
 
-    ``photosensor=None`` becomes a :class:`~iactrace.camera.photosensor.UniformQE`
+    ``photosensor=None`` becomes a :class:`~iactrace.camera.photosensor.ConstantQE`
     with unit efficiency, so a geometry-only sensor group still detects every
-    incident ray.
+    incident ray. The photocathode geometry (if any) is owned by the photosensor.
     """
     return DetectionChain(
         concentrator=concentrator,
-        photosensor=photosensor if photosensor is not None else UniformQE(1.0),
+        photosensor=photosensor if photosensor is not None else ConstantQE(1.0),
         gap=gap,
     )
 
@@ -214,7 +214,7 @@ class SquareSensorGroup(SensorGroup):
             concentrator: Optional per-pixel light concentrator (e.g. a
                 :class:`~iactrace.camera.winston_cone.WinstonCone`).
             photosensor: Per-pixel detector response. ``None`` defaults to a
-                perfect flat :class:`~iactrace.camera.photosensor.UniformQE`.
+                perfect flat :class:`~iactrace.camera.photosensor.ConstantQE`.
             gap: Spacing from the concentrator exit (or the entrance plane when
                 there is no concentrator) to the detector (``>= 0``).
 
@@ -303,6 +303,7 @@ class SquareSensorGroup(SensorGroup):
             values=sensor_rays.values,
             path_length=sensor_rays.path_length,
             n=sensor_rays.n,
+            alive=sensor_rays.alive,
         )
 
 
@@ -352,7 +353,7 @@ class HexagonalSensorGroup(SensorGroup):
             concentrator: Optional per-pixel light concentrator (e.g. a
                 :class:`~iactrace.camera.winston_cone.WinstonCone`).
             photosensor: Per-pixel detector response. ``None`` defaults to a
-                perfect flat :class:`~iactrace.camera.photosensor.UniformQE`.
+                perfect flat :class:`~iactrace.camera.photosensor.ConstantQE`.
             gap: Spacing from the concentrator exit (or the entrance plane when
                 there is no concentrator) to the detector (``>= 0``).
 
@@ -477,4 +478,5 @@ class HexagonalSensorGroup(SensorGroup):
             values=sensor_rays.values,
             path_length=sensor_rays.path_length,
             n=sensor_rays.n,
+            alive=sensor_rays.alive,
         )
