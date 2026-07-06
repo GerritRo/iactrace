@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Literal
 
 import equinox as eqx
+import jax.numpy as jnp
 from jax import Array
 
 from .transforms import euler_to_matrix
@@ -11,33 +12,54 @@ from .transforms import euler_to_matrix
 class RayBundle(eqx.Module):
     """Bundle of rays through the optical system.
 
-    Carries ray positions, directions, weights, and path lengths.
+    Carries ray positions, directions, weights, path lengths, and a
+    per-ray liveness flag.
 
     The frame of ``origins`` / ``directions`` is implicit and depends on
     where the bundle came from: ``Telescope.render`` and ``Telescope.trace``
     return rays in the **camera-local** frame so they can be fed straight
     into ``Camera.collect`` / ``Camera.image``.
 
-    ``values`` is a dimensionless throughput-weighted photon count.
-    Every interaction along the optical path multiplies into it:
+    **Liveness vs throughput.** IACTrace keeps the two ways a ray can be
+    "lost" on separate axes:
 
-        primary sampling weight  ->  reflectivity / refractivity ->
-        aperture mask  ->  obstruction shadow  ->  concentrator throughput
-        ->  quantum efficiency
+    * ``alive`` (bool) answers *"is this a valid, still-propagating
+      ray?"*. It is flipped off only by **geometry / occlusion** loss: a
+      ray that misses every element in a stage, lands outside an aperture,
+      is blocked by an obstruction, or misses the sensor. Once ``False``
+      it stays ``False`` (an absorbing state), and the ``origins`` /
+      ``directions`` of a dead ray are meaningless — always mask geometry
+      with ``alive`` before reading positions.
+    * ``values`` (float >= 0) is the **radiometric throughput** of a live
+      ray. Every *physical* coefficient multiplies into it — primary
+      sampling weight, reflectivity / transmittance, quantum efficiency,
+      concentrator throughput. A live ray may legitimately reach ``0``
+      (a perfectly absorbing coating, total internal reflection); that is
+      distinct from a dead ray and is *not* recorded on the ``alive`` axis.
 
-    so by the time the bundle reaches ``Camera.collect`` the entries of
+    As an invariant a dead ray always carries ``values == 0``, so the
+    image / response-matrix sums (which add ``values``) need no masking;
+    the ``alive`` flag exists so per-ray consumers can tell *why* a ray is
+    dark. "Carries light" is simply ``alive & (values > 0)``.
+
+    By the time the bundle reaches ``Camera.collect`` the entries of
     ``values`` are photoelectrons, not raw photons.
 
     Attributes:
-        origins: Ray positions in 3D (n_rays, 3)
-        directions: Ray direction vectors (n_rays, 3)
-        values: Throughput-weighted ray intensities (n_rays,)
+        origins: Ray positions in 3D (n_rays, 3). Meaningful only where
+            ``alive`` is ``True``.
+        directions: Ray direction vectors (n_rays, 3). Meaningful only
+            where ``alive`` is ``True``.
+        values: Throughput-weighted ray intensities (n_rays,).
         path_length: Accumulated **optical** path length per ray
             (n_rays,), in metres.
         n: Per-ray refractive index of the medium each ray is
             currently propagating in (n_rays,). Carried so downstream
             consumers (sensor intersection, focal-surface analysis)
             can weight the final geometric leg correctly.
+        alive: Per-ray liveness flag (n_rays,), boolean. ``True`` for a
+            valid, still-propagating ray. Defaults to all-``True`` at
+            construction, i.e. a freshly built bundle is fully alive.
     """
 
     origins: Array
@@ -45,6 +67,30 @@ class RayBundle(eqx.Module):
     values: Array
     path_length: Array
     n: Array
+    alive: Array
+
+    def __init__(
+        self,
+        origins: Array,
+        directions: Array,
+        values: Array,
+        path_length: Array,
+        n: Array,
+        alive: Array | None = None,
+    ) -> None:
+        self.origins = origins
+        self.directions = directions
+        self.values = values
+        self.path_length = path_length
+        self.n = n
+        # A bundle is born fully alive; callers that terminate rays pass an
+        # explicit mask. Kept last with a default so external constructions
+        # (and the whole test suite) that predate the flag still work.
+        self.alive = (
+            jnp.ones(values.shape[0], dtype=bool)
+            if alive is None
+            else jnp.asarray(alive, dtype=bool)
+        )
 
     def to_frame(self, origin: Array, rotation: Array) -> RayBundle:
         """Express these rays in the local frame given by ``origin`` + Euler ``rotation``.
@@ -53,8 +99,8 @@ class RayBundle(eqx.Module):
         ``rotation`` are XYZ Euler angles in degrees.
 
         This is a **pure coordinate transform**: it moves ``origins`` and
-        ``directions`` and leaves ``values`` / ``path_length`` / ``n``
-        untouched.
+        ``directions`` and leaves ``values`` / ``path_length`` / ``n`` /
+        ``alive`` untouched.
         """
         rot = euler_to_matrix(rotation)
         return RayBundle(
@@ -63,6 +109,7 @@ class RayBundle(eqx.Module):
             values=self.values,
             path_length=self.path_length,
             n=self.n,
+            alive=self.alive,
         )
 
 

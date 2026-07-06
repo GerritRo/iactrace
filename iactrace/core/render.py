@@ -52,22 +52,30 @@ def apply_final_leg_shadow(rb, obstruction_groups, camera_position, camera_rotat
         rot,
     )
     shadow = _shadow_mask(rb.origins, rb.directions, obstruction_groups, t_cap)
+    # An opaque obstruction terminates the ray (geometry loss), so it flips
+    # ``alive`` rather than merely scaling ``values``.
+    new_alive = rb.alive & (shadow > 0)
     return RayBundle(
         origins=rb.origins,
         directions=rb.directions,
-        values=rb.values * shadow,
+        values=jnp.where(new_alive, rb.values, 0.0),
         path_length=rb.path_length,
         n=rb.n,
+        alive=new_alive,
     )
 
 
-def _trace_stage(origins, directions, values, current_n, group, obstructions):
+def _trace_stage(origins, directions, values, alive, current_n, group, obstructions):
     """Process rays through one optical stage: intersect all elements, apply physics,
     check shadows.
 
-    Returns ``(new_origins, new_directions, new_values, segment_length,
-    opl_internal, new_n)``:
+    Returns ``(new_origins, new_directions, new_values, new_alive,
+    segment_length, opl_internal, new_n)``:
 
+    * ``new_alive``: per-ray liveness after this stage. A ray dies here if
+      it misses every element (or lands outside an aperture) or is blocked
+      by an obstruction; the physical coefficients only attenuate a ray
+      that is still alive.
     * ``segment_length``: geometric distance from the previous stage
       to this surface (in the medium ``current_n``).
     * ``opl_internal``: per-ray OPL accumulated *inside* the
@@ -134,6 +142,13 @@ def _trace_stage(origins, directions, values, current_n, group, obstructions):
     )
 
     shadow = _shadow_mask(origins, directions, obstructions, best_t)
+    # Liveness vs throughput: a miss (no element / outside aperture) or an
+    # obstruction terminates the ray, so it flips ``alive``; ``coeffs``
+    # (reflectivity / transmittance, TIR ...) only attenuate ``values`` of a
+    # ray that is still alive. Dead rays are forced to ``values == 0`` so the
+    # downstream image sums stay correct without consulting ``alive``.
+    new_alive = alive & hit & (shadow > 0)
+    new_values = jnp.where(new_alive, values * coeffs, 0.0)
     segment = jnp.where(hit, best_t, 0.0)
     opl_internal = jnp.where(hit, opl_internal, 0.0)
     # Rays that missed keep their medium; only rays that interacted update it.
@@ -141,7 +156,8 @@ def _trace_stage(origins, directions, values, current_n, group, obstructions):
     return (
         new_origins,
         new_dirs,
-        values * hit * shadow * coeffs,
+        new_values,
+        new_alive,
         segment,
         opl_internal,
         new_n,
@@ -177,10 +193,12 @@ def _build_source_rays(
         obstruction_groups: list of ObstructionGroup for shadow testing.
 
     Returns:
-        ``(origins, directions, normals, values, leg_in)`` all shaped
-        (n_rays, ...). ``leg_in`` is the optical path length each ray
-        already accumulated travelling from the source (or reference
-        wavefront) to its primary sample point.
+        ``(origins, directions, normals, values, alive, leg_in)`` all
+        shaped (n_rays, ...). ``alive`` is ``False`` for rays whose
+        source-to-primary segment is blocked by an obstruction. ``leg_in``
+        is the optical path length each ray already accumulated travelling
+        from the source (or reference wavefront) to its primary sample
+        point.
     """
     n_sources = sources.shape[0]
     n_samples = points.shape[0]
@@ -210,14 +228,13 @@ def _build_source_rays(
     leg_in_flat = leg_in.reshape(n_rays)
 
     shadow = _shadow_mask(origins_flat, -dirs_flat, obstruction_groups)
+    # A blocked source-to-primary segment terminates the ray (geometry loss).
+    alive = shadow > 0
     weights_flat = jnp.broadcast_to(weights[:, 0][None, :], (n_sources, n_samples)).reshape(n_rays)
-    vals = (
-        jnp.broadcast_to(source_values[:, None], (n_sources, n_samples)).reshape(n_rays)
-        / weights_flat
-        * shadow
-    )
+    vals = jnp.broadcast_to(source_values[:, None], (n_sources, n_samples)).reshape(n_rays)
+    vals = jnp.where(alive, vals / weights_flat, 0.0)
 
-    return origins_flat, dirs_flat, normals_flat, vals, leg_in_flat
+    return origins_flat, dirs_flat, normals_flat, vals, alive, leg_in_flat
 
 
 def _apply_primary_interaction(group, element_idx, origins, directions, normals, values, current_n):
@@ -261,7 +278,7 @@ def _trace_one_element(
     in world coordinates, source-major.
     """
     s0_points, s0_normals, s0_weights = geom
-    origins, dirs, normals, vals, leg_in = _build_source_rays(
+    origins, dirs, normals, vals, alive, leg_in = _build_source_rays(
         s0_points[eidx],
         s0_normals[eidx],
         s0_weights[eidx],
@@ -284,10 +301,11 @@ def _trace_one_element(
     # location on the primary doesn't conflate with downstream analysis.
     path_length = leg_in
     for sidx in stage_indices[1:]:
-        origins, dirs, vals, seg, opl_internal, new_n = _trace_stage(
+        origins, dirs, vals, alive, seg, opl_internal, new_n = _trace_stage(
             origins,
             dirs,
             vals,
+            alive,
             current_n,
             stages[sidx],
             obstructions,
@@ -300,6 +318,7 @@ def _trace_one_element(
         values=vals,
         path_length=path_length,
         n=current_n,
+        alive=alive,
     )
 
 
@@ -417,11 +436,12 @@ def trace_optics(optical_groups, obstruction_groups, ray_origins, ray_directions
     origins, dirs, vals = ray_origins, ray_directions, values
     path_length = jnp.zeros(vals.shape[0])
     current_n = jnp.ones(vals.shape[0])
+    alive = jnp.ones(vals.shape[0], dtype=bool)
 
     if stage_indices:
         for stage_idx in stage_indices:
-            origins, dirs, vals, seg, opl_internal, new_n = _trace_stage(
-                origins, dirs, vals, current_n, stages[stage_idx], obstruction_groups
+            origins, dirs, vals, alive, seg, opl_internal, new_n = _trace_stage(
+                origins, dirs, vals, alive, current_n, stages[stage_idx], obstruction_groups
             )
             path_length = path_length + current_n * seg + opl_internal
             current_n = new_n
@@ -432,4 +452,5 @@ def trace_optics(optical_groups, obstruction_groups, ray_origins, ray_directions
         values=vals,
         path_length=path_length,
         n=current_n,
+        alive=alive,
     )

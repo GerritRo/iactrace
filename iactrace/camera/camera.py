@@ -36,7 +36,10 @@ def intersect_sensor(
         Tuple of ``(sensor_rays, s_idx, hit_mask)`` where *sensor_rays*
         is a :class:`~iactrace.core.ray_bundle.RayBundle` in the
         sensor-local frame, *s_idx* identifies which sensor each ray hit,
-        and *hit_mask* is True for rays that intersected a sensor.
+        and *hit_mask* is the ray bundle's ``alive`` flag after the sensor
+        step: ``True`` for a ray that was still alive coming in **and**
+        intersected a sensor. It equals ``sensor_rays.alive`` and is
+        returned separately only for backward compatibility.
     """
     if isinstance(ray_bundle, LazyRayBundle):
         ray_bundle = ray_bundle.materialise()
@@ -67,10 +70,11 @@ def intersect_sensor(
     t_sensor = all_ts[s_idx, idx]
     local_dirs = all_dirs[s_idx, idx]
 
-    # Create hit mask and advance path length
-    hit_mask = jnp.isfinite(t_sensor)
+    # A ray missing every sensor plane terminates (geometry loss)
+    hit = jnp.isfinite(t_sensor)
+    alive = ray_bundle.alive & hit
     path_length = ray_bundle.path_length + jnp.where(
-        hit_mask,
+        hit,
         t_sensor * ray_bundle.n,
         0.0,
     )
@@ -78,11 +82,12 @@ def intersect_sensor(
     sensor_rays = RayBundle(
         origins=jnp.stack([pts[:, 0], pts[:, 1], jnp.zeros(n_rays)], axis=-1),
         directions=local_dirs,
-        values=ray_bundle.values,
+        values=jnp.where(alive, ray_bundle.values, 0.0),
         path_length=path_length,
         n=ray_bundle.n,
+        alive=alive,
     )
-    return sensor_rays, s_idx, hit_mask
+    return sensor_rays, s_idx, alive
 
 
 def _run_chain(
@@ -164,13 +169,16 @@ class Camera(eqx.Module):
         ray_bundle: RayBundle | LazyRayBundle,
         sensor_idx: int = 0,
     ) -> tuple[Array, Array, Array, Array]:
-        """Per-ray output ``(pe_vals, pe_times, pix_id, hit_mask)``.
+        """Per-ray output ``(pe_vals, pe_times, pix_id, detected)``.
 
-        ``hit_mask`` is ``True`` for rays that hit a sensor plane and are
-        not in the edge area defined by edge width.
-        ``False`` for rays that missed every sensor; entries in
-        ``pix_id``/``pe_times`` for missed rays are meaningless and
-        should be filtered with the mask before use.
+        ``detected`` is the final liveness flag: ``True`` for a ray that
+        stayed alive through the optics **and** landed on a pixel's active
+        area (inside the sensor bounds and outside the edge deadband).
+        It is ``False`` for a ray that was lost anywhere upstream (missed
+        an element, shadowed, absorbed geometry), missed every sensor, or
+        fell in a pixel gap / edge. Entries of ``pix_id`` / ``pe_times``
+        for undetected rays are meaningless and must be filtered with this
+        mask before use; ``pe_vals`` is already zeroed there.
 
         Materialises a :class:`LazyRayBundle`: per-ray output cannot be
         produced incrementally.
