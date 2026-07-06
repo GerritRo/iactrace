@@ -28,22 +28,30 @@ def _shadow_mask(origins, directions, obstructions, max_t=1e10):
 
 def apply_final_leg_shadow(rb, obstruction_groups, camera_position, camera_rotation):
     """Shadow the converging beam on the final last-optic -> focal-plane leg.
+
     ``rb`` must be a world-frame bundle as produced by the render, i.e.
     *before* :meth:`RayBundle.to_frame`: its ``origins`` lie on the last
     optic and its ``directions`` point toward the focal plane. Only
     ``values`` is modified, so the leg's contribution to ``path_length`` is
     still added later by the sensor intersection.
+
+    The leg is capped at the **camera reference plane** (``camera_position``),
+    not at each ray's true sensor / focal-surface landing point. For a thin
+    camera (sensor ~ ``camera_position``) these coincide; if the sensor group
+    or focal surface is offset along the optical axis they differ, and an
+    obstruction between ``camera_position`` and the true landing plane is not
+    accounted for.
     """
     if not obstruction_groups:
         return rb
     rot = euler_to_matrix(camera_rotation)
-    _, t_focal = jax.vmap(intersect_plane, in_axes=(0, 0, None, None))(
+    _, t_cap = jax.vmap(intersect_plane, in_axes=(0, 0, None, None))(
         rb.origins,
         rb.directions,
         camera_position,
         rot,
     )
-    shadow = _shadow_mask(rb.origins, rb.directions, obstruction_groups, t_focal)
+    shadow = _shadow_mask(rb.origins, rb.directions, obstruction_groups, t_cap)
     return RayBundle(
         origins=rb.origins,
         directions=rb.directions,

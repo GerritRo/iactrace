@@ -24,7 +24,15 @@ from .obstructions import (
 from .optics import OpticalElementGroup
 from .ray_bundle import LazyRayBundle, RayBundle
 from .render import render_optics, trace_optics
-from .surfaces import AsphericSurfaceGroup, SurfaceGroup
+from .surfaces import (
+    AsphericSurfaceGroup,
+    FreeformSurfaceGroup,
+    SumSurfaceGroup,
+    SurfaceGroup,
+    ZernikeSurfaceGroup,
+    bicubic_interp,
+    zernike_terms,
+)
 from .transforms import euler_to_matrix
 
 __all__ = [
@@ -47,6 +55,11 @@ __all__ = [
     # Surfaces
     "SurfaceGroup",
     "AsphericSurfaceGroup",
+    "ZernikeSurfaceGroup",
+    "SumSurfaceGroup",
+    "FreeformSurfaceGroup",
+    "zernike_terms",
+    "bicubic_interp",
     # BSDF
     "BSDF",
     "GaussianBSDF",
