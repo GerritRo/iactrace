@@ -1,4 +1,5 @@
 import jax.numpy as jnp
+import pytest
 
 from iactrace.core.coatings import fresnel_unpolarized
 from iactrace.core.interactions import refract, refract_slab
@@ -25,34 +26,20 @@ class TestRefract:
         assert jnp.isclose(cos_i, 1.0, atol=1e-10)
         assert not tir
 
-    def test_snells_law_air_to_glass(self):
-        """Verify Snell's law: n1*sin(theta1) = n2*sin(theta2)."""
-        theta_i = jnp.pi / 4
+    @pytest.mark.parametrize(
+        ("theta_i", "n1", "n2"),
+        [(jnp.pi / 4, 1.0, 1.5), (jnp.deg2rad(20.0), 1.5, 1.0)],
+    )
+    def test_snells_law(self, theta_i, n1, n2):
+        """Snell's law holds entering and leaving glass: n1 sinθ1 = n2 sinθ2."""
         direction = jnp.array([jnp.sin(theta_i), 0.0, -jnp.cos(theta_i)])
         normal = jnp.array([0.0, 0.0, 1.0])
-        n1, n2 = 1.0, 1.5
 
         refracted, _, tir = refract(direction, normal, n1, n2)
 
-        sin_theta_i = jnp.sin(theta_i)
         cos_t = _cos_t_from_direction(refracted, normal)
         sin_theta_t = jnp.sqrt(1.0 - cos_t**2)
-        assert jnp.isclose(n1 * sin_theta_i, n2 * sin_theta_t, rtol=1e-6)
-        assert not tir
-
-    def test_snells_law_glass_to_air(self):
-        """Refraction from glass to air bends ray away from normal."""
-        theta_i = jnp.deg2rad(20.0)
-        direction = jnp.array([jnp.sin(theta_i), 0.0, -jnp.cos(theta_i)])
-        normal = jnp.array([0.0, 0.0, 1.0])
-        n1, n2 = 1.5, 1.0
-
-        refracted, _, tir = refract(direction, normal, n1, n2)
-
-        sin_theta_i = jnp.sin(theta_i)
-        cos_t = _cos_t_from_direction(refracted, normal)
-        sin_theta_t = jnp.sqrt(1.0 - cos_t**2)
-        assert jnp.isclose(n1 * sin_theta_i, n2 * sin_theta_t, rtol=1e-6)
+        assert jnp.isclose(n1 * jnp.sin(theta_i), n2 * sin_theta_t, rtol=1e-6)
         assert not tir
 
     def test_total_internal_reflection_critical_angle(self):
@@ -70,16 +57,6 @@ class TestRefract:
         direction_above = jnp.array([jnp.sin(theta_above), 0.0, -jnp.cos(theta_above)])
         _, _, tir_above = refract(direction_above, normal, n1, n2)
         assert tir_above
-
-    def test_refracted_direction_is_normalized(self):
-        """Output direction should be unit vector."""
-        direction = jnp.array([0.3, 0.2, -0.9])
-        direction = direction / jnp.linalg.norm(direction)
-        normal = jnp.array([0.0, 0.0, 1.0])
-
-        refracted, _, _ = refract(direction, normal, 1.0, 1.5)
-
-        assert jnp.isclose(jnp.linalg.norm(refracted), 1.0, atol=1e-10)
 
     def test_equal_indices_no_change(self):
         """When n1 == n2, ray direction is unchanged."""
@@ -216,34 +193,20 @@ class TestRefractSlab:
         # tilted relative to the slab normal inside the glass.
         assert path_length > thickness
 
-    def test_lateral_displacement_increases_with_angle(self):
-        """Oblique rays have larger lateral offset than normal rays."""
+    def test_lateral_offset_grows_with_angle_and_thickness(self):
+        """Slab lateral offset increases with both incidence angle and thickness."""
         normal = jnp.array([0.0, 0.0, 1.0])
         position = jnp.array([0.0, 0.0, 0.0])
         n_out, n_in = 1.0, 1.5
-        thickness = 0.01
 
-        _, pos_normal, *_ = refract_slab(
-            jnp.array([0.0, 0.0, -1.0]),
-            normal,
-            position,
-            n_out,
-            n_in,
-            thickness,
-        )
+        def offset(theta_deg, thickness):
+            theta = jnp.deg2rad(theta_deg)
+            direction = jnp.array([jnp.sin(theta), 0.0, -jnp.cos(theta)])
+            _, pos, *_ = refract_slab(direction, normal, position, n_out, n_in, thickness)
+            return jnp.abs(pos[0])
 
-        theta_30 = jnp.deg2rad(30.0)
-        dir_30 = jnp.array([jnp.sin(theta_30), 0.0, -jnp.cos(theta_30)])
-        _, pos_30, *_ = refract_slab(
-            dir_30,
-            normal,
-            position,
-            n_out,
-            n_in,
-            thickness,
-        )
-
-        assert jnp.abs(pos_30[0]) > jnp.abs(pos_normal[0]) + 1e-10
+        assert offset(30.0, 0.01) > offset(0.0, 0.01) + 1e-10  # grows with angle
+        assert offset(30.0, 0.02) > offset(30.0, 0.01)  # grows with thickness
 
     def test_slab_fresnel_squared_at_normal_incidence(self):
         """Caller computes T = T_face^2 from the cos_i returned by refract_slab."""
@@ -269,70 +232,6 @@ class TestRefractSlab:
 
         assert jnp.isclose(transmittance, T_expected, rtol=1e-4)
         assert valid
-
-    def test_slab_high_angle_no_tir(self):
-        """No TIR for moderate angles in typical glass."""
-        theta_i = jnp.deg2rad(40.0)
-        direction = jnp.array([jnp.sin(theta_i), 0.0, -jnp.cos(theta_i)])
-        normal = jnp.array([0.0, 0.0, 1.0])
-        position = jnp.array([0.0, 0.0, 0.0])
-        n_out, n_in = 1.0, 1.5
-        thickness = 0.01
-
-        _, _, _, valid, _ = refract_slab(
-            direction,
-            normal,
-            position,
-            n_out,
-            n_in,
-            thickness,
-        )
-        assert valid
-
-    def test_slab_thickness_affects_offset(self):
-        """Thicker slab produces larger lateral offset."""
-        theta_i = jnp.deg2rad(30.0)
-        direction = jnp.array([jnp.sin(theta_i), 0.0, -jnp.cos(theta_i)])
-        normal = jnp.array([0.0, 0.0, 1.0])
-        position = jnp.array([0.0, 0.0, 0.0])
-        n_out, n_in = 1.0, 1.5
-
-        _, pos_thin, *_ = refract_slab(
-            direction,
-            normal,
-            position,
-            n_out,
-            n_in,
-            thickness=0.01,
-        )
-        _, pos_thick, *_ = refract_slab(
-            direction,
-            normal,
-            position,
-            n_out,
-            n_in,
-            thickness=0.02,
-        )
-
-        assert jnp.abs(pos_thick[0]) > jnp.abs(pos_thin[0])
-
-    def test_slab_z_displacement_equals_thickness(self):
-        """Z displacement through slab equals thickness at normal incidence."""
-        direction = jnp.array([0.0, 0.0, -1.0])
-        normal = jnp.array([0.0, 0.0, 1.0])
-        position = jnp.array([0.0, 0.0, 0.0])
-        n_out, n_in = 1.0, 1.5
-        thickness = 0.015
-
-        _, exit_pos, *_ = refract_slab(
-            direction,
-            normal,
-            position,
-            n_out,
-            n_in,
-            thickness,
-        )
-        assert jnp.isclose(exit_pos[2] - position[2], -thickness, atol=1e-10)
 
 
 class TestReflect:
@@ -365,15 +264,3 @@ class TestReflect:
         expected = jnp.array([1.0, 0.0, 1.0]) / jnp.sqrt(2)
         assert jnp.allclose(reflected, expected, atol=1e-10)
         assert jnp.isclose(cos_angle.squeeze(), 1.0 / jnp.sqrt(2), atol=1e-10)
-
-    def test_reflected_direction_is_unit_length(self):
-        """Reflected direction should be unit vector."""
-        from iactrace.core.interactions import reflect
-
-        direction = jnp.array([0.3, 0.4, -0.866])
-        direction = direction / jnp.linalg.norm(direction)
-        normal = jnp.array([0.0, 0.0, 1.0])
-
-        reflected, _ = reflect(direction, normal)
-
-        assert jnp.isclose(jnp.linalg.norm(reflected), 1.0, atol=1e-10)

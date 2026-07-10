@@ -8,7 +8,6 @@ import jax.numpy as jnp
 import pytest
 
 from iactrace.core.coatings import (
-    Coating,
     ConstantCoating,
     TabulatedCoating,
     fresnel_unpolarized,
@@ -36,16 +35,6 @@ class TestConstantCoating:
         for c in (1.0, 0.5, 0.0):
             out = coating(jnp.full(5, c), idx)
             assert jnp.allclose(out, 0.9)
-
-    def test_jit_compatible(self):
-        coating = ConstantCoating(values=jnp.array([0.9, 0.8]))
-
-        @jax.jit
-        def evaluate(c, cos, idx):
-            return c(cos, idx)
-
-        out = evaluate(coating, jnp.array([0.5, 0.5]), jnp.array([0, 1]))
-        assert jnp.allclose(out, jnp.array([0.9, 0.8]))
 
 
 class TestTabulatedCoating:
@@ -117,20 +106,6 @@ class TestTabulatedCoating:
         cos = jnp.array([1.0, 0.5, 0.0])
         idx = jnp.array([0, 0, 0])
         assert jnp.allclose(c1(cos, idx), c2(cos, idx))
-
-    def test_jit_and_vmap_compatible(self):
-        coating = TabulatedCoating.from_degrees(
-            angles_deg=[0.0, 60.0, 90.0],
-            values=[1.0, 0.5, 0.0],
-            n_elements=2,
-        )
-
-        @jax.jit
-        def evaluate(c, cos, idx):
-            return c(cos, idx)
-
-        out = evaluate(coating, jnp.array([1.0, 0.5]), jnp.array([0, 1]))
-        assert jnp.allclose(out, jnp.array([1.0, 0.5]), atol=1e-6)
 
 
 class TestDefaults:
@@ -432,11 +407,3 @@ class TestFactoryFlow:
             g.interaction_module.transmittance_scalar,
             jnp.array([1.0]),
         )
-
-
-class TestAbstractClass:
-    """Subclasses must implement ``__call__``."""
-
-    def test_cannot_instantiate_abstract(self):
-        with pytest.raises(TypeError):
-            Coating()

@@ -12,6 +12,7 @@ telescope:
 mirror_templates:
   M1_aspheric:
     surface:
+      type: aspheric
       curvature: 0.12161019999999999
       conic: 0.0
       aspheric:
@@ -26,6 +27,7 @@ mirror_templates:
       - -2.7358600000381654e-09
   M2_aspheric:
     surface:
+      type: aspheric
       curvature: 0.458716
       conic: 0.0
       aspheric:

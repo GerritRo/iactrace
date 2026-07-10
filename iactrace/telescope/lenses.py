@@ -10,6 +10,8 @@ from ..core.coatings import Coating
 from ..core.interactions import RefractInteraction, SlabInteraction
 from ..core.optics import OpticalElementGroup
 from ..core.surfaces import AsphericSurfaceGroup
+from ._common import as_aspheric_row as _as_aspheric_row
+from ._common import as_vec3 as _as_vec3
 
 __all__ = [
     "refractive_group",
@@ -17,19 +19,6 @@ __all__ = [
     "aspheric_lens",
     "plano_slab",
 ]
-
-
-def _as_vec3(value, name: str) -> Array:
-    arr = jnp.asarray(value)
-    if arr.shape != (3,):
-        raise ValueError(f"{name} must have shape (3,), got {arr.shape}")
-    return arr
-
-
-def _as_aspheric_row(coeffs: Sequence[float] | None) -> Array:
-    if coeffs is None:
-        return jnp.zeros((0,))
-    return jnp.asarray(coeffs)
 
 
 # Low-level canonical builders

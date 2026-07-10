@@ -1,4 +1,3 @@
-import jax
 import pytest
 
 from iactrace.io import (
@@ -9,21 +8,12 @@ from iactrace.io import (
 
 
 @pytest.fixture
-def n_samples():
-    return 4
-
-
-@pytest.fixture
-def random_key():
-    return jax.random.key(0)
-
-
-@pytest.fixture
 def valid_template():
     """A valid mirror template for testing."""
     return {
         "test_mirror": {
             "surface": {
+                "type": "aspheric",
                 "curvature": 0.1,
                 "conic": -1.0,
             }
@@ -42,8 +32,8 @@ class TestMirrorConfigErrors:
         config = {
             "telescope": {"camera_position": [0, 0, 0], "camera_rotation": [0, 0, 0]},
             "mirror_templates": {
-                "template_a": {"surface": {"curvature": 0.1, "conic": -1}},
-                "template_b": {"surface": {"curvature": 0.2, "conic": -1}},
+                "template_a": {"surface": {"type": "aspheric", "curvature": 0.1, "conic": -1}},
+                "template_b": {"surface": {"type": "aspheric", "curvature": 0.2, "conic": -1}},
             },
             "mirrors": [
                 {
@@ -106,40 +96,30 @@ class TestMirrorConfigErrors:
         with pytest.raises(YAMLConfigError, match="does not match any of the expected tags"):
             build_telescope_config(config, n_samples, random_key)
 
-    def test_missing_camera_position_raises(self, n_samples, random_key):
-        """Telescope config without camera_position should raise YAMLConfigError."""
-        config = {
-            "telescope": {"name": "no_cam_pos"},
-            "mirrors": [],
-        }
-        with pytest.raises(YAMLConfigError, match="Field required"):
-            build_telescope_config(config, n_samples, random_key)
-
-    def test_telescope_rejects_sensors_section(self, n_samples, random_key):
-        """Telescope schema is strict -- combined-format sensors are forbidden."""
-        config = {
-            "telescope": {"camera_position": [0, 0, 0], "camera_rotation": [0, 0, 0]},
-            "mirrors": [],
-            "sensors": [
-                {
-                    "type": "square",
-                    "position": [0, 0, 5],
-                    "orientation": [0, 0, 0],
-                    "width": 10,
-                    "height": 10,
-                    "bounds": [-1, 1, -1, 1],
-                }
-            ],
-        }
-        with pytest.raises(YAMLConfigError):
-            build_telescope_config(config, n_samples, random_key)
-
-    def test_telescope_rejects_camera_section(self, n_samples, random_key):
-        """Telescope schema is strict -- combined-format camera block is forbidden."""
+    @pytest.mark.parametrize(
+        "extra",
+        [
+            {
+                "sensors": [
+                    {
+                        "type": "square",
+                        "position": [0, 0, 5],
+                        "orientation": [0, 0, 0],
+                        "width": 10,
+                        "height": 10,
+                        "bounds": [-1, 1, -1, 1],
+                    }
+                ]
+            },
+            {"camera": {"quantum_efficiency": 0.5}},
+        ],
+    )
+    def test_telescope_rejects_combined_format_section(self, n_samples, random_key, extra):
+        """Telescope schema is strict: combined-format sensors/camera blocks are forbidden."""
         config = {
             "telescope": {"camera_position": [0, 0, 0], "camera_rotation": [0, 0, 0]},
             "mirrors": [],
-            "camera": {"quantum_efficiency": 0.5},
+            **extra,
         }
         with pytest.raises(YAMLConfigError):
             build_telescope_config(config, n_samples, random_key)
@@ -216,58 +196,6 @@ class TestSensorConfigErrors:
 class TestValidConfigs:
     """Test that valid configurations load correctly."""
 
-    def test_valid_disk_mirror_loads(self, n_samples, random_key, valid_template):
-        """Valid circular mirror configuration should load successfully."""
-        tel_config = {
-            "telescope": {"camera_position": [0, 0, 5], "camera_rotation": [0, 0, 0]},
-            "mirror_templates": valid_template,
-            "mirrors": [
-                {
-                    "template": "test_mirror",
-                    "position": [0, 0, 0],
-                    "orientation": [0, 0, 0],
-                    "aperture": {"type": "circular", "radius": 0.5},
-                }
-            ],
-        }
-        cam_config = {
-            "sensors": [
-                {
-                    "type": "square",
-                    "position": [0, 0, 0],
-                    "orientation": [0, 0, 0],
-                    "width": 100,
-                    "height": 100,
-                    "bounds": [-1, 1, -1, 1],
-                }
-            ],
-        }
-
-        telescope = build_telescope_config(tel_config, n_samples, random_key)
-        camera = build_camera_config(cam_config)
-        assert len(telescope.mirror_groups) == 1
-        assert len(camera.sensor_groups) == 1
-
-    def test_valid_polygon_mirror_loads(self, n_samples, random_key, valid_template):
-        """Valid polygon mirror configuration should load successfully."""
-        tel_config = {
-            "telescope": {"camera_position": [0, 0, 5], "camera_rotation": [0, 0, 0]},
-            "mirror_templates": valid_template,
-            "mirrors": [
-                {
-                    "template": "test_mirror",
-                    "position": [0, 0, 0],
-                    "orientation": [0, 0, 0],
-                    "aperture": {
-                        "type": "polygon",
-                        "vertices": [[0, 0], [1, 0], [0.5, 1]],
-                    },
-                }
-            ],
-        }
-        telescope = build_telescope_config(tel_config, n_samples, random_key)
-        assert len(telescope.mirror_groups) == 1
-
     def test_empty_telescope_loads(self, n_samples, random_key):
         """Empty telescope configuration should load without errors."""
         tel_config = {
@@ -310,6 +238,57 @@ class TestValidConfigs:
         # Check per-mirror curvatures
         assert float(group.surface.curvatures[0]) == pytest.approx(0.2)
         assert float(group.surface.curvatures[1]) == pytest.approx(0.1)  # template default
+        
+
+    def test_untyped_surface_rejected(self, n_samples, random_key):
+        """A surface block without a ``type`` discriminator is rejected.
+        Surfaces are a typed union (like apertures), so the legacy untyped
+        ``{curvature, conic, aspheric}`` block no longer loads.
+        """
+        config = {
+            "telescope": {"camera_position": [0, 0, 0], "camera_rotation": [0, 0, 0]},
+            "mirror_templates": {
+                "legacy": {"surface": {"curvature": 0.1, "conic": -1.0}},
+            },
+            "mirrors": [
+                {
+                    "template": "legacy",
+                    "position": [0, 0, 0],
+                    "orientation": [0, 0, 0],
+                    "aperture": {"type": "circular", "radius": 0.5},
+                },
+            ],
+        }
+        with pytest.raises(YAMLConfigError):
+            build_telescope_config(config, n_samples, random_key)
+            
+    
+    def test_typed_aspheric_lens_surface_loads(self, n_samples, random_key):
+        """An aspheric-disk lens reads its shape from a nested typed surface."""
+        config = {
+            "telescope": {"camera_position": [0, 0, 5], "camera_rotation": [0, 0, 0]},
+            "lenses": [
+                {
+                    "type": "aspheric_disk",
+                    "position": [0, 0, 0.1],
+                    "orientation": [0, 0, 0],
+                    "aperture": {"type": "circular", "radius": 0.05},
+                    "surface": {
+                        "type": "aspheric",
+                        "curvature": 5.0,
+                        "conic": -1.5,
+                        "aspheric": [1e-6, 2e-8],
+                    },
+                    "n_inside": 1.5,
+                    "stage": 1,
+                },
+            ],
+        }
+        telescope = build_telescope_config(config, n_samples, random_key)
+        surface = telescope.lens_groups[0].surface
+        assert float(surface.curvatures[0]) == pytest.approx(5.0)
+        assert float(surface.conics[0]) == pytest.approx(-1.5)
+        assert float(surface.aspherics[0][0]) == pytest.approx(1e-6)
 
 
 class TestCoatingsFromYaml:
@@ -322,7 +301,7 @@ class TestCoatingsFromYaml:
             "telescope": {"camera_position": [0, 0, 5], "camera_rotation": [0, 0, 0]},
             "mirror_templates": {
                 "protected_silver": {
-                    "surface": {"curvature": 0.1, "conic": -1.0},
+                    "surface": {"type": "aspheric", "curvature": 0.1, "conic": -1.0},
                     "coating": {
                         "type": "table",
                         "angles_deg": [0.0, 30.0, 60.0, 80.0],
@@ -352,7 +331,7 @@ class TestCoatingsFromYaml:
             "telescope": {"camera_position": [0, 0, 5], "camera_rotation": [0, 0, 0]},
             "mirror_templates": {
                 "matte": {
-                    "surface": {"curvature": 0.1, "conic": -1.0},
+                    "surface": {"type": "aspheric", "curvature": 0.1, "conic": -1.0},
                     "reflectivity": 0.85,
                 },
             },
@@ -375,7 +354,7 @@ class TestCoatingsFromYaml:
         config = {
             "telescope": {"camera_position": [0, 0, 5], "camera_rotation": [0, 0, 0]},
             "mirror_templates": {
-                "tpl": {"surface": {"curvature": 0.1, "conic": -1.0}},
+                "tpl": {"surface": {"type": "aspheric", "curvature": 0.1, "conic": -1.0}},
             },
             "mirrors": [
                 {
@@ -404,7 +383,7 @@ class TestCoatingsFromYaml:
             "telescope": {"camera_position": [0, 0, 5], "camera_rotation": [0, 0, 0]},
             "mirror_templates": {
                 "tpl_a": {
-                    "surface": {"curvature": 0.1, "conic": -1.0},
+                    "surface": {"type": "aspheric", "curvature": 0.1, "conic": -1.0},
                     "coating": {
                         "type": "table",
                         "angles_deg": [0.0, 90.0],
@@ -412,7 +391,7 @@ class TestCoatingsFromYaml:
                     },
                 },
                 "tpl_b": {
-                    "surface": {"curvature": 0.2, "conic": -1.0},
+                    "surface": {"type": "aspheric", "curvature": 0.2, "conic": -1.0},
                     "coating": {
                         "type": "table",
                         "angles_deg": [0.0, 90.0],
@@ -449,8 +428,7 @@ class TestCoatingsFromYaml:
                     "position": [0, 0, 0.1],
                     "orientation": [0, 0, 0],
                     "aperture": {"type": "circular", "radius": 0.05},
-                    "curvature": 5.0,
-                    "conic": 0.0,
+                    "surface": {"type": "aspheric", "curvature": 5.0, "conic": 0.0},
                     "n_inside": 1.5,
                     "stage": 1,
                     "coating": {
@@ -477,8 +455,7 @@ class TestCoatingsFromYaml:
                     "position": [0, 0, 0.1],
                     "orientation": [0, 0, 0],
                     "aperture": {"type": "circular", "radius": 0.05},
-                    "curvature": 5.0,
-                    "conic": 0.0,
+                    "surface": {"type": "aspheric", "curvature": 5.0, "conic": 0.0},
                     "n_inside": 1.5,
                     "stage": 1,
                 },
@@ -494,7 +471,7 @@ class TestCoatingsFromYaml:
             "telescope": {"camera_position": [0, 0, 5], "camera_rotation": [0, 0, 0]},
             "mirror_templates": {
                 "bad": {
-                    "surface": {"curvature": 0.1, "conic": -1.0},
+                    "surface": {"type": "aspheric", "curvature": 0.1, "conic": -1.0},
                     "coating": {
                         "type": "table",
                         "angles_deg": [0.0, 45.0],

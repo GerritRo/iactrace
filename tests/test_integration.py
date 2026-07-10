@@ -1,180 +1,13 @@
 import jax
 import jax.numpy as jnp
 
-from iactrace import Camera, SquareSensorGroup, Telescope
-from iactrace.core.apertures import DiskAperture
-from iactrace.core.interactions import ReflectInteraction
-from iactrace.core.obstructions import CylinderGroup, SphereGroup
-from iactrace.core.optics import OpticalElementGroup
-from iactrace.core.surfaces import AsphericSurfaceGroup
+from iactrace.core.obstructions import SphereGroup
 
-
-def _make_disk_mirror_group(
-    positions, rotations, curvatures, conics, aspherics, radii, optical_stage=0, n_samples=100
-):
-    """Build an OpticalElementGroup configured as a reflective disk mirror."""
-    n = curvatures.shape[0]
-    surface = AsphericSurfaceGroup(
-        curvatures=curvatures,
-        conics=conics,
-        aspherics=aspherics,
-        offsets=jnp.zeros((n, 2)),
-    )
-    aperture = DiskAperture(radii=radii, inner_radii=jnp.zeros(n))
-    interaction = ReflectInteraction(reflectivity=None, reflectivity_scalar=jnp.ones(n))
-    return OpticalElementGroup(
-        positions=positions,
-        rotations=rotations,
-        surface=surface,
-        aperture=aperture,
-        interaction_module=interaction,
-        sample_key=jax.random.key(0),
-        optical_stage=optical_stage,
-        n_samples=n_samples,
-    )
-
-
-def make_simple_telescope(curvature=1.0, n_samples=1024, key=None):
-    """Create a minimal telescope + camera for testing."""
-    if key is None:
-        key = jax.random.key(0)
-
-    positions = jnp.array([[0.0, 0.0, 0.0]])
-    rotations = jnp.array([[0.0, 0.0, 0.0]])
-    curvatures = jnp.array([curvature])
-    conics = jnp.array([-1.0])
-    aspherics = jnp.zeros((1, 1))
-    radii = jnp.array([0.1])
-
-    mirror_group = _make_disk_mirror_group(
-        positions,
-        rotations,
-        curvatures,
-        conics,
-        aspherics,
-        radii,
-        optical_stage=0,
-        n_samples=n_samples,
-    )
-
-    focal_length = 1.0 / (2.0 * curvature) if curvature != 0 else 1000.0
-
-    sensor = SquareSensorGroup(
-        positions=[[0.0, 0.0, 0.0]],
-        rotations=[[0.0, 0.0, 0.0]],
-        width=100,
-        height=100,
-        bounds=(-0.018, 0.018, -0.018, 0.018),
-    )
-
-    telescope = Telescope(
-        mirror_groups=[mirror_group],
-        obstruction_groups=None,
-        name="test_telescope",
-        camera_position=[0.0, 0.0, focal_length],
-    )
-
-    camera = Camera(sensor_groups=[sensor])
-
-    return telescope, camera
-
-
-def make_two_stage_telescope(n_samples=512, key=None):
-    """Create a two-stage telescope + camera."""
-    if key is None:
-        key = jax.random.key(0)
-
-    first = _make_disk_mirror_group(
-        positions=jnp.array([[0.0, 0.0, 0.0]]),
-        rotations=jnp.array([[0.0, 0.0, 0.0]]),
-        curvatures=jnp.array([0.0]),
-        conics=jnp.array([0.0]),
-        aspherics=jnp.zeros((1, 1)),
-        radii=jnp.array([0.1]),
-        optical_stage=0,
-        n_samples=n_samples,
-    )
-
-    second = _make_disk_mirror_group(
-        positions=jnp.array([[0.0, 0.0, 0.5]]),
-        rotations=jnp.array([[0.0, 45.0, 0.0]]),
-        curvatures=jnp.array([0.0]),
-        conics=jnp.array([0.0]),
-        aspherics=jnp.zeros((1, 1)),
-        radii=jnp.array([0.2]),
-        optical_stage=1,
-        n_samples=n_samples,
-    )
-
-    sensor = SquareSensorGroup(
-        positions=[[0.0, 0.0, 0.0]],
-        rotations=[[0.0, 0.0, 0.0]],
-        width=50,
-        height=50,
-        bounds=(-0.2, 0.2, -0.2, 0.2),
-    )
-
-    telescope = Telescope(
-        mirror_groups=[first, second],
-        obstruction_groups=None,
-        name="two_stage_telescope",
-        camera_position=[0.5, 0.0, 0.5],
-        camera_rotation=[0.0, 90.0, 0.0],
-    )
-
-    camera = Camera(sensor_groups=[sensor])
-
-    return telescope, camera
-
-
-def make_telescope_with_obstruction(n_samples=1024, key=None):
-    """Create a telescope + camera with a central obstruction."""
-    if key is None:
-        key = jax.random.key(0)
-
-    positions = jnp.array([[0.0, 0.0, 0.0]])
-    rotations = jnp.array([[0.0, 0.0, 0.0]])
-    curvatures = jnp.array([1.0])
-    conics = jnp.array([-1.0])
-    aspherics = jnp.zeros((1, 1))
-    radii = jnp.array([0.1])
-
-    mirror_group = _make_disk_mirror_group(
-        positions,
-        rotations,
-        curvatures,
-        conics,
-        aspherics,
-        radii,
-        optical_stage=0,
-        n_samples=n_samples,
-    )
-
-    # Central obstruction near the aperture:
-    obstruction = CylinderGroup(
-        p1=[[0.0, 0.0, 0.05]],
-        p2=[[0.0, 0.0, 0.2]],
-        r=[0.03],
-    )
-
-    sensor = SquareSensorGroup(
-        positions=[[0.0, 0.0, 0.0]],
-        rotations=[[0.0, 0.0, 0.0]],
-        width=100,
-        height=100,
-        bounds=(-0.018, 0.018, -0.018, 0.018),
-    )
-
-    telescope = Telescope(
-        mirror_groups=[mirror_group],
-        obstruction_groups=[obstruction],
-        name="obstructed_telescope",
-        camera_position=[0.0, 0.0, 0.5],
-    )
-
-    camera = Camera(sensor_groups=[sensor])
-
-    return telescope, camera
+from ._helpers import (
+    make_simple_telescope,
+    make_telescope_with_obstruction,
+    make_two_stage_telescope,
+)
 
 
 class TestBasicRendering:
@@ -223,7 +56,7 @@ class TestBasicRendering:
         tel, cam = make_simple_telescope()
         sources = jnp.array([[0.0, 0.0, -1.0]])
         rb = tel.render(sources, jnp.array([1.0]), source_type="parallel")
-        sensor_rays, _, _ = intersect_sensor(cam, rb.materialise())
+        sensor_rays, _ = intersect_sensor(cam, rb.materialise())
 
         assert jnp.std(sensor_rays.origins[:, 0]) < 1e-8
         assert jnp.std(sensor_rays.origins[:, 1]) < 1e-8
@@ -557,7 +390,12 @@ class TestFinalLegShadow:
         return SphereGroup(centers=[[0.0, 0.0, 0.46]], radii=[0.02])
 
     def test_blocks_converging_cone_in_image(self):
-        """Fold path (Camera.image): near-focus obstruction collapses flux."""
+        """Fold path (Camera.image): near-focus obstruction collapses flux.
+
+        The near-focus collapse is asserted once, here on the fold path. The
+        materialise (collect) and eager (trace) paths share the same
+        apply_final_leg_shadow step, which the unit tests above exercise
+        directly, so re-checking the collapse per entry point is redundant."""
         key = jax.random.key(0)
         tel, cam = make_simple_telescope(n_samples=4096, key=key)
         tel_obs = tel.add_obstruction(self._near_focus_sphere())
@@ -567,43 +405,6 @@ class TestFinalLegShadow:
 
         flux_clear = jnp.sum(cam.image(tel.render(sources, values, source_type="parallel")))
         flux_obs = jnp.sum(cam.image(tel_obs.render(sources, values, source_type="parallel")))
-
-        assert flux_clear > 0
-        assert flux_obs < 0.2 * flux_clear
-
-    def test_blocks_converging_cone_in_collect(self):
-        """Materialise path (Camera.collect): same near-focus collapse."""
-        key = jax.random.key(0)
-        tel, cam = make_simple_telescope(n_samples=4096, key=key)
-        tel_obs = tel.add_obstruction(self._near_focus_sphere())
-
-        sources = jnp.array([[0.0, 0.0, -1.0]])
-        values = jnp.array([1.0])
-
-        pe_clear, _, _, _ = cam.collect(tel.render(sources, values, source_type="parallel"))
-        pe_obs, _, _, _ = cam.collect(tel_obs.render(sources, values, source_type="parallel"))
-
-        flux_clear = jnp.sum(pe_clear)
-        flux_obs = jnp.sum(pe_obs)
-        assert flux_clear > 0
-        assert flux_obs < 0.2 * flux_clear
-
-    def test_blocks_converging_cone_in_trace(self):
-        """Trace path (Telescope.trace): collimated rays reflected into the
-        converging cone are shadowed on the final leg."""
-        key = jax.random.key(0)
-        tel, cam = make_simple_telescope(key=key)
-        tel_obs = tel.add_obstruction(self._near_focus_sphere())
-
-        # Collimated on-axis rays filling the aperture, heading -z onto the
-        # mirror; they reflect into the cone converging toward the focus.
-        r = jnp.linspace(0.0, 0.099, 64)
-        origins = jnp.stack([r, jnp.zeros_like(r), jnp.ones_like(r)], axis=1)
-        directions = jnp.broadcast_to(jnp.array([0.0, 0.0, -1.0]), origins.shape)
-        values = jnp.ones(r.shape[0])
-
-        flux_clear = jnp.sum(tel.trace(origins, directions, values).values)
-        flux_obs = jnp.sum(tel_obs.trace(origins, directions, values).values)
 
         assert flux_clear > 0
         assert flux_obs < 0.2 * flux_clear

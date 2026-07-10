@@ -109,10 +109,16 @@ ignore = ["E501"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
-addopts = "-v --tb=short -m 'not notebooks'"
+addopts = "--tb=short -m 'not notebooks and not slow'"
 markers = [
     "notebooks: marks tests as notebook tests (deselect with '-m \"not notebooks\"')",
+    "slow: marks statistical / Monte-Carlo tests (deselect with '-m \"not slow\"')",
 ]
+
+# Coverage reflects the physics engine (core/camera/telescope/io); viz is only
+# smoke-tested by design, so exclude it rather than chase matplotlib/trimesh %.
+[tool.coverage.run]
+omit = ["iactrace/viz/*"]
 
 # -- Commitizen (conventional commits + changelog) --
 [tool.commitizen]

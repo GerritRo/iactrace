@@ -42,24 +42,44 @@ ApertureSchema = Annotated[
 # Mirror template & mirror schemas
 
 
-class SurfaceSchema(BaseModel):
+class AsphericSurfaceSchema(BaseModel):
+    """Even-aspheric conic surface: sag from ``curvature``/``conic`` plus
+    optional higher-order ``aspheric`` coefficients. Spherical (``conic = 0``)
+    and parabolic (``conic = -1``) surfaces are the natural special cases."""
+
+    type: Literal["aspheric"] = "aspheric"
     curvature: float
-    conic: float
+    conic: float = 0.0
     aspheric: list[float] = Field(default_factory=list)
 
 
-class ZernikeSchema(BaseModel):
-    """Per-element Zernike figure error summed onto the aspheric surface.
-    ``coeffs`` are RMS-normalized Noll coefficients in metres, indexed from
-    ``Z1`` (``coeffs[0]`` = piston). At most 11 terms (Z1..Z11) are supported.
-    ``r_norm`` is the normalization radius, with ``rho = 1`` at this radius.
-    See :class:`~iactrace.core.surfaces.ZernikeSurfaceGroup`. Presence of this
-    block makes the element's surface an asphere + Zernike
-    :class:`~iactrace.core.surfaces.SumSurfaceGroup`.
+class ZernikeSurfaceSchema(BaseModel):
+    """Zernike figure surface (RMS-normalized Noll coefficients, in metres).
+
+    ``coeffs`` are indexed from ``Z1`` (``coeffs[0]`` = piston); at most 11
+    terms (Z1..Z11) are supported. ``r_norm`` is the normalization radius, with
+    ``rho = 1`` at this radius. Use it on its own for a pure figure surface, or
+    as one entry in a summed surface list (typically after an ``aspheric``
+    base). See :class:`~iactrace.core.surfaces.ZernikeSurfaceGroup`.
     """
 
+    type: Literal["zernike"] = "zernike"
     coeffs: list[float] = Field(min_length=1, max_length=11)
     r_norm: float = Field(gt=0)
+
+
+# A single surface shape (discriminated union). Adding a new shape is a schema
+# class here plus an arm in ``iactrace.io.adapters`` (_split_surface on load,
+# _surface_to_spec on save).
+SurfaceSchema = Annotated[
+    AsphericSurfaceSchema | ZernikeSurfaceSchema,
+    Field(discriminator="type"),
+]
+
+# An element's surface: one shape, or a list of shapes summed together
+# (-> SumSurfaceGroup). An ``aspheric`` shape, if present, should come first
+# so it supplies the ray-intersection initial guess.
+SurfaceSpec = SurfaceSchema | list[SurfaceSchema]
 
 
 class GaussianBSDFSchema(BaseModel):
@@ -129,14 +149,23 @@ class TabulatedCurveSchema(BaseModel):
         return self
 
 
-class MirrorTemplateSchema(BaseModel):
-    """Deduplicated surface geometry shared by mirrors. Per-element coating
-    (``reflectivity``) and ``bsdf`` live on the mirror, not the template."""
+# Discriminated union of coating curves (one member today). Adding a curve
+# model is a schema class here plus an arm in ``iactrace.io.adapters``.
+CoatingSchema = Annotated[
+    TabulatedCurveSchema,
+    Field(discriminator="type"),
+]
 
-    surface: SurfaceSchema
+
+class MirrorTemplateSchema(BaseModel):
+    """Shared surface geometry (aspheric + any Zernike terms) referenced by
+    mirrors. Per-element coating (``reflectivity``) and ``bsdf`` live on the
+    mirror, not the template."""
+
+    surface: SurfaceSpec
     bsdf: BSDFSchema | None = None
     reflectivity: float | None = None
-    coating: TabulatedCurveSchema | None = None
+    coating: CoatingSchema | None = None
 
 
 class MirrorSchema(BaseModel):
@@ -151,7 +180,6 @@ class MirrorSchema(BaseModel):
     stage: int = Field(ge=0, default=0)
     bsdf: BSDFSchema | None = None
     reflectivity: float | None = None
-    zernike: ZernikeSchema | None = None
     id: str | None = None
 
 
@@ -163,15 +191,12 @@ class AsphericDiskLensSchema(BaseModel):
     position: Vec3
     orientation: Vec3
     aperture: ApertureSchema
-    curvature: float
-    conic: float
+    surface: SurfaceSpec
     n_inside: float = Field(gt=0)
     n_outside: float = Field(gt=0, default=1.0)
-    aspheric: list[float] = Field(default_factory=list)
     offset: Vec2 = Field(default_factory=lambda: [0.0, 0.0])
     transmittance: float = Field(ge=0, le=1, default=1.0)
-    coating: TabulatedCurveSchema | None = None
-    zernike: ZernikeSchema | None = None
+    coating: CoatingSchema | None = None
     stage: int = Field(ge=0, default=0)
     id: str | None = None
 
@@ -185,7 +210,7 @@ class PlanoSlabSchema(BaseModel):
     n_inside: float = Field(gt=0)
     n_outside: float = Field(gt=0, default=1.0)
     transmittance: float = Field(ge=0, le=1, default=1.0)
-    coating: TabulatedCurveSchema | None = None
+    coating: CoatingSchema | None = None
     stage: int = Field(ge=0, default=0)
     id: str | None = None
 
@@ -260,7 +285,7 @@ ObstructionSchema = Annotated[
 
 
 class WinstonConeSchema(BaseModel):
-    """Serialized :class:`~iactrace.camera.winston_cone.WinstonCone`.
+    """Serialized :class:`~iactrace.camera.optics.winston.WinstonCone`.
 
     ``entrance_apothem`` is the physical mouth at ``z = length`` (the truncated
     mouth when ``length`` is given, the full CPC mouth when it is omitted). The
@@ -281,7 +306,7 @@ class WinstonConeSchema(BaseModel):
 
 
 class OkumuraConeSchema(BaseModel):
-    """Serialized :class:`~iactrace.camera.okumura_cone.OkumuraCone`.
+    """Serialized :class:`~iactrace.camera.optics.okumura.OkumuraCone`.
 
     The walls follow a quadratic or cubic Bezier meridian instead of Winston's
     paraboloid. ``control_points`` are the interior Bezier points in the paper's
@@ -304,7 +329,7 @@ class OkumuraConeSchema(BaseModel):
 
 
 class ConstantQESchema(BaseModel):
-    """Serialized :class:`~iactrace.camera.photosensor.ConstantQE`."""
+    """Serialized :class:`~iactrace.camera.detector.photodetector.ConstantQE`."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -312,15 +337,36 @@ class ConstantQESchema(BaseModel):
     qe: float = Field(ge=0, le=1, default=1.0)
 
 
-# Discriminated-union slots for the detection chain. ``ConcentratorSchema`` now
-# carries two concrete members (Winston + Okumura), keyed on the ``type`` literal;
-# ``io/adapters.py`` has the matching build/dump arms. The photosensor slot stays
-# a single member (``ConstantQE``) until a second concrete type joins it.
+class PMTSchema(BaseModel):
+    """Serialized :class:`~iactrace.camera.detector.pmt.PMT`.
+
+    A photomultiplier response: photocathode QE plus an optional entrance
+    window (``n_window``, Fresnel angular response), with the spherical-cap
+    photocathode geometry given by ``face_radius`` / ``face_sag`` and the
+    body cylinder by ``length`` (``None`` -> ``2 * face_radius``).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal["pmt"] = "pmt"
+    qe: float = Field(ge=0, le=1, default=1.0)
+    n_window: float | None = Field(default=None, gt=1)
+    face_radius: float = Field(gt=0)
+    face_sag: float = Field(ge=0, default=0.0)
+    length: float | None = Field(default=None, ge=0)
+    n_facets: int = Field(ge=3, default=48)
+
+
+# Discriminated-union slots for the detection chain, keyed on the ``type``
+# literal; ``io/adapters.py`` has the matching build/dump arms.
 ConcentratorSchema = Annotated[
     WinstonConeSchema | OkumuraConeSchema,
     Field(discriminator="type"),
 ]
-PhotoSensorSchema = ConstantQESchema
+PhotoDetectorSchema = Annotated[
+    ConstantQESchema | PMTSchema,
+    Field(discriminator="type"),
+]
 
 
 # Sensor schemas
@@ -385,7 +431,7 @@ class SquareSensorSchema(BaseModel):
     edge_width: float = Field(ge=0, default=0.0)
     concentrator: ConcentratorSchema | None = None
     gap: float = Field(ge=0, default=0.0)
-    photosensor: PhotoSensorSchema | None = None
+    photodetector: PhotoDetectorSchema | None = None
     id: str | None = None
 
     @model_validator(mode="before")
@@ -409,7 +455,7 @@ class HexagonalSensorSchema(BaseModel):
     edge_width: float = Field(ge=0, default=0.0)
     concentrator: ConcentratorSchema | None = None
     gap: float = Field(ge=0, default=0.0)
-    photosensor: PhotoSensorSchema | None = None
+    photodetector: PhotoDetectorSchema | None = None
     id: str | None = None
 
     @field_validator("centers_y")
@@ -493,7 +539,7 @@ class TelescopeConfigSchema(BaseModel):
         """
 
         def _aperture_sig(ap: ApertureSchema) -> tuple[str, int]:
-            if isinstance(ap, PolygonApertureSchema):
+            if ap.type == "polygon":
                 return ("polygon", len(ap.vertices))
             return ("circular", 0)
 

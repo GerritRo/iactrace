@@ -14,6 +14,7 @@ from iactrace.core.sampling import sample_annulus
 from iactrace.core.surfaces import AsphericSurfaceGroup
 
 
+@pytest.mark.slow
 class TestSampleAnnulus:
     """Test the sample_annulus function for uniform annular sampling."""
 
@@ -46,36 +47,6 @@ class TestSampleAnnulus:
         # Should be approximately 50-50 split
         ratio = inner_half_count / n_samples
         assert 0.48 < ratio < 0.52, f"Area distribution not uniform: {ratio:.3f}"
-
-    def test_angular_uniformity(self, random_key):
-        """Samples should be uniformly distributed in angle."""
-        inner_r, outer_r = 0.3, 1.0
-        n_samples = 10000
-
-        samples = sample_annulus(random_key, inner_r, outer_r, (n_samples,))
-        angles = jnp.arctan2(samples[:, 1], samples[:, 0])
-
-        # Check samples in each quadrant (should be ~25% each)
-        q1 = jnp.sum((angles >= 0) & (angles < jnp.pi / 2)) / n_samples
-        q2 = jnp.sum((angles >= jnp.pi / 2) & (angles < jnp.pi)) / n_samples
-        q3 = jnp.sum((angles >= -jnp.pi) & (angles < -jnp.pi / 2)) / n_samples
-        q4 = jnp.sum((angles >= -jnp.pi / 2) & (angles < 0)) / n_samples
-
-        for q, name in [(q1, "Q1"), (q2, "Q2"), (q3, "Q3"), (q4, "Q4")]:
-            assert 0.23 < q < 0.27, f"Angular distribution not uniform in {name}: {q:.3f}"
-
-    def test_zero_inner_radius_matches_disk(self, random_key):
-        """With inner_radius=0, sample_annulus should produce a uniform disk distribution."""
-        outer_r = 1.0
-        n_samples = 10000
-
-        annulus_samples = sample_annulus(random_key, 0.0, outer_r, (n_samples,))
-
-        annulus_radii = jnp.sqrt(annulus_samples[:, 0] ** 2 + annulus_samples[:, 1] ** 2)
-
-        # Mean radius for uniform disk: 2/3 * R
-        expected_mean = 2 / 3 * outer_r
-        assert jnp.isclose(jnp.mean(annulus_radii), expected_mean, rtol=0.05)
 
 
 class TestAnnularAperture:

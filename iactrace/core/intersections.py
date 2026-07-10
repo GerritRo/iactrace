@@ -304,20 +304,27 @@ def intersect_conic(ray_origin, ray_direction, curvature, conic):
     B = 2 * (c * (ox * dx + oy * dy + (1 + k) * oz * dz) - dz)
     C = c * (ox * ox + oy * oy + (1 + k) * oz * oz) - 2 * oz
 
-    # Handle near-zero curvature (plane)
+    # Handle near-zero curvature (plane). Grad-safe division (double-where):
+    # a bare -oz/dz would inject nan into the gradient for rays parallel to
+    # the plane (dz == 0), even though the inf branch is the one selected.
     is_plane = jnp.abs(c) < 1e-12
-    t_plane = jnp.where(jnp.abs(dz) > 1e-10, -oz / dz, jnp.inf)
+    dz_ok = jnp.abs(dz) > 1e-10
+    t_plane = jnp.where(dz_ok, -oz / jnp.where(dz_ok, dz, 1.0), jnp.inf)
     t_plane = jnp.where(t_plane > 1e-8, t_plane, jnp.inf)
 
-    # Handle linear case (A ~ 0, e.g., paraboloid on-axis)
+    # Handle linear case (A ~ 0, e.g., paraboloid on-axis); grad-safe as above.
     is_linear = jnp.abs(A) < 1e-12
-    t_linear = jnp.where(jnp.abs(B) > 1e-12, -C / B, jnp.inf)
+    b_ok = jnp.abs(B) > 1e-12
+    t_linear = jnp.where(b_ok, -C / jnp.where(b_ok, B, 1.0), jnp.inf)
     t_linear = jnp.where(t_linear > 1e-8, t_linear, jnp.inf)
 
-    # Solve quadratic
+    # Solve quadratic. Grad-safe sqrt: at discriminant == 0 (e.g. the fully
+    # degenerate flat-plane case A == B == 0) the sqrt's infinite slope would
+    # otherwise nan the gradient even though the plane branch is selected.
     discriminant = B * B - 4 * A * C
     no_intersection = discriminant < 0
-    sqrt_disc = jnp.sqrt(jnp.maximum(discriminant, 0.0))
+    disc_ok = discriminant > 0.0
+    sqrt_disc = jnp.where(disc_ok, jnp.sqrt(jnp.where(disc_ok, discriminant, 1.0)), 0.0)
 
     # Two roots
     t1 = (-B - sqrt_disc) / (2 * A + 1e-30)
@@ -336,44 +343,6 @@ def intersect_conic(ray_origin, ray_direction, curvature, conic):
     # Select: plane -> linear -> quadratic
     t_conic = jnp.where(is_linear, t_linear, t_conic)
     return jnp.where(is_plane, t_plane, t_conic)
-
-
-def intersect_conic_normal(ray_origin, ray_direction, curvature, conic):
-    """Ray-conic intersection with the analytic surface normal.
-
-    Wraps :func:`intersect_conic` (vertex at the origin, axis ``+z``) and adds
-    the closed-form normal from the gradient of the implicit conic
-    ``F = c*(x^2 + y^2) + (1+k)*c*z^2 - 2*z``. Cheaper and branch-free compared
-    with the sag-graph autodiff normal in
-    :func:`~iactrace.core.surfaces.compute_sag_and_normal`, and it works directly
-    from the 3D hit point, so it suits ray-traced stopping/detector surfaces.
-
-    Args:
-        ray_origin: Ray origin ``(3,)`` in the surface's vertex frame.
-        ray_direction: Ray direction ``(3,)``, normalized.
-        curvature: ``c = 1 / R``. ``0`` -> flat plane.
-        conic: Conic constant ``k`` (``0`` -> sphere).
-
-    Returns:
-        ``(t, point, normal)``: ray parameter (``inf`` on a miss), hit point
-        ``(3,)``, and unit normal ``(3,)`` oriented toward ``+z`` at the vertex.
-        ``point`` / ``normal`` are sanitized to finite values on a miss so a
-        downstream ``vmap`` stays grad-safe.
-    """
-    t = intersect_conic(ray_origin, ray_direction, curvature, conic)
-    t_safe = jnp.where(jnp.isfinite(t), t, 0.0)
-    point = ray_origin + t_safe * ray_direction
-
-    # Outward (light-facing) normal is -grad(F); grad(F) at the vertex is
-    # (0, 0, -2), so -grad points to +z there.
-    grad = jnp.array([
-        2.0 * curvature * point[0],
-        2.0 * curvature * point[1],
-        2.0 * curvature * (1.0 + conic) * point[2] - 2.0,
-    ])
-    normal = -grad
-    normal = normal / jnp.maximum(jnp.linalg.norm(normal), 1e-12)
-    return t, point, normal
 
 
 ### Newton-Raphson method

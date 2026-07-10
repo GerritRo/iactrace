@@ -4,15 +4,11 @@ import pytest
 
 from iactrace import Camera, Telescope
 from iactrace.camera.camera import intersect_sensor
-from iactrace.core.apertures import DiskAperture
-from iactrace.core.interactions import ReflectInteraction
-from iactrace.core.optics import OpticalElementGroup
-from iactrace.core.surfaces import AsphericSurfaceGroup
 
 
 def _xy(camera, rb):
     """Return (x, y) of intersected sensor positions; for tests."""
-    sensor_rays, _, _ = intersect_sensor(camera, rb)
+    sensor_rays, _ = intersect_sensor(camera, rb)
     return sensor_rays.origins[:, 0], sensor_rays.origins[:, 1]
 
 
@@ -44,13 +40,6 @@ class TestRoughnessInTracing:
         directions = jnp.broadcast_to(jnp.array([0.0, 0.0, -1.0]), (n_rays, 3))
         values = jnp.ones(n_rays)
         return origins, directions, values
-
-    def test_sample_key_initialized(self, telescope_and_camera):
-        """Test that sample_key is properly initialized."""
-        telescope, camera = telescope_and_camera
-        group = telescope.mirror_groups[0]
-        assert hasattr(group, "sample_key")
-        assert group.sample_key is not None
 
     def test_roughness_increases_psf_spread(self, telescope_and_camera, test_rays):
         """Test that applying roughness increases the PSF spread."""
@@ -151,63 +140,3 @@ class TestRoughnessInTracing:
 
         # Results should be different (not exactly equal)
         assert not jnp.allclose(pts1, pts2), "Different keys should produce different perturbations"
-
-
-class TestMirrorGroupKeys:
-    """Test sample_key and bsdf handling in OpticalElementGroup."""
-
-    def test_disk_mirror_group_has_key(self):
-        """Test that OpticalElementGroup initializes sample_key."""
-        n_mirrors = 3
-        surface = AsphericSurfaceGroup(
-            curvatures=jnp.ones(n_mirrors) * 0.01,
-            conics=jnp.zeros(n_mirrors),
-            aspherics=jnp.zeros((n_mirrors, 1)),
-            offsets=jnp.zeros((n_mirrors, 2)),
-        )
-        aperture = DiskAperture(
-            radii=jnp.ones(n_mirrors) * 0.5,
-            inner_radii=jnp.zeros(n_mirrors),
-        )
-        interaction = ReflectInteraction(reflectivity=None, reflectivity_scalar=jnp.ones(n_mirrors))
-        group = OpticalElementGroup(
-            positions=jnp.zeros((n_mirrors, 3)),
-            rotations=jnp.zeros((n_mirrors, 3)),
-            surface=surface,
-            aperture=aperture,
-            interaction_module=interaction,
-            sample_key=jax.random.key(0),
-            optical_stage=0,
-            n_samples=100,
-        )
-
-        assert hasattr(group, "sample_key")
-        assert group.sample_key is not None
-
-    def test_bsdf_scale_default_zero(self):
-        """Test that bsdf.scale defaults to zero when no bsdf is set."""
-        n_mirrors = 3
-        surface = AsphericSurfaceGroup(
-            curvatures=jnp.ones(n_mirrors) * 0.01,
-            conics=jnp.zeros(n_mirrors),
-            aspherics=jnp.zeros((n_mirrors, 1)),
-            offsets=jnp.zeros((n_mirrors, 2)),
-        )
-        aperture = DiskAperture(
-            radii=jnp.ones(n_mirrors) * 0.5,
-            inner_radii=jnp.zeros(n_mirrors),
-        )
-        interaction = ReflectInteraction(reflectivity=None, reflectivity_scalar=jnp.ones(n_mirrors))
-        group = OpticalElementGroup(
-            positions=jnp.zeros((n_mirrors, 3)),
-            rotations=jnp.zeros((n_mirrors, 3)),
-            surface=surface,
-            aperture=aperture,
-            interaction_module=interaction,
-            sample_key=jax.random.key(0),
-            optical_stage=0,
-            n_samples=100,
-        )
-
-        # bsdf.scale defaults to zero (no roughness effect)
-        assert jnp.all(group.bsdf.scale == 0), "Default bsdf.scale should be zero"

@@ -6,9 +6,6 @@ import numpy as np
 import pytest
 
 from iactrace import Telescope
-from iactrace.core.apertures import DiskAperture
-from iactrace.core.interactions import ReflectInteraction
-from iactrace.core.optics import OpticalElementGroup
 from iactrace.core.surfaces import (
     AsphericSurfaceGroup,
     SumSurfaceGroup,
@@ -16,21 +13,7 @@ from iactrace.core.surfaces import (
 )
 from iactrace.telescope import operations as ops
 
-
-def _mirror_group(surface, radii, stage=0):
-    n = surface.offsets.shape[0]
-    aperture = DiskAperture(radii=radii, inner_radii=jnp.zeros(n))
-    interaction = ReflectInteraction(reflectivity=None, reflectivity_scalar=jnp.ones(n))
-    return OpticalElementGroup(
-        positions=jnp.zeros((n, 3)),
-        rotations=jnp.zeros((n, 3)),
-        surface=surface,
-        aperture=aperture,
-        interaction_module=interaction,
-        sample_key=jax.random.key(0),
-        optical_stage=stage,
-        n_samples=64,
-    )
+from ._helpers import mirror_group_with_surface
 
 
 @pytest.fixture
@@ -42,7 +25,7 @@ def asphere_telescope():
         aspherics=jnp.zeros((n, 0)),
         offsets=jnp.zeros((n, 2)),
     )
-    group = _mirror_group(surface, radii=jnp.array([0.5, 0.5]))
+    group = mirror_group_with_surface(surface, radius=jnp.array([0.5, 0.5]))
     return Telescope(mirror_groups=[group], name="t")
 
 
@@ -165,9 +148,7 @@ class TestCapabilityDispatchThroughSum:
 
     def test_focal_error_through_sum(self, asphere_telescope, random_key):
         k1, k2 = jax.random.split(random_key)
-        tel = ops.apply_zernike_error(
-            asphere_telescope, 0, jnp.array([0.0, 0.0, 0.0, 1e-3]), k1
-        )
+        tel = ops.apply_zernike_error(asphere_telescope, 0, jnp.array([0.0, 0.0, 0.0, 1e-3]), k1)
         c_before = ops._asphere_of(tel.stage(0).surface).curvatures
         tel = ops.apply_focal_error(tel, 0, 0.05, k2)
         c_after = ops._asphere_of(tel.stage(0).surface).curvatures
@@ -176,7 +157,7 @@ class TestCapabilityDispatchThroughSum:
     def test_no_asphere_raises(self, random_key):
         """A standalone-Zernike stage rejects aspheric prescription ops."""
         zg = ZernikeSurfaceGroup(coeffs=jnp.zeros((1, 4)), r_norm=jnp.ones(1))
-        group = _mirror_group(zg, radii=jnp.array([0.5]))
+        group = mirror_group_with_surface(zg, radius=jnp.array([0.5]))
         tel = Telescope(mirror_groups=[group], name="z")
         with pytest.raises(ValueError, match="no aspheric surface"):
             ops.set_curvatures(tel, 0, jnp.array([0.1]))

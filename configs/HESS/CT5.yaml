@@ -12,6 +12,7 @@ telescope:
 mirror_templates:
   spherical_72m:
     surface:
+      type: aspheric
       curvature: 0.013736
       conic: 0.0
       aspheric: []

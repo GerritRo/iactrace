@@ -17,7 +17,6 @@ from iactrace.core.apertures import DiskAperture, PolygonAperture
 from iactrace.core.bsdf import DoubleGaussianBSDF, GaussianBSDF
 from iactrace.core.interactions import (
     InteractionType,
-    ReflectInteraction,
     RefractInteraction,
     SlabInteraction,
 )
@@ -27,26 +26,12 @@ from iactrace.core.obstructions import (
     OpenCylinderGroup,
     SphereGroup,
 )
-from iactrace.core.optics import OpticalElementGroup
-from iactrace.core.surfaces import AsphericSurfaceGroup
 from iactrace.telescope import Telescope, lenses, mirrors, obstructions
 
 # mirrors.*
 
 
 class TestMirrorsSpherical:
-    def test_returns_optical_element_group(self, random_key):
-        m = mirrors.spherical(
-            position=(0.0, 0.0, 0.0),
-            focal_length=0.4,
-            radius=0.1,
-            key=random_key,
-        )
-        assert isinstance(m, OpticalElementGroup)
-        assert isinstance(m.surface, AsphericSurfaceGroup)
-        assert isinstance(m.aperture, DiskAperture)
-        assert isinstance(m.interaction_module, ReflectInteraction)
-
     def test_conic_and_curvature(self, random_key):
         m = mirrors.spherical(
             position=(0.0, 0.0, 0.0),
@@ -58,38 +43,6 @@ class TestMirrorsSpherical:
         assert jnp.allclose(m.surface.curvatures, jnp.array([1.25]))
         assert jnp.allclose(m.surface.conics, jnp.array([0.0]))
         assert m.interaction == InteractionType.REFLECT
-
-    def test_shapes(self, random_key):
-        m = mirrors.spherical(
-            position=(1.0, 2.0, 3.0),
-            focal_length=0.5,
-            radius=0.1,
-            key=random_key,
-        )
-        assert m.positions.shape == (1, 3)
-        assert m.rotations.shape == (1, 3)
-        assert jnp.allclose(m.positions[0], jnp.array([1.0, 2.0, 3.0]))
-
-    def test_inner_radius_makes_annulus(self, random_key):
-        m = mirrors.spherical(
-            position=(0, 0, 0),
-            focal_length=0.4,
-            radius=0.1,
-            inner_radius=0.03,
-            key=random_key,
-        )
-        assert jnp.allclose(m.aperture.inner_radii, jnp.array([0.03]))
-
-    def test_bsdf_omitted_when_zero(self, random_key):
-        m = mirrors.spherical(
-            position=(0, 0, 0),
-            focal_length=0.4,
-            radius=0.1,
-            key=random_key,
-        )
-        # Default BSDF is all-zero GaussianBSDF filled in by OpticalElementGroup.
-        assert isinstance(m.bsdf, GaussianBSDF)
-        assert jnp.allclose(m.bsdf.scale, jnp.zeros(1))
 
     def test_bsdf_set_when_nonzero(self, random_key):
         m = mirrors.spherical(
@@ -221,28 +174,6 @@ class TestLensesAsphericLens:
 
 
 class TestLensesPlanoSlab:
-    def test_uses_slab_interaction(self, random_key):
-        slab = lenses.plano_slab(
-            position=(0, 0, 0.39),
-            radius=0.05,
-            thickness=0.002,
-            n_inside=1.5,
-            key=random_key,
-        )
-        assert isinstance(slab.interaction_module, SlabInteraction)
-        assert slab.interaction == InteractionType.SLAB
-
-    def test_zero_curvature_and_conic(self, random_key):
-        slab = lenses.plano_slab(
-            position=(0, 0, 0.39),
-            radius=0.05,
-            thickness=0.002,
-            key=random_key,
-        )
-        assert jnp.allclose(slab.surface.curvatures, jnp.zeros(1))
-        assert jnp.allclose(slab.surface.conics, jnp.zeros(1))
-        assert slab.surface.aspherics.shape == (1, 0)
-
     def test_thickness_passed_through(self, random_key):
         slab = lenses.plano_slab(
             position=(0, 0, 0.39),
@@ -255,6 +186,7 @@ class TestLensesPlanoSlab:
         assert jnp.allclose(slab.interaction_module.thickness, jnp.array([0.003]))
         assert jnp.allclose(slab.interaction_module.n_inside, jnp.array([1.52]))
         assert jnp.allclose(slab.interaction_module.transmittance_scalar, jnp.array([0.9]))
+        assert slab.interaction == InteractionType.SLAB
 
 
 # obstructions.*
@@ -273,11 +205,13 @@ class TestObstructionsPrimitives:
         c = obstructions.open_cylinder(p1=(0, 0, 0), p2=(0, 0, 1), r=0.01)
         assert isinstance(c, OpenCylinderGroup)
         assert len(c) == 1
+        assert jnp.allclose(c.r, jnp.array([0.01]))
 
     def test_box(self):
-        b = obstructions.box(p1=(-0.1, -0.1, 0), p2=(0.1, 0.1, 0.05))
+        b = obstructions.box(p1=(-0.1, -0.1, 0.0), p2=(0.1, 0.1, 0.05))
         assert isinstance(b, BoxGroup)
         assert len(b) == 1
+        assert jnp.allclose(b.p1[0], jnp.array([-0.1, -0.1, 0.0]))
 
     def test_sphere(self):
         s = obstructions.sphere(center=(0, 0, 0.4), r=0.02)

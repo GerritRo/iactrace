@@ -4,6 +4,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.collections import PolyCollection
 
+from ..core.transforms import euler_to_matrix
+
 
 def show_camera(
     image,
@@ -84,36 +86,13 @@ def show_camera(
     return ax
 
 
-def _euler_matrix(tip_deg, tilt_deg, roll_deg):
-    """NumPy mirror of :func:`iactrace.core.transforms.euler_to_matrix`."""
-    rx, ry, rz = np.radians([tip_deg, tilt_deg, roll_deg])
-    Rx = np.array(
-        [
-            [1, 0, 0],
-            [0, np.cos(rx), -np.sin(rx)],
-            [0, np.sin(rx), np.cos(rx)],
-        ]
-    )
-    Ry = np.array(
-        [
-            [np.cos(ry), 0, np.sin(ry)],
-            [0, 1, 0],
-            [-np.sin(ry), 0, np.cos(ry)],
-        ]
-    )
-    Rz = np.array(
-        [
-            [np.cos(rz), -np.sin(rz), 0],
-            [np.sin(rz), np.cos(rz), 0],
-            [0, 0, 1],
-        ]
-    )
-    return Rz @ Ry @ Rx
-
-
 def _stack_rotations(rotations):
-    """Per-sensor rotation matrices, shape (n_sensors, 3, 3)."""
-    return np.stack([_euler_matrix(*r) for r in np.asarray(rotations)])
+    """Per-sensor rotation matrices, shape (n_sensors, 3, 3).
+
+    Uses the canonical :func:`iactrace.core.transforms.euler_to_matrix` so the
+    2D camera view shares the exact Euler convention of the 3D geometry.
+    """
+    return np.stack([np.asarray(euler_to_matrix(r)) for r in np.asarray(rotations)])
 
 
 def _square_polygons(image, sensor):

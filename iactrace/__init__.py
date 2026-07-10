@@ -8,10 +8,9 @@ from .camera import (
     DetectionChain,
     HexagonalSensorGroup,
     OkumuraCone,
-    PhotoSensor,
+    PhotoDetector,
     SensorGroup,
     SquareSensorGroup,
-    StopSurface,
     WinstonCone,
 )
 from .core import LazyRayBundle, RayBundle
@@ -36,11 +35,10 @@ __all__ = [
     "SensorGroup",
     "SquareSensorGroup",
     "HexagonalSensorGroup",
-    # PhotoSensor
-    "PhotoSensor",
+    # PhotoDetector
+    "PhotoDetector",
     "ConstantQE",
     "PMT",
-    "StopSurface",
     # Visualization
     "show_camera",
     "show_telescope",

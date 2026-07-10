@@ -1,10 +1,8 @@
 import jax
-import jax.numpy as jnp
 import numpy as np
 import trimesh
 
 from ..core import euler_to_matrix
-from ..core.surfaces import sag_raw
 from ._utils import convex_hull_2d as _convex_hull_2d
 
 
@@ -62,35 +60,26 @@ def show_telescope(telescope, camera=None, **kwargs):
 
     scene = trimesh.Scene()
 
-    # Add mirror groups
-    for group in telescope.mirror_groups:
-        meshes = _get_mirror_meshes(group)
-        if meshes:
-            combined = trimesh.util.concatenate(meshes)
-            _apply_color(combined, mirror_color)
-            scene.add_geometry(combined)
-
-    # Add lens groups
-    for group in telescope.lens_groups:
-        meshes = _get_lens_meshes(group)
-        if meshes:
-            combined = trimesh.util.concatenate(meshes)
-            _apply_color(combined, lens_color)
-            scene.add_geometry(combined)
-
-    # Add obstruction groups
-    for group in telescope.obstruction_groups:
-        meshes = _get_obstruction_meshes(group)
-        if meshes:
-            combined = trimesh.util.concatenate(meshes)
-            _apply_color(combined, obstruction_color)
-            scene.add_geometry(combined)
+    # Each optical family renders the same way: build per-element meshes,
+    # merge them, colour the merge, and add it to the scene.
+    for groups, get_meshes, color in (
+        (telescope.mirror_groups, _get_mirror_meshes, mirror_color),
+        (telescope.lens_groups, _get_lens_meshes, lens_color),
+        (telescope.obstruction_groups, _get_obstruction_meshes, obstruction_color),
+    ):
+        for group in groups:
+            meshes = get_meshes(group)
+            if meshes:
+                combined = trimesh.util.concatenate(meshes)
+                _apply_color(combined, color)
+                scene.add_geometry(combined)
 
     # Add sensors from camera
     if camera is not None:
-        cam_transform = np.eye(4)
-        cam_transform[:3, :3] = np.asarray(euler_to_matrix(telescope.camera_rotation))
-        cam_transform[:3, 3] = np.asarray(telescope.camera_position)
+        cam_transform = _rigid_transform(
+            np.asarray(euler_to_matrix(telescope.camera_rotation)),
+            np.asarray(telescope.camera_position),
+        )
         for sensor_group in camera.sensor_groups:
             meshes = _get_sensor_meshes(sensor_group)
             for mesh in meshes:
@@ -124,12 +113,13 @@ def show_sensor_chain(camera, sensor_idx=0, **kwargs):
     Draws, in the canonical pixel-local frame (entrance aperture at ``z = 0``,
     axis ``+z``): the pixel entrance aperture, the concentrator walls (if a
     concentrator is present and exposes :meth:`Concentrator.cross_sections`), and
-    the photosensor's stopping surface -- its actual photocathode geometry, drawn
-    curved when the photosensor owns a curved :class:`StopSurface`, otherwise a
+    the photodetector's sensor surface -- its actual photocathode geometry, drawn
+    curved when the photodetector owns a curved
+    :class:`~iactrace.camera.detector.surface.DetectionSurface`, otherwise a
     flat active-area polygon at ``chain.detector_z``.
 
-    If the photosensor exposes a 3D envelope (:meth:`PhotoSensor.envelope`, e.g.
-    a :class:`~iactrace.camera.photosensor.PMT`), its glass body is lofted around
+    If the photodetector exposes a 3D envelope (:meth:`PhotoDetector.envelope`, e.g.
+    a :class:`~iactrace.camera.detector.pmt.PMT`), its glass body is lofted around
     the detector plane as well.
 
     Args:
@@ -171,11 +161,11 @@ def show_sensor_chain(camera, sensor_idx=0, **kwargs):
 
     # Photocathode stopping surface, at its own vertex position (light enters at
     # z=0 from +z and the chain runs toward -z; the surface sits near the detector
-    # plane and may bulge up into a cone). The photosensor owns this geometry.
-    surface = chain._effective_surface()
+    # plane and may bulge up into a cone). The photodetector owns this geometry.
+    surface = chain.surface
     if surface.is_flat:
         # Flat detector: draw the active-area polygon (outline / fallback ring).
-        det_outline = chain.photosensor.outline()
+        det_outline = chain.photodetector.outline()
         if det_outline is None:
             cross = chain.concentrator.cross_sections() if chain.concentrator is not None else None
             if cross is not None:
@@ -191,7 +181,7 @@ def show_sensor_chain(camera, sensor_idx=0, **kwargs):
             )
         )
     else:
-        # Curved photocathode: draw the actual conic surface of revolution.
+        # Curved photocathode: draw the actual surface of revolution from its sag.
         r_det = surface.radius
         if not np.isfinite(r_det):
             cross = chain.concentrator.cross_sections() if chain.concentrator is not None else None
@@ -200,23 +190,21 @@ def show_sensor_chain(camera, sensor_idx=0, **kwargs):
                 if cross is not None
                 else float(np.max(np.linalg.norm(np.asarray(entrance), axis=-1)))
             )
-        c, k = surface.curvature, surface.conic
-
-        def _sag(x, y):
-            return sag_raw(x, y, c, k, jnp.asarray([]))
-
         det_mesh = _make_double_sided(
             _create_disk_mesh(
-                [0.0, 0.0, surface.vertex_z], [0.0, 0.0, 0.0], float(r_det), sag_fn=_sag
+                [0.0, 0.0, surface.vertex_z],
+                [0.0, 0.0, 0.0],
+                float(r_det),
+                sag_fn=surface.shape._index(0)._sag_local,
             )
         )
     if det_mesh is not None:
         _apply_color(det_mesh, detector_color)
         scene.add_geometry(det_mesh)
 
-    # Optional 3D photosensor body (e.g. a PMT tube behind the photocathode),
+    # Optional 3D photodetector body (e.g. a PMT tube behind the photocathode),
     # lofted below the detector plane; mirrors the concentrator cross_sections path.
-    envelope = chain.photosensor.envelope()
+    envelope = chain.photodetector.envelope()
     if envelope is not None:
         z_env, rings_env = envelope
         body = _create_lofted_mesh(np.asarray(z_env) + chain.detector_z, np.asarray(rings_env))
@@ -235,11 +223,31 @@ def _make_double_sided(mesh):
     mesh.faces = np.vstack([mesh.faces, faces_reversed])
     return mesh
 
+def _rigid_transform(rotation, translation):
+    """Assemble a 4x4 homogeneous transform from a 3x3 rotation and a translation."""
+    transform = np.eye(4)
+    transform[:3, :3] = rotation
+    transform[:3, 3] = translation
+    return transform
 
-def _get_mirror_meshes(group):
-    """Get list of mirror meshes from group.
+def _align_z_to(direction_norm):
+    """Rotation mapping local +Z onto the unit ``direction_norm`` (Rodrigues)."""
+    z_axis = np.array([0.0, 0.0, 1.0])
+    if np.allclose(direction_norm, z_axis):
+        return np.eye(3)
+    if np.allclose(direction_norm, -z_axis):
+        return np.diag([1.0, -1.0, -1.0])
+    v = np.cross(z_axis, direction_norm)
+    s = np.linalg.norm(v)
+    c = np.dot(z_axis, direction_norm)
+    vx = np.array([[0, -v[2], v[1]], [v[2], 0, -v[0]], [-v[1], v[0], 0]])
+    return np.eye(3) + vx + vx @ vx * (1 - c) / (s * s)
 
-    Each mirror has its own surface parameters (curvature, conic, aspherics).
+def _curved_face_meshes(group):
+    """One double-sided curved face mesh per element.
+
+    Shared by mirror groups and refractive lens groups: each element renders
+    as a single surface honouring its own aperture and sag.
     """
     meshes = []
     for i in range(len(group)):
@@ -250,10 +258,14 @@ def _get_mirror_meshes(group):
         mesh = _aperture_face_mesh(
             group.positions[i], group.rotations[i], group.aperture, i, sag_fn=sag_fn
         )
-        if mesh is None:
-            continue
-        meshes.append(_make_double_sided(mesh))
+        if mesh is not None:
+            meshes.append(_make_double_sided(mesh))
     return meshes
+
+
+def _get_mirror_meshes(group):
+    """Curved face mesh per mirror (each with its own curvature/conic/aspherics)."""
+    return _curved_face_meshes(group)
 
 
 def _get_lens_meshes(group):
@@ -266,31 +278,21 @@ def _get_lens_meshes(group):
     """
     from ..core.interactions import RefractInteraction, SlabInteraction
 
-    meshes = []
-
     if isinstance(group.interaction_module, RefractInteraction):
-        for i in range(len(group)):
+        return _curved_face_meshes(group)
 
-            def sag_fn(x, y, _i=i):
-                return group.surface.sag_at(_i, x, y)
-
-            mesh = _aperture_face_mesh(
-                group.positions[i], group.rotations[i], group.aperture, i, sag_fn=sag_fn
-            )
-            if mesh is None:
-                continue
-            meshes.append(_make_double_sided(mesh))
-
-    elif isinstance(group.interaction_module, SlabInteraction):
+    if isinstance(group.interaction_module, SlabInteraction):
         thickness = np.asarray(group.interaction_module.thickness)
+        meshes = []
         for i in range(len(group)):
             mesh = _aperture_slab_mesh(
                 group.positions[i], group.rotations[i], group.aperture, i, float(thickness[i])
             )
             if mesh is not None:
                 meshes.append(mesh)
+        return meshes
 
-    return meshes
+    return []
 
 
 def _get_obstruction_meshes(group):
@@ -736,29 +738,10 @@ def _create_cylinder_mesh(p1, p2, radius, sections=16):
     # Create cylinder along Z, then transform
     cylinder = trimesh.creation.cylinder(radius=radius, height=height, sections=sections)
 
-    # Compute transform: rotate Z to direction, translate to midpoint
-    direction_norm = direction / height
-    z_axis = np.array([0.0, 0.0, 1.0])
-
-    # Rotation from Z to direction using Rodrigues formula
-    if np.allclose(direction_norm, z_axis):
-        rotation = np.eye(3)
-    elif np.allclose(direction_norm, -z_axis):
-        rotation = np.diag([1.0, -1.0, -1.0])
-    else:
-        v = np.cross(z_axis, direction_norm)
-        s = np.linalg.norm(v)
-        c = np.dot(z_axis, direction_norm)
-        vx = np.array([[0, -v[2], v[1]], [v[2], 0, -v[0]], [-v[1], v[0], 0]])
-        rotation = np.eye(3) + vx + vx @ vx * (1 - c) / (s * s)
-
+    # Rotate local Z onto the axis and translate to the midpoint.
+    rotation = _align_z_to(direction / height)
     center = (p1 + p2) / 2
-
-    transform = np.eye(4)
-    transform[:3, :3] = rotation
-    transform[:3, 3] = center
-
-    cylinder.apply_transform(transform)
+    cylinder.apply_transform(_rigid_transform(rotation, center))
     return cylinder
 
 
@@ -817,28 +800,10 @@ def _create_open_cylinder_mesh(p1, p2, radius, sections=16):
 
     mesh = trimesh.Trimesh(vertices=vertices, faces=faces)
 
-    # Compute transform: rotate Z to direction, translate to midpoint
-    direction_norm = direction / height
-    z_axis = np.array([0.0, 0.0, 1.0])
-
-    if np.allclose(direction_norm, z_axis):
-        rotation = np.eye(3)
-    elif np.allclose(direction_norm, -z_axis):
-        rotation = np.diag([1.0, -1.0, -1.0])
-    else:
-        v = np.cross(z_axis, direction_norm)
-        s = np.linalg.norm(v)
-        c = np.dot(z_axis, direction_norm)
-        vx = np.array([[0, -v[2], v[1]], [v[2], 0, -v[0]], [-v[1], v[0], 0]])
-        rotation = np.eye(3) + vx + vx @ vx * (1 - c) / (s * s)
-
+    # Rotate local Z onto the axis and translate to the midpoint.
+    rotation = _align_z_to(direction / height)
     center = (p1 + p2) / 2
-
-    transform = np.eye(4)
-    transform[:3, :3] = rotation
-    transform[:3, 3] = center
-
-    mesh.apply_transform(transform)
+    mesh.apply_transform(_rigid_transform(rotation, center))
     return mesh
 
 
@@ -866,13 +831,7 @@ def _create_oriented_box_mesh(center, half_extents, rotation_matrix):
         return None
 
     box = trimesh.creation.box(extents=extents)
-
-    # Apply rotation and translation
-    transform = np.eye(4)
-    transform[:3, :3] = rotation_matrix
-    transform[:3, 3] = center
-
-    box.apply_transform(transform)
+    box.apply_transform(_rigid_transform(rotation_matrix, center))
     return box
 
 
@@ -945,10 +904,7 @@ def _aperture_slab_mesh(position, rotation_euler, aperture, i, thickness, sectio
         raise TypeError(f"Unsupported aperture type: {type(aperture).__name__}")
 
     rot_matrix = np.asarray(euler_to_matrix(rotation_euler))
-    transform = np.eye(4)
-    transform[:3, :3] = rot_matrix
-    transform[:3, 3] = np.asarray(position)
-    mesh.apply_transform(transform)
+    mesh.apply_transform(_rigid_transform(rot_matrix, np.asarray(position)))
     return mesh
 
 

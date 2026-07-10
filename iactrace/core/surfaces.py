@@ -54,8 +54,7 @@ class SurfaceGroup(eqx.Module):
         return jax.tree_util.tree_map(lambda a: a[element_idx], self)
 
     def _sag_local(self, x, y):
-        """Intrinsic shape with the in-surface decenter applied and re-zeroed.
-        """
+        """Intrinsic shape with the in-surface decenter applied and re-zeroed."""
         x0 = self.offsets[0]
         y0 = self.offsets[1]
         return self._sag_intrinsic(x + x0, y + y0) - self._sag_intrinsic(x0, y0)
@@ -70,6 +69,36 @@ class SurfaceGroup(eqx.Module):
         safe_dz = jnp.where(jnp.abs(dz) > 1e-10, dz, 1e-10)
         t = -ray_origin[2] / safe_dz
         return jnp.maximum(t, 0.0)
+
+    @property
+    def _t_guess_is_exact(self) -> bool:
+        """Whether :meth:`_t_guess` already returns the exact intersection.
+
+        ``True`` lets :meth:`_intersect_t` bypass the Newton iteration
+        entirely -- e.g. an :class:`AsphericSurfaceGroup` with no aspheric
+        terms, whose guess is the closed-form conic root. Must be static
+        (decided from array shapes / types, not values), so it is jit-safe.
+        """
+        return False
+
+    def _intersect_t(self, ray_origin, ray_direction, max_iter=10, tol=1e-8):
+        """Single-element nearest forward intersection parameter (``inf`` on a miss).
+
+        Newton-refines from :meth:`_t_guess`; surfaces whose guess is exact
+        (:attr:`_t_guess_is_exact`) skip the iteration and return it directly.
+        """
+        t_init = self._t_guess(ray_origin, ray_direction)
+        if self._t_guess_is_exact:
+            return t_init
+        t, _, _ = newton_raphson_intersect(
+            self._sag_local,
+            ray_origin,
+            ray_direction,
+            t_init,
+            max_iter,
+            tol,
+        )
+        return t
 
     def compute_sag_and_normal_at(self, x, y):
         """Compute surface point and normal at (x, y) for a single element.
@@ -104,13 +133,15 @@ class SurfaceGroup(eqx.Module):
         """
         return self._index(element_idx)._sag_local(x, y)
 
-    def intersect_at(self, element_idx, ray_origin, ray_direction,
-                     max_iter=10, tol=1e-8):
+    def intersect_at(self, element_idx, ray_origin, ray_direction, max_iter=10, tol=1e-8):
         """Intersect a ray with a single element's surface.
 
         Used by the render pipeline for per-ray intersection. Generic over the
-        surface type: it takes the element's :meth:`_t_guess` as the initial
-        parameter and Newton-refines on :meth:`_sag_local`.
+        surface type: :meth:`_intersect_t` resolves the ray parameter (the
+        closed-form root for pure conics, Newton-refined from :meth:`_t_guess`
+        otherwise); ``point`` / ``normal`` follow from the sag at the hit. On
+        a miss (``t = inf``) they are evaluated at the ray origin, so they
+        stay finite for downstream masking.
 
         Args:
             element_idx: Element index within the group.
@@ -121,19 +152,20 @@ class SurfaceGroup(eqx.Module):
 
         Returns:
             Tuple of (t, point, normal):
-                - t: Intersection distance (scalar).
+                - t: Intersection distance (scalar), inf on a miss.
                 - point: Intersection point (3,).
                 - normal: Surface normal at intersection (3,).
         """
         elem = self._index(element_idx)
-        t_init = elem._t_guess(ray_origin, ray_direction)
-        t, hit_xy, _ = newton_raphson_intersect(
-            elem._sag_local, ray_origin, ray_direction, t_init, max_iter, tol,
-        )
-        point, normal = elem.compute_sag_and_normal_at(hit_xy[0], hit_xy[1])
+        t = elem._intersect_t(ray_origin, ray_direction, max_iter, tol)
+        t_safe = jnp.where(jnp.isfinite(t), t, 0.0)
+        hit = ray_origin + t_safe * ray_direction
+        point, normal = elem.compute_sag_and_normal_at(hit[0], hit[1])
         return t, point, normal
 
+
 # Asperic helpers
+
 
 def sag_raw(x, y, curvature, conic, aspheric):
     """Compute surface sag z(x,y) without offset.
@@ -157,7 +189,7 @@ def sag_raw(x, y, curvature, conic, aspheric):
 
     if aspheric.size > 0:
         powers = jnp.arange(2, 2 + len(aspheric))
-        z = z + jnp.sum(aspheric * r2 ** powers)
+        z = z + jnp.sum(aspheric * r2**powers)
 
     return z
 
@@ -228,12 +260,18 @@ class AsphericSurfaceGroup(SurfaceGroup):
         offsets: Per-element in-surface decenter (N, 2) (inherited)
     """
 
-    curvatures: jax.Array   # (N,)
-    conics: jax.Array        # (N,)
-    aspherics: jax.Array     # (N, K)
+    curvatures: jax.Array  # (N,)
+    conics: jax.Array  # (N,)
+    aspherics: jax.Array  # (N, K)
 
     def _sag_intrinsic(self, x, y):
         return sag_raw(x, y, self.curvatures, self.conics, self.aspherics)
+
+    @property
+    def _t_guess_is_exact(self) -> bool:
+        # With no aspheric terms the surface is a pure conic and _t_guess is
+        # already the closed-form intersection: bypass the Newton polish.
+        return self.aspherics.shape[-1] == 0
 
     def _t_guess(self, ray_origin, ray_direction):
         c = self.curvatures
@@ -280,19 +318,22 @@ def zernike_terms(u, v):
     s5 = jnp.sqrt(5.0)
     s6 = jnp.sqrt(6.0)
     s8 = jnp.sqrt(8.0)
-    return jnp.stack([
-        jnp.ones_like(u),                        # Z1  piston
-        2.0 * u,                                 # Z2  tilt (x)
-        2.0 * v,                                 # Z3  tilt (y)
-        s3 * (2.0 * r2 - 1.0),                   # Z4  defocus
-        s6 * (2.0 * u * v),                      # Z5  oblique astigmatism
-        s6 * (u * u - v * v),                    # Z6  vertical astigmatism
-        s8 * (3.0 * r2 - 2.0) * v,               # Z7  vertical coma
-        s8 * (3.0 * r2 - 2.0) * u,               # Z8  horizontal coma
-        s8 * (3.0 * u * u * v - v * v * v),      # Z9  vertical trefoil
-        s8 * (u * u * u - 3.0 * u * v * v),      # Z10 oblique trefoil
-        s5 * (6.0 * r2 * r2 - 6.0 * r2 + 1.0),   # Z11 primary spherical
-    ], axis=-1)
+    return jnp.stack(
+        [
+            jnp.ones_like(u),  # Z1  piston
+            2.0 * u,  # Z2  tilt (x)
+            2.0 * v,  # Z3  tilt (y)
+            s3 * (2.0 * r2 - 1.0),  # Z4  defocus
+            s6 * (2.0 * u * v),  # Z5  oblique astigmatism
+            s6 * (u * u - v * v),  # Z6  vertical astigmatism
+            s8 * (3.0 * r2 - 2.0) * v,  # Z7  vertical coma
+            s8 * (3.0 * r2 - 2.0) * u,  # Z8  horizontal coma
+            s8 * (3.0 * u * u * v - v * v * v),  # Z9  vertical trefoil
+            s8 * (u * u * u - 3.0 * u * v * v),  # Z10 oblique trefoil
+            s5 * (6.0 * r2 * r2 - 6.0 * r2 + 1.0),  # Z11 primary spherical
+        ],
+        axis=-1,
+    )
 
 
 class ZernikeSurfaceGroup(SurfaceGroup):
@@ -317,20 +358,17 @@ class ZernikeSurfaceGroup(SurfaceGroup):
         offsets: Per-element in-surface decenter (N, 2) (inherited).
     """
 
-    coeffs: jax.Array   # (N, J)
-    r_norm: jax.Array   # (N,)
+    coeffs: jax.Array  # (N, J)
+    r_norm: jax.Array  # (N,)
 
     def __init__(self, coeffs, r_norm, offsets=None):
         coeffs = jnp.asarray(coeffs)
         if coeffs.ndim != 2:
-            raise ValueError(
-                f"coeffs must be 2D (N, J), got shape {coeffs.shape}"
-            )
+            raise ValueError(f"coeffs must be 2D (N, J), got shape {coeffs.shape}")
         j = coeffs.shape[-1]
         if j > N_ZERNIKE:
             raise ValueError(
-                f"coeffs provides {j} Noll terms, but only {N_ZERNIKE} are "
-                "implemented (Z1..Z11)"
+                f"coeffs provides {j} Noll terms, but only {N_ZERNIKE} are implemented (Z1..Z11)"
             )
         n = coeffs.shape[0]
         self.coeffs = coeffs
@@ -340,7 +378,7 @@ class ZernikeSurfaceGroup(SurfaceGroup):
     def _sag_intrinsic(self, x, y):
         u = x / self.r_norm
         v = y / self.r_norm
-        terms = zernike_terms(u, v)              # (..., 11)
+        terms = zernike_terms(u, v)  # (..., 11)
         j = self.coeffs.shape[-1]
         return jnp.sum(self.coeffs * terms[..., :j], axis=-1)
 
@@ -435,14 +473,22 @@ def bicubic_interp(grid, u, v):
 
     cols = jnp.clip(i + jnp.arange(-1, 3), 0, w - 1)  # (4,) x neighbourhood
     rows = jnp.clip(j + jnp.arange(-1, 3), 0, h - 1)  # (4,) y neighbourhood
-    patch = grid[rows][:, cols]                       # (4, 4): rows over y, cols over x
+    patch = grid[rows][:, cols]  # (4, 4): rows over y, cols over x
 
     # Interpolate along x for each of the four rows, then along y.
     row_vals = _catmull_rom(
-        patch[:, 0], patch[:, 1], patch[:, 2], patch[:, 3], fu,
+        patch[:, 0],
+        patch[:, 1],
+        patch[:, 2],
+        patch[:, 3],
+        fu,
     )
     return _catmull_rom(
-        row_vals[0], row_vals[1], row_vals[2], row_vals[3], fv,
+        row_vals[0],
+        row_vals[1],
+        row_vals[2],
+        row_vals[3],
+        fv,
     )
 
 
@@ -467,23 +513,19 @@ class FreeformSurfaceGroup(SurfaceGroup):
         offsets: Per-element in-surface decenter (N, 2) (inherited).
     """
 
-    grid_z: jax.Array   # (N, H, W)
-    x0: jax.Array       # (N,)
-    y0: jax.Array       # (N,)
-    dx: jax.Array       # (N,)
-    dy: jax.Array       # (N,)
+    grid_z: jax.Array  # (N, H, W)
+    x0: jax.Array  # (N,)
+    y0: jax.Array  # (N,)
+    dx: jax.Array  # (N,)
+    dy: jax.Array  # (N,)
 
     def __init__(self, grid_z, x0, y0, dx, dy, offsets=None):
         grid_z = jnp.asarray(grid_z)
         if grid_z.ndim != 3:
-            raise ValueError(
-                f"grid_z must be 3D (N, H, W), got shape {grid_z.shape}"
-            )
+            raise ValueError(f"grid_z must be 3D (N, H, W), got shape {grid_z.shape}")
         n, h, w = grid_z.shape
         if h < 2 or w < 2:
-            raise ValueError(
-                f"grid must be at least 2x2 per element, got ({h}, {w})"
-            )
+            raise ValueError(f"grid must be at least 2x2 per element, got ({h}, {w})")
         self.grid_z = grid_z
         self.x0 = jnp.broadcast_to(jnp.asarray(x0, dtype=grid_z.dtype), (n,))
         self.y0 = jnp.broadcast_to(jnp.asarray(y0, dtype=grid_z.dtype), (n,))
@@ -501,16 +543,16 @@ class FreeformSurfaceGroup(SurfaceGroup):
         """
         grid_z = jnp.asarray(grid_z)
         if grid_z.ndim != 3:
-            raise ValueError(
-                f"grid_z must be 3D (N, H, W), got shape {grid_z.shape}"
-            )
+            raise ValueError(f"grid_z must be 3D (N, H, W), got shape {grid_z.shape}")
         n, h, w = grid_z.shape
         hw = jnp.broadcast_to(jnp.asarray(half_width, dtype=grid_z.dtype), (n,))
         hh = jnp.broadcast_to(jnp.asarray(half_height, dtype=grid_z.dtype), (n,))
         return cls(
             grid_z=grid_z,
-            x0=-hw, y0=-hh,
-            dx=2.0 * hw / (w - 1), dy=2.0 * hh / (h - 1),
+            x0=-hw,
+            y0=-hh,
+            dx=2.0 * hw / (w - 1),
+            dy=2.0 * hh / (h - 1),
             offsets=offsets,
         )
 

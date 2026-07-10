@@ -1,7 +1,3 @@
-import tempfile
-from pathlib import Path
-
-import jax
 import numpy as np
 import pytest
 
@@ -16,16 +12,6 @@ from iactrace.io import (
 
 
 @pytest.fixture
-def n_samples():
-    return 4
-
-
-@pytest.fixture
-def random_key():
-    return jax.random.key(0)
-
-
-@pytest.fixture
 def simple_disk_telescope_config():
     return {
         "telescope": {
@@ -37,6 +23,7 @@ def simple_disk_telescope_config():
         "mirror_templates": {
             "spherical": {
                 "surface": {
+                    "type": "aspheric",
                     "curvature": 0.05,
                     "conic": -1.0,
                     "aspheric": [],
@@ -64,24 +51,6 @@ def simple_disk_telescope_config():
 
 
 @pytest.fixture
-def simple_camera_config():
-    return {
-        "camera": {"quantum_efficiency": 1.0},
-        "sensors": [
-            {
-                "id": "sensor_0",
-                "type": "square",
-                "position": [0.0, 0.0, 0.0],
-                "orientation": [0.0, 0.0, 0.0],
-                "width": 100,
-                "height": 100,
-                "bounds": [-1.0, 1.0, -1.0, 1.0],
-            }
-        ],
-    }
-
-
-@pytest.fixture
 def polygon_telescope_config():
     return {
         "telescope": {
@@ -93,6 +62,7 @@ def polygon_telescope_config():
         "mirror_templates": {
             "hex_surface": {
                 "surface": {
+                    "type": "aspheric",
                     "curvature": 0.033,
                     "conic": 0.0,
                     "aspheric": [],
@@ -132,7 +102,7 @@ def telescope_with_obstructions_config():
             "camera_rotation": [0.0, 0.0, 0.0],
         },
         "mirror_templates": {
-            "primary": {"surface": {"curvature": 0.05, "conic": -1.0, "aspheric": []}}
+            "primary": {"surface": {"type": "aspheric", "curvature": 0.05, "conic": -1.0, "aspheric": []}}
         },
         "mirrors": [
             {
@@ -179,52 +149,40 @@ class TestTelescopeToDict:
 
 
 class TestSaveTelescope:
-    def test_save_creates_file(self, n_samples, random_key, simple_disk_telescope_config):
+    def test_save_overwrite_false_raises(
+        self, n_samples, random_key, simple_disk_telescope_config, tmp_path
+    ):
         telescope = build_telescope_config(simple_disk_telescope_config, n_samples, random_key)
-        with tempfile.NamedTemporaryFile(suffix=".yaml", delete=False) as f:
-            filepath = Path(f.name)
-        try:
-            result_path = save_telescope(telescope, filepath)
-            assert result_path.exists()
-        finally:
-            filepath.unlink(missing_ok=True)
-
-    def test_save_overwrite_false_raises(self, n_samples, random_key, simple_disk_telescope_config):
-        telescope = build_telescope_config(simple_disk_telescope_config, n_samples, random_key)
-        with tempfile.NamedTemporaryFile(suffix=".yaml", delete=False) as f:
-            filepath = Path(f.name)
-        try:
-            with pytest.raises(FileExistsError):
-                save_telescope(telescope, filepath, overwrite=False)
-        finally:
-            filepath.unlink(missing_ok=True)
+        filepath = tmp_path / "t.yaml"
+        save_telescope(telescope, filepath)
+        with pytest.raises(FileExistsError):
+            save_telescope(telescope, filepath, overwrite=False)
+        save_telescope(telescope, filepath, overwrite=True)  # overwrite=True succeeds
 
 
 # Round-trip
 
 
 class TestRoundTrip:
-    def test_disk_mirror_roundtrip(self, n_samples, random_key, simple_disk_telescope_config):
+    def test_disk_mirror_roundtrip(
+        self, n_samples, random_key, simple_disk_telescope_config, tmp_path
+    ):
         telescope1 = build_telescope_config(simple_disk_telescope_config, n_samples, random_key)
-        with tempfile.NamedTemporaryFile(suffix=".yaml", delete=False) as f:
-            filepath = Path(f.name)
-        try:
-            save_telescope(telescope1, filepath)
-            telescope2 = Telescope.from_yaml(filepath, n_samples, key=random_key)
+        filepath = tmp_path / "t.yaml"
+        save_telescope(telescope1, filepath)
+        telescope2 = Telescope.from_yaml(filepath, n_samples, key=random_key)
 
-            assert telescope1.name == telescope2.name
-            assert len(telescope1.mirror_groups) == len(telescope2.mirror_groups)
-            for g1, g2 in zip(telescope1.mirror_groups, telescope2.mirror_groups, strict=False):
-                np.testing.assert_allclose(
-                    np.asarray(g1.positions), np.asarray(g2.positions), rtol=1e-5
-                )
-                np.testing.assert_allclose(
-                    np.asarray(g1.rotations), np.asarray(g2.rotations), rtol=1e-5
-                )
-        finally:
-            filepath.unlink(missing_ok=True)
+        assert telescope1.name == telescope2.name
+        assert len(telescope1.mirror_groups) == len(telescope2.mirror_groups)
+        for g1, g2 in zip(telescope1.mirror_groups, telescope2.mirror_groups, strict=False):
+            np.testing.assert_allclose(
+                np.asarray(g1.positions), np.asarray(g2.positions), rtol=1e-5
+            )
+            np.testing.assert_allclose(
+                np.asarray(g1.rotations), np.asarray(g2.rotations), rtol=1e-5
+            )
 
-    def _roundtrip_mirror(self, bsdf, reflectivity, random_key):
+    def _roundtrip_mirror(self, bsdf, reflectivity, random_key, tmp_path):
         import jax.numpy as jnp
 
         from iactrace.core.apertures import DiskAperture
@@ -245,22 +203,20 @@ class TestRoundTrip:
             n_samples=10,
         )
         tel = Telescope(mirror_groups=[mg], camera_position=[0.0, 0.0, 1.0])
-        with tempfile.NamedTemporaryFile(suffix=".yaml", delete=False) as f:
-            filepath = Path(f.name)
-        try:
-            save_telescope(tel, filepath)
-            return Telescope.from_yaml(filepath, 10, key=random_key).mirror_groups[0]
-        finally:
-            filepath.unlink(missing_ok=True)
+        filepath = tmp_path / "t.yaml"
+        save_telescope(tel, filepath)
+        return Telescope.from_yaml(filepath, 10, key=random_key).mirror_groups[0]
 
-    def test_mirror_reflectivity_roundtrips(self, random_key):
+    def test_mirror_reflectivity_roundtrips(self, random_key, tmp_path):
         # The mirror "coating" must survive save/load (was silently reset to 1.0).
-        g = self._roundtrip_mirror(bsdf=None, reflectivity=0.83, random_key=random_key)
+        g = self._roundtrip_mirror(
+            bsdf=None, reflectivity=0.83, random_key=random_key, tmp_path=tmp_path
+        )
         np.testing.assert_allclose(
             np.asarray(g.interaction_module.reflectivity_scalar), [0.83], rtol=1e-5
         )
 
-    def test_gaussian_bsdf_roundtrips(self, random_key):
+    def test_gaussian_bsdf_roundtrips(self, random_key, tmp_path):
         import jax.numpy as jnp
 
         from iactrace.core.bsdf import GaussianBSDF
@@ -269,11 +225,12 @@ class TestRoundTrip:
             bsdf=GaussianBSDF(scale=jnp.array([25.0])),
             reflectivity=1.0,
             random_key=random_key,
+            tmp_path=tmp_path,
         )
         assert isinstance(g.bsdf, GaussianBSDF)
         np.testing.assert_allclose(np.asarray(g.bsdf.scale), [25.0], rtol=1e-5)
 
-    def test_double_gaussian_bsdf_roundtrips(self, random_key):
+    def test_double_gaussian_bsdf_roundtrips(self, random_key, tmp_path):
         import jax.numpy as jnp
 
         from iactrace.core.bsdf import DoubleGaussianBSDF
@@ -286,6 +243,7 @@ class TestRoundTrip:
             ),
             reflectivity=0.9,
             random_key=random_key,
+            tmp_path=tmp_path,
         )
         assert isinstance(g.bsdf, DoubleGaussianBSDF)
         np.testing.assert_allclose(np.asarray(g.bsdf.scale_narrow), [10.0], rtol=1e-5)
@@ -295,46 +253,40 @@ class TestRoundTrip:
             np.asarray(g.interaction_module.reflectivity_scalar), [0.9], rtol=1e-5
         )
 
-    def test_polygon_mirror_roundtrip(self, n_samples, random_key, polygon_telescope_config):
+    def test_polygon_mirror_roundtrip(
+        self, n_samples, random_key, polygon_telescope_config, tmp_path
+    ):
         telescope1 = build_telescope_config(polygon_telescope_config, n_samples, random_key)
-        with tempfile.NamedTemporaryFile(suffix=".yaml", delete=False) as f:
-            filepath = Path(f.name)
-        try:
-            save_telescope(telescope1, filepath)
-            telescope2 = Telescope.from_yaml(filepath, n_samples, key=random_key)
+        filepath = tmp_path / "t.yaml"
+        save_telescope(telescope1, filepath)
+        telescope2 = Telescope.from_yaml(filepath, n_samples, key=random_key)
 
-            from iactrace.core.apertures import PolygonAperture
+        from iactrace.core.apertures import PolygonAperture
 
-            for g1, g2 in zip(telescope1.mirror_groups, telescope2.mirror_groups, strict=False):
-                if isinstance(getattr(g1, "aperture", None), PolygonAperture):
-                    assert isinstance(getattr(g2, "aperture", None), PolygonAperture)
-                    np.testing.assert_allclose(
-                        np.asarray(g1.aperture.vertices),
-                        np.asarray(g2.aperture.vertices),
-                        rtol=1e-5,
-                    )
-        finally:
-            filepath.unlink(missing_ok=True)
+        for g1, g2 in zip(telescope1.mirror_groups, telescope2.mirror_groups, strict=False):
+            if isinstance(getattr(g1, "aperture", None), PolygonAperture):
+                assert isinstance(getattr(g2, "aperture", None), PolygonAperture)
+                np.testing.assert_allclose(
+                    np.asarray(g1.aperture.vertices),
+                    np.asarray(g2.aperture.vertices),
+                    rtol=1e-5,
+                )
 
     def test_obstructions_roundtrip(
-        self, n_samples, random_key, telescope_with_obstructions_config
+        self, n_samples, random_key, telescope_with_obstructions_config, tmp_path
     ):
         telescope1 = build_telescope_config(
             telescope_with_obstructions_config, n_samples, random_key
         )
-        with tempfile.NamedTemporaryFile(suffix=".yaml", delete=False) as f:
-            filepath = Path(f.name)
-        try:
-            save_telescope(telescope1, filepath)
-            telescope2 = Telescope.from_yaml(filepath, n_samples, key=random_key)
+        filepath = tmp_path / "t.yaml"
+        save_telescope(telescope1, filepath)
+        telescope2 = Telescope.from_yaml(filepath, n_samples, key=random_key)
 
-            assert telescope1.obstruction_groups is not None
-            assert telescope2.obstruction_groups is not None
-            assert len(telescope1.obstruction_groups) == len(telescope2.obstruction_groups)
-        finally:
-            filepath.unlink(missing_ok=True)
+        assert telescope1.obstruction_groups is not None
+        assert telescope2.obstruction_groups is not None
+        assert len(telescope1.obstruction_groups) == len(telescope2.obstruction_groups)
 
-    def test_surface_parameters_preserved(self, n_samples, random_key):
+    def test_surface_parameters_preserved(self, n_samples, random_key, tmp_path):
         config = {
             "telescope": {
                 "name": "aspheric_test",
@@ -345,6 +297,7 @@ class TestRoundTrip:
             "mirror_templates": {
                 "aspheric": {
                     "surface": {
+                        "type": "aspheric",
                         "curvature": 0.0123456,
                         "conic": -1.5,
                         "aspheric": [1e-6, 2e-8, 3e-10],
@@ -363,27 +316,23 @@ class TestRoundTrip:
             "obstructions": [],
         }
         telescope1 = build_telescope_config(config, n_samples, random_key)
-        with tempfile.NamedTemporaryFile(suffix=".yaml", delete=False) as f:
-            filepath = Path(f.name)
-        try:
-            save_telescope(telescope1, filepath, precision=12)
-            telescope2 = Telescope.from_yaml(filepath, n_samples, key=random_key)
+        filepath = tmp_path / "t.yaml"
+        save_telescope(telescope1, filepath, precision=12)
+        telescope2 = Telescope.from_yaml(filepath, n_samples, key=random_key)
 
-            for g1, g2 in zip(telescope1.mirror_groups, telescope2.mirror_groups, strict=False):
-                np.testing.assert_allclose(
-                    np.asarray(g1.surface.curvatures),
-                    np.asarray(g2.surface.curvatures),
-                    rtol=1e-10,
-                )
-                np.testing.assert_allclose(
-                    np.asarray(g1.surface.conics),
-                    np.asarray(g2.surface.conics),
-                    rtol=1e-10,
-                )
-        finally:
-            filepath.unlink(missing_ok=True)
+        for g1, g2 in zip(telescope1.mirror_groups, telescope2.mirror_groups, strict=False):
+            np.testing.assert_allclose(
+                np.asarray(g1.surface.curvatures),
+                np.asarray(g2.surface.curvatures),
+                rtol=1e-10,
+            )
+            np.testing.assert_allclose(
+                np.asarray(g1.surface.conics),
+                np.asarray(g2.surface.conics),
+                rtol=1e-10,
+            )
 
-    def test_hexagonal_sensor_roundtrip(self):
+    def test_hexagonal_sensor_roundtrip(self, tmp_path):
         cam_config = {
             "sensors": [
                 {
@@ -397,27 +346,23 @@ class TestRoundTrip:
             ],
         }
         camera1 = build_camera_config(cam_config)
-        with tempfile.NamedTemporaryFile(suffix=".yaml", delete=False) as f:
-            filepath = Path(f.name)
-        try:
-            save_camera(camera1, filepath)
-            camera2 = Camera.from_yaml(filepath)
+        filepath = tmp_path / "t.yaml"
+        save_camera(camera1, filepath)
+        camera2 = Camera.from_yaml(filepath)
 
-            from iactrace.camera.sensor_group import HexagonalSensorGroup
+        from iactrace.camera.sensor_group import HexagonalSensorGroup
 
-            s1 = camera1.sensor_groups[0]
-            s2 = camera2.sensor_groups[0]
-            assert isinstance(s1, HexagonalSensorGroup)
-            assert isinstance(s2, HexagonalSensorGroup)
-            np.testing.assert_allclose(
-                np.asarray(s1.hex_centers),
-                np.asarray(s2.hex_centers),
-                rtol=1e-5,
-            )
-        finally:
-            filepath.unlink(missing_ok=True)
+        s1 = camera1.sensor_groups[0]
+        s2 = camera2.sensor_groups[0]
+        assert isinstance(s1, HexagonalSensorGroup)
+        assert isinstance(s2, HexagonalSensorGroup)
+        np.testing.assert_allclose(
+            np.asarray(s1.hex_centers),
+            np.asarray(s2.hex_centers),
+            rtol=1e-5,
+        )
 
-    def _square(self, concentrator=None, photosensor=None, gap=0.0):
+    def _square(self, concentrator=None, photodetector=None, gap=0.0):
         return SquareSensorGroup(
             positions=[[0.0, 0.0, 0.0]],
             rotations=[[0.0, 0.0, 0.0]],
@@ -425,25 +370,21 @@ class TestRoundTrip:
             height=4,
             bounds=(-0.02, 0.02, -0.02, 0.02),
             concentrator=concentrator,
-            photosensor=photosensor,
+            photodetector=photodetector,
             gap=gap,
         )
 
-    def test_camera_chain_scalars_roundtrip(self):
-        camera1 = Camera([self._square(photosensor=ConstantQE(0.85), gap=0.004)])
-        with tempfile.NamedTemporaryFile(suffix=".yaml", delete=False) as f:
-            filepath = Path(f.name)
-        try:
-            save_camera(camera1, filepath)
-            chain = Camera.from_yaml(filepath).sensor_groups[0].chain
-            assert isinstance(chain.photosensor, ConstantQE)
-            assert chain.photosensor.qe == pytest.approx(0.85)
-            assert chain.gap == pytest.approx(0.004)
-            assert chain.concentrator is None
-        finally:
-            filepath.unlink(missing_ok=True)
+    def test_camera_chain_scalars_roundtrip(self, tmp_path):
+        camera1 = Camera([self._square(photodetector=ConstantQE(0.85), gap=0.004)])
+        filepath = tmp_path / "t.yaml"
+        save_camera(camera1, filepath)
+        chain = Camera.from_yaml(filepath).sensor_groups[0].chain
+        assert isinstance(chain.photodetector, ConstantQE)
+        assert chain.photodetector.qe == pytest.approx(0.85)
+        assert chain.gap == pytest.approx(0.004)
+        assert chain.concentrator is None
 
-    def test_camera_winston_cone_roundtrip(self):
+    def test_camera_winston_cone_roundtrip(self, tmp_path):
         cone = WinstonCone(
             n_sides=6,
             entrance_apothem=0.025,
@@ -453,30 +394,26 @@ class TestRoundTrip:
             orientation_deg=15.0,
         )
         camera1 = Camera([self._square(concentrator=cone, gap=0.003)])
-        with tempfile.NamedTemporaryFile(suffix=".yaml", delete=False) as f:
-            filepath = Path(f.name)
-        try:
-            save_camera(camera1, filepath)
-            chain2 = Camera.from_yaml(filepath).sensor_groups[0].chain
-            c1, c2 = camera1.sensor_groups[0].chain.concentrator, chain2.concentrator
-            assert isinstance(c2, WinstonCone)
-            assert c2.n_sides == c1.n_sides
-            assert c2.max_bounces == c1.max_bounces
-            assert c2.exit_apothem == pytest.approx(c1.exit_apothem)
-            assert c2.entrance_apothem == pytest.approx(c1.entrance_apothem)
-            assert c2.length == pytest.approx(c1.length, rel=1e-4)
-            assert c2.reflectivity == pytest.approx(c1.reflectivity)
-            assert c2.orientation == pytest.approx(c1.orientation)
-            assert chain2.gap == pytest.approx(0.003)
-        finally:
-            filepath.unlink(missing_ok=True)
+        filepath = tmp_path / "t.yaml"
+        save_camera(camera1, filepath)
+        chain2 = Camera.from_yaml(filepath).sensor_groups[0].chain
+        c1, c2 = camera1.sensor_groups[0].chain.concentrator, chain2.concentrator
+        assert isinstance(c2, WinstonCone)
+        assert c2.n_sides == c1.n_sides
+        assert c2.max_bounces == c1.max_bounces
+        assert c2.exit_apothem == pytest.approx(c1.exit_apothem)
+        assert c2.entrance_apothem == pytest.approx(c1.entrance_apothem)
+        assert c2.length == pytest.approx(c1.length, rel=1e-4)
+        assert c2.reflectivity == pytest.approx(c1.reflectivity)
+        assert c2.orientation == pytest.approx(c1.orientation)
+        assert chain2.gap == pytest.approx(0.003)
 
-    def test_camera_truncated_winston_cone_roundtrip(self):
+    def test_camera_truncated_winston_cone_roundtrip(self, tmp_path):
         import math
 
         import jax.numpy as jnp
 
-        from iactrace.camera.winston_cone import profile_apothem
+        from iactrace.camera.optics.winston import profile_apothem
 
         # A genuinely truncated cone, specified by its physical mouth at z = L.
         a2, cutoff_deg, length = 0.01, 20.0, 0.04
@@ -484,21 +421,17 @@ class TestRoundTrip:
         phys = float(profile_apothem(jnp.asarray(length), a2, s, c))
         cone = WinstonCone(6, entrance_apothem=phys, exit_apothem=a2, length=length)
         camera1 = Camera([self._square(concentrator=cone)])
-        with tempfile.NamedTemporaryFile(suffix=".yaml", delete=False) as f:
-            filepath = Path(f.name)
-        try:
-            save_camera(camera1, filepath, precision=12)
-            c1 = camera1.sensor_groups[0].chain.concentrator
-            c2 = Camera.from_yaml(filepath).sensor_groups[0].chain.concentrator
-            assert isinstance(c2, WinstonCone)
-            assert c2.entrance_apothem == pytest.approx(c1.entrance_apothem)
-            assert c2.length == pytest.approx(c1.length)
-            assert c2._wall_tilt() == pytest.approx(c1._wall_tilt())
-            assert c2.exit_apothem == pytest.approx(c1.exit_apothem)
-        finally:
-            filepath.unlink(missing_ok=True)
+        filepath = tmp_path / "t.yaml"
+        save_camera(camera1, filepath, precision=12)
+        c1 = camera1.sensor_groups[0].chain.concentrator
+        c2 = Camera.from_yaml(filepath).sensor_groups[0].chain.concentrator
+        assert isinstance(c2, WinstonCone)
+        assert c2.entrance_apothem == pytest.approx(c1.entrance_apothem)
+        assert c2.length == pytest.approx(c1.length)
+        assert (c2.s, c2.c) == pytest.approx((c1.s, c1.c))
+        assert c2.exit_apothem == pytest.approx(c1.exit_apothem)
 
-    def test_camera_okumura_cone_roundtrip(self):
+    def test_camera_okumura_cone_roundtrip(self, tmp_path):
         from iactrace import OkumuraCone
 
         cone = OkumuraCone.cubic(
@@ -512,41 +445,76 @@ class TestRoundTrip:
             orientation_deg=15.0,
         )
         camera1 = Camera([self._square(concentrator=cone, gap=0.003)])
-        with tempfile.NamedTemporaryFile(suffix=".yaml", delete=False) as f:
-            filepath = Path(f.name)
-        try:
-            save_camera(camera1, filepath)
-            sensor = camera1.to_dict()["sensors"][0]
-            assert sensor["concentrator"]["type"] == "okumura"
-            chain2 = Camera.from_yaml(filepath).sensor_groups[0].chain
-            c1, c2 = camera1.sensor_groups[0].chain.concentrator, chain2.concentrator
-            assert isinstance(c2, OkumuraCone)
-            assert c2.degree == c1.degree == 3
-            assert c2.control_points == pytest.approx(np.asarray(c1.control_points))
-            assert c2.n_sides == c1.n_sides
-            assert c2.max_bounces == c1.max_bounces
-            assert c2.exit_apothem == pytest.approx(c1.exit_apothem)
-            assert c2.entrance_apothem == pytest.approx(c1.entrance_apothem)
-            assert c2.length == pytest.approx(c1.length, rel=1e-4)
-            assert c2.reflectivity == pytest.approx(c1.reflectivity)
-            assert c2.orientation == pytest.approx(c1.orientation)
-            assert chain2.gap == pytest.approx(0.003)
-        finally:
-            filepath.unlink(missing_ok=True)
+        filepath = tmp_path / "t.yaml"
+        save_camera(camera1, filepath)
+        sensor = camera1.to_dict()["sensors"][0]
+        assert sensor["concentrator"]["type"] == "okumura"
+        chain2 = Camera.from_yaml(filepath).sensor_groups[0].chain
+        c1, c2 = camera1.sensor_groups[0].chain.concentrator, chain2.concentrator
+        assert isinstance(c2, OkumuraCone)
+        assert c2.degree == c1.degree == 3
+        assert c2.control_points == pytest.approx(np.asarray(c1.control_points))
+        assert c2.n_sides == c1.n_sides
+        assert c2.max_bounces == c1.max_bounces
+        assert c2.exit_apothem == pytest.approx(c1.exit_apothem)
+        assert c2.entrance_apothem == pytest.approx(c1.entrance_apothem)
+        assert c2.length == pytest.approx(c1.length, rel=1e-4)
+        assert c2.reflectivity == pytest.approx(c1.reflectivity)
+        assert c2.orientation == pytest.approx(c1.orientation)
+        assert chain2.gap == pytest.approx(0.003)
 
-    def test_camera_nonuniform_photosensor_warns_and_falls_back(self):
+    def test_camera_pmt_roundtrip(self, tmp_path):
+        from iactrace import PMT
+
+        pmt = PMT(
+            qe=0.35,
+            n_window=1.48,
+            face_radius=0.011,
+            face_sag=0.003,
+            length=0.05,
+            n_facets=32,
+        )
+        camera1 = Camera([self._square(photodetector=pmt)])
+        filepath = tmp_path / "t.yaml"
+        save_camera(camera1, filepath)
+        sensor = camera1.to_dict()["sensors"][0]
+        assert sensor["photodetector"]["type"] == "pmt"
+        p2 = Camera.from_yaml(filepath).sensor_groups[0].chain.photodetector
+        assert isinstance(p2, PMT)
+        assert p2.qe == pytest.approx(pmt.qe)
+        assert p2.n_window == pytest.approx(pmt.n_window)
+        assert p2.face_radius == pytest.approx(pmt.face_radius)
+        assert p2.face_sag == pytest.approx(pmt.face_sag)
+        assert p2.length == pytest.approx(pmt.length)
+        assert p2.n_facets == pmt.n_facets
+
+    def test_camera_pmt_default_length_roundtrip(self, tmp_path):
+        # length=None resolves to 2*face_radius at construction; the resolved
+        # value is written, so the reload is exact without re-deriving it.
+        from iactrace import PMT
+
+        pmt = PMT(qe=0.9, face_radius=0.008)
+        camera1 = Camera([self._square(photodetector=pmt)])
+        filepath = tmp_path / "t.yaml"
+        save_camera(camera1, filepath)
+        p2 = Camera.from_yaml(filepath).sensor_groups[0].chain.photodetector
+        assert isinstance(p2, PMT)
+        assert p2.n_window is None
+        assert p2.length == pytest.approx(2 * 0.008)
+
+    def test_camera_nonuniform_photodetector_warns_and_falls_back(self, tmp_path):
         import equinox as eqx
 
-        from iactrace.camera.photosensor import PhotoSensor
+        from iactrace.camera.detector import PhotoDetector
         from iactrace.core.ray_bundle import RayBundle
 
-        class WeirdSensor(PhotoSensor):
+        class WeirdSensor(PhotoDetector):
             pde: float = eqx.field(static=True)
 
             def __init__(self, pde=0.5):
                 self.pde = float(pde)
 
-            def detect(self, local_rays: RayBundle, normals=None) -> RayBundle:
+            def detect(self, local_rays: RayBundle) -> RayBundle:
                 return RayBundle(
                     origins=local_rays.origins,
                     directions=local_rays.directions,
@@ -555,17 +523,13 @@ class TestRoundTrip:
                     n=local_rays.n,
                 )
 
-        camera1 = Camera([self._square(photosensor=WeirdSensor(0.5))])
-        with tempfile.NamedTemporaryFile(suffix=".yaml", delete=False) as f:
-            filepath = Path(f.name)
-        try:
-            with pytest.warns(UserWarning):
-                save_camera(camera1, filepath)
-            chain = Camera.from_yaml(filepath).sensor_groups[0].chain
-            assert isinstance(chain.photosensor, ConstantQE)
-            assert chain.photosensor.qe == pytest.approx(1.0)
-        finally:
-            filepath.unlink(missing_ok=True)
+        camera1 = Camera([self._square(photodetector=WeirdSensor(0.5))])
+        filepath = tmp_path / "t.yaml"
+        with pytest.warns(UserWarning):
+            save_camera(camera1, filepath)
+        chain = Camera.from_yaml(filepath).sensor_groups[0].chain
+        assert isinstance(chain.photodetector, ConstantQE)
+        assert chain.photodetector.qe == pytest.approx(1.0)
 
     def test_sensor_without_chain_keys_backward_compatible(self):
         # Released camera files are `sensors:`-only with no detection-chain keys;
@@ -586,12 +550,12 @@ class TestRoundTrip:
         )
         chain = camera.sensor_groups[0].chain
         assert chain.concentrator is None
-        assert isinstance(chain.photosensor, ConstantQE)
-        assert chain.photosensor.qe == pytest.approx(1.0)
+        assert isinstance(chain.photodetector, ConstantQE)
+        assert chain.photodetector.qe == pytest.approx(1.0)
         assert chain.gap == pytest.approx(0.0)
 
-    def test_photosensor_slot_explicit_yaml(self):
-        # The detector response is a first-class discriminated `photosensor:` slot
+    def test_photodetector_slot_explicit_yaml(self):
+        # The detector response is a first-class discriminated `photodetector:` slot
         # on each sensor group, alongside its `gap`.
         camera = build_camera_config(
             {
@@ -603,26 +567,18 @@ class TestRoundTrip:
                         "width": 4,
                         "height": 4,
                         "bounds": [-0.02, 0.02, -0.02, 0.02],
-                        "photosensor": {"type": "constant", "qe": 0.7},
+                        "photodetector": {"type": "constant", "qe": 0.7},
                         "gap": 0.002,
                     }
                 ],
             }
         )
         chain = camera.sensor_groups[0].chain
-        assert isinstance(chain.photosensor, ConstantQE)
-        assert chain.photosensor.qe == pytest.approx(0.7)
+        assert isinstance(chain.photodetector, ConstantQE)
+        assert chain.photodetector.qe == pytest.approx(0.7)
         assert chain.gap == pytest.approx(0.002)
 
-    def test_camera_to_dict_uses_discriminated_slots(self):
-        cone = WinstonCone(n_sides=6, entrance_apothem=0.025, exit_apothem=0.01)
-        cam = Camera([self._square(concentrator=cone, photosensor=ConstantQE(0.9))])
-        sensor = cam.to_dict()["sensors"][0]
-        assert sensor["photosensor"]["type"] == "constant"
-        assert sensor["photosensor"]["qe"] == pytest.approx(0.9)
-        assert sensor["concentrator"]["type"] == "winston"
-
-    def test_multiple_stages_preserved(self, n_samples, random_key):
+    def test_multiple_stages_preserved(self, n_samples, random_key, tmp_path):
         config = {
             "telescope": {
                 "name": "two_stage",
@@ -631,8 +587,8 @@ class TestRoundTrip:
                 "camera_rotation": [0.0, 0.0, 0.0],
             },
             "mirror_templates": {
-                "primary": {"surface": {"curvature": 0.05, "conic": -1.0, "aspheric": []}},
-                "secondary": {"surface": {"curvature": 0.1, "conic": 0.0, "aspheric": []}},
+                "primary": {"surface": {"type": "aspheric", "curvature": 0.05, "conic": -1.0, "aspheric": []}},
+                "secondary": {"surface": {"type": "aspheric", "curvature": 0.1, "conic": 0.0, "aspheric": []}},
             },
             "mirrors": [
                 {
@@ -655,20 +611,16 @@ class TestRoundTrip:
             "obstructions": [],
         }
         telescope1 = build_telescope_config(config, n_samples, random_key)
-        with tempfile.NamedTemporaryFile(suffix=".yaml", delete=False) as f:
-            filepath = Path(f.name)
-        try:
-            save_telescope(telescope1, filepath)
-            telescope2 = Telescope.from_yaml(filepath, n_samples, key=random_key)
+        filepath = tmp_path / "t.yaml"
+        save_telescope(telescope1, filepath)
+        telescope2 = Telescope.from_yaml(filepath, n_samples, key=random_key)
 
-            assert len(telescope2.mirror_groups) == 2
-            stages = {g.optical_stage for g in telescope2.mirror_groups}
-            assert 0 in stages
-            assert 1 in stages
-        finally:
-            filepath.unlink(missing_ok=True)
+        assert len(telescope2.mirror_groups) == 2
+        stages = {g.optical_stage for g in telescope2.mirror_groups}
+        assert 0 in stages
+        assert 1 in stages
 
-    def test_reflectivity_curve_roundtrip(self, n_samples, random_key):
+    def test_reflectivity_curve_roundtrip(self, n_samples, random_key, tmp_path):
         """A tabulated R(theta) curve survives save -> load."""
         from iactrace.core.coatings import (
             TabulatedCoating,
@@ -683,7 +635,7 @@ class TestRoundTrip:
             },
             "mirror_templates": {
                 "silver": {
-                    "surface": {"curvature": 0.05, "conic": -1.0, "aspheric": []},
+                    "surface": {"type": "aspheric", "curvature": 0.05, "conic": -1.0, "aspheric": []},
                     "coating": {
                         "type": "table",
                         "angles_deg": [0.0, 30.0, 60.0, 80.0],
@@ -703,35 +655,31 @@ class TestRoundTrip:
             "obstructions": [],
         }
         telescope1 = build_telescope_config(config, n_samples, random_key)
-        with tempfile.NamedTemporaryFile(suffix=".yaml", delete=False) as f:
-            filepath = Path(f.name)
-        try:
-            save_telescope(telescope1, filepath)
-            telescope2 = Telescope.from_yaml(filepath, n_samples, key=random_key)
+        filepath = tmp_path / "t.yaml"
+        save_telescope(telescope1, filepath)
+        telescope2 = Telescope.from_yaml(filepath, n_samples, key=random_key)
 
-            interaction1 = telescope1.mirror_groups[0].interaction_module
-            interaction2 = telescope2.mirror_groups[0].interaction_module
+        interaction1 = telescope1.mirror_groups[0].interaction_module
+        interaction2 = telescope2.mirror_groups[0].interaction_module
 
-            # Both have a tabulated curve, byte-identical scalar
-            assert isinstance(interaction1.reflectivity, TabulatedCoating)
-            assert isinstance(interaction2.reflectivity, TabulatedCoating)
-            np.testing.assert_allclose(
-                np.asarray(interaction1.reflectivity.cos_table),
-                np.asarray(interaction2.reflectivity.cos_table),
-                rtol=1e-10,
-            )
-            np.testing.assert_allclose(
-                np.asarray(interaction1.reflectivity.values),
-                np.asarray(interaction2.reflectivity.values),
-                rtol=1e-10,
-            )
-            np.testing.assert_allclose(
-                np.asarray(interaction1.reflectivity_scalar),
-                np.asarray(interaction2.reflectivity_scalar),
-                rtol=1e-10,
-            )
-        finally:
-            filepath.unlink(missing_ok=True)
+        # Both have a tabulated curve, byte-identical scalar
+        assert isinstance(interaction1.reflectivity, TabulatedCoating)
+        assert isinstance(interaction2.reflectivity, TabulatedCoating)
+        np.testing.assert_allclose(
+            np.asarray(interaction1.reflectivity.cos_table),
+            np.asarray(interaction2.reflectivity.cos_table),
+            rtol=1e-10,
+        )
+        np.testing.assert_allclose(
+            np.asarray(interaction1.reflectivity.values),
+            np.asarray(interaction2.reflectivity.values),
+            rtol=1e-10,
+        )
+        np.testing.assert_allclose(
+            np.asarray(interaction1.reflectivity_scalar),
+            np.asarray(interaction2.reflectivity_scalar),
+            rtol=1e-10,
+        )
 
     def test_default_mirror_yaml_unchanged(
         self,

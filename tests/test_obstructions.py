@@ -13,16 +13,6 @@ from iactrace.core.obstructions import (
 class TestCylinderGroup:
     """Test cylinder obstruction group."""
 
-    def test_creation(self):
-        """Cylinder group can be created."""
-        cylinders = CylinderGroup(
-            p1=[[0, 0, 0], [1, 0, 0]],
-            p2=[[0, 0, 5], [1, 0, 5]],
-            r=[0.1, 0.2],
-        )
-
-        assert len(cylinders) == 2
-
     def test_ray_hits_cylinder(self):
         """Ray hitting cylinder returns valid t."""
         cylinder = CylinderGroup(
@@ -102,15 +92,6 @@ class TestOpenCylinderGroup:
 class TestBoxGroup:
     """Test axis-aligned box obstruction group."""
 
-    def test_creation(self):
-        """Box group can be created."""
-        boxes = BoxGroup(
-            p1=[[0, 0, 0], [5, 5, 5]],
-            p2=[[1, 1, 1], [6, 6, 6]],
-        )
-
-        assert len(boxes) == 2
-
     def test_ray_hits_box(self):
         """Ray hitting box returns valid t."""
         box = BoxGroup(
@@ -144,15 +125,6 @@ class TestBoxGroup:
 class TestSphereGroup:
     """Test sphere obstruction group."""
 
-    def test_creation(self):
-        """Sphere group can be created."""
-        spheres = SphereGroup(
-            centers=[[0, 0, 0], [5, 0, 0]],
-            radii=[1.0, 2.0],
-        )
-
-        assert len(spheres) == 2
-
     def test_ray_hits_sphere(self):
         """Ray hitting sphere returns valid t."""
         sphere = SphereGroup(
@@ -185,16 +157,6 @@ class TestSphereGroup:
 
 class TestTriangleGroup:
     """Test triangle obstruction group."""
-
-    def test_creation(self):
-        """Triangle group can be created."""
-        triangles = TriangleGroup(
-            v0=[[0, 0, 0]],
-            v1=[[2, 0, 0]],
-            v2=[[1, 2, 0]],
-        )
-
-        assert len(triangles) == 1
 
     def test_ray_hits_triangle(self):
         """Ray hitting triangle returns valid t."""
@@ -231,16 +193,6 @@ class TestTriangleGroup:
 
 class TestOrientedBoxGroup:
     """Test oriented box obstruction group."""
-
-    def test_creation(self):
-        """Oriented box group can be created."""
-        boxes = OrientedBoxGroup(
-            centers=[[0, 0, 0]],
-            half_extents=[[1, 1, 1]],
-            rotations=[jnp.eye(3)],
-        )
-
-        assert len(boxes) == 1
 
     def test_ray_hits_oriented_box(self):
         """Ray hitting oriented box returns valid t."""

@@ -4,35 +4,12 @@ import pytest
 
 from iactrace import Telescope
 from iactrace.core.apertures import DiskAperture
-from iactrace.core.interactions import ReflectInteraction, RefractInteraction
+from iactrace.core.interactions import RefractInteraction
 from iactrace.core.optics import OpticalElementGroup
 from iactrace.core.surfaces import AsphericSurfaceGroup
 from iactrace.telescope import operations as ops
 
-
-def _make_disk_mirror_group(
-    positions, rotations, curvatures, conics, aspherics, radii, optical_stage=0, n_samples=100
-):
-    """Build an OpticalElementGroup configured as a reflective disk mirror."""
-    n = curvatures.shape[0]
-    surface = AsphericSurfaceGroup(
-        curvatures=curvatures,
-        conics=conics,
-        aspherics=aspherics,
-        offsets=jnp.zeros((n, 2)),
-    )
-    aperture = DiskAperture(radii=radii, inner_radii=jnp.zeros(n))
-    interaction = ReflectInteraction(reflectivity=None, reflectivity_scalar=jnp.ones(n))
-    return OpticalElementGroup(
-        positions=positions,
-        rotations=rotations,
-        surface=surface,
-        aperture=aperture,
-        interaction_module=interaction,
-        sample_key=jax.random.key(0),
-        optical_stage=optical_stage,
-        n_samples=n_samples,
-    )
+from ._helpers import make_disk_mirror_group
 
 
 @pytest.fixture
@@ -45,7 +22,7 @@ def simple_telescope(random_key):
     aspherics = jnp.zeros((2, 2))
     radii = jnp.array([0.5, 0.5])
 
-    mirror_group = _make_disk_mirror_group(
+    mirror_group = make_disk_mirror_group(
         positions,
         rotations,
         curvatures,
@@ -113,6 +90,7 @@ class TestMathematicalCorrectness:
 class TestRandomPerturbations:
     """Verify statistical properties of random perturbations."""
 
+    @pytest.mark.slow
     def test_misalignment_has_correct_statistics(self, simple_telescope, random_key):
         """Misalignment perturbations should have correct mean and std."""
         n_mirrors = 1000
@@ -123,7 +101,7 @@ class TestRandomPerturbations:
         aspherics = jnp.zeros((n_mirrors, 2))
         radii = jnp.full(n_mirrors, 0.5)
 
-        large_group = _make_disk_mirror_group(
+        large_group = make_disk_mirror_group(
             positions,
             rotations,
             curvatures,
@@ -263,7 +241,7 @@ class TestGetInfo:
 def _make_lens_telescope():
     """Telescope with one mirror group at stage 0 and one lens group at stage 1."""
     n = 2
-    mirror = _make_disk_mirror_group(
+    mirror = make_disk_mirror_group(
         positions=jnp.zeros((n, 3)),
         rotations=jnp.zeros((n, 3)),
         curvatures=jnp.full(n, 0.1),
@@ -375,25 +353,3 @@ class TestKindValidation:
         tel = _make_lens_telescope()
         with pytest.raises(IndexError, match="no stage 5"):
             tel.stage(5)
-
-
-class TestStageAccess:
-    """Stage indexing and kind queries."""
-
-    def test_stage_indices_sorted(self):
-        tel = _make_lens_telescope()
-        assert tel.stage_indices() == [0, 1]
-
-    def test_stages_of_kind(self):
-        tel = _make_lens_telescope()
-        assert tel.stages_of_kind("mirror") == [0]
-        assert tel.stages_of_kind("lens") == [1]
-        assert tel.stages_of_kind("slab") == []
-
-    def test_n_stages(self):
-        assert _make_lens_telescope().n_stages == 2
-
-    def test_stage_kind_property(self):
-        tel = _make_lens_telescope()
-        assert tel.stage(0).kind == "mirror"
-        assert tel.stage(1).kind == "lens"

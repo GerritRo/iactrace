@@ -92,6 +92,26 @@ class RayBundle(eqx.Module):
             else jnp.asarray(alive, dtype=bool)
         )
 
+    def replace(self, **changes: Array) -> RayBundle:
+        """Copy with the given fields replaced (functional update).
+
+        ``rays.replace(values=v)`` reads better than re-listing all six
+        fields; unknown field names raise ``TypeError``.
+        """
+        fields = {
+            "origins": self.origins,
+            "directions": self.directions,
+            "values": self.values,
+            "path_length": self.path_length,
+            "n": self.n,
+            "alive": self.alive,
+        }
+        unknown = set(changes) - set(fields)
+        if unknown:
+            raise TypeError(f"RayBundle has no field(s) {sorted(unknown)}")
+        fields.update(changes)
+        return RayBundle(**fields)
+
     def to_frame(self, origin: Array, rotation: Array) -> RayBundle:
         """Express these rays in the local frame given by ``origin`` + Euler ``rotation``.
 

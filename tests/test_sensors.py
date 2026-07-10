@@ -2,20 +2,10 @@ import jax.numpy as jnp
 import pytest
 
 from iactrace import ConstantQE, HexagonalSensorGroup, SquareSensorGroup
-from iactrace.camera._hexgeom import SQRT3, _detect_hex_grid
+from iactrace.camera._hexgeom import _detect_hex_grid
 from iactrace.core.intersections import intersect_plane
 
-
-def make_hex_centers(n_rings=2, hex_size=0.001):
-    """Generate hexagonal grid center positions."""
-    centers = []
-    for q in range(-n_rings, n_rings + 1):
-        for r in range(-n_rings, n_rings + 1):
-            if max(abs(q), abs(r), abs(-q - r)) <= n_rings:
-                x = hex_size * SQRT3 * (q + r / 2)
-                y = hex_size * 1.5 * r
-                centers.append([x, y])
-    return jnp.array(centers)
+from ._helpers import bin_positions, make_hex_centers
 
 
 class TestSquareSensor:
@@ -36,7 +26,7 @@ class TestSquareSensor:
         y = jnp.array([0.1])
         values = jnp.array([1.0])
 
-        result = sensor.accumulate(sensor_idx, x, y, values)
+        result = bin_positions(sensor, sensor_idx, x, y, values)
 
         assert result[0, 5, 5] == 1.0
         assert result.sum() == 1.0
@@ -56,7 +46,7 @@ class TestSquareSensor:
         y = jnp.array([0.1, 0.1, 0.1])
         values = jnp.array([1.0, 2.0, 3.0])
 
-        result = sensor.accumulate(sensor_idx, x, y, values)
+        result = bin_positions(sensor, sensor_idx, x, y, values)
 
         assert result[0, 5, 5] == 6.0
 
@@ -75,7 +65,7 @@ class TestSquareSensor:
         y = jnp.array([0.0, 0.0, 0.0])
         values = jnp.array([1.0, 2.0, 3.0])
 
-        result = sensor.accumulate(sensor_idx, x, y, values)
+        result = bin_positions(sensor, sensor_idx, x, y, values)
 
         assert result.sum() == 1.0
 
@@ -98,7 +88,7 @@ class TestHexagonalSensor:
         y = jnp.array([0.0])
         values = jnp.array([1.0])
 
-        result = sensor.accumulate(sensor_idx, x, y, values)
+        result = bin_positions(sensor, sensor_idx, x, y, values)
 
         assert result.sum() == 1.0
         assert jnp.max(result) == 1.0
@@ -118,7 +108,7 @@ class TestHexagonalSensor:
         y = jnp.array([0.0, 0.0])
         values = jnp.array([1.0, 2.0])
 
-        result = sensor.accumulate(sensor_idx, x, y, values)
+        result = bin_positions(sensor, sensor_idx, x, y, values)
 
         assert result.sum() == 1.0
 
@@ -141,11 +131,13 @@ class TestEdgeExclusion:
         values = jnp.array([1.0])
 
         # Center of pixel should be valid
-        result_center = sensor.accumulate(sensor_idx, jnp.array([0.1]), jnp.array([0.1]), values)
+        result_center = bin_positions(
+            sensor, sensor_idx, jnp.array([0.1]), jnp.array([0.1]), values
+        )
         assert result_center.sum() == 1.0
 
         # Point close to edge should be excluded
-        result_edge = sensor.accumulate(sensor_idx, jnp.array([0.01]), jnp.array([0.1]), values)
+        result_edge = bin_positions(sensor, sensor_idx, jnp.array([0.01]), jnp.array([0.1]), values)
         assert result_edge.sum() == 0.0
 
 
@@ -169,7 +161,7 @@ class TestMultiSensor:
         y = jnp.array([0.1, 0.1, 0.1])
         values = jnp.array([1.0, 2.0, 3.0])
 
-        result = sensor.accumulate(sensor_idx, x, y, values)
+        result = bin_positions(sensor, sensor_idx, x, y, values)
 
         assert result.shape == (3, 10, 10)
         assert result[0].sum() == 1.0
@@ -193,7 +185,7 @@ class TestMultiSensor:
         y = jnp.array([0.0, 0.0])
         values = jnp.array([5.0, 7.0])
 
-        result = sensor.accumulate(sensor_idx, x, y, values)
+        result = bin_positions(sensor, sensor_idx, x, y, values)
 
         assert result.shape == (2, len(hex_centers))
         assert result[0].sum() == 5.0
@@ -227,7 +219,7 @@ class TestHexGridInfrastructure:
         y = hex_centers[:, 1]
         values = jnp.ones(len(hex_centers))
 
-        result = sensor.accumulate(sensor_idx, x, y, values)
+        result = bin_positions(sensor, sensor_idx, x, y, values)
 
         assert jnp.sum(result > 0) == len(hex_centers)
 
@@ -271,7 +263,7 @@ class TestPlaneIntersection:
 
 
 class TestValidation:
-    """Constructor input validation across sensor groups, photosensor, camera."""
+    """Constructor input validation across sensor groups, photodetector, camera."""
 
     def test_square_rejects_bad_positions_shape(self):
         with pytest.raises(ValueError, match="positions"):
@@ -339,15 +331,6 @@ class TestValidation:
                 rotations=[[0.0, 0.0, 0.0]],
                 hex_centers=[[0.0, 0.0, 0.0]],  # (1, 3), not (M, 2)
             )
-
-    def test_hex_accepts_valid_centers(self):
-        centers = make_hex_centers(n_rings=1, hex_size=0.01)
-        sensor = HexagonalSensorGroup(
-            positions=[[0.0, 0.0, 0.0]],
-            rotations=[[0.0, 0.0, 0.0]],
-            hex_centers=centers,
-        )
-        assert sensor.n_pixels == len(centers)
 
     def test_constant_qe_rejects_out_of_range(self):
         with pytest.raises(ValueError, match="qe"):

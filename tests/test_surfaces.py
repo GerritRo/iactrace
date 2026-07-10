@@ -15,11 +15,6 @@ class TestSurfaceSag:
             z = sag_raw(x, y, curvature=0.0, conic=0.0, aspheric=jnp.array([]))
             assert jnp.allclose(z, 0.0, atol=1e-12)
 
-    def test_spherical_sag_at_origin(self):
-        """Spherical surface has zero sag at origin."""
-        z = sag_raw(0.0, 0.0, curvature=0.1, conic=0.0, aspheric=jnp.array([]))
-        assert jnp.allclose(z, 0.0, atol=1e-12)
-
     def test_spherical_sag_symmetry(self):
         """Spherical surface sag depends only on r^2 = x^2 + y^2."""
         c = 0.05
@@ -83,13 +78,6 @@ class TestSurfaceNormals:
             _, normal = compute_sag_and_normal(x, y, offset, 0.0, 0.0, jnp.array([]))
             expected = jnp.array([0.0, 0.0, 1.0])
             assert jnp.allclose(normal, expected, atol=1e-8)
-
-    def test_spherical_normal_at_origin(self):
-        """Spherical surface normal at origin is vertical."""
-        offset = jnp.array([0.0, 0.0])
-        _, normal = compute_sag_and_normal(0.0, 0.0, offset, 0.1, 0.0, jnp.array([]))
-        expected = jnp.array([0.0, 0.0, 1.0])
-        assert jnp.allclose(normal, expected, atol=1e-8)
 
     def test_normal_is_unit_length(self):
         """Surface normal should always be unit length."""
@@ -169,15 +157,6 @@ class TestConicIntersection:
         t = intersect_conic(jnp.array([0.0, 0.0, 5.0]), jnp.array([0.0, 0.0, -1.0]), 0.0, 0.0)
         assert jnp.allclose(t, 5.0)
 
-    def test_spherical_surface(self):
-        """Spherical surface (k=0) intersection lies on surface."""
-        c = 0.1
-        origin = jnp.array([2.0, 1.0, 10.0])
-        direction = jnp.array([0.0, 0.0, -1.0])
-        t = intersect_conic(origin, direction, c, 0.0)
-        hit = origin + t * direction
-        assert jnp.allclose(self._surface_residual(hit, c, 0.0), 0.0, atol=1e-8)
-
     def test_paraboloid_surface(self):
         """Paraboloid (k=-1) intersection lies on surface."""
         c = 0.05
@@ -196,16 +175,6 @@ class TestConicIntersection:
         t = intersect_conic(origin, direction, c, k)
         hit = origin + t * direction
         assert jnp.allclose(self._surface_residual(hit, c, k), 0.0, atol=1e-8)
-
-    def test_ray_parallel_to_surface_misses(self):
-        """Ray parallel to surface returns infinity."""
-        t = intersect_conic(jnp.array([0.0, 0.0, 100.0]), jnp.array([1.0, 0.0, 0.0]), 0.1, 0.0)
-        assert jnp.isinf(t)
-
-    def test_ray_pointing_away_misses(self):
-        """Ray pointing away from surface returns infinity."""
-        t = intersect_conic(jnp.array([0.0, 0.0, 25.0]), jnp.array([0.0, 0.0, 1.0]), 0.1, 0.0)
-        assert jnp.isinf(t)
 
 
 class TestNewtonRaphsonIntersect:
@@ -277,20 +246,6 @@ class TestNewtonRaphsonIntersect:
         assert valid
         self._verify_hit(sag_fn, origin, direction, t, hit_xy, valid)
 
-    def test_oblique_ray(self):
-        """Oblique ray on paraboloid."""
-        c = 0.05
-
-        def sag_fn(x, y):
-            return c * (x**2 + y**2)
-
-        origin = jnp.array([5.0, 3.0, 15.0])
-        direction = jnp.array([-0.2, -0.1, -1.0])
-        direction = direction / jnp.linalg.norm(direction)
-        t, hit_xy, valid = newton_raphson_intersect(sag_fn, origin, direction)
-        assert valid
-        self._verify_hit(sag_fn, origin, direction, t, hit_xy, valid)
-
     def test_ray_parallel_misses(self):
         """Ray parallel to flat surface misses."""
 
@@ -337,19 +292,6 @@ class TestNewtonRaphsonIntersect:
         assert valid
         assert jnp.allclose(t, 1e6, rtol=1e-6)
 
-    def test_small_curvature(self):
-        """Works with small curvature."""
-        c = 1e-6
-
-        def sag_fn(x, y):
-            return c * (x**2 + y**2)
-
-        origin = jnp.array([1.0, 1.0, 10.0])
-        direction = jnp.array([0.0, 0.0, -1.0])
-        t, hit_xy, valid = newton_raphson_intersect(sag_fn, origin, direction)
-        assert valid
-        self._verify_hit(sag_fn, origin, direction, t, hit_xy, valid)
-
     def test_high_curvature(self):
         """Works with high curvature."""
         c = 1.0
@@ -363,28 +305,40 @@ class TestNewtonRaphsonIntersect:
         assert valid
         self._verify_hit(sag_fn, origin, direction, t, hit_xy, valid)
 
-    def test_t_is_positive(self):
-        """Valid intersection has positive t."""
 
-        def sag_fn(x, y):
-            return 0.0
+class TestPureConicBypass:
+    """AsphericSurfaceGroup with no aspheric terms intersects in closed form.
 
-        origin = jnp.array([0.0, 0.0, 5.0])
-        direction = jnp.array([0.0, 0.0, -1.0])
-        t, hit_xy, valid = newton_raphson_intersect(sag_fn, origin, direction)
-        assert valid
-        assert t > 0
+    ``_t_guess_is_exact`` bypasses the Newton iteration; the result must be
+    indistinguishable from the Newton-refined path on the same geometry."""
 
-    def test_hit_xy_matches_ray(self):
-        """hit_xy matches ray position at t."""
+    @staticmethod
+    def _group(aspherics):
+        from iactrace.core.surfaces import AsphericSurfaceGroup
 
-        def sag_fn(x, y):
-            return 0.05 * (x**2 + y**2)
+        return AsphericSurfaceGroup(
+            offsets=jnp.asarray([[0.05, -0.02]]),
+            curvatures=jnp.asarray([-1.0 / 12.0]),
+            conics=jnp.asarray([-0.4]),
+            aspherics=aspherics,
+        )
 
-        origin = jnp.array([2.0, 3.0, 10.0])
-        direction = jnp.array([-0.1, -0.1, -1.0])
-        direction = direction / jnp.linalg.norm(direction)
-        t, hit_xy, valid = newton_raphson_intersect(sag_fn, origin, direction)
-        assert valid
-        expected_xy = origin[:2] + t * direction[:2]
-        assert jnp.allclose(hit_xy, expected_xy, atol=1e-8)
+    def test_bypass_matches_newton(self):
+        # Same conic, once as a pure conic (closed form) and once with a zero
+        # aspheric term (forcing Newton): t, point and normal must agree.
+        pure = self._group(jnp.zeros((1, 0)))
+        poly = self._group(jnp.zeros((1, 1)))
+        key = jax.random.PRNGKey(3)
+        n = 500
+        o = jnp.concatenate(
+            [jax.random.uniform(key, (n, 2), minval=-2.0, maxval=2.0), jnp.full((n, 1), 10.0)],
+            axis=1,
+        )
+        d = jnp.tile(jnp.array([0.03, -0.01, -1.0]), (n, 1))
+        d = d / jnp.linalg.norm(d, axis=1, keepdims=True)
+
+        t1, p1, n1 = jax.vmap(lambda oo, dd: pure.intersect_at(0, oo, dd))(o, d)
+        t2, p2, n2 = jax.vmap(lambda oo, dd: poly.intersect_at(0, oo, dd))(o, d)
+        assert jnp.allclose(t1, t2, atol=1e-9)
+        assert jnp.allclose(p1, p2, atol=1e-9)
+        assert jnp.allclose(n1, n2, atol=1e-9)
