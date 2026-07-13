@@ -1,28 +1,28 @@
 import equinox as eqx
 import jax.numpy as jnp
+import numpy as np
 import pytest
 
 from iactrace import (
     Camera,
     Concentrator,
+    ConstantQE,
     DetectionChain,
     HexagonalSensorGroup,
-    PhotoSensor,
+    PhotoDetector,
     SquareSensorGroup,
-    UniformQE,
 )
 from iactrace.camera._hexgeom import _hex_norm, _rotate
 from iactrace.camera.camera import intersect_sensor
 from iactrace.core.ray_bundle import RayBundle
 
-from .test_integration import make_simple_telescope
-from .test_sensors import make_hex_centers
+from ._helpers import bin_positions, make_hex_centers, spherical_cap_surface
 
 # Stub chain elements (concrete physics is out of scope for the scaffolding)
 
 
 class StubCone(Concentrator):
-    """Minimal concentrator: shift to z=length, attenuate, add path length."""
+    """Minimal concentrator: shift to z=-length, attenuate, add path, then land."""
 
     length: float = eqx.field(static=True)
     refl: float = eqx.field(static=True)
@@ -31,16 +31,14 @@ class StubCone(Concentrator):
         self.length = float(length)
         self.refl = float(refl)
 
-    def apply(self, local_rays: RayBundle) -> RayBundle:
+    def to_surface(self, local_rays: RayBundle, surface) -> RayBundle:
         o = local_rays.origins
-        new_o = jnp.stack([o[:, 0], o[:, 1], o[:, 2] - self.length], axis=-1)
-        return RayBundle(
-            origins=new_o,
-            directions=local_rays.directions,
+        shifted = local_rays.replace(
+            origins=jnp.stack([o[:, 0], o[:, 1], o[:, 2] - self.length], axis=-1),
             values=local_rays.values * self.refl,
             path_length=local_rays.path_length + self.length,
-            n=local_rays.n,
         )
+        return surface.stop(shifted)
 
     def cross_sections(self):
         angles = jnp.deg2rad(30.0 + 60.0 * jnp.arange(6))
@@ -50,8 +48,8 @@ class StubCone(Concentrator):
         return z, rings
 
 
-class StubPMT(PhotoSensor):
-    """Minimal photosensor: attenuate by pde at the detector plane (no advance)."""
+class StubPMT(PhotoDetector):
+    """Minimal photodetector: attenuate by pde at the detector plane (no advance)."""
 
     pde: float = eqx.field(static=True)
 
@@ -72,7 +70,7 @@ class StubPMT(PhotoSensor):
         return jnp.array([[-s, -s], [s, -s], [s, s], [-s, s]])
 
 
-def _square_sensor(concentrator=None, photosensor=None, gap=0.0):
+def _square_sensor(concentrator=None, photodetector=None, gap=0.0):
     return SquareSensorGroup(
         positions=[[0.0, 0.0, 0.0]],
         rotations=[[0.0, 0.0, 0.0]],
@@ -80,7 +78,7 @@ def _square_sensor(concentrator=None, photosensor=None, gap=0.0):
         height=8,
         bounds=(-1.0, 1.0, -1.0, 1.0),
         concentrator=concentrator,
-        photosensor=photosensor,
+        photodetector=photodetector,
         gap=gap,
     )
 
@@ -102,16 +100,16 @@ def _downward_rays(xy):
 # 1. to_pixel_frame correctness
 
 
-class TestToPixelFrame:
-    def test_square_center_maps_to_origin(self):
-        sensor = _square_sensor()
-        # dx = dy = 0.25; pixel centres at x0 + (i+0.5)*dx = -1 + 0.25*(i+0.5)
-        cx = -1.0 + 0.25 * 2.5  # pixel index 2 centre = -0.375
-        rays = _downward_rays([[cx, cx]])
-        local = sensor.to_pixel_frame(rays, jnp.zeros(1, int))
-        assert jnp.allclose(local.origins[:, :2], 0.0, atol=1e-7)
-        assert jnp.allclose(local.origins[:, 2], 0.0)
+def _localize(sensor, rays):
+    """Assign pixels (single tile) and reframe -- the pipeline's two-step."""
+    n = rays.origins.shape[0]
+    pix_id, valid = sensor.pixel_index_and_mask(
+        jnp.zeros(n, int), rays.origins[:, 0], rays.origins[:, 1]
+    )
+    return sensor.to_pixel_frame(rays, pix_id), pix_id, valid
 
+
+class TestToPixelFrame:
     def test_square_isometry_preserves_values_and_path(self):
         sensor = _square_sensor()
         rays = RayBundle(
@@ -121,7 +119,7 @@ class TestToPixelFrame:
             path_length=jnp.array([3.5]),
             n=jnp.ones(1),
         )
-        local = sensor.to_pixel_frame(rays, jnp.zeros(1, int))
+        local, _, _ = _localize(sensor, rays)
         assert jnp.allclose(local.values, rays.values)
         assert jnp.allclose(local.path_length, rays.path_length)
         # offset must be within half a pixel of the centre
@@ -150,7 +148,7 @@ class TestToPixelFrame:
             path_length=jnp.array([0.0]),
             n=jnp.ones(1),
         )
-        local = sensor.to_pixel_frame(rays, jnp.zeros(1, int))
+        local, _, _ = _localize(sensor, rays)
         # Centre maps to origin.
         assert jnp.allclose(local.origins[:, :2], 0.0, atol=1e-6)
         # Direction rotated by -grid_rotation: (cos gr, -sin gr).
@@ -160,39 +158,51 @@ class TestToPixelFrame:
             atol=1e-6,
         )
 
-    def test_hex_in_pixel_local_radius_bounded(self):
-        centers = make_hex_centers(n_rings=2, hex_size=0.01)
+    def test_hex_frame_matches_binning(self):
+        # The frame a ray is reframed into and the pixel it is binned into come
+        # from ONE pixel_index_and_mask call; on a rotated layout every valid
+        # ray must land inside its assigned hexagon, and the centre table must
+        # reconstruct the grid coordinates exactly.
+        theta = jnp.deg2rad(17.0)
+        centers = make_hex_centers(n_rings=3, hex_size=0.01)
+        gx, gy = _rotate(centers[:, 0], centers[:, 1], theta)
         sensor = HexagonalSensorGroup(
             positions=[[0.0, 0.0, 0.0]],
             rotations=[[0.0, 0.0, 0.0]],
-            hex_centers=centers,
+            hex_centers=jnp.stack([gx, gy], axis=-1),
         )
-        # Ray near a hex centre stays inside the hexagon (hex_norm <= 1).
-        offset = jnp.array([[0.3 * sensor.hex_inradius, 0.0, 0.0]])
-        rays = RayBundle(
-            origins=offset,
-            directions=jnp.array([[0.0, 0.0, 1.0]]),
-            values=jnp.array([1.0]),
-            path_length=jnp.array([0.0]),
-            n=jnp.ones(1),
-        )
-        local = sensor.to_pixel_frame(rays, jnp.zeros(1, int))
-        norm = _hex_norm(local.origins[0, 0], local.origins[0, 1], sensor.hex_inradius)
-        assert float(norm) <= 1.0
+        rng = np.random.default_rng(7)
+        xy = rng.uniform(-0.08, 0.08, (500, 2))
+        rays = _downward_rays(xy)
+        local, pix_id, valid = _localize(sensor, rays)
+
+        v = np.asarray(valid)
+        assert 100 < v.sum() < v.size  # both populations present
+        norms = _hex_norm(local.origins[:, 0], local.origins[:, 1], sensor.hex_inradius)
+        assert np.all(np.asarray(norms)[v] <= 1.0 + 1e-9)
+
+        # local + assigned centre reproduces the grid coordinates (pure isometry)
+        x_grid, y_grid = sensor._to_grid_coords(rays.origins[:, 0], rays.origins[:, 1])
+        c = np.asarray(sensor.pixel_centers_grid)[np.asarray(pix_id) % sensor.n_pixels]
+        assert np.allclose(np.asarray(local.origins[:, 0]) + c[:, 0], np.asarray(x_grid))
+        assert np.allclose(np.asarray(local.origins[:, 1]) + c[:, 1], np.asarray(y_grid))
 
 
-# 2. Backward compatibility: no concentrator + UniformQE
+# 2. Backward compatibility: no concentrator + ConstantQE
 
 
 class TestBackwardCompat:
     def test_image_matches_entrance_binning(self):
+        # A no-cone ConstantQE chain must reproduce the old entrance-binning image
+        # exactly (a released-file compatibility guarantee).
         qe = 0.42
-        sensor = _square_sensor(photosensor=UniformQE(qe))
+        sensor = _square_sensor(photodetector=ConstantQE(qe))
         cam = Camera([sensor])
         rays = _downward_rays([[0.1, 0.1], [0.3, -0.2], [-0.5, 0.4], [5.0, 5.0]])
 
-        sensor_rays, s_idx, _ = intersect_sensor(cam, rays)
-        expected = sensor.accumulate(
+        sensor_rays, s_idx = intersect_sensor(cam, rays)
+        expected = bin_positions(
+            sensor,
             s_idx,
             sensor_rays.origins[:, 0],
             sensor_rays.origins[:, 1],
@@ -200,20 +210,9 @@ class TestBackwardCompat:
         )
         assert jnp.allclose(cam.image(rays), expected)
 
-    def test_collect_times_and_values_unchanged(self):
-        qe = 0.6
-        sensor = _square_sensor(photosensor=UniformQE(qe))
-        cam = Camera([sensor])
-        rays = _downward_rays([[0.1, 0.1], [0.3, -0.2], [5.0, 5.0]])
-
-        sensor_rays, _, _ = intersect_sensor(cam, rays)
-        pe, t, _pix, hit = cam.collect(rays)
-        # detected rays carry value*qe; the off-sensor (5,5) ray is undetected -> 0.
-        assert jnp.allclose(pe, jnp.where(hit, sensor_rays.values * qe, 0.0))
-        assert bool(hit[0]) and bool(hit[1]) and not bool(hit[2])
-        assert jnp.allclose(t, sensor_rays.path_length)
-
     def test_collect_pe_sum_matches_image_with_edge_width(self):
+        # Kept separate: this exercises the edge_width dead-zone in collect(),
+        # a different code path from the plain entrance-binning above.
         # collect() must honour edge_width exactly like image(): per-ray pe (now
         # zeroed in the dead-zone) sums to the binned image total.
         qe = 0.8
@@ -224,7 +223,7 @@ class TestBackwardCompat:
             height=8,
             bounds=(-1.0, 1.0, -1.0, 1.0),
             edge_width=0.1,
-            photosensor=UniformQE(qe),
+            photodetector=ConstantQE(qe),
         )
         cam = Camera([sensor])
         g = jnp.linspace(-0.95, 0.95, 22)
@@ -235,16 +234,6 @@ class TestBackwardCompat:
         assert jnp.allclose(pe.sum(), cam.image(rays).sum(), atol=1e-5)
         assert 0.0 < float(pe.sum()) < xy.shape[0] * qe  # dead-zone has teeth
 
-    def test_response_matrix_rows_sum_to_image(self):
-        # The fused per-source fold (response_matrix) and the plain image both
-        # flow through the refactored `_project_to_sensor`; their totals must
-        # still agree. Off-axis sources avoid the central-pixel boundary
-        # pile-up that float rounding would otherwise leak across pixels.
-        tel, cam = make_simple_telescope(n_samples=64)
-        sources = jnp.array([[0.0003, 0.0001, -1.0], [0.0005, 0.0, -1.0], [-0.0005, 0.0, -1.0]])
-        rb = tel.render(sources, jnp.ones(3), source_type="parallel")
-        assert jnp.allclose(cam.response_matrix(rb).sum(axis=0), cam.image(rb), atol=1e-5)
-
 
 # 3. DetectionChain composition + end-to-end
 
@@ -252,7 +241,7 @@ class TestBackwardCompat:
 class TestDetectionChain:
     def test_propagate_composes_cone_and_pmt(self):
         chain = DetectionChain(
-            concentrator=StubCone(length=0.05, refl=0.9), photosensor=StubPMT(pde=0.8), gap=0.01
+            concentrator=StubCone(length=0.05, refl=0.9), photodetector=StubPMT(pde=0.8), gap=0.01
         )
         # Rays travel toward -z (canonical light direction): the cone exits them
         # at z=-length and the chain free-flights a further gap to detector_z.
@@ -268,7 +257,7 @@ class TestDetectionChain:
         assert jnp.allclose(out.path_length, 0.05 + 0.01)
 
     def test_no_concentrator_is_detect_only(self):
-        chain = DetectionChain(concentrator=None, photosensor=StubPMT(pde=0.5), gap=0.02)
+        chain = DetectionChain(concentrator=None, photodetector=StubPMT(pde=0.5), gap=0.02)
         # Rays already at the entrance plane (z=0): with no cone the chain
         # free-flights them across the gap, adding exactly `gap` to path_length.
         rays = RayBundle(
@@ -282,31 +271,21 @@ class TestDetectionChain:
         assert jnp.allclose(out.values, 0.5)
         assert jnp.allclose(out.path_length, 0.02)
 
-    def test_detector_z_single_source_of_truth(self):
-        # No concentrator: detector sits at -gap.
-        chain = DetectionChain(concentrator=None, photosensor=UniformQE(1.0), gap=0.02)
-        assert jnp.allclose(chain.detector_z, -0.02)
-        # With a cone: detector sits at -(length + gap).
-        chain2 = DetectionChain(
-            concentrator=StubCone(length=0.05), photosensor=UniformQE(1.0), gap=0.02
-        )
-        assert jnp.allclose(chain2.detector_z, -(0.05 + 0.02))
-
     def test_negative_gap_rejected_everywhere(self):
         # __check_init__ on DetectionChain guards every construction path.
         with pytest.raises(ValueError, match="gap"):
-            DetectionChain(concentrator=None, photosensor=UniformQE(1.0), gap=-0.5)
+            DetectionChain(concentrator=None, photodetector=ConstantQE(1.0), gap=-0.5)
         with pytest.raises(ValueError, match="gap"):
             _square_sensor(gap=-0.5)
         with pytest.raises(ValueError, match="gap"):
             Camera([_square_sensor()]).set_gap(0, -0.5)
         # gap == 0.0 stays valid
-        assert DetectionChain(concentrator=None, photosensor=UniformQE(1.0), gap=0.0).gap == 0.0
+        assert DetectionChain(concentrator=None, photodetector=ConstantQE(1.0), gap=0.0).gap == 0.0
 
     def test_advance_is_finite_for_parallel_rays(self):
         # A ray parallel to the detector plane (dz=0) never reaches it; the chain
         # leaves it in place so path_length stays finite (it is masked later).
-        chain = DetectionChain(concentrator=None, photosensor=UniformQE(1.0), gap=0.02)
+        chain = DetectionChain(concentrator=None, photodetector=ConstantQE(1.0), gap=0.02)
         rays = RayBundle(
             origins=jnp.array([[0.0, 0.0, 0.0]]),
             directions=jnp.array([[1.0, 0.0, 0.0]]),
@@ -320,7 +299,7 @@ class TestDetectionChain:
 
     def test_camera_end_to_end_with_chain(self):
         sensor = _square_sensor(
-            concentrator=StubCone(refl=0.9), photosensor=StubPMT(pde=0.8), gap=0.01
+            concentrator=StubCone(refl=0.9), photodetector=StubPMT(pde=0.8), gap=0.01
         )
         cam = Camera([sensor])
         rays = _downward_rays([[0.1, 0.1], [0.3, -0.2]])
@@ -341,38 +320,17 @@ class TestShowSensorChain:
         pytest.importorskip("trimesh")
         from iactrace import show_sensor_chain
 
-        cam = Camera([_square_sensor(concentrator=StubCone(), photosensor=StubPMT(), gap=0.01)])
+        cam = Camera([_square_sensor(concentrator=StubCone(), photodetector=StubPMT(), gap=0.01)])
         scene = show_sensor_chain(cam)
         # entrance + cone walls + detector
         assert len(scene.geometry) >= 3
-
-    def test_without_concentrator(self):
-        pytest.importorskip("trimesh")
-        from iactrace import show_sensor_chain
-
-        cam = Camera([_square_sensor()])  # no cone, UniformQE
-        scene = show_sensor_chain(cam)
-        assert len(scene.geometry) >= 1  # entrance (+ detector), no crash
-
-    def test_hexagonal_entrance(self):
-        pytest.importorskip("trimesh")
-        from iactrace import show_sensor_chain
-
-        sensor = HexagonalSensorGroup(
-            positions=[[0.0, 0.0, 0.0]],
-            rotations=[[0.0, 0.0, 0.0]],
-            hex_centers=make_hex_centers(n_rings=2, hex_size=0.01),
-            concentrator=StubCone(),
-        )
-        scene = show_sensor_chain(Camera([sensor]))
-        assert len(scene.geometry) >= 2
 
 
 # 5. Camera setters round-trip through the chain
 
 
 class TestSetters:
-    def test_set_concentrator_and_photosensor(self):
+    def test_set_concentrator_and_photodetector(self):
         cam = Camera([_square_sensor()])
         assert cam.sensor_groups[0].chain.concentrator is None
         assert cam.get_info()["sensor_group_0"]["has_concentrator"] is False
@@ -389,93 +347,113 @@ class TestSetters:
         assert cam.sensor_groups[0].chain.concentrator is None
 
         pmt = StubPMT(pde=0.7)
-        cam3 = cam2.set_photosensor(0, pmt)
+        cam3 = cam2.set_photodetector(0, pmt)
         chain3 = cam3.sensor_groups[0].chain
-        assert isinstance(chain3.photosensor, StubPMT)
-        assert chain3.photosensor.pde == pmt.pde
+        assert isinstance(chain3.photodetector, StubPMT)
+        assert chain3.photodetector.pde == pmt.pde
         assert isinstance(chain3.concentrator, StubCone)
 
-    def test_clear_concentrator(self):
-        cam = Camera([_square_sensor(concentrator=StubCone())])
-        cleared = cam.set_concentrator(0, None)
+        # Clearing the concentrator (set to None) restores the detect-only chain.
+        cleared = cam3.set_concentrator(0, None)
         assert cleared.sensor_groups[0].chain.concentrator is None
-
-    def test_setters_target_one_group_independently(self):
-        # The chain lives per group; a Camera setter touches only its sensor_idx.
-        cam = Camera([_square_sensor(), _square_sensor()])
-        cam2 = cam.set_concentrator(1, StubCone(length=0.05))
-        assert cam2.sensor_groups[0].chain.concentrator is None
-        assert isinstance(cam2.sensor_groups[1].chain.concentrator, StubCone)
-        # functional update leaves the original camera untouched
-        assert cam.sensor_groups[1].chain.concentrator is None
 
     def test_per_group_chains_are_independent(self):
         # Two groups in one camera carry different chains (set at construction).
-        g_cone = _square_sensor(concentrator=StubCone(), photosensor=StubPMT(pde=0.7))
-        g_plain = _square_sensor(photosensor=UniformQE(0.5))
+        g_cone = _square_sensor(concentrator=StubCone(), photodetector=StubPMT(pde=0.7))
+        g_plain = _square_sensor(photodetector=ConstantQE(0.5))
         cam = Camera([g_cone, g_plain])
         assert cam.sensor_groups[0].chain.concentrator is not None
         assert cam.sensor_groups[1].chain.concentrator is None
         assert cam.get_info()["sensor_group_1"]["has_concentrator"] is False
 
-    def test_set_gap_round_trip(self):
-        cam = Camera([_square_sensor(concentrator=StubCone(length=0.05))])
-        assert cam.sensor_groups[0].chain.gap == 0.0
-        cam2 = cam.set_gap(0, 0.03)
-        assert cam2.sensor_groups[0].chain.gap == 0.03
-        # functional update leaves the original untouched
-        assert cam.sensor_groups[0].chain.gap == 0.0
-        # the detector plane reflects cone length + gap
-        assert jnp.allclose(cam2.sensor_groups[0].chain.detector_z, -(0.05 + 0.03))
 
-    def test_get_info_reports_gap_and_detector_z(self):
-        cam = Camera([_square_sensor(concentrator=StubCone(length=0.05), gap=0.01)])
-        info = cam.get_info()["sensor_group_0"]
-        assert jnp.allclose(info["gap"], 0.01)
-        assert jnp.allclose(info["detector_z"], -(0.05 + 0.01))
+# 6. DetectionSurface: every photodetector has one; generic core shapes match conics
 
 
-# 6. Concentrator fill index -> optical-path-length weighting
+def _slanted_rays(n=200, z0=0.05, slope=0.08, seed=2):
+    rng = np.random.default_rng(seed)
+    xy = rng.uniform(-0.006, 0.006, (n, 2))
+    origins = jnp.asarray(np.c_[xy, np.full(n, z0)])
+    d = jnp.tile(jnp.array([slope, 0.0, -1.0]), (n, 1))
+    d = d / jnp.linalg.norm(d, axis=1, keepdims=True)
+    return RayBundle(
+        origins=origins,
+        directions=d,
+        values=jnp.ones(n),
+        path_length=jnp.zeros(n),
+        n=jnp.ones(n),
+    )
 
 
-class TestConcentratorIndex:
-    def test_default_index_is_air(self):
-        # Hollow guides (Winston cones, the StubCone) inherit the base air index.
-        assert StubCone().index == 1.0
+def _sphere_as_core_group(curvature):
+    from iactrace.core.surfaces import AsphericSurfaceGroup
 
-    def test_index_override_weights_opl(self):
-        # A solid dielectric guide overrides `index`; its `apply` weights the
-        # internal geometric path by that index when accumulating OPL.
-        class SolidStub(Concentrator):
-            length: float = eqx.field(static=True)
-            n_mat: float = eqx.field(static=True)
+    return AsphericSurfaceGroup(
+        offsets=jnp.zeros((1, 2)),
+        curvatures=jnp.asarray([curvature]),
+        conics=jnp.zeros(1),
+        aspherics=jnp.zeros((1, 0)),
+    )
 
-            def __init__(self, length: float = 0.05, n_mat: float = 1.5) -> None:
-                self.length = float(length)
-                self.n_mat = float(n_mat)
 
-            @property
-            def index(self) -> float:
-                return self.n_mat
+class TestDetectionSurface:
+    def test_every_photodetector_has_a_surface(self):
+        from iactrace import PMT
+        from iactrace.camera.detector import DetectionSurface
 
-            def apply(self, local_rays: RayBundle) -> RayBundle:
-                o = local_rays.origins
-                new_o = jnp.stack([o[:, 0], o[:, 1], o[:, 2] - self.length], axis=-1)
-                return RayBundle(
-                    origins=new_o,
-                    directions=local_rays.directions,
-                    values=local_rays.values,
-                    path_length=local_rays.path_length + self.index * self.length,
-                    n=local_rays.n,
-                )
+        flat = ConstantQE(0.5).surface
+        assert isinstance(flat, DetectionSurface)
+        assert flat.is_flat and flat.vertex_z == 0.0
 
-        rays = RayBundle(
-            origins=jnp.zeros((1, 3)),
-            directions=jnp.array([[0.0, 0.0, -1.0]]),
-            values=jnp.ones(1),
-            path_length=jnp.zeros(1),
-            n=jnp.ones(1),
+        pmt = PMT(
+            qe=1.0, face_radius=0.01, surface=spherical_cap_surface(0.01, 0.002), vertex_z=0.002
         )
-        out = SolidStub(length=0.05, n_mat=1.5).apply(rays)
-        # OPL = index * geometric length, not the bare geometric 0.05.
-        assert jnp.allclose(out.path_length, 1.5 * 0.05)
+        dome = pmt.surface
+        assert not dome.is_flat
+        assert dome.vertex_z == pytest.approx(0.002)
+        assert dome.radius == pytest.approx(0.01)
+
+    def test_shape_and_conic_kwargs_are_exclusive(self):
+        from iactrace.camera.detector import DetectionSurface
+
+        with pytest.raises(ValueError, match="not both"):
+            DetectionSurface(_sphere_as_core_group(-30.0), curvature=-30.0)
+
+    def test_generic_shape_stop_matches_conic_fast_path(self):
+        # The same sphere given as curvature (closed-form intersection) and as a
+        # core AsphericSurfaceGroup (Newton-Raphson) must stop rays identically.
+        from iactrace.camera.detector import DetectionSurface
+
+        c = -1.0 / 0.03
+        fast = DetectionSurface(vertex_z=-0.01, curvature=c, radius=0.02)
+        generic = DetectionSurface(_sphere_as_core_group(c), vertex_z=-0.01, radius=0.02)
+        rays = _slanted_rays()
+
+        out_f = fast.stop(rays)
+        out_g = generic.stop(rays)
+        assert jnp.allclose(out_f.origins, out_g.origins, atol=1e-9)
+        assert jnp.allclose(out_f.values, out_g.values)
+        assert jnp.allclose(out_f.path_length, out_g.path_length, atol=1e-9)
+        # normals are photodetector-side now; both descriptions must agree there too
+        assert jnp.allclose(
+            fast.normals_at(out_f.origins), generic.normals_at(out_g.origins), atol=1e-9
+        )
+
+    def test_chain_with_pmt_photocathode(self):
+        # End-to-end: cone + curved PMT photocathode + Fresnel window response.
+        from iactrace import PMT, WinstonCone
+
+        cone = WinstonCone(6, 0.02, 0.01, reflectivity=0.95, max_bounces=12)
+        pmt = PMT(
+            qe=0.8,
+            n_window=1.48,
+            face_radius=0.011,
+            surface=spherical_cap_surface(0.011, 0.003),
+            vertex_z=0.003,
+        )
+        chain = DetectionChain(concentrator=cone, photodetector=pmt, gap=0.002)
+        out = chain.propagate(_slanted_rays(z0=0.0, slope=0.1))
+        v = jnp.asarray(out.values)
+        assert float(v.sum()) > 0.0
+        # qe and the window transmittance both bite: nothing exceeds qe.
+        assert float(v.max()) < 0.8

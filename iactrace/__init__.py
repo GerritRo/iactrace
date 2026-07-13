@@ -1,15 +1,16 @@
 import jax
 
 from .camera import (
+    PMT,
     Camera,
     Concentrator,
+    ConstantQE,
     DetectionChain,
     HexagonalSensorGroup,
     OkumuraCone,
-    PhotoSensor,
+    PhotoDetector,
     SensorGroup,
     SquareSensorGroup,
-    UniformQE,
     WinstonCone,
 )
 from .core import LazyRayBundle, RayBundle
@@ -34,9 +35,10 @@ __all__ = [
     "SensorGroup",
     "SquareSensorGroup",
     "HexagonalSensorGroup",
-    # PhotoSensor
-    "PhotoSensor",
-    "UniformQE",
+    # PhotoDetector
+    "PhotoDetector",
+    "ConstantQE",
+    "PMT",
     # Visualization
     "show_camera",
     "show_telescope",

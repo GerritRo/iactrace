@@ -1940,5 +1940,12 @@ sensors:
     reflectivity: 0.78
     max_bounces: 10
     orientation_deg: 0.0
+  photodetector:
+    type: pmt
+    qe: 1.0            # for now kept ideal
+    n_window: 1.49
+    face_radius: 0.01425
+    length: 0.098
+    vertex_z: 0.0
   gap: 0.001000
   edge_width: 0.0005

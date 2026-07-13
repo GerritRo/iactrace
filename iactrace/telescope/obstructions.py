@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-import jax.numpy as jnp
-
 # Re-export the low-level primitives for convenience
 from ..core.obstructions import (
     BoxGroup,
@@ -14,6 +12,7 @@ from ..core.obstructions import (
     SphereGroup,
     TriangleGroup,
 )
+from ._common import as_vec3
 
 __all__ = [
     # Re-exported core primitives
@@ -33,10 +32,8 @@ __all__ = [
 
 
 def _as_vec3(value, name: str) -> list[float]:
-    arr = jnp.asarray(value)
-    if arr.shape != (3,):
-        raise ValueError(f"{name} must have shape (3,), got {arr.shape}")
-    return [float(v) for v in arr]
+    """Coerce to shape ``(3,)``, then a plain list (these factories build list-of-lists)."""
+    return as_vec3(value, name).tolist()
 
 
 # Single-primitive factories

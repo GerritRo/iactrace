@@ -12,6 +12,8 @@ from ..core.coatings import Coating
 from ..core.interactions import ReflectInteraction
 from ..core.optics import OpticalElementGroup
 from ..core.surfaces import AsphericSurfaceGroup
+from ._common import as_aspheric_row as _as_aspheric_row
+from ._common import as_vec3 as _as_vec3
 
 __all__ = [
     "mirror_group",
@@ -20,22 +22,6 @@ __all__ = [
     "aspheric",
     "disk_array",
 ]
-
-
-# Input-shape helpers
-
-
-def _as_vec3(value, name: str) -> Array:
-    arr = jnp.asarray(value)
-    if arr.shape != (3,):
-        raise ValueError(f"{name} must have shape (3,), got {arr.shape}")
-    return arr
-
-
-def _as_aspheric_row(coeffs: Sequence[float] | None) -> Array:
-    if coeffs is None:
-        return jnp.zeros((0,))
-    return jnp.asarray(coeffs)
 
 
 # Low-level canonical builder
@@ -270,6 +256,43 @@ def _single_disk_mirror(
     )
 
 
+def _focal_length_disk_mirror(
+    *,
+    conic: float,
+    position: Sequence[float],
+    focal_length: float,
+    radius: float,
+    rotation: Sequence[float] = (0.0, 0.0, 0.0),
+    inner_radius: float = 0.0,
+    reflectivity: float = 1.0,
+    coating: Coating | None = None,
+    bsdf_scale: float = 0.0,
+    optical_stage: int = 0,
+    n_samples: int = 100,
+    key: Array,
+) -> OpticalElementGroup:
+    """Common backing for :func:`spherical` and :func:`parabolic`.
+
+    Both derive ``curvature = 1 / (2 * focal_length)`` and differ only in
+    ``conic`` (``0`` vs ``-1``).
+    """
+    return _single_disk_mirror(
+        position=position,
+        rotation=rotation,
+        curvature=1.0 / (2.0 * float(focal_length)),
+        conic=conic,
+        aspheric_coeffs=None,
+        radius=radius,
+        inner_radius=inner_radius,
+        reflectivity=reflectivity,
+        coating=coating,
+        bsdf_scale=bsdf_scale,
+        optical_stage=optical_stage,
+        n_samples=n_samples,
+        key=key,
+    )
+
+
 def spherical(
     *,
     position: Sequence[float],
@@ -301,13 +324,12 @@ def spherical(
         n_samples: Monte Carlo samples per render call.
         key: JAX PRNG key.
     """
-    return _single_disk_mirror(
-        position=position,
-        rotation=rotation,
-        curvature=1.0 / (2.0 * float(focal_length)),
+    return _focal_length_disk_mirror(
         conic=0.0,
-        aspheric_coeffs=None,
+        position=position,
+        focal_length=focal_length,
         radius=radius,
+        rotation=rotation,
         inner_radius=inner_radius,
         reflectivity=reflectivity,
         coating=coating,
@@ -340,13 +362,12 @@ def parabolic(
 
     Args: see :func:`spherical`.
     """
-    return _single_disk_mirror(
-        position=position,
-        rotation=rotation,
-        curvature=1.0 / (2.0 * float(focal_length)),
+    return _focal_length_disk_mirror(
         conic=-1.0,
-        aspheric_coeffs=None,
+        position=position,
+        focal_length=focal_length,
         radius=radius,
+        rotation=rotation,
         inner_radius=inner_radius,
         reflectivity=reflectivity,
         coating=coating,

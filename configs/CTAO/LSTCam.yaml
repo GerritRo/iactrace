@@ -11,7 +11,19 @@ sensors:
    reflectivity: 0.95
    max_bounces: 10
    orientation_deg: 0.0
-   length: 0.068    
+   length: 0.068   
+  photodetector:
+    type: pmt
+    qe: 1.0            # for now kept perfect
+    n_window: 1.52     
+    face_radius: 0.01925
+    surface:
+      type: aspheric
+      curvature: -47.619048
+      conic: 0.0
+    vertex_z: 0.00290731 # had to be guessed for LST, assumes roughly 1mm.
+    length: 0.087
+  edge_width: 0.0005
   position:
   - 0.000000
   - 0.000000

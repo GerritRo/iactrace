@@ -151,7 +151,10 @@ These validate the kind at the requested stage and raise
 **Focal length (mirror or lens, kind-dispatched formula)**
 
 For mirrors, ``c = 1 / (2 f)``. For single-surface refractive lenses,
-``c = 1 / ((n_inside - n_outside) f)``. Slabs raise.
+``c = 1 / ((n_inside - n_outside) f)``, where ``n_outside`` is a design-time
+ambient-index assumption passed to the operation (default ``1.0``; the lens
+itself stores no ambient index -- the render loop reads it dynamically from
+each ray's current medium). Slabs raise.
 
 .. code-block:: python
 

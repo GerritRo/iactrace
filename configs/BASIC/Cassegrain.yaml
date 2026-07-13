@@ -12,11 +12,13 @@ telescope:
 mirror_templates:
   template_0:
     surface:
+      type: aspheric
       curvature: 1.250000
       conic: -1.000000
       aspheric: []
   template_1:
     surface:
+      type: aspheric
       curvature: -4.444444
       conic: -2.250000
       aspheric: []

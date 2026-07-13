@@ -1,20 +1,22 @@
 from .camera import Camera
-from .chain import DetectionChain
-from .concentrator import Concentrator
-from .okumura_cone import OkumuraCone
-from .photosensor import PhotoSensor, UniformQE
+from .detection_chain import DetectionChain
+from .detector import PMT, ConstantQE, PhotoDetector
+from .optics import ChainTrace, Concentrator, OkumuraCone, PolygonalCone, WinstonCone, trace_chain
 from .sensor_group import HexagonalSensorGroup, SensorGroup, SquareSensorGroup
-from .winston_cone import WinstonCone
 
 __all__ = [
     "Camera",
     "DetectionChain",
     "Concentrator",
+    "PolygonalCone",
     "WinstonCone",
     "OkumuraCone",
     "SensorGroup",
     "SquareSensorGroup",
     "HexagonalSensorGroup",
-    "PhotoSensor",
-    "UniformQE",
+    "PhotoDetector",
+    "PMT",
+    "ConstantQE",
+    "trace_chain",
+    "ChainTrace",
 ]

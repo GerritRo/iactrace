@@ -12,6 +12,7 @@ telescope:
 mirror_templates:
   primary:
     surface:
+      type: aspheric
       curvature: 1.250000
       conic: -1.000000
       aspheric: []

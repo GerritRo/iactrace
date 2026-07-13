@@ -10,6 +10,8 @@ from ..core.coatings import Coating
 from ..core.interactions import RefractInteraction, SlabInteraction
 from ..core.optics import OpticalElementGroup
 from ..core.surfaces import AsphericSurfaceGroup
+from ._common import as_aspheric_row as _as_aspheric_row
+from ._common import as_vec3 as _as_vec3
 
 __all__ = [
     "refractive_group",
@@ -17,19 +19,6 @@ __all__ = [
     "aspheric_lens",
     "plano_slab",
 ]
-
-
-def _as_vec3(value, name: str) -> Array:
-    arr = jnp.asarray(value)
-    if arr.shape != (3,):
-        raise ValueError(f"{name} must have shape (3,), got {arr.shape}")
-    return arr
-
-
-def _as_aspheric_row(coeffs: Sequence[float] | None) -> Array:
-    if coeffs is None:
-        return jnp.zeros((0,))
-    return jnp.asarray(coeffs)
 
 
 # Low-level canonical builders
@@ -45,7 +34,6 @@ def refractive_group(
     offsets: Array,
     aperture: Aperture,
     n_inside: Array,
-    n_outside: float,
     transmittance: Array | float = 1.0,
     sample_key: Array,
     coating: Coating | None = None,
@@ -67,8 +55,10 @@ def refractive_group(
         aspherics: Per-element aspheric coefficients, shape ``(N, K)``.
         offsets: Per-element surface decentering, shape ``(N, 2)``.
         aperture: Pre-built aperture sized to ``N``.
-        n_inside: Per-element refractive index, shape ``(N,)``.
-        n_outside: Scalar ambient refractive index (shared by all elements).
+        n_inside: Per-element refractive index, shape ``(N,)``. The ambient
+            index on the incident side is not stored: the render loop reads
+            it dynamically from each ray's current medium (see
+            :class:`~iactrace.core.interactions.RefractInteraction`).
         transmittance: Per-element bulk transmittance in ``[0, 1]``, shape
             ``(N,)``.
         sample_key: JAX PRNG key for aperture sampling.
@@ -96,7 +86,6 @@ def refractive_group(
     )
     interaction = RefractInteraction(
         n_inside=n_inside,
-        n_outside=float(n_outside),
         transmittance=coating,
         transmittance_scalar=trans_scalar,
     )
@@ -119,7 +108,6 @@ def slab_group(
     rotations: Array,
     aperture: Aperture,
     n_inside: Array,
-    n_outside: float,
     thickness: Array,
     transmittance: Array | float = 1.0,
     sample_key: Array,
@@ -138,8 +126,10 @@ def slab_group(
         positions: Per-element front-surface positions, shape ``(N, 3)``.
         rotations: Per-element Euler angles in degrees, shape ``(N, 3)``.
         aperture: Pre-built aperture sized to ``N``.
-        n_inside: Per-element slab refractive index, shape ``(N,)``.
-        n_outside: Scalar ambient refractive index.
+        n_inside: Per-element slab refractive index, shape ``(N,)``. The
+            ambient index is not stored: the render loop reads it
+            dynamically from each ray's current medium (see
+            :class:`~iactrace.core.interactions.SlabInteraction`).
         thickness: Per-element slab thickness in metres, shape ``(N,)``.
         transmittance: Per-element bulk transmittance in ``[0, 1]``, shape
             ``(N,)``.
@@ -165,7 +155,6 @@ def slab_group(
     )
     interaction = SlabInteraction(
         n_inside=n_inside,
-        n_outside=float(n_outside),
         thickness=thickness,
         transmittance=coating,
         transmittance_scalar=trans_scalar,
@@ -186,6 +175,11 @@ def slab_group(
 # High-level sugar: single-element factories
 
 
+def _single_disk_aperture(radius: float) -> DiskAperture:
+    """A solid (no inner hole) ``DiskAperture`` for a single-element group."""
+    return DiskAperture(radii=jnp.asarray([float(radius)]), inner_radii=jnp.zeros(1))
+
+
 def _single_disk_refractive(
     *,
     position,
@@ -195,7 +189,6 @@ def _single_disk_refractive(
     aspheric_coeffs,
     radius,
     n_inside,
-    n_outside,
     transmittance,
     coating,
     optical_stage,
@@ -208,10 +201,7 @@ def _single_disk_refractive(
     aspheric_row = _as_aspheric_row(aspheric_coeffs)
     n = 1
 
-    aperture = DiskAperture(
-        radii=jnp.asarray([float(radius)]),
-        inner_radii=jnp.zeros(n),
-    )
+    aperture = _single_disk_aperture(radius)
 
     return refractive_group(
         positions=pos.reshape(1, 3),
@@ -222,7 +212,6 @@ def _single_disk_refractive(
         offsets=jnp.zeros((n, 2)),
         aperture=aperture,
         n_inside=jnp.asarray([float(n_inside)]),
-        n_outside=float(n_outside),
         transmittance=jnp.asarray([float(transmittance)]),
         coating=coating,
         sample_key=key,
@@ -240,7 +229,6 @@ def aspheric_lens(
     conic: float = 0.0,
     aspheric_coeffs: Sequence[float] | None = None,
     n_inside: float = 1.5,
-    n_outside: float = 1.0,
     transmittance: float = 1.0,
     coating: Coating | None = None,
     optical_stage: int = 0,
@@ -260,7 +248,7 @@ def aspheric_lens(
         rotation: Euler angles in degrees. Defaults to no rotation.
         conic: Schwarzschild conic constant.
         aspheric_coeffs: Even aspheric coefficients ``[a2, a4, ...]``.
-        n_inside, n_outside, transmittance, optical_stage, n_samples, key:
+        n_inside, transmittance, optical_stage, n_samples, key:
             see :func:`thin`.
     """
     return _single_disk_refractive(
@@ -271,7 +259,6 @@ def aspheric_lens(
         aspheric_coeffs=aspheric_coeffs,
         radius=radius,
         n_inside=n_inside,
-        n_outside=n_outside,
         transmittance=transmittance,
         coating=coating,
         optical_stage=optical_stage,
@@ -287,7 +274,6 @@ def plano_slab(
     thickness: float,
     rotation: Sequence[float] = (0.0, 0.0, 0.0),
     n_inside: float = 1.5,
-    n_outside: float = 1.0,
     transmittance: float = 1.0,
     coating: Coating | None = None,
     optical_stage: int = 0,
@@ -307,27 +293,21 @@ def plano_slab(
         thickness: Slab thickness in metres (along the optical axis).
         rotation: Euler angles in degrees. Defaults to no rotation.
         n_inside: Refractive index of the slab material. Defaults to 1.5.
-        n_outside: Refractive index of the ambient medium. Defaults to 1.0.
         transmittance: Bulk transmittance in ``[0, 1]``. Defaults to 1.0.
         optical_stage: Stage index within the Telescope.
         n_samples: Monte Carlo samples per element per render.
         key: JAX PRNG key for aperture sampling.
     """
-    n = 1
     pos = _as_vec3(position, "position")
     rot = _as_vec3(rotation, "rotation")
 
-    aperture = DiskAperture(
-        radii=jnp.asarray([float(radius)]),
-        inner_radii=jnp.zeros(n),
-    )
+    aperture = _single_disk_aperture(radius)
 
     return slab_group(
         positions=pos.reshape(1, 3),
         rotations=rot.reshape(1, 3),
         aperture=aperture,
         n_inside=jnp.asarray([float(n_inside)]),
-        n_outside=float(n_outside),
         thickness=jnp.asarray([float(thickness)]),
         transmittance=jnp.asarray([float(transmittance)]),
         coating=coating,

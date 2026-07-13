@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import math
-import warnings
 from collections import defaultdict
 from collections.abc import Callable
 from typing import TYPE_CHECKING, NamedTuple
@@ -12,10 +11,10 @@ import jax.numpy as jnp
 import numpy as np
 from jax import Array
 
-from ..camera.okumura_cone import OkumuraCone
-from ..camera.photosensor import UniformQE
+from ..camera.detector import PMT, ConstantQE
+from ..camera.optics import OkumuraCone, WinstonCone
+from ..camera.optics.winston import cpc_full_length
 from ..camera.sensor_group import HexagonalSensorGroup, SquareSensorGroup
-from ..camera.winston_cone import WinstonCone, cpc_full_length, cpc_wall_tilt
 from ..core.apertures import Aperture, DiskAperture, PolygonAperture
 from ..core.bsdf import BSDF, DoubleGaussianBSDF, GaussianBSDF
 from ..core.coatings import Coating, TabulatedCoating
@@ -42,11 +41,13 @@ from ..core.surfaces import (
 from ..core.transforms import euler_to_matrix
 from .schemas import (
     AsphericDiskLensSchema,
+    AsphericSurfaceSchema,
     BoxObstructionSchema,
     BSDFSchema,
     CameraFileSchema,
     CircularApertureSchema,
     ConcentratorSchema,
+    ConstantQESchema,
     CylinderObstructionSchema,
     DoubleGaussianBSDFSchema,
     GaussianBSDFSchema,
@@ -56,26 +57,25 @@ from .schemas import (
     OkumuraConeSchema,
     OpenCylinderObstructionSchema,
     OrientedBoxObstructionSchema,
-    PhotoSensorSchema,
+    PhotoDetectorSchema,
     PlanoSlabSchema,
+    PMTSchema,
     PolygonApertureSchema,
     SphereObstructionSchema,
     SquareSensorSchema,
-    SurfaceSchema,
     TabulatedCurveSchema,
     TelescopeConfigSchema,
     TelescopeMetadataSchema,
     TriangleObstructionSchema,
-    UniformQESchema,
     WinstonConeSchema,
-    ZernikeSchema,
+    ZernikeSurfaceSchema,
 )
 
 if TYPE_CHECKING:
     from ..camera import Camera
-    from ..camera.chain import DetectionChain
-    from ..camera.concentrator import Concentrator
-    from ..camera.photosensor import PhotoSensor
+    from ..camera.detection_chain import DetectionChain
+    from ..camera.detector import PhotoDetector
+    from ..camera.optics import Concentrator
     from ..camera.sensor_group import SensorGroup
     from ..telescope import Telescope
 
@@ -103,13 +103,14 @@ class _ParsedMirror(NamedTuple):
     curvature: float
     conic: float
     aspheric: list[float]
+    has_aspheric: bool
     offset: list[float]
     stage: int
     aperture: CircularApertureSchema | PolygonApertureSchema
     bsdf: BSDFSchema | None
     reflectivity_scalar: float
     coating_curve: TabulatedCurveSchema | None
-    zernike: ZernikeSchema | None
+    zernike: ZernikeSurfaceSchema | None
 
 
 def _to_float_list(arr: np.ndarray | jnp.ndarray) -> list[float]:
@@ -217,43 +218,130 @@ def _bucket_by_aperture_signature[T](
     return buckets
 
 
+def _surface_list(spec) -> list:
+    """Normalise a surface spec (a single shape or a list) to a list of shapes."""
+    return list(spec) if isinstance(spec, list) else [spec]
+
+
+def _split_surface(
+    spec,
+) -> tuple[AsphericSurfaceSchema | None, ZernikeSurfaceSchema | None]:
+    """Split a surface spec into its ``(aspheric, zernike)`` shapes.
+
+    At most one of each is allowed today; the surface's sag is their sum.
+    """
+    asph: AsphericSurfaceSchema | None = None
+    zern: ZernikeSurfaceSchema | None = None
+    for s in _surface_list(spec):
+        match s.type:
+            case "aspheric":
+                if asph is not None:
+                    raise ValueError("a surface may list at most one aspheric shape")
+                asph = s
+            case "zernike":
+                if zern is not None:
+                    raise ValueError("a surface may list at most one zernike shape")
+                zern = s
+    return asph, zern
+
+
+def _single_element_surface(spec) -> AsphericSurfaceGroup | ZernikeSurfaceGroup | SumSurfaceGroup:
+    """Build a one-element (N=1) core surface from a schema spec.
+
+    Reuses :func:`_split_surface` -- the same aspheric/zernike decomposition
+    every mirror and lens surface goes through -- so any surface an optical
+    element can describe (a bare aspheric shape, a bare zernike shape, or
+    their sum) is buildable from a single spec. The N-wide counterpart lives
+    in :func:`_build_mirror_group` / :func:`_build_aspheric_disk_lens_group`
+    (batched over a bucket); this is the N=1 case, used by
+    :func:`_pmt_from_schema`.
+    """
+    asph, zern = _split_surface(spec)
+    aspheric = AsphericSurfaceGroup(
+        offsets=jnp.zeros((1, 2)),
+        curvatures=jnp.asarray([asph.curvature if asph is not None else 0.0]),
+        conics=jnp.asarray([asph.conic if asph is not None else 0.0]),
+        aspherics=_pad_aspherics([asph.aspheric if asph is not None else []]),
+    )
+    if zern is None:
+        return aspheric
+    zernike = ZernikeSurfaceGroup(
+        coeffs=jnp.asarray([zern.coeffs]), r_norm=jnp.asarray([zern.r_norm])
+    )
+    if asph is None:
+        return zernike
+    return SumSurfaceGroup([aspheric, zernike])
+
+
+class _ResolvedSurface(NamedTuple):
+    curvature: float
+    conic: float
+    aspheric: list[float]
+    has_aspheric: bool
+    zernike: ZernikeSurfaceSchema | None
+
+
 def _resolve_surface(
-    mirror: MirrorSchema, template: MirrorTemplateSchema
-) -> tuple[float, float, list[float]]:
-    """Resolve surface parameters from mirror + template (mirror overrides template)."""
-    surface = template.surface
-    curvature = mirror.curvature if mirror.curvature is not None else surface.curvature
-    conic = mirror.conic if mirror.conic is not None else surface.conic
-    aspheric = mirror.aspheric if mirror.aspheric is not None else surface.aspheric
-    return curvature, conic, aspheric
+    mirror: MirrorSchema, template: MirrorTemplateSchema | None
+) -> _ResolvedSurface:
+    """Resolve a mirror's surface: the mirror is the joint of itself and its
+    (optional) template, field by field, with the mirror's own value winning
+    whenever both define it.
+
+    ``curvature`` / ``conic`` / ``aspheric`` / ``zernike`` are each resolved
+    independently -- a mirror may override just one (e.g. ``curvature`` for a
+    segmented primary panel) while inheriting the rest from the template, or
+    a template-less mirror may set all of them itself, or a mirror may supply
+    its own ``zernike`` (e.g. a measured per-panel figure error) while
+    sharing the template's aspheric base with every other panel.
+    """
+    asph = zern = None
+    if template is not None and template.surface is not None:
+        asph, zern = _split_surface(template.surface)
+    override = (
+        mirror.curvature is not None or mirror.conic is not None or mirror.aspheric is not None
+    )
+    base_c = asph.curvature if asph is not None else 0.0
+    base_k = asph.conic if asph is not None else 0.0
+    base_a = asph.aspheric if asph is not None else []
+    return _ResolvedSurface(
+        curvature=mirror.curvature if mirror.curvature is not None else base_c,
+        conic=mirror.conic if mirror.conic is not None else base_k,
+        aspheric=mirror.aspheric if mirror.aspheric is not None else base_a,
+        has_aspheric=asph is not None or override,
+        zernike=mirror.zernike if mirror.zernike is not None else zern,
+    )
 
 
 def _resolve_bsdf(
     mirror: MirrorSchema,
-    template: MirrorTemplateSchema,
+    template: MirrorTemplateSchema | None,
 ) -> BSDFSchema | None:
-    """Resolve the per-mirror BSDF schema (mirror overrides template).
-
-    The template's ``bsdf`` acts as a shared default; a mirror may
-    override it with its own ``bsdf`` block.
-    """
+    """Resolve the per-mirror BSDF schema (mirror overrides template)."""
     if mirror.bsdf is not None:
         return mirror.bsdf
-    return template.bsdf
+    return template.bsdf if template is not None else None
 
 
 def _resolve_reflectivity(
     mirror: MirrorSchema,
-    template: MirrorTemplateSchema,
+    template: MirrorTemplateSchema | None,
 ) -> tuple[float, TabulatedCurveSchema | None]:
     """Resolve (bulk_scalar, coating_curve) from mirror + template.
 
-    Per-mirror scalar overrides the template scalar; the coating lives
-    on the template only.
+    Both the scalar and the coating follow the same mirror-wins-if-defined
+    rule as every other joint field.
     """
-    template_scalar = template.reflectivity if template.reflectivity is not None else 1.0
+    template_scalar = (
+        template.reflectivity if template is not None and template.reflectivity is not None else 1.0
+    )
     scalar = mirror.reflectivity if mirror.reflectivity is not None else float(template_scalar)
-    return float(scalar), template.coating
+    coating = (
+        mirror.coating
+        if mirror.coating is not None
+        else (template.coating if template is not None else None)
+    )
+    return float(scalar), coating
 
 
 def _curves_equal(
@@ -389,8 +477,10 @@ def mirrors_from_schemas(
     # Resolve templates and parse each mirror into typed tuples
     parsed: list[_ParsedMirror] = []
     for mirror in mirrors:
-        template = templates[mirror.template]
-        curvature, conic, aspheric = _resolve_surface(mirror, template)
+        # A mirror without a template is fully self-contained; TelescopeConfigSchema
+        # already validated that a non-None template name exists in `templates`.
+        template = templates[mirror.template] if mirror.template is not None else None
+        surface = _resolve_surface(mirror, template)
         bsdf = _resolve_bsdf(mirror, template)
         refl_scalar, coating_curve = _resolve_reflectivity(mirror, template)
 
@@ -398,16 +488,17 @@ def mirrors_from_schemas(
             _ParsedMirror(
                 position=mirror.position,
                 orientation=mirror.orientation,
-                curvature=curvature,
-                conic=conic,
-                aspheric=aspheric,
+                curvature=surface.curvature,
+                conic=surface.conic,
+                aspheric=surface.aspheric,
+                has_aspheric=surface.has_aspheric,
                 offset=mirror.offset,
                 stage=mirror.stage,
                 aperture=mirror.aperture,
                 bsdf=bsdf,
                 reflectivity_scalar=refl_scalar,
                 coating_curve=coating_curve,
-                zernike=mirror.zernike,
+                zernike=surface.zernike,
             )
         )
 
@@ -429,10 +520,81 @@ def mirrors_from_schemas(
     return groups
 
 
+class _BsdfSpec(NamedTuple):
+    """Bidirectional spec for one BSDF type; see ``_ConcentratorSpec``.
+
+    ``build`` assembles a whole-bucket domain BSDF from a list of per-element
+    schemas (already known to be homogeneous and non-empty); ``to_schema``
+    projects element ``i`` of a domain BSDF back to a schema, or ``None`` for
+    a trivially-zero element.
+    """
+
+    type_name: str
+    schema: type
+    group: type
+    build: Callable[[list], BSDF | None]
+    # Each entry's to_schema only ever accepts that entry's own BSDF subclass
+    # (the driver looks it up by type(bsdf) first), narrower than a plain
+    # Callable[[BSDF, int], ...] would allow; typed loosely here for that reason.
+    to_schema: Callable[..., BSDFSchema | None]
+
+
+def _build_gaussian_bsdf(schemas: list[GaussianBSDFSchema | None]) -> GaussianBSDF | None:
+    scale = jnp.asarray([s.scale if s is not None else 0.0 for s in schemas])
+    if bool(jnp.all(scale == 0)):
+        return None
+    return GaussianBSDF(scale=scale)
+
+
+def _gaussian_bsdf_to_schema(bsdf: GaussianBSDF, i: int) -> GaussianBSDFSchema | None:
+    scale = float(bsdf.scale[i])
+    return None if scale == 0.0 else GaussianBSDFSchema(scale=scale)
+
+
+def _build_double_gaussian_bsdf(
+    schemas: list[DoubleGaussianBSDFSchema | None],
+) -> DoubleGaussianBSDF:
+    def _col(attr: str) -> Array:
+        return jnp.asarray([getattr(s, attr) if s is not None else 0.0 for s in schemas])
+
+    return DoubleGaussianBSDF(
+        scale_narrow=_col("scale_narrow"),
+        scale_wide=_col("scale_wide"),
+        mix_weight=_col("mix_weight"),
+    )
+
+
+def _double_gaussian_bsdf_to_schema(bsdf: DoubleGaussianBSDF, i: int) -> DoubleGaussianBSDFSchema:
+    return DoubleGaussianBSDFSchema(
+        scale_narrow=float(bsdf.scale_narrow[i]),
+        scale_wide=float(bsdf.scale_wide[i]),
+        mix_weight=float(bsdf.mix_weight[i]),
+    )
+
+
+# The single source of truth for BSDF round-tripping; see _CONCENTRATOR_SPECS.
+# Adding a BSDF model is one entry here plus a schema variant in
+# iactrace.io.schemas.
+_BSDF_SPECS: tuple[_BsdfSpec, ...] = (
+    _BsdfSpec(
+        "gaussian", GaussianBSDFSchema, GaussianBSDF, _build_gaussian_bsdf, _gaussian_bsdf_to_schema
+    ),
+    _BsdfSpec(
+        "double_gaussian",
+        DoubleGaussianBSDFSchema,
+        DoubleGaussianBSDF,
+        _build_double_gaussian_bsdf,
+        _double_gaussian_bsdf_to_schema,
+    ),
+)
+_BSDF_SPEC_BY_GROUP: dict[type, _BsdfSpec] = {s.group: s for s in _BSDF_SPECS}
+_BSDF_SPEC_BY_TYPE: dict[str, _BsdfSpec] = {s.type_name: s for s in _BSDF_SPECS}
+
+
 def _build_bsdf_for_bucket(
     schemas: list[BSDFSchema | None],
 ) -> BSDF | None:
-    """Reassemble one group's BSDF from per-element schemas.
+    """Reassemble one group's BSDF from per-element schemas; see ``_BSDF_SPECS``.
 
     All ``None`` -> ``None`` (perfect specular). Otherwise every element
     that declares a BSDF must share the same ``type``; per-element
@@ -440,9 +602,6 @@ def _build_bsdf_for_bucket(
     a BSDF default to zero (specular for that element). Mixed types
     raise ``ValueError``, mirroring the per-bucket coating guard in
     :func:`_build_coating_for_bucket`.
-
-    Adding a BSDF model means adding a schema variant in
-    :mod:`iactrace.io.schemas` and one arm here.
     """
     present = [s for s in schemas if s is not None]
     if not present:
@@ -456,34 +615,13 @@ def _build_bsdf_for_bucket(
             "across stages, or harmonise their `bsdf.type`."
         )
 
-    match present[0]:
-        case GaussianBSDFSchema():
-            scale = jnp.asarray(
-                [s.scale if isinstance(s, GaussianBSDFSchema) else 0.0 for s in schemas]
-            )
-            if bool(jnp.all(scale == 0)):
-                return None
-            return GaussianBSDF(scale=scale)
-        case DoubleGaussianBSDFSchema():
-
-            def _col(attr: str) -> Array:
-                return jnp.asarray(
-                    [
-                        getattr(s, attr) if isinstance(s, DoubleGaussianBSDFSchema) else 0.0
-                        for s in schemas
-                    ]
-                )
-
-            return DoubleGaussianBSDF(
-                scale_narrow=_col("scale_narrow"),
-                scale_wide=_col("scale_wide"),
-                mix_weight=_col("mix_weight"),
-            )
-        case _:  # pragma: no cover - unreachable while the union is exhaustive
-            raise ValueError(
-                f"Unhandled BSDF schema {type(present[0]).__name__}; add an "
-                "arm to _build_bsdf_for_bucket."
-            )
+    spec = _BSDF_SPEC_BY_TYPE.get(present[0].type)
+    if spec is None:  # pragma: no cover - unreachable while the union is exhaustive
+        raise ValueError(
+            f"Unhandled BSDF schema type {present[0].type!r}; add a "
+            "_BsdfSpec entry in iactrace.io.adapters."
+        )
+    return spec.build(schemas)
 
 
 def _build_mirror_group(
@@ -526,10 +664,15 @@ def _build_mirror_group(
         optical_stage=stage,
         n_samples=n_samples,
     )
-    return _maybe_add_zernike(group, [m.zernike for m in mirrors])
+    return _compose_surface(
+        group,
+        [m.zernike for m in mirrors],
+        has_aspheric=any(m.has_aspheric for m in mirrors),
+    )
+
 
 def _build_zernike_for_bucket(
-    schemas: list[ZernikeSchema | None],
+    schemas: list[ZernikeSurfaceSchema | None],
 ) -> ZernikeSurfaceGroup | None:
     """Reassemble one group's Zernike term from per-element schemas, or ``None``.
     All ``None`` -> ``None`` (no figure error). Otherwise every element's
@@ -551,20 +694,37 @@ def _build_zernike_for_bucket(
             coeffs.append(list(z.coeffs) + [0.0] * (width - len(z.coeffs)))
             r_norms.append(z.r_norm)
     return ZernikeSurfaceGroup(
-        coeffs=jnp.asarray(coeffs), r_norm=jnp.asarray(r_norms),
+        coeffs=jnp.asarray(coeffs),
+        r_norm=jnp.asarray(r_norms),
     )
 
 
-def _maybe_add_zernike(
+def _compose_surface(
     group: OpticalElementGroup,
-    schemas: list[ZernikeSchema | None],
+    zernike_schemas: list[ZernikeSurfaceSchema | None],
+    *,
+    has_aspheric: bool,
 ) -> OpticalElementGroup:
-    """Wrap the group's aspheric surface in a Sum + Zernike term if any present."""
-    zernike = _build_zernike_for_bucket(schemas)
+    """Replace the group's built aspheric surface with the composed surface.
+
+    The group is always built with an :class:`AsphericSurfaceGroup` (flat when
+    the spec has no aspheric shape). Given the per-element Zernike shapes and
+    whether the bucket has an aspheric shape at all:
+
+    - no Zernike -> keep the aspheric surface (bare asphere);
+    - Zernike + aspheric -> ``SumSurfaceGroup([asphere, zernike])``;
+    - Zernike only -> a standalone :class:`ZernikeSurfaceGroup` (the flat
+      placeholder asphere is dropped; its decenter carries over).
+    """
+    zernike = _build_zernike_for_bucket(zernike_schemas)
     if zernike is None:
         return group
-    new_surface = SumSurfaceGroup([group.surface, zernike])
-    return eqx.tree_at(lambda g: g.surface, group, new_surface)
+    if not has_aspheric:
+        standalone = ZernikeSurfaceGroup(
+            coeffs=zernike.coeffs, r_norm=zernike.r_norm, offsets=group.surface.offsets
+        )
+        return eqx.tree_at(lambda g: g.surface, group, standalone)
+    return eqx.tree_at(lambda g: g.surface, group, SumSurfaceGroup([group.surface, zernike]))
 
 
 def lenses_from_schemas(
@@ -574,24 +734,20 @@ def lenses_from_schemas(
 ) -> list[OpticalElementGroup]:
     """Convert validated lens schemas to OpticalElementGroup domain objects.
 
-    Groups by ``(type, stage, aperture_signature)``; mirroring how
-    :func:`mirrors_from_schemas` groups mirrors and constructs one
-    :class:`OpticalElementGroup` per bucket.
+    Buckets by ``type`` via ``_LENS_SPECS`` (mirroring how obstructions
+    dispatch on ``_OBSTRUCTION_SPECS``), then within each type bucket groups
+    by ``(stage, aperture_signature)`` via :func:`_build_lens_groups_by_stage`,
+    mirroring how :func:`mirrors_from_schemas` groups mirrors.
     """
-    aspheric_disks: list[AsphericDiskLensSchema] = []
-    plano_slabs: list[PlanoSlabSchema] = []
+    by_type: dict[str, list] = defaultdict(list)
     for lens in lenses:
-        match lens.type:
-            case "aspheric_disk":
-                aspheric_disks.append(lens)
-            case "plano_slab":
-                plano_slabs.append(lens)
+        by_type[lens.type].append(lens)
 
     groups: list[OpticalElementGroup] = []
-    key, groups = _build_lens_groups_by_stage(
-        aspheric_disks, _build_aspheric_disk_lens_group, key, groups
-    )
-    key, groups = _build_lens_groups_by_stage(plano_slabs, _build_plano_slab_group, key, groups)
+    for spec in _LENS_SPECS:
+        bucket = by_type.get(spec.type_name)
+        if bucket:
+            key, groups = _build_lens_groups_by_stage(bucket, spec.builder, key, groups)
     return groups
 
 
@@ -613,29 +769,6 @@ def _build_lens_groups_by_stage[L: AsphericDiskLensSchema | PlanoSlabSchema](
     return key, groups
 
 
-def _resolve_shared_n_outside[L: AsphericDiskLensSchema | PlanoSlabSchema](
-    lenses: list[L],
-) -> float:
-    """Resolve the single ambient index shared by a lens bucket.
-
-    A group stores one scalar ``n_outside`` for all its elements, so
-    lenses bucketed together (same stage + aperture) must agree on it.
-    Differing values raise rather than silently adopting the first
-    lens's value, mirroring the per-bucket coating guard in
-    :func:`_build_coating_for_bucket`.
-    """
-    values = [lens.n_outside for lens in lenses]
-    first = values[0]
-    if any(v != first for v in values):
-        raise ValueError(
-            "Lenses grouped at the same stage with the same aperture must "
-            f"share a single n_outside; got {sorted(set(values))}. The "
-            "ambient index is stored per group, not per element; split "
-            "them across stages, or harmonise n_outside."
-        )
-    return float(first)
-
-
 def _build_aspheric_disk_lens_group(
     lenses: list[AsphericDiskLensSchema],
     aperture: Aperture,
@@ -654,23 +787,27 @@ def _build_aspheric_disk_lens_group(
         [lens.coating for lens in lenses],
         n,
     )
+    split = [_split_surface(lens.surface) for lens in lenses]  # (aspheric, zernike) per lens
 
     group = refractive_group(
         positions=jnp.asarray([lens.position for lens in lenses]),
         rotations=jnp.asarray([lens.orientation for lens in lenses]),
-        curvatures=jnp.asarray([lens.curvature for lens in lenses]),
-        conics=jnp.asarray([lens.conic for lens in lenses]),
-        aspherics=_pad_aspherics([lens.aspheric for lens in lenses]),
+        curvatures=jnp.asarray([a.curvature if a else 0.0 for a, _ in split]),
+        conics=jnp.asarray([a.conic if a else 0.0 for a, _ in split]),
+        aspherics=_pad_aspherics([a.aspheric if a else [] for a, _ in split]),
         offsets=jnp.asarray([lens.offset for lens in lenses]),
         aperture=aperture,
         n_inside=jnp.asarray([lens.n_inside for lens in lenses]),
-        n_outside=_resolve_shared_n_outside(lenses),
         transmittance=jnp.asarray([lens.transmittance for lens in lenses]),
         coating=coating,
         sample_key=sample_key,
         optical_stage=stage,
     )
-    return _maybe_add_zernike(group, [lens.zernike for lens in lenses])
+    return _compose_surface(
+        group,
+        [z for _, z in split],
+        has_aspheric=any(a is not None for a, _ in split),
+    )
 
 
 def _build_plano_slab_group(
@@ -697,7 +834,6 @@ def _build_plano_slab_group(
         rotations=jnp.asarray([lens.orientation for lens in lenses]),
         aperture=aperture,
         n_inside=jnp.asarray([lens.n_inside for lens in lenses]),
-        n_outside=_resolve_shared_n_outside(lenses),
         thickness=jnp.asarray([lens.thickness for lens in lenses]),
         transmittance=jnp.asarray([lens.transmittance for lens in lenses]),
         coating=coating,
@@ -706,103 +842,152 @@ def _build_plano_slab_group(
     )
 
 
+class _ObsField(NamedTuple):
+    """One field of an obstruction, mapping a schema attr to a group attr.
+
+    ``kind`` selects how the value is projected in each direction:
+    ``vec3``/``scalar`` copy through (arrays batch on load, elements read
+    back on save); ``euler_matrix`` converts Euler degrees <-> a 3x3 matrix.
+    """
+
+    schema_attr: str
+    group_attr: str
+    kind: str  # 'vec3' | 'scalar' | 'euler_matrix'
+
+
+class _ObsSpec(NamedTuple):
+    """Bidirectional spec for one obstruction primitive type."""
+
+    type_name: str
+    schema: type
+    group: type
+    fields: tuple[_ObsField, ...]
+
+
+# The single source of truth for obstruction round-tripping. Adding a new
+# primitive is one entry here plus its schema (io.schemas) and group
+# (core.obstructions) classes; the load/save drivers below are type-agnostic.
+_OBSTRUCTION_SPECS: tuple[_ObsSpec, ...] = (
+    _ObsSpec(
+        "cylinder",
+        CylinderObstructionSchema,
+        CylinderGroup,
+        (
+            _ObsField("p1", "p1", "vec3"),
+            _ObsField("p2", "p2", "vec3"),
+            _ObsField("r", "r", "scalar"),
+        ),
+    ),
+    _ObsSpec(
+        "open_cylinder",
+        OpenCylinderObstructionSchema,
+        OpenCylinderGroup,
+        (
+            _ObsField("p1", "p1", "vec3"),
+            _ObsField("p2", "p2", "vec3"),
+            _ObsField("r", "r", "scalar"),
+        ),
+    ),
+    _ObsSpec(
+        "box",
+        BoxObstructionSchema,
+        BoxGroup,
+        (_ObsField("p1", "p1", "vec3"), _ObsField("p2", "p2", "vec3")),
+    ),
+    _ObsSpec(
+        "sphere",
+        SphereObstructionSchema,
+        SphereGroup,
+        (_ObsField("center", "centers", "vec3"), _ObsField("r", "radii", "scalar")),
+    ),
+    _ObsSpec(
+        "oriented_box",
+        OrientedBoxObstructionSchema,
+        OrientedBoxGroup,
+        (
+            _ObsField("center", "centers", "vec3"),
+            _ObsField("half_extents", "half_extents", "vec3"),
+            _ObsField("rotation", "rotations", "euler_matrix"),
+        ),
+    ),
+    _ObsSpec(
+        "triangle",
+        TriangleObstructionSchema,
+        TriangleGroup,
+        (
+            _ObsField("v0", "v0", "vec3"),
+            _ObsField("v1", "v1", "vec3"),
+            _ObsField("v2", "v2", "vec3"),
+        ),
+    ),
+)
+
+
+def _build_obstruction_group(spec: _ObsSpec, schemas: list) -> ObstructionGroup:
+    """Batch a homogeneous list of obstruction schemas into one group."""
+    kwargs: dict[str, object] = {}
+    for f in spec.fields:
+        values = [getattr(s, f.schema_attr) for s in schemas]
+        if f.kind == "euler_matrix":
+            kwargs[f.group_attr] = jnp.stack([euler_to_matrix(jnp.asarray(v)) for v in values])
+        else:
+            kwargs[f.group_attr] = values  # group __init__ applies jnp.asarray
+    return spec.group(**kwargs)
+
+
 def obstructions_from_schemas(
     obstructions: list[ObstructionSchemaType],
 ) -> list[ObstructionGroup]:
-    """Convert validated obstruction schemas to ObstructionGroup domain objects."""
-    cylinders: list[CylinderObstructionSchema] = []
-    open_cyls: list[OpenCylinderObstructionSchema] = []
-    boxes: list[BoxObstructionSchema] = []
-    spheres: list[SphereObstructionSchema] = []
-    ori_boxes: list[OrientedBoxObstructionSchema] = []
-    triangles: list[TriangleObstructionSchema] = []
+    """Convert validated obstruction schemas to ObstructionGroup domain objects.
 
+    Same-typed schemas are batched into one group. Groups are emitted in
+    ``_OBSTRUCTION_SPECS`` declaration order, independent of input order.
+    """
+    by_type: dict[str, list] = defaultdict(list)
     for obs in obstructions:
-        match obs.type:
-            case "cylinder":
-                cylinders.append(obs)
-            case "open_cylinder":
-                open_cyls.append(obs)
-            case "box":
-                boxes.append(obs)
-            case "sphere":
-                spheres.append(obs)
-            case "oriented_box":
-                ori_boxes.append(obs)
-            case "triangle":
-                triangles.append(obs)
-
-    groups: list[ObstructionGroup] = []
-    if cylinders:
-        groups.append(_build_cylinder_group(cylinders))
-    if open_cyls:
-        groups.append(_build_open_cylinder_group(open_cyls))
-    if boxes:
-        groups.append(_build_box_group(boxes))
-    if spheres:
-        groups.append(_build_sphere_group(spheres))
-    if ori_boxes:
-        groups.append(_build_oriented_box_group(ori_boxes))
-    if triangles:
-        groups.append(_build_triangle_group(triangles))
-    return groups
+        by_type[obs.type].append(obs)
+    return [
+        _build_obstruction_group(spec, by_type[spec.type_name])
+        for spec in _OBSTRUCTION_SPECS
+        if by_type.get(spec.type_name)
+    ]
 
 
-def _build_cylinder_group(schemas: list[CylinderObstructionSchema]) -> CylinderGroup:
-    return CylinderGroup(
-        p1=[s.p1 for s in schemas],
-        p2=[s.p2 for s in schemas],
-        r=[s.r for s in schemas],
+def _build_square_group(
+    schema: SquareSensorSchema, positions, rotations, concentrator, photodetector, gap
+) -> SquareSensorGroup:
+    b = schema.bounds
+    return SquareSensorGroup(
+        positions=positions,
+        rotations=rotations,
+        width=schema.width,
+        height=schema.height,
+        bounds=(b[0], b[1], b[2], b[3]),
+        edge_width=schema.edge_width,
+        concentrator=concentrator,
+        photodetector=photodetector,
+        gap=gap,
     )
 
 
-def _build_open_cylinder_group(schemas: list[OpenCylinderObstructionSchema]) -> OpenCylinderGroup:
-    return OpenCylinderGroup(
-        p1=[s.p1 for s in schemas],
-        p2=[s.p2 for s in schemas],
-        r=[s.r for s in schemas],
-    )
-
-
-def _build_box_group(schemas: list[BoxObstructionSchema]) -> BoxGroup:
-    return BoxGroup(
-        p1=[s.p1 for s in schemas],
-        p2=[s.p2 for s in schemas],
-    )
-
-
-def _build_sphere_group(schemas: list[SphereObstructionSchema]) -> SphereGroup:
-    return SphereGroup(
-        centers=[s.center for s in schemas],
-        radii=[s.r for s in schemas],
-    )
-
-
-def _build_oriented_box_group(schemas: list[OrientedBoxObstructionSchema]) -> OrientedBoxGroup:
-    rotations = []
-    for s in schemas:
-        euler = jnp.asarray(s.rotation)
-        rot_matrix = euler_to_matrix(euler)
-        rotations.append(rot_matrix)
-    return OrientedBoxGroup(
-        centers=[s.center for s in schemas],
-        half_extents=[s.half_extents for s in schemas],
-        rotations=jnp.stack(rotations),
-    )
-
-
-def _build_triangle_group(schemas: list[TriangleObstructionSchema]) -> TriangleGroup:
-    return TriangleGroup(
-        v0=[s.v0 for s in schemas],
-        v1=[s.v1 for s in schemas],
-        v2=[s.v2 for s in schemas],
+def _build_hex_group(
+    schema: HexagonalSensorSchema, positions, rotations, concentrator, photodetector, gap
+) -> HexagonalSensorGroup:
+    return HexagonalSensorGroup(
+        positions=positions,
+        rotations=rotations,
+        hex_centers=[[x, y] for x, y in zip(schema.centers_x, schema.centers_y, strict=False)],
+        edge_width=schema.edge_width,
+        concentrator=concentrator,
+        photodetector=photodetector,
+        gap=gap,
     )
 
 
 def sensor_from_schema(
     schema: SquareSensorSchema | HexagonalSensorSchema,
 ) -> SensorGroup:
-    """Convert a validated sensor schema to a SensorGroup domain object.
+    """Convert a validated sensor schema to a SensorGroup domain object; see ``_SENSOR_SPECS``.
 
     The schema ``position`` / ``orientation`` are interpreted as
     **camera-local** coordinates.
@@ -810,66 +995,34 @@ def sensor_from_schema(
     positions = [list(p) for p in schema.positions]
     rotations = [list(r) for r in schema.orientations]
     concentrator = _concentrator_from_schema(schema.concentrator)
-    photosensor = _photosensor_from_schema(schema.photosensor)
-    gap = schema.gap
-
-    match schema.type:
-        case "square":
-            b = schema.bounds
-            return SquareSensorGroup(
-                positions=positions,
-                rotations=rotations,
-                width=schema.width,
-                height=schema.height,
-                bounds=(b[0], b[1], b[2], b[3]),
-                edge_width=schema.edge_width,
-                concentrator=concentrator,
-                photosensor=photosensor,
-                gap=gap,
-            )
-        case "hexagonal":
-            return HexagonalSensorGroup(
-                positions=positions,
-                rotations=rotations,
-                hex_centers=[
-                    [x, y] for x, y in zip(schema.centers_x, schema.centers_y, strict=False)
-                ],
-                edge_width=schema.edge_width,
-                concentrator=concentrator,
-                photosensor=photosensor,
-                gap=gap,
-            )
+    photodetector = _photodetector_from_schema(schema.photodetector)
+    spec = _SENSOR_SPEC_BY_TYPE.get(schema.type)
+    if spec is None:  # pragma: no cover - unreachable while the union is exhaustive
+        raise ValueError(f"unknown sensor schema type: {schema.type!r}")
+    return spec.build(schema, positions, rotations, concentrator, photodetector, schema.gap)
 
 
 # Domain -> Schema (saving)
 
 
 def _bsdf_to_schema(bsdf: BSDF | None, i: int) -> BSDFSchema | None:
-    """Project element ``i`` of a group BSDF to a serialisable schema.
+    """Project element ``i`` of a group BSDF to a serialisable schema; see ``_BSDF_SPECS``.
 
     ``None`` and an all-zero :class:`~iactrace.core.bsdf.GaussianBSDF`
     element round-trip as ``None`` so default (specular) mirrors stay
     clean in the YAML. Unhandled BSDF subclasses raise rather than being
     silently dropped to a partial form.
     """
-    match bsdf:
-        case None:
-            return None
-        case GaussianBSDF():
-            scale = float(bsdf.scale[i])
-            return None if scale == 0.0 else GaussianBSDFSchema(scale=scale)
-        case DoubleGaussianBSDF():
-            return DoubleGaussianBSDFSchema(
-                scale_narrow=float(bsdf.scale_narrow[i]),
-                scale_wide=float(bsdf.scale_wide[i]),
-                mix_weight=float(bsdf.mix_weight[i]),
-            )
-        case _:
-            raise ValueError(
-                f"BSDF type {type(bsdf).__name__} cannot be serialised to "
-                "YAML; add a schema variant in iactrace.io.schemas and an "
-                "arm in _bsdf_to_schema / _build_bsdf_for_bucket."
-            )
+    if bsdf is None:
+        return None
+    spec = _BSDF_SPEC_BY_GROUP.get(type(bsdf))
+    if spec is None:
+        raise ValueError(
+            f"BSDF type {type(bsdf).__name__} cannot be serialised to "
+            "YAML; add a schema variant in iactrace.io.schemas and a "
+            "_BsdfSpec entry in iactrace.io.adapters."
+        )
+    return spec.to_schema(bsdf, i)
 
 
 def _surface_components(
@@ -887,9 +1040,7 @@ def _surface_components(
         return surface, None
     if isinstance(surface, ZernikeSurfaceGroup):
         if not np.allclose(np.asarray(surface.offsets), 0.0):
-            raise ValueError(
-                "cannot serialise a Zernike surface with a non-zero decenter"
-            )
+            raise ValueError("cannot serialise a Zernike surface with a non-zero decenter")
         return None, surface
     if isinstance(surface, SumSurfaceGroup):
         if not np.allclose(np.asarray(surface.offsets), 0.0):
@@ -911,18 +1062,12 @@ def _surface_components(
                     "ZernikeSurfaceGroup are supported"
                 )
         if zern is not None and not np.allclose(np.asarray(zern.offsets), 0.0):
-            raise ValueError(
-                "cannot serialise a Zernike term with a non-zero decenter"
-            )
+            raise ValueError("cannot serialise a Zernike term with a non-zero decenter")
         return asph, zern
-    raise ValueError(
-        f"cannot serialise surface type {type(surface).__name__}"
-    )
+    raise ValueError(f"cannot serialise surface type {type(surface).__name__}")
 
 
-def _zernike_to_schema(
-    zernike: ZernikeSurfaceGroup | None, i: int
-) -> ZernikeSchema | None:
+def _zernike_to_schema(zernike: ZernikeSurfaceGroup | None, i: int) -> ZernikeSurfaceSchema | None:
     """Project element ``i`` of a Zernike term to a schema, or ``None``.
     Elements whose coefficients are all zero round-trip as ``None`` so default
     (figure-error-free) elements stay clean in the YAML.
@@ -932,7 +1077,43 @@ def _zernike_to_schema(
     coeffs = _strip_trailing_zeros(_to_float_list(zernike.coeffs[i]))
     if not coeffs:
         return None
-    return ZernikeSchema(coeffs=coeffs, r_norm=float(zernike.r_norm[i]))
+    return ZernikeSurfaceSchema(coeffs=coeffs, r_norm=float(zernike.r_norm[i]))
+
+
+def _surface_to_spec(asph, zern, i: int):
+    """Serialise element ``i``'s surface into a spec: one shape, or a summed list.
+
+    An aspheric shape comes first (it supplies the intersection guess); a
+    non-trivial Zernike term follows. A standalone Zernike surface serialises as
+    a single ``zernike`` shape.
+    """
+    shapes: list = []
+    if asph is not None:
+        shapes.append(
+            AsphericSurfaceSchema(
+                curvature=float(asph.curvatures[i]),
+                conic=float(asph.conics[i]),
+                aspheric=_strip_trailing_zeros(_to_float_list(asph.aspherics[i])),
+            )
+        )
+    z = _zernike_to_schema(zern, i)
+    if z is not None:
+        shapes.append(z)
+    if not shapes:
+        shapes.append(AsphericSurfaceSchema(curvature=0.0, conic=0.0, aspheric=[]))
+    return shapes[0] if len(shapes) == 1 else shapes
+
+
+def _surface_spec_key(spec) -> tuple:
+    """Hashable key for a surface spec, used to dedup mirror templates."""
+    parts: list = []
+    for s in _surface_list(spec):
+        match s.type:
+            case "aspheric":
+                parts.append(("aspheric", s.curvature, s.conic, tuple(s.aspheric)))
+            case "zernike":
+                parts.append(("zernike", tuple(s.coeffs), s.r_norm))
+    return tuple(parts)
 
 
 def _asphere_surface_arrays(
@@ -953,21 +1134,52 @@ def _asphere_surface_arrays(
     return asph, zern, offsets
 
 
+class _MirrorData(NamedTuple):
+    """One mirror element's resolved fields, before the template/self-contained
+    decision (:func:`mirrors_to_schemas`)."""
+
+    group: OpticalElementGroup
+    i: int
+    asph_schema: AsphericSurfaceSchema | None
+    zern_schema: ZernikeSurfaceSchema | None
+    coating_schema: TabulatedCurveSchema | None
+    offset: Array
+    bsdf_schema: BSDFSchema | None
+    reflectivity_scalar: float
+
+
+def _mirror_base_key(d: _MirrorData) -> tuple | None:
+    """Dedup key for a mirror's templatable fields (aspheric base + coating).
+
+    ``None`` when the mirror has no aspheric base at all (a standalone
+    Zernike surface); such mirrors never join a template. ``zernike`` and
+    ``bsdf`` are deliberately excluded -- they stay per-mirror even when the
+    aspheric base is shared (see :func:`mirrors_to_schemas`).
+    """
+    if d.asph_schema is None:
+        return None
+    return (_surface_spec_key(d.asph_schema), _curve_schema_to_key(d.coating_schema))
+
+
 def mirrors_to_schemas(
     groups: list[OpticalElementGroup],
 ) -> tuple[dict[str, MirrorTemplateSchema], list[MirrorSchema]]:
     """Extract mirror schemas from OpticalElementGroup list.
 
-    Returns templates dict + mirror list. Deduplicates surface params into templates.
-    BSDF and the per-element Zernike figure error are stored per-mirror (not part
-    of the dedup key) since mirrors sharing a surface template can carry different
-    roughness / figure parameters.
-    """
-    templates: dict[str, MirrorTemplateSchema] = {}
-    mirrors: list[MirrorSchema] = []
-    template_counter = 0
-    surface_to_template: dict[tuple, str] = {}
+    Each mirror is written as the joint of an optional template and its own
+    fields, mirroring how loading resolves them (:func:`_resolve_surface`):
 
+    * The *aspheric* base (curvature/conic/aspheric) plus ``coating`` are
+      deduplicated into a shared template when two or more mirrors have the
+      exact same combination. A mirror whose combination is unique to it (or
+      has no aspheric base at all -- a standalone Zernike surface) gets no
+      template: its curvature/conic/aspheric/coating are written directly.
+    * ``zernike`` is always written directly on the mirror, never folded into
+      a template, since it typically represents a per-panel measured figure
+      error even when every panel shares the same base prescription.
+    * ``bsdf`` is always per-mirror, as before.
+    """
+    data: list[_MirrorData] = []
     for group in groups:
         match group.interaction_module:
             case ReflectInteraction() as interaction:
@@ -976,48 +1188,83 @@ def mirrors_to_schemas(
                 continue
 
         coating_schema = _coating_to_curve_schema(interaction.reflectivity)
-        coating_key = _curve_schema_to_key(coating_schema)
         asph, zern, offsets = _asphere_surface_arrays(group.surface, len(group))
 
         for i in range(len(group)):
-            if asph is not None:
-                curvature = float(asph.curvatures[i])
-                conic = float(asph.conics[i])
-                aspheric_raw = _strip_trailing_zeros(_to_float_list(asph.aspherics[i]))
-            else:
-                curvature, conic, aspheric_raw = 0.0, 0.0, []
-
-            surface_key = (curvature, conic, tuple(aspheric_raw), coating_key)
-
-            if surface_key not in surface_to_template:
-                template_name = f"template_{template_counter}"
-                template_counter += 1
-                surface_to_template[surface_key] = template_name
-                templates[template_name] = MirrorTemplateSchema(
-                    surface=SurfaceSchema(
-                        curvature=curvature,
-                        conic=conic,
-                        aspheric=aspheric_raw if aspheric_raw else [],
-                    ),
-                    coating=coating_schema,
+            asph_schema = (
+                AsphericSurfaceSchema(
+                    curvature=float(asph.curvatures[i]),
+                    conic=float(asph.conics[i]),
+                    aspheric=_strip_trailing_zeros(_to_float_list(asph.aspherics[i])),
                 )
-
-            template_name = surface_to_template[surface_key]
-            scalar = float(interaction.reflectivity_scalar[i])
-            mirrors.append(
-                MirrorSchema(
-                    position=_to_float_list(group.positions[i]),
-                    orientation=_to_float_list(group.rotations[i]),
-                    aperture=_aperture_to_schema(group.aperture, i),
-                    template=template_name,
-                    stage=group.optical_stage,
-                    offset=_to_float_list(offsets[i]),
-                    bsdf=_bsdf_to_schema(group.bsdf, i),
-                    reflectivity=scalar if scalar != 1.0 else None,
-                    zernike=_zernike_to_schema(zern, i),
-                    id=f"M_{len(mirrors)}",
+                if asph is not None
+                else None
+            )
+            data.append(
+                _MirrorData(
+                    group=group,
+                    i=i,
+                    asph_schema=asph_schema,
+                    zern_schema=_zernike_to_schema(zern, i),
+                    coating_schema=coating_schema,
+                    offset=offsets[i],
+                    bsdf_schema=_bsdf_to_schema(group.bsdf, i),
+                    reflectivity_scalar=float(interaction.reflectivity_scalar[i]),
                 )
             )
+
+    counts: dict[tuple, int] = defaultdict(int)
+    for d in data:
+        key = _mirror_base_key(d)
+        if key is not None:
+            counts[key] += 1
+
+    templates: dict[str, MirrorTemplateSchema] = {}
+    key_to_template: dict[tuple, str] = {}
+    mirrors: list[MirrorSchema] = []
+
+    for d in data:
+        key = _mirror_base_key(d)
+
+        if key is not None and counts[key] > 1:
+            template_name = key_to_template.get(key)
+            if template_name is None:
+                template_name = f"template_{len(templates)}"
+                key_to_template[key] = template_name
+                templates[template_name] = MirrorTemplateSchema(
+                    surface=d.asph_schema,
+                    coating=d.coating_schema,
+                )
+            curvature = conic = aspheric = None
+            coating = None
+        else:
+            template_name = None
+            coating = d.coating_schema
+            if d.asph_schema is None:
+                curvature = conic = aspheric = None
+            else:
+                curvature = d.asph_schema.curvature
+                conic = d.asph_schema.conic if d.asph_schema.conic != 0.0 else None
+                aspheric = d.asph_schema.aspheric or None
+
+        mirrors.append(
+            MirrorSchema(
+                position=_to_float_list(d.group.positions[d.i]),
+                orientation=_to_float_list(d.group.rotations[d.i]),
+                aperture=_aperture_to_schema(d.group.aperture, d.i),
+                template=template_name,
+                curvature=curvature,
+                conic=conic,
+                aspheric=aspheric,
+                zernike=d.zern_schema,
+                stage=d.group.optical_stage,
+                offset=_to_float_list(d.offset),
+                bsdf=d.bsdf_schema,
+                reflectivity=(d.reflectivity_scalar if d.reflectivity_scalar != 1.0 else None),
+                coating=coating,
+                id=f"M_{len(mirrors)}",
+            )
+        )
 
     return templates, mirrors
 
@@ -1043,29 +1290,16 @@ def _aperture_to_schema(
 def lenses_to_schemas(
     groups: list[OpticalElementGroup] | None,
 ) -> list[LensSchemaType]:
-    """Extract lens schemas from OpticalElementGroup list."""
+    """Extract lens schemas from OpticalElementGroup list; see ``_LENS_SPECS``."""
     if not groups:
         return []
 
     lenses: list[LensSchemaType] = []
     for group in groups:
-        match group.interaction_module:
-            case RefractInteraction() as interaction:
-                asph, zern, offsets = _asphere_surface_arrays(group.surface, len(group))
-                for i in range(len(group)):
-                    lenses.append(_extract_aspheric_disk_lens(
-                        group, interaction, i, len(lenses), asph, zern, offsets,
-                    ))
-            case SlabInteraction() as interaction:
-                _, slab_zern = _surface_components(group.surface)
-                if slab_zern is not None:
-                    raise ValueError(
-                        "cannot serialise a Zernike figure error on a plano slab"
-                    )
-                for i in range(len(group)):
-                    lenses.append(_extract_plano_slab_lens(group, interaction, i, len(lenses)))
-            case _:
-                continue
+        spec = _LENS_SPEC_BY_INTERACTION.get(type(group.interaction_module))
+        if spec is None:
+            continue
+        lenses.extend(spec.extract_group(group, len(lenses)))
     return lenses
 
 
@@ -1079,26 +1313,16 @@ def _extract_aspheric_disk_lens(
     offsets: Array,
 ) -> AsphericDiskLensSchema:
     """Extract an AsphericDiskLensSchema from element i of a group."""
-    if asph is not None:
-        curvature = float(asph.curvatures[i])
-        conic = float(asph.conics[i])
-        aspheric_raw = _strip_trailing_zeros(_to_float_list(asph.aspherics[i]))
-    else:
-        curvature, conic, aspheric_raw = 0.0, 0.0, []
     coating_schema = _coating_to_curve_schema(interaction.transmittance)
     return AsphericDiskLensSchema(
         position=_to_float_list(group.positions[i]),
         orientation=_to_float_list(group.rotations[i]),
         aperture=_aperture_to_schema(group.aperture, i),
-        curvature=curvature,
-        conic=conic,
+        surface=_surface_to_spec(asph, zern, i),
         n_inside=float(interaction.n_inside[i]),
-        n_outside=float(interaction.n_outside),
-        aspheric=aspheric_raw,
         offset=_to_float_list(offsets[i]),
         transmittance=float(interaction.transmittance_scalar[i]),
         coating=coating_schema,
-        zernike=_zernike_to_schema(zern, i),
         stage=group.optical_stage,
         id=f"lens_{counter}",
     )
@@ -1118,7 +1342,6 @@ def _extract_plano_slab_lens(
         aperture=_aperture_to_schema(group.aperture, i),
         thickness=float(interaction.thickness[i]),
         n_inside=float(interaction.n_inside[i]),
-        n_outside=float(interaction.n_outside),
         transmittance=float(interaction.transmittance_scalar[i]),
         coating=coating_schema,
         stage=group.optical_stage,
@@ -1126,98 +1349,115 @@ def _extract_plano_slab_lens(
     )
 
 
+def _extract_aspheric_disk_lenses(
+    group: OpticalElementGroup, start: int
+) -> list[AsphericDiskLensSchema]:
+    """Extract every element of an aspheric-disk lens group, starting at index ``start``."""
+    interaction = group.interaction_module
+    # _LENS_SPEC_BY_INTERACTION only ever routes here for a RefractInteraction
+    # group; the assert both documents and narrows that for the type checker.
+    assert isinstance(interaction, RefractInteraction)
+    asph, zern, offsets = _asphere_surface_arrays(group.surface, len(group))
+    return [
+        _extract_aspheric_disk_lens(group, interaction, i, start + i, asph, zern, offsets)
+        for i in range(len(group))
+    ]
+
+
+def _extract_plano_slab_lenses(group: OpticalElementGroup, start: int) -> list[PlanoSlabSchema]:
+    """Extract every element of a plano-slab group, starting at index ``start``."""
+    interaction = group.interaction_module
+    # _LENS_SPEC_BY_INTERACTION only ever routes here for a SlabInteraction
+    # group; the assert both documents and narrows that for the type checker.
+    assert isinstance(interaction, SlabInteraction)
+    _, slab_zern = _surface_components(group.surface)
+    if slab_zern is not None:
+        raise ValueError("cannot serialise a Zernike figure error on a plano slab")
+    return [_extract_plano_slab_lens(group, interaction, i, start + i) for i in range(len(group))]
+
+
+class _LensSpec(NamedTuple):
+    """Bidirectional spec for one lens type, mirroring ``_ObsSpec``.
+
+    ``builder`` constructs one bucket's :class:`OpticalElementGroup` (see
+    :func:`_build_lens_groups_by_stage`); ``extract_group`` is its inverse,
+    projecting a whole group back to its per-element schemas. Each lens kind
+    needs different per-group setup before its per-element loop (an aspheric
+    disk resolves its surface decomposition once per group; a slab is always
+    flat and only checks for a stray Zernike term), so unlike an obstruction's
+    flat field table, that setup lives inside each kind's own function.
+    """
+
+    type_name: str
+    schema: type
+    interaction: type
+    builder: Callable[[list, Aperture, int, Array], OpticalElementGroup]
+    extract_group: Callable[[OpticalElementGroup, int], list]
+
+
+# The single source of truth for lens round-tripping; see _OBSTRUCTION_SPECS /
+# _CONCENTRATOR_SPECS. Adding a lens type is one entry here plus its schema
+# (io.schemas) and builder/extractor functions.
+_LENS_SPECS: tuple[_LensSpec, ...] = (
+    _LensSpec(
+        "aspheric_disk",
+        AsphericDiskLensSchema,
+        RefractInteraction,
+        _build_aspheric_disk_lens_group,
+        _extract_aspheric_disk_lenses,
+    ),
+    _LensSpec(
+        "plano_slab",
+        PlanoSlabSchema,
+        SlabInteraction,
+        _build_plano_slab_group,
+        _extract_plano_slab_lenses,
+    ),
+)
+_LENS_SPEC_BY_INTERACTION: dict[type, _LensSpec] = {s.interaction: s for s in _LENS_SPECS}
+
+
+_SPEC_BY_GROUP: dict[type, _ObsSpec] = {spec.group: spec for spec in _OBSTRUCTION_SPECS}
+
+
+def _extract_obstruction(spec: _ObsSpec, group: ObstructionGroup, i: int, counter: int):
+    """Project element ``i`` of an obstruction group back to its schema."""
+    kwargs: dict[str, object] = {"id": f"obs_{counter}"}
+    for f in spec.fields:
+        col = getattr(group, f.group_attr)
+        if f.kind == "scalar":
+            kwargs[f.schema_attr] = float(col[i])
+        elif f.kind == "euler_matrix":
+            kwargs[f.schema_attr] = _rotation_matrix_to_euler(np.asarray(col[i]))
+        else:  # vec3
+            kwargs[f.schema_attr] = _to_float_list(col[i])
+    return spec.schema(**kwargs)
+
+
 def obstructions_to_schemas(
     groups: list[ObstructionGroup] | None,
 ) -> list[ObstructionSchemaType]:
-    """Extract obstruction schemas from ObstructionGroup list."""
+    """Extract obstruction schemas from an ObstructionGroup list.
+
+    One schema per primitive, ``id``-numbered globally in traversal order.
+    """
     if not groups:
         return []
 
     obstructions: list[ObstructionSchemaType] = []
-    counter = 0
     for group in groups:
+        spec = _SPEC_BY_GROUP.get(type(group))
+        if spec is None:
+            raise ValueError(f"Unknown obstruction group type: {type(group)}")
         for i in range(len(group)):
-            match group:
-                case CylinderGroup():
-                    obstructions.append(_extract_cylinder(group, i, counter))
-                case OpenCylinderGroup():
-                    obstructions.append(_extract_open_cylinder(group, i, counter))
-                case BoxGroup():
-                    obstructions.append(_extract_box(group, i, counter))
-                case SphereGroup():
-                    obstructions.append(_extract_sphere(group, i, counter))
-                case OrientedBoxGroup():
-                    obstructions.append(_extract_oriented_box(group, i, counter))
-                case TriangleGroup():
-                    obstructions.append(_extract_triangle(group, i, counter))
-                case _:
-                    raise ValueError(f"Unknown obstruction group type: {type(group)}")
-            counter += 1
+            obstructions.append(_extract_obstruction(spec, group, i, len(obstructions)))
     return obstructions
-
-
-def _extract_cylinder(group: CylinderGroup, i: int, counter: int) -> CylinderObstructionSchema:
-    return CylinderObstructionSchema(
-        p1=_to_float_list(group.p1[i]),
-        p2=_to_float_list(group.p2[i]),
-        r=float(group.r[i]),
-        id=f"obs_{counter}",
-    )
-
-
-def _extract_open_cylinder(
-    group: OpenCylinderGroup, i: int, counter: int
-) -> OpenCylinderObstructionSchema:
-    return OpenCylinderObstructionSchema(
-        p1=_to_float_list(group.p1[i]),
-        p2=_to_float_list(group.p2[i]),
-        r=float(group.r[i]),
-        id=f"obs_{counter}",
-    )
-
-
-def _extract_box(group: BoxGroup, i: int, counter: int) -> BoxObstructionSchema:
-    return BoxObstructionSchema(
-        p1=_to_float_list(group.p1[i]),
-        p2=_to_float_list(group.p2[i]),
-        id=f"obs_{counter}",
-    )
-
-
-def _extract_sphere(group: SphereGroup, i: int, counter: int) -> SphereObstructionSchema:
-    return SphereObstructionSchema(
-        center=_to_float_list(group.centers[i]),
-        r=float(group.radii[i]),
-        id=f"obs_{counter}",
-    )
-
-
-def _extract_oriented_box(
-    group: OrientedBoxGroup, i: int, counter: int
-) -> OrientedBoxObstructionSchema:
-    rotation_matrix = np.asarray(group.rotations[i])
-    euler = _rotation_matrix_to_euler(rotation_matrix)
-    return OrientedBoxObstructionSchema(
-        center=_to_float_list(group.centers[i]),
-        half_extents=_to_float_list(group.half_extents[i]),
-        rotation=euler,
-        id=f"obs_{counter}",
-    )
-
-
-def _extract_triangle(group: TriangleGroup, i: int, counter: int) -> TriangleObstructionSchema:
-    return TriangleObstructionSchema(
-        v0=_to_float_list(group.v0[i]),
-        v1=_to_float_list(group.v1[i]),
-        v2=_to_float_list(group.v2[i]),
-        id=f"obs_{counter}",
-    )
 
 
 def sensors_to_schemas(
     sensors: list[SensorGroup],
 ) -> list[SensorSchemaType]:
-    """Extract sensor schemas from a SensorGroup list.
+    """Extract sensor schemas from a SensorGroup list; see ``_SENSOR_SPECS``.
 
     One YAML entry per :class:`SensorGroup`: groups carrying multiple
     sensors are written with plural ``positions``/``orientations`` lists,
@@ -1226,13 +1466,10 @@ def sensors_to_schemas(
     """
     result: list[SensorSchemaType] = []
     for counter, group in enumerate(sensors):
-        match group:
-            case SquareSensorGroup():
-                result.append(_extract_square_group(group, counter))
-            case HexagonalSensorGroup():
-                result.append(_extract_hex_group(group, counter))
-            case _:
-                raise ValueError(f"Unknown sensor group type: {type(group)}")
+        spec = _SENSOR_SPEC_BY_GROUP.get(type(group))
+        if spec is None:
+            raise ValueError(f"Unknown sensor group type: {type(group)}")
+        result.append(spec.extract(group, counter))
     return result
 
 
@@ -1240,7 +1477,7 @@ def _extract_square_group(
     group: SquareSensorGroup,
     counter: int,
 ) -> SquareSensorSchema:
-    concentrator, gap, photosensor = _chain_to_schema_fields(group.chain)
+    concentrator, gap, photodetector = _chain_to_schema_fields(group.chain)
     return SquareSensorSchema(
         positions=[_to_float_list(p) for p in group.positions],
         orientations=[_to_float_list(r) for r in group.rotations],
@@ -1250,7 +1487,7 @@ def _extract_square_group(
         edge_width=group.edge_width,
         concentrator=concentrator,
         gap=gap,
-        photosensor=photosensor,
+        photodetector=photodetector,
         id=f"sensor_{counter}",
     )
 
@@ -1260,7 +1497,7 @@ def _extract_hex_group(
     counter: int,
 ) -> HexagonalSensorSchema:
     hex_centers = np.asarray(group.hex_centers)
-    concentrator, gap, photosensor = _chain_to_schema_fields(group.chain)
+    concentrator, gap, photodetector = _chain_to_schema_fields(group.chain)
     return HexagonalSensorSchema(
         positions=[_to_float_list(p) for p in group.positions],
         orientations=[_to_float_list(r) for r in group.rotations],
@@ -1269,157 +1506,292 @@ def _extract_hex_group(
         edge_width=group.edge_width,
         concentrator=concentrator,
         gap=gap,
-        photosensor=photosensor,
+        photodetector=photodetector,
         id=f"sensor_{counter}",
     )
+
+
+class _SensorSpec(NamedTuple):
+    """Bidirectional spec for one sensor-group type; see ``_ConcentratorSpec``."""
+
+    type_name: str
+    schema: type
+    group: type
+    build: Callable[..., SensorGroup]
+    # Each entry's extract only ever accepts that entry's own SensorGroup
+    # subclass (the driver looks it up by type(group) first); see _BsdfSpec.
+    extract: Callable[..., SensorSchemaType]
+
+
+# The single source of truth for sensor-group round-tripping; see
+# _OBSTRUCTION_SPECS / _CONCENTRATOR_SPECS.
+_SENSOR_SPECS: tuple[_SensorSpec, ...] = (
+    _SensorSpec(
+        "square", SquareSensorSchema, SquareSensorGroup, _build_square_group, _extract_square_group
+    ),
+    _SensorSpec(
+        "hexagonal",
+        HexagonalSensorSchema,
+        HexagonalSensorGroup,
+        _build_hex_group,
+        _extract_hex_group,
+    ),
+)
+_SENSOR_SPEC_BY_TYPE: dict[str, _SensorSpec] = {s.type_name: s for s in _SENSOR_SPECS}
+_SENSOR_SPEC_BY_GROUP: dict[type, _SensorSpec] = {s.group: s for s in _SENSOR_SPECS}
+
+
+class _ConcentratorSpec(NamedTuple):
+    """Bidirectional spec for one concentrator type, mirroring ``_ObsSpec``.
+
+    Unlike an obstruction, a concentrator's schema<->domain conversion isn't
+    a flat field copy (truncation / wall-tilt reconstruction is involved), so
+    each entry carries a pair of converter callables rather than a field
+    table; the type-name-keyed table and type-agnostic load/save drivers
+    below are otherwise the same idea.
+    """
+
+    type_name: str
+    schema: type
+    group: type
+    # Each entry's converters only ever handle that entry's own concrete
+    # domain / schema type (the drivers look them up by type(x) / x.type
+    # first); see _BsdfSpec for why these aren't narrowly typed.
+    to_schema: Callable[..., ConcentratorSchema]
+    from_schema: Callable[..., Concentrator]
+
+
+def _winston_to_schema(concentrator: WinstonCone) -> WinstonConeSchema:
+    # entrance_apothem is the physical mouth at z=length; for a truncated
+    # cone the depth reconstructs the wall on load. An untruncated cone is
+    # written as length=None so reload is exact. "Full" <-> the mouth equals
+    # the full-CPC mouth a2/s for the stored wall tilt s.
+    ideal_mouth = concentrator.exit_apothem / concentrator.s
+    truncated = not math.isclose(concentrator.entrance_apothem, ideal_mouth, rel_tol=1e-9)
+    return WinstonConeSchema(
+        n_sides=concentrator.n_sides,
+        entrance_apothem=concentrator.entrance_apothem,
+        exit_apothem=concentrator.exit_apothem,
+        length=concentrator.length if truncated else None,
+        reflectivity=concentrator.reflectivity,
+        max_bounces=concentrator.max_bounces,
+        orientation_deg=math.degrees(concentrator.orientation),
+    )
+
+
+def _winston_from_schema(schema: WinstonConeSchema) -> WinstonCone:
+    return WinstonCone(
+        n_sides=schema.n_sides,
+        entrance_apothem=schema.entrance_apothem,
+        exit_apothem=schema.exit_apothem,
+        length=schema.length,
+        reflectivity=schema.reflectivity,
+        max_bounces=schema.max_bounces,
+        orientation_deg=schema.orientation_deg,
+    )
+
+
+def _okumura_to_schema(concentrator: OkumuraCone) -> OkumuraConeSchema:
+    # A None length reconstructs the Winston-equivalent depth on load;
+    s = concentrator.exit_apothem / concentrator.entrance_apothem
+    c = math.sqrt(1.0 - s * s)
+    default_length = cpc_full_length(concentrator.exit_apothem, s, c)
+    truncated = not math.isclose(concentrator.length, default_length, rel_tol=1e-9)
+    return OkumuraConeSchema(
+        n_sides=concentrator.n_sides,
+        entrance_apothem=concentrator.entrance_apothem,
+        exit_apothem=concentrator.exit_apothem,
+        control_points=[[r, z] for r, z in concentrator.control_points],
+        length=concentrator.length if truncated else None,
+        reflectivity=concentrator.reflectivity,
+        max_bounces=concentrator.max_bounces,
+        orientation_deg=math.degrees(concentrator.orientation),
+    )
+
+
+def _okumura_from_schema(schema: OkumuraConeSchema) -> OkumuraCone:
+    return OkumuraCone(
+        n_sides=schema.n_sides,
+        entrance_apothem=schema.entrance_apothem,
+        exit_apothem=schema.exit_apothem,
+        control_points=[(r, z) for r, z in schema.control_points],
+        length=schema.length,
+        reflectivity=schema.reflectivity,
+        max_bounces=schema.max_bounces,
+        orientation_deg=schema.orientation_deg,
+    )
+
+
+# The single source of truth for concentrator round-tripping, mirroring
+# _OBSTRUCTION_SPECS. Adding a new concentrator is one entry here plus its
+# schema (io.schemas) and domain (camera.optics) classes; the load/save
+# drivers below are type-agnostic and raise for anything not registered
+# (no silent drop-to-None on save).
+_CONCENTRATOR_SPECS: tuple[_ConcentratorSpec, ...] = (
+    _ConcentratorSpec(
+        "winston", WinstonConeSchema, WinstonCone, _winston_to_schema, _winston_from_schema
+    ),
+    _ConcentratorSpec(
+        "okumura", OkumuraConeSchema, OkumuraCone, _okumura_to_schema, _okumura_from_schema
+    ),
+)
+_CONCENTRATOR_SPEC_BY_GROUP: dict[type, _ConcentratorSpec] = {
+    s.group: s for s in _CONCENTRATOR_SPECS
+}
+_CONCENTRATOR_SPEC_BY_TYPE: dict[str, _ConcentratorSpec] = {
+    s.type_name: s for s in _CONCENTRATOR_SPECS
+}
 
 
 def _concentrator_to_schema(
     concentrator: Concentrator | None,
 ) -> ConcentratorSchema | None:
-    """Serialize a concentrator (``None`` -> ``None``).
+    """Serialize a concentrator (``None`` -> ``None``); see ``_CONCENTRATOR_SPECS``.
 
-    :class:`WinstonCone` and :class:`OkumuraCone` round-trip exactly; any other
-    :class:`~iactrace.camera.concentrator.Concentrator` subclass emits a
-    :class:`UserWarning` and is dropped. To support another cone type, add a
-    ``case`` here, a converter in :func:`_concentrator_from_schema`, a
-    ``...Schema`` class, and a member to the ``ConcentratorSchema`` alias.
+    Raises for any :class:`~iactrace.camera.optics.concentrator.Concentrator`
+    subclass without a registered spec, rather than silently dropping it --
+    an unrepresentable concentrator is a large, silent physics change if
+    saving just wrote "no concentrator" instead.
     """
-    match concentrator:
-        case None:
-            return None
-        case OkumuraCone():
-            # A None length reconstructs the Winston-equivalent depth on load;
-            s = concentrator.exit_apothem / concentrator.entrance_apothem
-            c = math.sqrt(1.0 - s * s)
-            default_length = cpc_full_length(concentrator.exit_apothem, s, c)
-            truncated = not math.isclose(concentrator.length, default_length, rel_tol=1e-9)
-            return OkumuraConeSchema(
-                n_sides=concentrator.n_sides,
-                entrance_apothem=concentrator.entrance_apothem,
-                exit_apothem=concentrator.exit_apothem,
-                control_points=[[r, z] for r, z in concentrator.control_points],
-                length=concentrator.length if truncated else None,
-                reflectivity=concentrator.reflectivity,
-                max_bounces=concentrator.max_bounces,
-                orientation_deg=math.degrees(concentrator.orientation),
-            )
-        case WinstonCone():
-            # entrance_apothem is the physical mouth at z=length; for a truncated
-            # cone the depth reconstructs the wall on load. An untruncated cone is
-            # written as length=None so reload is exact. "Full" <-> the mouth equals
-            # the full-CPC mouth a2/s for the wall tilt s.
-            s, _ = cpc_wall_tilt(
-                concentrator.exit_apothem,
-                concentrator.entrance_apothem,
-                concentrator.length,
-            )
-            ideal_mouth = concentrator.exit_apothem / s
-            truncated = not math.isclose(concentrator.entrance_apothem, ideal_mouth, rel_tol=1e-9)
-            return WinstonConeSchema(
-                n_sides=concentrator.n_sides,
-                entrance_apothem=concentrator.entrance_apothem,
-                exit_apothem=concentrator.exit_apothem,
-                length=concentrator.length if truncated else None,
-                reflectivity=concentrator.reflectivity,
-                max_bounces=concentrator.max_bounces,
-                orientation_deg=math.degrees(concentrator.orientation),
-            )
-        case _:
-            warnings.warn(
-                f"{type(concentrator).__name__} is not representable in camera "
-                "YAML; the concentrator will be dropped on save.",
-                UserWarning,
-                stacklevel=2,
-            )
-            return None
+    if concentrator is None:
+        return None
+    spec = _CONCENTRATOR_SPEC_BY_GROUP.get(type(concentrator))
+    if spec is None:
+        raise ValueError(
+            f"{type(concentrator).__name__} is not representable in camera "
+            "YAML; add a _ConcentratorSpec entry in iactrace.io.adapters "
+            "plus a schema in iactrace.io.schemas."
+        )
+    return spec.to_schema(concentrator)
 
 
 def _concentrator_from_schema(
     schema: ConcentratorSchema | None,
 ) -> Concentrator | None:
     """Rebuild a concentrator from its schema (``None`` -> no concentrator)."""
-    match schema:
-        case None:
-            return None
-        case WinstonConeSchema():
-            return WinstonCone(
-                n_sides=schema.n_sides,
-                entrance_apothem=schema.entrance_apothem,
-                exit_apothem=schema.exit_apothem,
-                length=schema.length,
-                reflectivity=schema.reflectivity,
-                max_bounces=schema.max_bounces,
-                orientation_deg=schema.orientation_deg,
-            )
-        case OkumuraConeSchema():
-            return OkumuraCone(
-                n_sides=schema.n_sides,
-                entrance_apothem=schema.entrance_apothem,
-                exit_apothem=schema.exit_apothem,
-                control_points=[(r, z) for r, z in schema.control_points],
-                length=schema.length,
-                reflectivity=schema.reflectivity,
-                max_bounces=schema.max_bounces,
-                orientation_deg=schema.orientation_deg,
-            )
-        case _:
-            raise ValueError(f"unknown concentrator schema: {type(schema).__name__}")
+    if schema is None:
+        return None
+    spec = _CONCENTRATOR_SPEC_BY_TYPE.get(schema.type)
+    if spec is None:
+        raise ValueError(f"unknown concentrator schema: {type(schema).__name__}")
+    return spec.from_schema(schema)
 
 
-def _photosensor_to_schema(photosensor: PhotoSensor) -> PhotoSensorSchema:
-    """Serialize a photosensor.
+class _PhotoDetectorSpec(NamedTuple):
+    """Bidirectional spec for one photodetector type; see ``_ConcentratorSpec``."""
 
-    Only :class:`UniformQE` round-trips exactly today; any other
-    :class:`~iactrace.camera.photosensor.PhotoSensor` subclass emits a
-    :class:`UserWarning` and falls back to a flat ``UniformQE(1.0)``. To support
-    another response model, add a ``case`` here and in
-    :func:`_photosensor_from_schema`, a ``...Schema`` class, and a member to the
-    ``PhotoSensorSchema`` alias.
+    type_name: str
+    schema: type
+    group: type
+    # Loosely typed for the same reason as _ConcentratorSpec: each entry's
+    # converters only ever handle that entry's own concrete type.
+    to_schema: Callable[..., PhotoDetectorSchema]
+    from_schema: Callable[..., PhotoDetector]
+
+
+def _constant_qe_to_schema(photodetector: ConstantQE) -> ConstantQESchema:
+    return ConstantQESchema(qe=float(photodetector.qe))
+
+
+def _constant_qe_from_schema(schema: ConstantQESchema) -> ConstantQE:
+    return ConstantQE(schema.qe)
+
+
+def _pmt_to_schema(photodetector: PMT) -> PMTSchema:
+    # The photocathode figure round-trips through the exact same
+    # (aspheric, zernike) decomposition mirrors and lenses use.
+    asph, zern = _surface_components(photodetector.shape)
+    return PMTSchema(
+        qe=float(photodetector.qe),
+        n_window=None if photodetector.n_window is None else float(photodetector.n_window),
+        face_radius=float(photodetector.face_radius),
+        surface=_surface_to_spec(asph, zern, 0),
+        vertex_z=float(photodetector.vertex_z),
+        # PMT resolves length=None to 2*face_radius at construction;
+        # write the resolved value so the reload is exact.
+        length=float(photodetector.length),
+        n_facets=int(photodetector.n_facets),
+    )
+
+
+def _pmt_from_schema(schema: PMTSchema) -> PMT:
+    return PMT(
+        qe=schema.qe,
+        n_window=schema.n_window,
+        face_radius=schema.face_radius,
+        surface=_single_element_surface(schema.surface),
+        vertex_z=schema.vertex_z,
+        length=schema.length,
+        n_facets=schema.n_facets,
+    )
+
+
+# The single source of truth for photodetector round-tripping; see
+# _CONCENTRATOR_SPECS.
+_PHOTODETECTOR_SPECS: tuple[_PhotoDetectorSpec, ...] = (
+    _PhotoDetectorSpec(
+        "constant", ConstantQESchema, ConstantQE, _constant_qe_to_schema, _constant_qe_from_schema
+    ),
+    _PhotoDetectorSpec("pmt", PMTSchema, PMT, _pmt_to_schema, _pmt_from_schema),
+)
+_PHOTODETECTOR_SPEC_BY_GROUP: dict[type, _PhotoDetectorSpec] = {
+    s.group: s for s in _PHOTODETECTOR_SPECS
+}
+_PHOTODETECTOR_SPEC_BY_TYPE: dict[str, _PhotoDetectorSpec] = {
+    s.type_name: s for s in _PHOTODETECTOR_SPECS
+}
+
+
+def _photodetector_to_schema(photodetector: PhotoDetector) -> PhotoDetectorSchema:
+    """Serialize a photodetector; see ``_PHOTODETECTOR_SPECS``.
+
+    Raises for any :class:`~iactrace.camera.detector.photodetector.PhotoDetector`
+    subclass without a registered spec, rather than silently falling back to
+    a perfect ``ConstantQE(1.0)`` -- that fallback would be a large, silent
+    change to the detection efficiency.
     """
-    match photosensor:
-        case UniformQE():
-            return UniformQESchema(qe=float(photosensor.qe))
-        case _:
-            warnings.warn(
-                f"{type(photosensor).__name__} is not representable in camera "
-                "YAML; saving with a flat quantum efficiency of 1.0.",
-                UserWarning,
-                stacklevel=2,
-            )
-            return UniformQESchema(qe=1.0)
+    spec = _PHOTODETECTOR_SPEC_BY_GROUP.get(type(photodetector))
+    if spec is None:
+        raise ValueError(
+            f"{type(photodetector).__name__} is not representable in camera "
+            "YAML; add a _PhotoDetectorSpec entry in iactrace.io.adapters "
+            "plus a schema in iactrace.io.schemas."
+        )
+    return spec.to_schema(photodetector)
 
 
-def _photosensor_from_schema(schema: PhotoSensorSchema | None) -> PhotoSensor:
-    """Rebuild a photosensor from its schema (``None`` -> ``UniformQE(1.0)``)."""
-    match schema:
-        case None:
-            return UniformQE(1.0)
-        case UniformQESchema():
-            return UniformQE(schema.qe)
-        case _:
-            raise ValueError(f"unknown photosensor schema: {type(schema).__name__}")
+def _photodetector_from_schema(schema: PhotoDetectorSchema | None) -> PhotoDetector:
+    """Rebuild a photodetector from its schema (``None`` -> ``ConstantQE(1.0)``)."""
+    if schema is None:
+        return ConstantQE(1.0)
+    spec = _PHOTODETECTOR_SPEC_BY_TYPE.get(schema.type)
+    if spec is None:
+        raise ValueError(f"unknown photodetector schema: {type(schema).__name__}")
+    return spec.from_schema(schema)
 
 
 def _chain_to_schema_fields(
     chain: DetectionChain,
-) -> tuple[ConcentratorSchema | None, float, PhotoSensorSchema | None]:
-    """Project a detection chain to its ``(concentrator, gap, photosensor)`` schema.
+) -> tuple[ConcentratorSchema | None, float, PhotoDetectorSchema | None]:
+    """Project a detection chain to its ``(concentrator, gap, photodetector)`` schema.
 
-    Only :class:`~iactrace.camera.photosensor.UniformQE` photosensors and
-    :class:`~iactrace.camera.winston_cone.WinstonCone` concentrators round-trip
-    exactly; other subclasses warn and fall back (see ``_photosensor_to_schema``
-    / ``_concentrator_to_schema``) so saving never crashes. The trivial
-    perfect-QE photosensor is emitted as ``None`` so a geometry-only sensor
-    group serializes without a redundant ``photosensor:`` block.
+    Photodetectors (:class:`~iactrace.camera.detector.photodetector.ConstantQE` /
+    :class:`~iactrace.camera.detector.pmt.PMT`) and concentrators
+    (:class:`~iactrace.camera.optics.winston.WinstonCone` /
+    :class:`~iactrace.camera.optics.okumura.OkumuraCone`) round-trip exactly;
+    any other subclass raises (see ``_photodetector_to_schema`` /
+    ``_concentrator_to_schema``) rather than silently degrading the physics.
+    The trivial perfect-QE photodetector is emitted as ``None`` so a
+    geometry-only sensor group serializes without a redundant
+    ``photodetector:`` block.
     """
     concentrator = _concentrator_to_schema(chain.concentrator)
-    photosensor: PhotoSensorSchema | None
-    if isinstance(chain.photosensor, UniformQE) and float(chain.photosensor.qe) == 1.0:
-        photosensor = None
+    photodetector: PhotoDetectorSchema | None
+    if isinstance(chain.photodetector, ConstantQE) and float(chain.photodetector.qe) == 1.0:
+        photodetector = None
     else:
-        photosensor = _photosensor_to_schema(chain.photosensor)
-    return concentrator, float(chain.gap), photosensor
+        photodetector = _photodetector_to_schema(chain.photodetector)
+    return concentrator, float(chain.gap), photodetector
 
 
 def telescope_to_schema(telescope: Telescope) -> TelescopeConfigSchema:

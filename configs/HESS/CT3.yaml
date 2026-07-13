@@ -23,6 +23,7 @@ telescope:
 mirror_templates:
   spherical_30m:
     surface:
+      type: aspheric
       aspheric: []
       conic: 0.000000
       curvature: 0.033300

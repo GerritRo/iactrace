@@ -21,9 +21,9 @@ class FocalSurfaceHits(eqx.Module):
     """Result of intersecting a :class:`RayBundle` with a :class:`FocalSurface`.
 
     All arrays have leading dimension ``n_rays`` and are aligned with the input
-    bundle. Missed rays appear with ``hit_mask = False`` and meaningless values
-    in the position/direction arrays: always filter with ``hit_mask`` before
-    using ``xy_local`` for plotting or statistics.
+    bundle. Dead rays appear with ``hit_mask = False`` and meaningless values
+    in the position/direction arrays: always filter with ``hit_mask`` (or
+    :attr:`alive`) before using ``xy_local`` for plotting or statistics.
 
     Attributes:
         xy_local: Tangent-plane coordinates at the hit, in the surface-local
@@ -32,7 +32,11 @@ class FocalSurfaceHits(eqx.Module):
             focal plane.
         t: Ray parameter at the hit; equals the world-frame distance travelled
             from ``ray_bundle.origins`` to the surface (n_rays,).
-        hit_mask: True for rays that actually crossed the surface (n_rays,).
+        hit_mask: Liveness at the surface (n_rays,): ``True`` for a ray that
+            was still alive on arrival **and** crossed this surface. This is
+            the input bundle's ``alive`` flag ANDed with a real intersection,
+            so a ray lost upstream (shadowed, off-aperture) is ``False`` here
+            even if its stale geometry would formally cross the surface.
         directions_local: Ray directions in the surface-local frame (n_rays, 3).
             Useful for chief-ray / angle-of-incidence analysis.
         opl: Per-ray optical path length from the source wavefront to the
@@ -50,7 +54,12 @@ class FocalSurfaceHits(eqx.Module):
 
     @property
     def alive(self) -> Array:
-        """Rays that crossed the surface and carry light (hit_mask & values > 0)."""
+        """Rays that reached the surface carrying light (``hit_mask & values > 0``).
+
+        The one-stop filter for photometry / spot diagrams: it excludes both
+        geometry loss (``hit_mask``) and rays attenuated to zero throughput
+        such as absorbed or totally-internally-reflected rays.
+        """
         return self.hit_mask & (self.values > 0)
 
 
@@ -108,7 +117,9 @@ class FocalSurface(eqx.Module):
             o_local,
             d_local,
         )
-        hit_mask = valid & jnp.isfinite(t)
+        # Liveness at the surface: only rays that were still alive coming in
+        # and land on a real intersection.
+        hit_mask = ray_bundle.alive & valid & jnp.isfinite(t)
 
         opl = ray_bundle.path_length + jnp.where(
             hit_mask,
@@ -143,9 +154,6 @@ class FlatFocalPlane(FocalSurface):
         self.rotation = jnp.zeros(3) if rotation is None else jnp.asarray(rotation, dtype=float)
 
     def _intersect_local(self, o_local, d_local):
-        # In the local frame the plane is centred at the origin with the
-        # identity rotation, so intersect_plane reduces to a closed-form
-        # z = 0 hit.
         center = jnp.zeros(3)
         rot = jnp.eye(3)
         xy, t = intersect_plane(o_local, d_local, center, rot)
@@ -195,8 +203,6 @@ class AsphericFocalSurface(FocalSurface):
         k = self.conic
         a = self.aspherics
 
-        # Closed-form conic intersection as initial guess; Newton-Raphson then
-        # refines for the aspheric terms.
         t_init = intersect_conic(o_local, d_local, c, k)
         t, hit_xy, valid = newton_raphson_intersect(
             lambda x, y: sag_raw(x, y, c, k, a),

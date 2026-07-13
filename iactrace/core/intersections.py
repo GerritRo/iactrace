@@ -304,20 +304,27 @@ def intersect_conic(ray_origin, ray_direction, curvature, conic):
     B = 2 * (c * (ox * dx + oy * dy + (1 + k) * oz * dz) - dz)
     C = c * (ox * ox + oy * oy + (1 + k) * oz * oz) - 2 * oz
 
-    # Handle near-zero curvature (plane)
+    # Handle near-zero curvature (plane). Grad-safe division (double-where):
+    # a bare -oz/dz would inject nan into the gradient for rays parallel to
+    # the plane (dz == 0), even though the inf branch is the one selected.
     is_plane = jnp.abs(c) < 1e-12
-    t_plane = jnp.where(jnp.abs(dz) > 1e-10, -oz / dz, jnp.inf)
+    dz_ok = jnp.abs(dz) > 1e-10
+    t_plane = jnp.where(dz_ok, -oz / jnp.where(dz_ok, dz, 1.0), jnp.inf)
     t_plane = jnp.where(t_plane > 1e-8, t_plane, jnp.inf)
 
-    # Handle linear case (A ~ 0, e.g., paraboloid on-axis)
+    # Handle linear case (A ~ 0, e.g., paraboloid on-axis); grad-safe as above.
     is_linear = jnp.abs(A) < 1e-12
-    t_linear = jnp.where(jnp.abs(B) > 1e-12, -C / B, jnp.inf)
+    b_ok = jnp.abs(B) > 1e-12
+    t_linear = jnp.where(b_ok, -C / jnp.where(b_ok, B, 1.0), jnp.inf)
     t_linear = jnp.where(t_linear > 1e-8, t_linear, jnp.inf)
 
-    # Solve quadratic
+    # Solve quadratic. Grad-safe sqrt: at discriminant == 0 (e.g. the fully
+    # degenerate flat-plane case A == B == 0) the sqrt's infinite slope would
+    # otherwise nan the gradient even though the plane branch is selected.
     discriminant = B * B - 4 * A * C
     no_intersection = discriminant < 0
-    sqrt_disc = jnp.sqrt(jnp.maximum(discriminant, 0.0))
+    disc_ok = discriminant > 0.0
+    sqrt_disc = jnp.where(disc_ok, jnp.sqrt(jnp.where(disc_ok, discriminant, 1.0)), 0.0)
 
     # Two roots
     t1 = (-B - sqrt_disc) / (2 * A + 1e-30)

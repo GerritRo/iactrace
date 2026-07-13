@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import math
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 
 import equinox as eqx
 import jax
@@ -9,13 +9,10 @@ import jax.numpy as jnp
 import numpy as np
 from jax import Array
 
-from ..core.interactions import reflect
-from ..core.ray_bundle import RayBundle
-from .concentrator import Concentrator
-from .winston_cone import cpc_full_length
+from .polygonal import PolygonalCone
+from .winston import cpc_full_length, cpc_ideal_wall_tilt
 
-_NUDGE = 1e-5  # off-wall step, scaled by a2
-_T_FLOOR = 1e-6  # spurious-hit rejection floor
+_T_FLOOR = 1e-6  # spurious-hit rejection floor, scaled by a2
 _N_BRACKET = 12  # sub-intervals used to isolate meridian roots on t in [0, 1]
 _N_BISECT = 20  # bisection steps that shrink each bracket
 _N_POLISH = 2  # Newton steps that give the selected root a clean derivative
@@ -160,7 +157,8 @@ def _wall_normal(n: Array, t: Array, gd_r: Array, gd_z: Array) -> Array:
 
     The meridian tangent in the ``(u, z)`` half-plane is ``(R'(t), Z'(t))``; the
     surface normal is perpendicular to it, lifted to 3-D along ``n_hat``. The
-    orientation (inward vs. outward) is irrelevant to :func:`reflect`.
+    orientation (inward vs. outward) is irrelevant to
+    :func:`~iactrace.core.interactions.reflect`.
     """
     Rp = _polyval(gd_r, t)
     Zp = _polyval(gd_z, t)
@@ -169,118 +167,16 @@ def _wall_normal(n: Array, t: Array, gd_r: Array, gd_z: Array) -> Array:
     return nrm / jnp.sqrt(jnp.where(norm_sq > 0.0, norm_sq, 1.0))
 
 
-def _single_step(o, d, value, path, done, n_hats, r_c, z_c, gd_r, gd_z, a2, length, refl):
-    """One reflection event for one ray (frozen once ``done``)."""
-    tau_all, t_all = jax.vmap(lambda n: _wall_hit(o, d, n, r_c, z_c, gd_r, gd_z, a2))(n_hats)
-    kbest = jnp.argmin(tau_all)
-    t_wall = tau_all[kbest]
-    t_bez = t_all[kbest]
-
-    dz = d[2]
-    safe_dz = jnp.where(dz != 0.0, dz, 1.0)
-    t_exit = jnp.where(dz < 0, (0.0 - o[2]) / safe_dz, jnp.inf)
-    t_ent = jnp.where(dz > 0, (length - o[2]) / safe_dz, jnp.inf)
-
-    is_exit = jnp.isfinite(t_exit) & (t_exit <= t_wall) & (t_exit <= t_ent)
-    is_wall = jnp.isfinite(t_wall) & (t_wall < t_exit) & (t_wall <= t_ent)
-    is_lost = (~is_exit) & (~is_wall)
-
-    tw = jnp.where(jnp.isfinite(t_wall), t_wall, 0.0)
-    pw = o + tw * d
-    nrm = _wall_normal(n_hats[kbest], t_bez, gd_r, gd_z)
-    dw, _ = reflect(d, nrm)
-    # Step off the wall along the reflected ray so the next intersection test
-    # sees this wall behind it. The nudge lies on the outgoing ray, so it is
-    # added back to the optical path and the geometry stays exact.
-    nudge = _NUDGE * a2
-    pw = pw + nudge * dw
-    te = jnp.where(jnp.isfinite(t_exit), t_exit, 0.0)
-
-    o_new = jnp.where(is_wall, pw, jnp.where(is_exit, o + te * d, o))
-    d_new = jnp.where(is_wall, dw, d)
-    value_new = jnp.where(is_lost, 0.0, jnp.where(is_wall, value * refl, value))
-    path_new = path + jnp.where(is_wall, tw + nudge, jnp.where(is_exit, te, 0.0))
-    done_new = done | is_exit | is_lost
-
-    live = ~done
-    return (
-        jnp.where(live, o_new, o),
-        jnp.where(live, d_new, d),
-        jnp.where(live, value_new, value),
-        jnp.where(live, path_new, path),
-        jnp.where(live, done_new, done),
-    )
-
-
-def trace(
-    origins,
-    directions,
-    n_hats,
-    r_coeffs,
-    z_coeffs,
-    entrance_apothem,
-    exit_apothem,
-    length,
-    reflectivity,
-    max_bounces,
-):
-    """Trace rays through the Okumura cone in CPC coords (exit z=0, mouth z=length).
-
-    Returns ``(exit_origins, exit_directions, value_factor, path_added)``;
-    ``value_factor`` is ``reflectivity**bounces`` for transmitted rays and ``0``
-    for rays that miss the mouth, leave back through it, or never exit within
-    ``max_bounces``.
-    """
-    a1, a2 = entrance_apothem, exit_apothem
-    r_c = jnp.asarray(r_coeffs)
-    z_c = jnp.asarray(z_coeffs)
-    gd_r = _polyder(r_c)
-    gd_z = _polyder(z_c)
-    n = origins.shape[0]
-
-    # Rays entering outside the cone mouth (inradius a1 at z = length) are lost.
-    u_all = origins[:, :2] @ n_hats.T
-    inside = jnp.all(u_all <= a1 + 1e-9, axis=1)
-
-    carry = (
-        origins,
-        directions,
-        jnp.where(inside, 1.0, 0.0),
-        jnp.zeros(n),
-        ~inside,
-    )
-
-    step_fn: Callable[..., tuple[Array, Array, Array, Array, Array]] = jax.vmap(
-        _single_step,
-        in_axes=(0, 0, 0, 0, 0, None, None, None, None, None, None, None, None),
-    )
-
-    def step(carry, _):
-        out = step_fn(*carry, n_hats, r_c, z_c, gd_r, gd_z, a2, length, reflectivity)
-        return out, None
-
-    (o, d, value, path, done), _ = jax.lax.scan(
-        step,
-        carry,
-        None,
-        length=max_bounces + 1,
-    )
-    # Rays still bouncing at the end are absorbed.
-    value = jnp.where(done, value, 0.0)
-    return o, d, value, path
-
-
-# OkumuraCone concentrator
-
-
-class OkumuraCone(Concentrator):
+class OkumuraCone(PolygonalCone):
     """Okumura light collector: a polygonal cone with Bezier-curve walls.
 
     A hollow light guide whose ``n_sides`` walls follow a quadratic or cubic
     Bezier meridian (Okumura 2012, arXiv:1205.3968) rather than the Winston
     paraboloid. Construct it either from an explicit list of interior control
     points or via :meth:`quadratic` / :meth:`cubic`, using the relative
-    coordinates tabulated in the paper.
+    coordinates tabulated in the paper. Like the Winston cone, it answers the
+    per-facet Bezier-meridian hit (:meth:`_nearest_hit`); the bounce loop is
+    owned by the shared :func:`~iactrace.camera.optics.polygonal.trace_chain`.
 
     The control points are given in the paper's normalized box: the exit rim is
     ``(0, 0)`` and the mouth is ``(1, 1)``, so a control point ``(r, z)`` has
@@ -345,8 +241,7 @@ class OkumuraCone(Concentrator):
             )
 
         if length is None:
-            s = a2 / a1
-            c = math.sqrt(1.0 - s * s)
+            s, c = cpc_ideal_wall_tilt(a2, a1)
             length = cpc_full_length(a2, s, c)
         length = float(length)
         if length <= 0.0:
@@ -406,54 +301,20 @@ class OkumuraCone(Concentrator):
         """Degree of the Bezier meridian (2 = quadratic, 3 = cubic)."""
         return len(self.control_points) + 1
 
-    def _wall_normals(self) -> Array:
-        a = self.orientation + 2.0 * jnp.pi * jnp.arange(self.n_sides) / self.n_sides
-        return jnp.stack([jnp.cos(a), jnp.sin(a)], axis=-1)
-
-    def apply(self, local_rays: RayBundle) -> RayBundle:
-        length = self.length
-        o, d = local_rays.origins, local_rays.directions
-        # chain (entrance z=0, light -z) -> CPC (entrance z=length, exit z=0):
-        o_cpc = jnp.stack([o[:, 0], o[:, 1], jnp.full(o.shape[0], length)], axis=-1)
-
-        oe, de, factor, path_add = trace(
-            o_cpc,
-            d,
-            self._wall_normals(),
-            jnp.asarray(self.r_coeffs),
-            jnp.asarray(self.z_coeffs),
-            self.entrance_apothem,
-            self.exit_apothem,
-            length,
-            self.reflectivity,
-            self.max_bounces,
-        )
-
-        o_out = jnp.stack([oe[:, 0], oe[:, 1], jnp.full(oe.shape[0], -length)], axis=-1)
-
-        return RayBundle(
-            origins=o_out,
-            directions=de,
-            values=local_rays.values * factor,
-            path_length=local_rays.path_length + self.index * path_add,
-            n=local_rays.n,
-        )
-
-    def cross_sections(self) -> tuple[Array, Array]:
-        n_slices = 24
+    def _nearest_hit(self, o: Array, d: Array) -> tuple[Array, Array]:
         r_c = jnp.asarray(self.r_coeffs)
         z_c = jnp.asarray(self.z_coeffs)
-        # sample the meridian from the mouth (t=1, z=0 chain) to the exit
-        # (t=0, z=-length chain)
-        t = jnp.linspace(1.0, 0.0, n_slices)
-        apothem = _polyval(r_c, t)
-        z_chain = _polyval(z_c, t) - self.length
-        corner_r = apothem / jnp.cos(jnp.pi / self.n_sides)
-        ang = (
-            self.orientation
-            + jnp.pi / self.n_sides
-            + 2.0 * jnp.pi * jnp.arange(self.n_sides) / self.n_sides
-        )
-        unit = jnp.stack([jnp.cos(ang), jnp.sin(ang)], axis=-1)  # (N, 2)
-        rings = corner_r[:, None, None] * unit[None, :, :]  # (K, N, 2)
-        return z_chain, rings
+        gd_r = _polyder(r_c)
+        gd_z = _polyder(z_c)
+        tau_all, t_all = jax.vmap(
+            lambda nh: _wall_hit(o, d, nh, r_c, z_c, gd_r, gd_z, self.exit_apothem)
+        )(self.n_hats)
+        kbest = jnp.argmin(tau_all)
+        normal = _wall_normal(self.n_hats[kbest], t_all[kbest], gd_r, gd_z)
+        return tau_all[kbest], normal
+
+    def _meridian(self) -> tuple[Array, Array]:
+        t = jnp.linspace(1.0, 0.0, self._N_SLICES)
+        apothem = _polyval(jnp.asarray(self.r_coeffs), t)
+        z_chain = _polyval(jnp.asarray(self.z_coeffs), t) - self.length
+        return z_chain, apothem
