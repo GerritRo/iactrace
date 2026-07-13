@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Callable
 
 import equinox as eqx
 import jax
@@ -22,10 +23,7 @@ class DetectionSurface(eqx.Module):
       revolution (a pure-conic core surface, intersected in closed form), or
     * ``shape`` -- any single-element core
       :class:`~iactrace.core.surfaces.SurfaceGroup` (aspheric, Zernike,
-      freeform, sums). This is the escape hatch for complicated photocathode
-      figures; it shares the exact surface conventions and intersection
-      machinery of the optical elements (Newton-Raphson, bypassed for pure
-      conics).
+      freeform, sums).
 
     The chain traces rays to this surface -- jointly with the concentrator
     walls when the pixel has a wall-based concentrator, otherwise a straight
@@ -113,15 +111,20 @@ class DetectionSurface(eqx.Module):
         within = (point[0] ** 2 + point[1] ** 2) <= self.radius**2
         return t, point, within
 
+    def sag_fn(self) -> Callable[[Array, Array], Array]:
+        """Return this surface's ``z(x, y)`` sag function.
+
+        For callers (e.g. 3D visualisation) that need a plain sag callable
+        rather than the full intersection machinery.
+        """
+        return lambda x, y: self.shape.sag_at(0, x, y)
+
     def normals_at(self, points: Array) -> Array:
         """Outward unit surface normals at the transverse positions of *points*.
 
         The surface is ``z = vertex_z + sag(x, y)``, so only ``(x, y)`` matter
         and the result is placement-independent -- angle-dependent photodetectors
         call this on the landing ``origins`` handed over by the chain.
-        Positions are clamped into the aperture first, so the meaningless
-        positions of dead rays cannot push the sag out of its domain (their
-        weight is already ``0``; the normal must merely stay finite).
         """
         x, y = points[..., 0], points[..., 1]
         if math.isfinite(self.radius):

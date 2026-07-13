@@ -10,12 +10,12 @@ import numpy as np
 from jax import Array
 
 from .polygonal import PolygonalCone
-from .winston import cpc_full_length
+from .winston import cpc_full_length, cpc_ideal_wall_tilt
 
 _T_FLOOR = 1e-6  # spurious-hit rejection floor, scaled by a2
 _N_BRACKET = 12  # sub-intervals used to isolate meridian roots on t in [0, 1]
-_N_BISECT = 20  # bisection steps that shrink each bracket
-_N_POLISH = 2  # Newton steps that give the selected root a clean derivative
+_N_BISECT = 20   # bisection steps that shrink each bracket
+_N_POLISH = 2    # Newton steps that give the selected root a clean derivative
 
 
 def _bezier_power_coeffs(control_values: Sequence[float]) -> list[float]:
@@ -241,8 +241,7 @@ class OkumuraCone(PolygonalCone):
             )
 
         if length is None:
-            s = a2 / a1
-            c = math.sqrt(1.0 - s * s)
+            s, c = cpc_ideal_wall_tilt(a2, a1)
             length = cpc_full_length(a2, s, c)
         length = float(length)
         if length <= 0.0:
@@ -303,8 +302,6 @@ class OkumuraCone(PolygonalCone):
         return len(self.control_points) + 1
 
     def _nearest_hit(self, o: Array, d: Array) -> tuple[Array, Array]:
-        # The power-basis coefficients derive from the static control points, so
-        # jnp.asarray / _polyder here are compile-time constants (XLA folds them).
         r_c = jnp.asarray(self.r_coeffs)
         z_c = jnp.asarray(self.z_coeffs)
         gd_r = _polyder(r_c)
@@ -317,8 +314,6 @@ class OkumuraCone(PolygonalCone):
         return tau_all[kbest], normal
 
     def _meridian(self) -> tuple[Array, Array]:
-        # sample from the mouth (t=1, z=0) to the exit (t=0, z=-length); the
-        # Bezier parameter gives the natural (non-uniform) axial spacing.
         t = jnp.linspace(1.0, 0.0, self._N_SLICES)
         apothem = _polyval(jnp.asarray(self.r_coeffs), t)
         z_chain = _polyval(jnp.asarray(self.z_coeffs), t) - self.length

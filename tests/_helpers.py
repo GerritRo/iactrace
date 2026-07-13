@@ -80,6 +80,23 @@ def mirror_group_with_surface(surface, radius=0.5, stage=0, n_samples=64):
     )
 
 
+def spherical_cap_surface(radius, sag):
+    """Single-element spherical-cap AsphericSurfaceGroup for PMT photocathode tests.
+
+    Mirrors the sag-to-curvature derivation the old ``PMT(face_sag=...)``
+    shorthand used internally, back when the PMT stored a bespoke
+    (radius, sag) pair instead of a general :class:`SurfaceGroup`. Pass the
+    result as ``PMT(..., surface=spherical_cap_surface(r, h), vertex_z=h)``.
+    """
+    r_curv = (radius * radius + sag * sag) / (2.0 * sag)
+    return AsphericSurfaceGroup(
+        offsets=jnp.zeros((1, 2)),
+        curvatures=jnp.array([-1.0 / r_curv]),
+        conics=jnp.zeros(1),
+        aspherics=jnp.zeros((1, 0)),
+    )
+
+
 # --- whole telescope + camera builders ----------------------------------------
 
 

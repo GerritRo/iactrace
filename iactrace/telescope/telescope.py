@@ -328,13 +328,20 @@ class Telescope(eqx.Module):
     def set_thickness(self, stage: int, thickness: Array | float) -> Telescope:
         return _ops.set_thickness(self, stage, thickness)
 
-    def set_focal_lengths(self, stage: int, focal_lengths: Array) -> Telescope:
-        return _ops.set_focal_lengths(self, stage, focal_lengths)
+    def set_focal_lengths(
+        self, stage: int, focal_lengths: Array, n_outside: float = 1.0
+    ) -> Telescope:
+        return _ops.set_focal_lengths(self, stage, focal_lengths, n_outside)
 
     def apply_focal_error(
-        self, stage: int, sigma: float, key: Array, relative: bool = False
+        self,
+        stage: int,
+        sigma: float,
+        key: Array,
+        relative: bool = False,
+        n_outside: float = 1.0,
     ) -> Telescope:
-        return _ops.apply_focal_error(self, stage, sigma, key, relative)
+        return _ops.apply_focal_error(self, stage, sigma, key, relative, n_outside)
 
     # Obstruction methods
 

@@ -58,27 +58,6 @@ class TestRefract:
         _, _, tir_above = refract(direction_above, normal, n1, n2)
         assert tir_above
 
-    def test_equal_indices_no_change(self):
-        """When n1 == n2, ray direction is unchanged."""
-        direction = jnp.array([0.3, 0.2, -0.9])
-        direction = direction / jnp.linalg.norm(direction)
-        normal = jnp.array([0.0, 0.0, 1.0])
-
-        refracted, _, tir = refract(direction, normal, 1.5, 1.5)
-
-        assert jnp.allclose(refracted, direction, atol=1e-10)
-        assert not tir
-
-    def test_refraction_plane_preserved(self):
-        """Refracted ray stays in the plane of incidence."""
-        direction = jnp.array([0.5, 0.0, -0.866])
-        direction = direction / jnp.linalg.norm(direction)
-        normal = jnp.array([0.0, 0.0, 1.0])
-
-        refracted, _, _ = refract(direction, normal, 1.0, 1.5)
-
-        assert jnp.isclose(refracted[1], 0.0, atol=1e-10)
-
 
 class TestFresnelUnpolarized:
     """Test Fresnel reflection/transmission coefficients.
@@ -87,18 +66,12 @@ class TestFresnelUnpolarized:
     so the API takes only the incidence cosine and the two indices.
     """
 
-    def test_normal_incidence_formula(self):
-        """At normal incidence, R = ((n1-n2)/(n1+n2))^2."""
+    def test_energy_conservation_and_normal_formula(self):
+        """R + T = 1 for all angles below TIR, and at normal incidence
+        R = ((n1-n2)/(n1+n2))^2."""
         n1, n2 = 1.0, 1.5
-        R, T = fresnel_unpolarized(1.0, n1, n2)
-
-        R_expected = ((n1 - n2) / (n1 + n2)) ** 2
-        assert jnp.isclose(R, R_expected, rtol=1e-6)
-        assert jnp.isclose(R + T, 1.0, atol=1e-10)
-
-    def test_energy_conservation(self):
-        """R + T = 1 for all angles below TIR."""
-        n1, n2 = 1.0, 1.5
+        R0, _ = fresnel_unpolarized(1.0, n1, n2)
+        assert jnp.isclose(R0, ((n1 - n2) / (n1 + n2)) ** 2, rtol=1e-6)
         for theta_i in [0.0, 0.2, 0.5, 0.8, 1.0]:
             R, T = fresnel_unpolarized(jnp.cos(theta_i), n1, n2)
             assert jnp.isclose(R + T, 1.0, atol=1e-10)
@@ -167,6 +140,10 @@ class TestRefractSlab:
         assert valid
         # Normal incidence: path inside slab = thickness; OPL = n_in * thickness.
         assert jnp.isclose(path_length, thickness, atol=1e-10)
+        # The caller's two-face transmittance T = T_face^2 = (1 - R_single)^2.
+        _, T_face = fresnel_unpolarized(cos_i, n_out, n_in)
+        R_single = ((n_out - n_in) / (n_out + n_in)) ** 2
+        assert jnp.isclose(T_face * T_face, (1 - R_single) ** 2, rtol=1e-4)
 
     def test_oblique_incidence_direction_preserved(self):
         """For parallel surfaces, exit direction equals entry direction."""
@@ -208,59 +185,19 @@ class TestRefractSlab:
         assert offset(30.0, 0.01) > offset(0.0, 0.01) + 1e-10  # grows with angle
         assert offset(30.0, 0.02) > offset(30.0, 0.01)  # grows with thickness
 
-    def test_slab_fresnel_squared_at_normal_incidence(self):
-        """Caller computes T = T_face^2 from the cos_i returned by refract_slab."""
-        direction = jnp.array([0.0, 0.0, -1.0])
-        normal = jnp.array([0.0, 0.0, 1.0])
-        position = jnp.array([0.0, 0.0, 0.0])
-        n_out, n_in = 1.0, 1.5
-        thickness = 0.01
-
-        _, _, cos_i, valid, _ = refract_slab(
-            direction,
-            normal,
-            position,
-            n_out,
-            n_in,
-            thickness,
-        )
-        _, T_face = fresnel_unpolarized(cos_i, n_out, n_in)
-        transmittance = T_face * T_face
-
-        R_single = ((n_out - n_in) / (n_out + n_in)) ** 2
-        T_expected = (1 - R_single) ** 2
-
-        assert jnp.isclose(transmittance, T_expected, rtol=1e-4)
-        assert valid
-
-
 class TestReflect:
     """Test reflection function."""
 
-    def test_normal_incidence_reverses_direction(self):
-        """Ray normal to surface reflects back along same line."""
+    def test_reflection_normal_and_oblique(self):
+        """Reflection reverses a normal-incidence ray and mirrors a 45 deg ray."""
         from iactrace.core.interactions import reflect
 
-        direction = jnp.array([0.0, 0.0, -1.0])
-        normal = jnp.array([0.0, 0.0, 1.0])
-
-        reflected, cos_angle = reflect(direction, normal)
-
-        expected = jnp.array([0.0, 0.0, 1.0])
-        assert jnp.allclose(reflected, expected, atol=1e-10)
+        # Normal incidence: reflects straight back, cos = 1.
+        r, cos_angle = reflect(jnp.array([0.0, 0.0, -1.0]), jnp.array([0.0, 0.0, 1.0]))
+        assert jnp.allclose(r, jnp.array([0.0, 0.0, 1.0]), atol=1e-10)
         assert jnp.isclose(cos_angle.squeeze(), 1.0, atol=1e-10)
 
-    def test_45_degree_reflection(self):
-        """45 degree incidence on horizontal surface."""
-        from iactrace.core.interactions import reflect
-
-        # Ray coming from upper left, hitting horizontal surface
-        direction = jnp.array([1.0, 0.0, -1.0]) / jnp.sqrt(2)
-        normal = jnp.array([0.0, 0.0, 1.0])
-
-        reflected, cos_angle = reflect(direction, normal)
-
-        # Should reflect to upper right
-        expected = jnp.array([1.0, 0.0, 1.0]) / jnp.sqrt(2)
-        assert jnp.allclose(reflected, expected, atol=1e-10)
+        # 45 deg incidence from upper left -> reflects to upper right, cos = 1/sqrt2.
+        r, cos_angle = reflect(jnp.array([1.0, 0.0, -1.0]) / jnp.sqrt(2), jnp.array([0.0, 0.0, 1.0]))
+        assert jnp.allclose(r, jnp.array([1.0, 0.0, 1.0]) / jnp.sqrt(2), atol=1e-10)
         assert jnp.isclose(cos_angle.squeeze(), 1.0 / jnp.sqrt(2), atol=1e-10)

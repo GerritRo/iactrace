@@ -24,35 +24,25 @@ def _downward_bundle(origins):
 class TestFlatFocalPlane:
     """Basic intersection behaviour of FlatFocalPlane."""
 
-    def test_downward_ray_hits_at_xy_origin(self):
-        """A ray on the optical axis hits at (0, 0) at unit distance."""
+    def test_intersection_axis_offset_and_translation(self):
+        """On-axis and off-axis rays hit at their (x, y) at the right distance,
+        and translating the plane moves the hit distance accordingly."""
         plane = FlatFocalPlane()
-        bundle = _downward_bundle([[0.0, 0.0, 1.0]])
-        hits = plane.intersect(bundle)
-
-        assert bool(hits.hit_mask[0])
-        assert jnp.allclose(hits.xy_local[0], jnp.zeros(2), atol=1e-6)
-        assert jnp.isclose(hits.z_local[0], 0.0, atol=1e-6)
-        assert jnp.isclose(hits.t[0], 1.0, atol=1e-6)
-
-    def test_xy_offset_preserved(self):
-        """Off-axis ray preserves its (x, y) at the hit."""
-        plane = FlatFocalPlane()
-        bundle = _downward_bundle([[0.3, -0.2, 2.0]])
-        hits = plane.intersect(bundle)
-
-        assert bool(hits.hit_mask[0])
-        assert jnp.allclose(hits.xy_local[0], jnp.array([0.3, -0.2]), atol=1e-6)
-        assert jnp.isclose(hits.t[0], 2.0, atol=1e-6)
-
-    def test_translated_plane(self):
-        """Plane at z=0.5 is hit at t=0.5 by a ray starting at z=1."""
-        plane = FlatFocalPlane(position=jnp.array([0.0, 0.0, 0.5]))
-        bundle = _downward_bundle([[0.0, 0.0, 1.0]])
-        hits = plane.intersect(bundle)
-
-        assert bool(hits.hit_mask[0])
-        assert jnp.isclose(hits.t[0], 0.5, atol=1e-6)
+        # on-axis ray from z=1 hits (0, 0) at t=1
+        on_axis = plane.intersect(_downward_bundle([[0.0, 0.0, 1.0]]))
+        assert bool(on_axis.hit_mask[0])
+        assert jnp.allclose(on_axis.xy_local[0], jnp.zeros(2), atol=1e-6)
+        assert jnp.isclose(on_axis.z_local[0], 0.0, atol=1e-6)
+        assert jnp.isclose(on_axis.t[0], 1.0, atol=1e-6)
+        # off-axis ray preserves its (x, y)
+        off_axis = plane.intersect(_downward_bundle([[0.3, -0.2, 2.0]]))
+        assert jnp.allclose(off_axis.xy_local[0], jnp.array([0.3, -0.2]), atol=1e-6)
+        assert jnp.isclose(off_axis.t[0], 2.0, atol=1e-6)
+        # a plane translated to z=0.5 is hit at t=0.5 by a ray from z=1
+        translated = FlatFocalPlane(position=jnp.array([0.0, 0.0, 0.5])).intersect(
+            _downward_bundle([[0.0, 0.0, 1.0]])
+        )
+        assert jnp.isclose(translated.t[0], 0.5, atol=1e-6)
 
 
 class TestAsphericFocalSurface:

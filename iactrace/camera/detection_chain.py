@@ -34,6 +34,18 @@ class DetectionChain(eqx.Module):
         if not self.gap >= 0.0:
             raise ValueError(f"gap must be >= 0, got {self.gap}")
 
+    def with_concentrator(self, concentrator: Concentrator | None) -> DetectionChain:
+        """Return a copy of this chain with its concentrator replaced."""
+        return DetectionChain(concentrator, self.photodetector, self.gap)
+
+    def with_photodetector(self, photodetector: PhotoDetector) -> DetectionChain:
+        """Return a copy of this chain with its photodetector replaced."""
+        return DetectionChain(self.concentrator, photodetector, self.gap)
+
+    def with_gap(self, gap: float) -> DetectionChain:
+        """Return a copy of this chain with its gap replaced."""
+        return DetectionChain(self.concentrator, self.photodetector, float(gap))
+
     @property
     def detector_z(self) -> float:
         """Detector-plane position in the pixel-local frame: ``-(length + gap)``."""

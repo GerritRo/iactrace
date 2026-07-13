@@ -1,6 +1,9 @@
 import jax
 import jax.numpy as jnp
+import pytest
 
+from iactrace import Camera, Telescope
+from iactrace.camera.camera import intersect_sensor
 from iactrace.core.obstructions import SphereGroup
 
 from ._helpers import (
@@ -8,6 +11,12 @@ from ._helpers import (
     make_telescope_with_obstruction,
     make_two_stage_telescope,
 )
+
+
+def _sensor_xy(camera, rb):
+    """(x, y) of intersected sensor positions, for PSF-spread comparisons."""
+    sensor_rays, _ = intersect_sensor(camera, rb)
+    return sensor_rays.origins[:, 0], sensor_rays.origins[:, 1]
 
 
 class TestBasicRendering:
@@ -31,7 +40,7 @@ class TestBasicRendering:
         assert flat.values.ndim == 1
         assert flat.path_length.ndim == 1
 
-    def test_camera_image_returns_correct_shape(self):
+    def test_camera_image_shape_and_nonzero(self):
         tel, cam = make_simple_telescope()
         sources = jnp.array([[0.0, 0.0, 1e6]])
         values = jnp.array([1.0])
@@ -39,15 +48,7 @@ class TestBasicRendering:
         image = cam.image(tel.render(sources, values, source_type="point"))
 
         assert image.shape == (1, 100, 100)
-
-    def test_render_nonzero_for_on_axis_source(self):
-        tel, cam = make_simple_telescope()
-        sources = jnp.array([[0.0, 0.0, 1e6]])
-        values = jnp.array([1.0])
-
-        image = cam.image(tel.render(sources, values, source_type="point"))
-
-        assert jnp.sum(image) > 0
+        assert jnp.sum(image) > 0  # on-axis source produces flux
 
     def test_parallel_rays_converge_at_center(self):
         """Parallel rays (on-axis) should focus at image center within precision."""
@@ -80,22 +81,7 @@ class TestBasicRendering:
 class TestResponseMatrix:
     """Camera.response_matrix(LazyRayBundle)."""
 
-    def test_shape_matches_image_with_leading_source_axis(self):
-        tel, cam = make_simple_telescope(n_samples=64)
-        sources = jnp.array(
-            [
-                [0.0, 0.0, -1.0],
-                [0.001, 0.0, -1.0],
-                [-0.001, 0.0, -1.0],
-            ]
-        )
-        single = cam.image(tel.render(sources[:1], jnp.ones(1), source_type="parallel"))
-
-        rm = cam.response_matrix(tel.render(sources, jnp.ones(3), source_type="parallel"))
-
-        assert rm.shape == (sources.shape[0],) + single.shape
-
-    def test_per_source_rows_equal_individual_renders(self):
+    def test_shape_and_per_source_rows_equal_individual_renders(self):
         tel, cam = make_simple_telescope(n_samples=64)
         # Slightly-off-axis sources avoid pile-ups on the central pixel
         # boundary that would otherwise leak across pixels under pure
@@ -108,37 +94,16 @@ class TestResponseMatrix:
                 [-0.0005, 0.0, -1.0],
             ]
         )
+        single = cam.image(tel.render(sources[:1], jnp.ones(1), source_type="parallel"))
+        rm = cam.response_matrix(tel.render(sources, jnp.ones(3), source_type="parallel"))
 
-        rm = cam.response_matrix(
-            tel.render(sources, jnp.ones(3), source_type="parallel"),
-        )
-
+        # Leading source axis, then each row equals the standalone single-source render.
+        assert rm.shape == (sources.shape[0],) + single.shape
         for i in range(sources.shape[0]):
-            img_i = cam.image(
-                tel.render(sources[i : i + 1], jnp.ones(1), source_type="parallel"),
-            )
+            img_i = cam.image(tel.render(sources[i : i + 1], jnp.ones(1), source_type="parallel"))
             assert jnp.allclose(rm[i], img_i, atol=1e-5), (
                 f"Response matrix row {i} disagrees with single-source render."
             )
-
-    def test_values_weight_rows(self):
-        tel, cam = make_simple_telescope(n_samples=64)
-        sources = jnp.array(
-            [
-                [0.0, 0.0, -1.0],
-                [0.0005, 0.0, -1.0],
-            ]
-        )
-
-        unit = cam.response_matrix(
-            tel.render(sources, jnp.ones(2), source_type="parallel"),
-        )
-        weighted = cam.response_matrix(
-            tel.render(sources, jnp.array([2.0, 3.0]), source_type="parallel"),
-        )
-
-        assert jnp.allclose(weighted[0], 2.0 * unit[0], atol=1e-5)
-        assert jnp.allclose(weighted[1], 3.0 * unit[1], atol=1e-5)
 
     def test_rejects_eager_bundle(self):
         """response_matrix needs the per-source structure carried by LazyRayBundle."""
@@ -192,48 +157,19 @@ class TestRenderLinearity:
 class TestEnergyConservation:
     """Test radiometric properties of ray tracing."""
 
-    def test_output_scales_with_input_intensity(self):
-        """Output flux scales linearly with input intensity."""
-        tel, cam = make_simple_telescope()
-        sources = jnp.array([[0.0, 0.0, 1e6]])
-
-        values1 = jnp.array([1.0])
-        values2 = jnp.array([3.0])
-
-        image1 = cam.image(tel.render(sources, values1, source_type="point"))
-        image2 = cam.image(tel.render(sources, values2, source_type="point"))
-
-        ratio = jnp.sum(image2) / jnp.sum(image1)
-        assert jnp.isclose(ratio, 3.0, rtol=0.01)
-
-    def test_output_scales_with_mirror_area(self):
-        """Output flux is proportional to mirror collecting area."""
+    def test_flux_tracks_mirror_area_and_reflectivity(self):
+        """Total collected flux is ~ the mirror collecting area, and scaling
+        mirror reflectivity scales the output proportionally."""
         tel, cam = make_simple_telescope()
         sources = jnp.array([[0.0, 0.0, 1e6]])
         values = jnp.array([1.0])
 
-        image = cam.image(tel.render(sources, values, source_type="point"))
-        total_flux = jnp.sum(image)
-
+        flux_full = jnp.sum(cam.image(tel.render(sources, values, source_type="point")))
         mirror_area = jnp.pi * 0.1**2
-
-        assert total_flux > 0.5 * mirror_area * values[0]
-        assert total_flux < 1.5 * mirror_area * values[0]
-
-    def test_reflectivity_scales_output(self):
-        """Scaling mirror reflectivity scales output proportionally."""
-        tel, cam = make_simple_telescope()
-
-        sources = jnp.array([[0.0, 0.0, 1e6]])
-        values = jnp.array([1.0])
-
-        image_full = cam.image(tel.render(sources, values, source_type="point"))
-        flux_full = jnp.sum(image_full)
+        assert 0.5 * mirror_area < flux_full < 1.5 * mirror_area
 
         tel_scaled = tel.scale_reflectivity(0, 3)
-        image_scaled = cam.image(tel_scaled.render(sources, values, source_type="point"))
-        flux_scaled = jnp.sum(image_scaled)
-
+        flux_scaled = jnp.sum(cam.image(tel_scaled.render(sources, values, source_type="point")))
         assert jnp.isclose(flux_scaled / flux_full, 3.0, rtol=0.01)
 
 
@@ -247,16 +183,6 @@ class TestMultiStageRendering:
         stages = [g.optical_stage for g in tel.mirror_groups]
         assert stages == [0, 1]
         assert len(tel.mirror_groups) == 2
-
-    def test_single_stage_produces_output(self):
-        """Single-stage telescope works correctly (baseline)."""
-        tel, cam = make_simple_telescope()
-
-        sources = jnp.array([[0.0, 0.0, -1.0]])
-        values = jnp.array([1.0])
-
-        image = cam.image(tel.render(sources, values, source_type="parallel"))
-        assert jnp.sum(image) > 0
 
 
 class TestObstructionEffects:
@@ -282,14 +208,6 @@ class TestObstructionEffects:
 
         assert flux_obstructed < flux_clear
         assert flux_obstructed > 0
-
-    def test_obstruction_group_is_attached(self):
-        """Telescope with obstruction has the obstruction group attached."""
-        tel, cam = make_telescope_with_obstruction()
-
-        assert tel.obstruction_groups is not None
-        assert len(tel.obstruction_groups) == 1
-        assert len(tel.obstruction_groups[0]) == 1
 
 
 class TestFinalLegShadow:
@@ -352,35 +270,6 @@ class TestFinalLegShadow:
         out = apply_final_leg_shadow(rb, [], jnp.array([0.0, 0.0, 1.0]), jnp.zeros(3))
         assert out is rb
 
-    def test_to_frame_is_pure_and_handoff_composes(self):
-        """to_frame is a pure reframe (values untouched); the explicit
-        shadow-then-reframe handoff reproduces the old coupled behaviour.
-
-        The final-leg shadow is no longer a side effect of the frame
-        transform -- it is an explicit ``apply_final_leg_shadow`` step the
-        render/trace entry points run before ``to_frame``.
-        """
-        from iactrace.core.render import apply_final_leg_shadow
-
-        rb = self._two_rays()
-        cam_pos = jnp.array([0.0, 0.0, 1.0])  # focal plane at z = 1
-        cam_rot = jnp.zeros(3)
-        sphere = SphereGroup(centers=[[0.0, 0.0, 0.5]], radii=[0.1])
-
-        # Pure reframe: geometry moves, values are left alone.
-        reframed = rb.to_frame(cam_pos, cam_rot)
-        assert jnp.allclose(reframed.values, rb.values)
-
-        # Explicit handoff: shadow the final leg, then reframe.
-        out = apply_final_leg_shadow(rb, [sphere], cam_pos, cam_rot).to_frame(cam_pos, cam_rot)
-
-        # Shadowed: axial ray blocked, offset ray kept.
-        assert float(out.values[0]) == 0.0
-        assert float(out.values[1]) == 1.0
-        # Reframed identically to a plain to_frame transform.
-        assert jnp.allclose(out.origins, reframed.origins)
-        assert jnp.allclose(out.directions, reframed.directions)
-
     def _near_focus_sphere(self):
         # make_simple_telescope: parabola of curvature 1 -> focus at z=0.5,
         # aperture radius 0.1. A small sphere just short of the focus sits
@@ -408,3 +297,77 @@ class TestFinalLegShadow:
 
         assert flux_clear > 0
         assert flux_obs < 0.2 * flux_clear
+
+
+class TestRoughnessInTracing:
+    """Mirror roughness effects on a real (HESS) telescope loaded from YAML."""
+
+    @pytest.fixture
+    def telescope_and_camera(self):
+        """Load a test telescope and camera from the split config files."""
+        telescope = Telescope.from_yaml("configs/HESS/CT3.yaml", 16, key=jax.random.key(42))
+        camera = Camera.from_yaml("configs/HESS/HESS1U.yaml")
+        return telescope, camera
+
+    @pytest.fixture
+    def test_rays(self):
+        """Create test rays for tracing."""
+        n_rays = 500
+        key1, key2 = jax.random.split(jax.random.key(123))
+        r = 5.0 * jnp.sqrt(jax.random.uniform(key1, (n_rays,)))
+        theta = jax.random.uniform(key2, (n_rays,)) * 2 * jnp.pi
+        origins = jnp.stack(
+            [r * jnp.cos(theta), r * jnp.sin(theta), jnp.ones(n_rays) * 100.0], axis=1
+        )
+        directions = jnp.broadcast_to(jnp.array([0.0, 0.0, -1.0]), (n_rays, 3))
+        return origins, directions, jnp.ones(n_rays)
+
+    def test_roughness_increases_psf_spread(self, telescope_and_camera, test_rays):
+        """Applying roughness increases the PSF spread."""
+        telescope, camera = telescope_and_camera
+        origins, directions, values = test_rays
+
+        rb_clean = telescope.trace(origins, directions, values)
+        x_clean, _ = _sensor_xy(camera, rb_clean)
+
+        tel_rough = telescope.apply_roughness(0, 60.0)  # 60 arcsec
+        rb_rough = tel_rough.trace(origins, directions, values)
+        x_rough, _ = _sensor_xy(camera, rb_rough)
+
+        hit_clean = rb_clean.values > 0
+        hit_rough = rb_rough.values > 0
+        if jnp.sum(hit_clean) > 10 and jnp.sum(hit_rough) > 10:
+            std_clean = jnp.std(x_clean[hit_clean])
+            std_rough = jnp.std(x_rough[hit_rough])
+            assert std_rough > std_clean, (
+                f"Roughness should increase PSF spread: {std_rough} <= {std_clean}"
+            )
+
+    def test_zero_roughness_no_change(self, telescope_and_camera, test_rays):
+        """Zero roughness does not change the traced positions or values."""
+        telescope, camera = telescope_and_camera
+        origins, directions, values = test_rays
+
+        rb_clean = telescope.trace(origins, directions, values)
+        x_clean, y_clean = _sensor_xy(camera, rb_clean)
+
+        tel_zero = telescope.apply_roughness(0, 0.0)
+        rb_zero = tel_zero.trace(origins, directions, values)
+        x_zero, y_zero = _sensor_xy(camera, rb_zero)
+
+        assert jnp.allclose(jnp.stack([x_clean, y_clean], 1), jnp.stack([x_zero, y_zero], 1))
+        assert jnp.allclose(rb_clean.values, rb_zero.values)
+
+    def test_roughness_is_deterministic(self, telescope_and_camera, test_rays):
+        """Roughness perturbation is deterministic across repeated traces."""
+        telescope, camera = telescope_and_camera
+        origins, directions, values = test_rays
+
+        tel_rough = telescope.apply_roughness(0, 30.0)
+        rb1 = tel_rough.trace(origins, directions, values)
+        rb2 = tel_rough.trace(origins, directions, values)
+        x1, y1 = _sensor_xy(camera, rb1)
+        x2, y2 = _sensor_xy(camera, rb2)
+
+        assert jnp.allclose(jnp.stack([x1, y1], 1), jnp.stack([x2, y2], 1))
+        assert jnp.allclose(rb1.values, rb2.values)

@@ -10,7 +10,7 @@ from ..detector.surface import DetectionSurface
 
 
 class Concentrator(eqx.Module):
-    """Abstract base for per-pixel light concentrators (cones / light guides / lenses).
+    """Abstract base for per-pixel light concentrators.
 
     A concentrator funnels light from its entrance aperture (``z = 0``) toward
     its exit aperture (``z = -length``) in its local space, onto a stopping
@@ -18,43 +18,18 @@ class Concentrator(eqx.Module):
     from the entrance aperture onto a given
     :class:`~iactrace.camera.detector.surface.DetectionSurface`, tracing the
     concentrator's *own* internal geometry jointly with that surface.
-
-    How it does so is entirely the concentrator's business, so the abstraction
-    is agnostic to the physical mechanism: a hollow reflective cone bounces rays
-    off its walls (:class:`~iactrace.camera.optics.polygonal.PolygonalCone`), a
-    lens concentrator refracts them through its elements, a solid dielectric
-    guide propagates and refracts at its faces. The detection chain only ever
-    calls :meth:`to_surface` -- it never needs to know which kind of concentrator
-    it holds, so a new design plugs in without touching the pipeline.
     """
 
     length: eqx.AbstractVar[float]
 
     @property
     def index(self) -> float:
-        """Refractive index of the medium the concentrator is filled with.
-
-        ``1.0`` for hollow / air-filled light guides such as Winston cones.
-        Solid dielectric / lens concentrators override this; :meth:`to_surface`
-        must weight the internal geometric path by it when accumulating optical
-        path length (``OPL += index * geometric_length``).
-        """
+        """Refractive index of the medium the concentrator is filled with."""
         return 1.0
 
     @abstractmethod
     def to_surface(self, rays: RayBundle, surface: DetectionSurface) -> RayBundle:
         """Deliver *rays* from the entrance aperture onto *surface*.
-
-        The single transport primitive every concentrator implements, tracing
-        its internal geometry jointly with the stopping surface (so a
-        photocathode curved into, or set below, the concentrator is landed on
-        correctly). Rays enter in the ``z = 0`` plane travelling toward ``-z``;
-        the returned bundle sits on *surface* with true directions preserved,
-        reflection / transmission losses folded into ``values`` and the optical
-        path added to ``path_length``. Rays that never reach the surface (lost
-        back through the entrance, absorbed, outside the mouth) come back with
-        ``alive = False`` and ``values = 0``; their positions are meaningless, as
-        everywhere else in the package.
 
         Args:
             rays: Rays at the entrance aperture, pixel-local frame.

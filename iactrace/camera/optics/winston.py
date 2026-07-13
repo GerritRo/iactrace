@@ -43,6 +43,17 @@ def cpc_wall_tilt(
     return s, c
 
 
+def cpc_ideal_wall_tilt(exit_apothem: float, entrance_apothem: float) -> tuple[float, float]:
+    """(sin, cos) of the wall tilt for the untruncated (ideal) CPC.
+
+    For the full cone, ``entrance_apothem`` *is* the full CPC entry a1, which
+    fixes the wall tilt directly: ``sin(theta) = a2 / a1``.
+    """
+    s = exit_apothem / entrance_apothem
+    c = math.sqrt(1.0 - s * s)
+    return s, c
+
+
 def cpc_full_length(exit_apothem: float, s: float, c: float) -> float:
     """Full (untruncated) CPC length for exit apothem a2 and wall tilt (s, c).
 
@@ -89,7 +100,7 @@ def _wall_t(o: Array, d: Array, n: Array, a2: float, s: float, c: float, k: floa
     t_lin = jnp.where(jnp.abs(B) > 1e-30, -C / safe_B, jnp.inf)
     t = jnp.where(jnp.abs(A) < 1e-14, t_lin, t_quad)
     # Reject backward / spurious near-zero hits with a floor that scales with the
-    # cone size (tracks the a2-scaled nudge, stays above float32 rounding noise).
+    # cone size.
     bad = (disc < 0) | (t <= _T_FLOOR * a2) | ~jnp.isfinite(t)
     return jnp.where(bad, jnp.inf, t)
 
@@ -163,10 +174,7 @@ class WinstonCone(PolygonalCone):
         self.orientation = math.radians(float(orientation_deg))
 
         if length is None:
-            # Untruncated cone: entrance_apothem is the full CPC entry a1, which
-            # fixes the wall tilt directly (sin = a2 / a1).
-            s = self.exit_apothem / self.entrance_apothem
-            c = math.sqrt(1.0 - s * s)
+            s, c = cpc_ideal_wall_tilt(self.exit_apothem, self.entrance_apothem)
             self.length = float(cpc_full_length(self.exit_apothem, s, c))
         else:
             # Truncated cone: entrance_apothem is the physical entry at z = length;

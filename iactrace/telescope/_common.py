@@ -1,5 +1,3 @@
-"""Shared input-shape helpers for the telescope factory modules."""
-
 from __future__ import annotations
 
 from collections.abc import Sequence

@@ -158,28 +158,46 @@ CoatingSchema = Annotated[
 
 
 class MirrorTemplateSchema(BaseModel):
-    """Shared surface geometry (aspheric + any Zernike terms) referenced by
-    mirrors. Per-element coating (``reflectivity``) and ``bsdf`` live on the
-    mirror, not the template."""
+    """Optional shared defaults a mirror may reference via ``template``.
 
-    surface: SurfaceSpec
+    Every field here can also be set directly on the mirror; see
+    :class:`MirrorSchema` for the override rule. A template with no
+    ``surface`` is valid (e.g. one that only shares a ``coating``), since a
+    mirror without an aspheric base of its own defaults to flat.
+    """
+
+    surface: SurfaceSpec | None = None
     bsdf: BSDFSchema | None = None
     reflectivity: float | None = None
     coating: CoatingSchema | None = None
 
 
 class MirrorSchema(BaseModel):
+    """A mirror facet.
+
+    Fully self-contained by default: ``curvature`` / ``conic`` / ``aspheric``
+    / ``zernike`` / ``bsdf`` / ``reflectivity`` / ``coating`` can all be set
+    directly here, with no ``template`` required. ``template`` (optional)
+    names a :class:`MirrorTemplateSchema` entry supplying defaults for
+    whichever of those fields the mirror itself leaves unset -- a mirror's
+    own value always wins when both are defined; a field left unset on both
+    falls back to its ordinary default (flat / unmodified surface, perfect
+    specular reflection, bare Fresnel-free reflectivity of 1.0).
+    """
+
     position: Vec3
     orientation: Vec3
     aperture: ApertureSchema
-    template: str
+    template: str | None = None
     curvature: float | None = None
     conic: float | None = None
     aspheric: list[float] | None = None
+    zernike: ZernikeSurfaceSchema | None = None
     offset: Vec2 = Field(default_factory=lambda: [0.0, 0.0])
     stage: int = Field(ge=0, default=0)
     bsdf: BSDFSchema | None = None
     reflectivity: float | None = None
+    coating: CoatingSchema | None = None
     id: str | None = None
 
 
@@ -193,7 +211,6 @@ class AsphericDiskLensSchema(BaseModel):
     aperture: ApertureSchema
     surface: SurfaceSpec
     n_inside: float = Field(gt=0)
-    n_outside: float = Field(gt=0, default=1.0)
     offset: Vec2 = Field(default_factory=lambda: [0.0, 0.0])
     transmittance: float = Field(ge=0, le=1, default=1.0)
     coating: CoatingSchema | None = None
@@ -208,7 +225,6 @@ class PlanoSlabSchema(BaseModel):
     aperture: ApertureSchema
     thickness: float = Field(gt=0)
     n_inside: float = Field(gt=0)
-    n_outside: float = Field(gt=0, default=1.0)
     transmittance: float = Field(ge=0, le=1, default=1.0)
     coating: CoatingSchema | None = None
     stage: int = Field(ge=0, default=0)
@@ -341,9 +357,14 @@ class PMTSchema(BaseModel):
     """Serialized :class:`~iactrace.camera.detector.pmt.PMT`.
 
     A photomultiplier response: photocathode QE plus an optional entrance
-    window (``n_window``, Fresnel angular response), with the spherical-cap
-    photocathode geometry given by ``face_radius`` / ``face_sag`` and the
-    body cylinder by ``length`` (``None`` -> ``2 * face_radius``).
+    window (``n_window``, Fresnel angular response). The photocathode
+    *figure* uses the exact same ``surface`` spec as mirrors and lenses
+    (:data:`SurfaceSpec`: an ``aspheric`` shape, a ``zernike`` shape, or a
+    summed list of both) -- any surface an optical element can describe, a
+    PMT photocathode can describe too. ``face_radius`` bounds the aperture
+    and ``vertex_z`` places the surface's vertex relative to the detector
+    plane (``0`` = flush with the mount, ``> 0`` peeks toward the light);
+    the body cylinder is given by ``length`` (``None`` -> ``2 * face_radius``).
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -352,7 +373,10 @@ class PMTSchema(BaseModel):
     qe: float = Field(ge=0, le=1, default=1.0)
     n_window: float | None = Field(default=None, gt=1)
     face_radius: float = Field(gt=0)
-    face_sag: float = Field(ge=0, default=0.0)
+    surface: SurfaceSpec = Field(
+        default_factory=lambda: AsphericSurfaceSchema(curvature=0.0, conic=0.0)
+    )
+    vertex_z: float = 0.0
     length: float | None = Field(default=None, ge=0)
     n_facets: int = Field(ge=3, default=48)
 
@@ -512,8 +536,14 @@ class TelescopeConfigSchema(BaseModel):
 
     @model_validator(mode="after")
     def validate_template_references(self) -> TelescopeConfigSchema:
-        """Validate that all mirror template references exist."""
+        """Validate that all mirror template references exist.
+
+        A mirror with no ``template`` (fully self-contained) has nothing to
+        check here.
+        """
         for i, mirror in enumerate(self.mirrors):
+            if mirror.template is None:
+                continue
             mirror_id = mirror.id or f"mirror[{i}]"
             if mirror.template not in self.mirror_templates:
                 available = (

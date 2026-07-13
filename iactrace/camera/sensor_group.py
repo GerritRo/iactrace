@@ -74,9 +74,9 @@ class SensorGroup(eqx.Module):
     """Abstract base class for sensor groups.
 
     A sensor group contains N sensors at different positions/orientations
-    that share the same pixel geometry **and the same detection chain**.
+    that share the same pixel geometry and the same detection chain.
     Each group owns its :class:`~iactrace.camera.detection_chain.DetectionChain`
-    (optional concentrator + ``gap`` + photodetector), so distinct groups in
+    (optional concentrator + gap + photodetector), so distinct groups in
     one :class:`~iactrace.camera.camera.Camera` can carry different cones or
     photodetectors.
 
@@ -106,27 +106,11 @@ class SensorGroup(eqx.Module):
 
     @abstractmethod
     def pixel_index_and_mask(self, sensor_idx: Array, x: Array, y: Array) -> tuple[Array, Array]:
-        """Localize ``(x, y)`` to a flat pixel index plus a validity mask.
-
-        The single source of truth for the pixel assignment: the camera
-        pipeline computes it exactly once per ray and feeds the result to both
-        :meth:`to_pixel_frame` (the frame the ray is traced in) and
-        :meth:`scatter` (the pixel its signal is binned into), so the two can
-        never disagree. Returns ``(flat_idx, valid)`` where *valid* is True
-        only for rays that land in a real pixel **and** outside the
-        ``edge_width`` dead-zone. Invalid rays get a clamped, meaningless index.
-        """
+        """Localize ``(x, y)`` to a flat pixel index plus a validity mask."""
         raise NotImplementedError
 
     def scatter(self, pix_id: Array, valid: Array, values: Array) -> Array:
-        """Sum *values* into the pixel accumulator by precomputed assignment.
-
-        ``(pix_id, valid)`` come from :meth:`pixel_index_and_mask`, so callers
-        that already localized their rays (the camera pipeline) bin without
-        re-deriving the assignment -- which they must, since a ray's landing
-        position after the detection chain no longer identifies its pixel.
-        The single differentiable binning primitive (:func:`jax.ops.segment_sum`).
-        """
+        """Sum *values* into the pixel accumulator by precomputed assignment."""
         shape = self.get_accumulator_shape()
         flat = jax.ops.segment_sum(
             jnp.where(valid, values, 0.0),
@@ -137,30 +121,24 @@ class SensorGroup(eqx.Module):
 
     @abstractmethod
     def in_bounds(self, x: Array, y: Array) -> Array:
-        """Predicate: True for ``(x, y)`` inside the sensor's active footprint.
-
-        Coordinates are in a single sensor's local frame. Used by
-        :func:`iactrace.camera.camera.intersect_sensor` to mask rays whose
-        plane intersection falls outside this tile's pixel region before
-        selecting the closest tile across a multi-sensor group.
-        """
+        """Predicate: True for ``(x, y)`` inside the sensor's active footprint."""
         raise NotImplementedError
+
+    def with_concentrator(self, concentrator: Concentrator | None) -> SensorGroup:
+        """Return a copy of this group with its chain's concentrator replaced."""
+        return eqx.tree_at(lambda g: g.chain, self, self.chain.with_concentrator(concentrator))
+
+    def with_photodetector(self, photodetector: PhotoDetector) -> SensorGroup:
+        """Return a copy of this group with its chain's photodetector replaced."""
+        return eqx.tree_at(lambda g: g.chain, self, self.chain.with_photodetector(photodetector))
+
+    def with_gap(self, gap: float) -> SensorGroup:
+        """Return a copy of this group with its chain's gap replaced."""
+        return eqx.tree_at(lambda g: g.chain, self, self.chain.with_gap(gap))
 
     @abstractmethod
     def to_pixel_frame(self, sensor_rays: RayBundle, pix_id: Array) -> RayBundle:
-        """Re-express tile-local rays in their assigned pixel's local frame.
-
-        A pure isometry, given the assignment: each ray's origin is shifted to
-        the centre of the pixel ``pix_id`` says it hit (the flat index from
-        :meth:`pixel_index_and_mask`), and origins + directions are rotated
-        into the grid-aligned pixel-local frame, so the single shared
-        detection chain can be applied to every pixel at once. ``values`` and
-        ``path_length`` are passed through untouched and origins keep
-        ``z = 0`` (the entrance aperture plane). Invalid rays carry a clamped
-        index, so their local coordinates are meaningless -- they are masked
-        by the ``valid`` flag everywhere downstream. See
-        :mod:`iactrace.camera.detection_chain` for the frame.
-        """
+        """Re-express tile-local rays in their assigned pixel's local frame."""
         raise NotImplementedError
 
 
@@ -178,11 +156,7 @@ def _square_edge_distance(x_frac: Array, y_frac: Array, dx: float, dy: float) ->
 
 
 class SquareSensorGroup(SensorGroup):
-    """Square pixel sensor group.
-
-    Contains N sensors at different positions/orientations that share the same
-    pixel geometry (width, height, bounds). Output shape is (N, height, width).
-    """
+    """Square pixel sensor group."""
 
     positions: Array
     rotations: Array
@@ -298,11 +272,7 @@ class SquareSensorGroup(SensorGroup):
 
 
 class HexagonalSensorGroup(SensorGroup):
-    """Hexagonal pixel sensor group.
-
-    Contains N sensors at different positions/orientations that share the same
-    hexagonal pixel geometry. Output shape is (N, n_pixels).
-    """
+    """Hexagonal pixel sensor group."""
 
     positions: Array
     rotations: Array
@@ -380,10 +350,7 @@ class HexagonalSensorGroup(SensorGroup):
             self.hex_centers, self.hex_size, self.grid_rotation, offset
         )
 
-        # Per-pixel cell centres in the grid-aligned frame, reconstructed from
-        # each pixel's rounded axial coordinates -- exactly the centres the
-        # per-ray axial rounding in pixel_index_and_mask resolves to, so
-        # to_pixel_frame can index this table instead of re-deriving them.
+        # Per-pixel cell centres in the grid-aligned frame
         cgx, cgy = self._to_grid_coords(self.hex_centers[:, 0], self.hex_centers[:, 1])
         q, r = _cartesian_to_axial(cgx, cgy, self.hex_size)
         qi, ri = _axial_round(q, r)

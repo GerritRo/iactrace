@@ -195,7 +195,7 @@ def show_sensor_chain(camera, sensor_idx=0, **kwargs):
                 [0.0, 0.0, surface.vertex_z],
                 [0.0, 0.0, 0.0],
                 float(r_det),
-                sag_fn=surface.shape._index(0)._sag_local,
+                sag_fn=surface.sag_fn(),
             )
         )
     if det_mesh is not None:
@@ -725,8 +725,13 @@ def _points_in_polygon(points, vertices):
     return inside
 
 
-def _create_cylinder_mesh(p1, p2, radius, sections=16):
-    """Create cylinder mesh between two points."""
+def _cylinder_axis_frame(p1, p2):
+    """Shared axis-frame setup for the cylinder mesh builders.
+
+    Returns ``(height, rotation, center)`` -- rotation aligning local Z onto
+    the ``p1 -> p2`` axis, and the midpoint to translate to -- or ``None``
+    for a degenerate (near-zero-height) axis.
+    """
     p1 = np.asarray(p1)
     p2 = np.asarray(p2)
     direction = p2 - p1
@@ -735,12 +740,20 @@ def _create_cylinder_mesh(p1, p2, radius, sections=16):
     if height < 1e-10:
         return None
 
-    # Create cylinder along Z, then transform
-    cylinder = trimesh.creation.cylinder(radius=radius, height=height, sections=sections)
-
-    # Rotate local Z onto the axis and translate to the midpoint.
     rotation = _align_z_to(direction / height)
     center = (p1 + p2) / 2
+    return height, rotation, center
+
+
+def _create_cylinder_mesh(p1, p2, radius, sections=16):
+    """Create cylinder mesh between two points."""
+    frame = _cylinder_axis_frame(p1, p2)
+    if frame is None:
+        return None
+    height, rotation, center = frame
+
+    # Create cylinder along Z, then transform
+    cylinder = trimesh.creation.cylinder(radius=radius, height=height, sections=sections)
     cylinder.apply_transform(_rigid_transform(rotation, center))
     return cylinder
 
@@ -763,13 +776,10 @@ def _create_box_mesh(p1, p2):
 
 def _create_open_cylinder_mesh(p1, p2, radius, sections=16):
     """Create open cylinder mesh (no end caps) between two points."""
-    p1 = np.asarray(p1)
-    p2 = np.asarray(p2)
-    direction = p2 - p1
-    height = np.linalg.norm(direction)
-
-    if height < 1e-10:
+    frame = _cylinder_axis_frame(p1, p2)
+    if frame is None:
         return None
+    height, rotation, center = frame
 
     # Create cylinder without caps
     # trimesh.creation.cylinder creates a capped cylinder, so we create an open one manually
@@ -799,10 +809,6 @@ def _create_open_cylinder_mesh(p1, p2, radius, sections=16):
         faces.append([b0, t0, t1])
 
     mesh = trimesh.Trimesh(vertices=vertices, faces=faces)
-
-    # Rotate local Z onto the axis and translate to the midpoint.
-    rotation = _align_z_to(direction / height)
-    center = (p1 + p2) / 2
     mesh.apply_transform(_rigid_transform(rotation, center))
     return mesh
 

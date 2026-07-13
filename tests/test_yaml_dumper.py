@@ -1,7 +1,17 @@
+import jax
+import jax.numpy as jnp
 import numpy as np
 import pytest
 
 from iactrace import Camera, ConstantQE, SquareSensorGroup, Telescope, WinstonCone
+from iactrace.core.apertures import DiskAperture
+from iactrace.core.interactions import ReflectInteraction
+from iactrace.core.optics import OpticalElementGroup
+from iactrace.core.surfaces import (
+    AsphericSurfaceGroup,
+    SumSurfaceGroup,
+    ZernikeSurfaceGroup,
+)
 from iactrace.io import (
     build_camera_config,
     build_telescope_config,
@@ -9,6 +19,8 @@ from iactrace.io import (
     save_telescope,
     telescope_to_dict,
 )
+from iactrace.io.yaml_io import YAMLConfigError
+from iactrace.telescope import operations as ops
 
 
 @pytest.fixture
@@ -146,6 +158,11 @@ class TestTelescopeToDict:
         # Telescope dict must NOT contain detector geometry.
         assert "sensors" not in result
         assert "camera" not in result
+        # A plain mirror (no coating/reflectivity) writes neither field.
+        for tpl in result["mirror_templates"].values():
+            assert "reflectivity" not in tpl and "coating" not in tpl
+        for m in result["mirrors"]:
+            assert "reflectivity" not in m
 
 
 class TestSaveTelescope:
@@ -207,39 +224,28 @@ class TestRoundTrip:
         save_telescope(tel, filepath)
         return Telescope.from_yaml(filepath, 10, key=random_key).mirror_groups[0]
 
-    def test_mirror_reflectivity_roundtrips(self, random_key, tmp_path):
-        # The mirror "coating" must survive save/load (was silently reset to 1.0).
-        g = self._roundtrip_mirror(
-            bsdf=None, reflectivity=0.83, random_key=random_key, tmp_path=tmp_path
-        )
-        np.testing.assert_allclose(
-            np.asarray(g.interaction_module.reflectivity_scalar), [0.83], rtol=1e-5
-        )
-
-    def test_gaussian_bsdf_roundtrips(self, random_key, tmp_path):
+    def test_reflectivity_and_bsdf_roundtrip(self, random_key, tmp_path):
+        """Mirror reflectivity and both BSDF roughness models survive save/load
+        (reflectivity was once silently reset to 1.0)."""
         import jax.numpy as jnp
 
-        from iactrace.core.bsdf import GaussianBSDF
+        from iactrace.core.bsdf import DoubleGaussianBSDF, GaussianBSDF
 
+        # plain reflectivity, no BSDF
+        g = self._roundtrip_mirror(bsdf=None, reflectivity=0.83, random_key=random_key, tmp_path=tmp_path)
+        np.testing.assert_allclose(np.asarray(g.interaction_module.reflectivity_scalar), [0.83], rtol=1e-5)
+
+        # single Gaussian BSDF
         g = self._roundtrip_mirror(
-            bsdf=GaussianBSDF(scale=jnp.array([25.0])),
-            reflectivity=1.0,
-            random_key=random_key,
-            tmp_path=tmp_path,
+            bsdf=GaussianBSDF(scale=jnp.array([25.0])), reflectivity=1.0, random_key=random_key, tmp_path=tmp_path
         )
         assert isinstance(g.bsdf, GaussianBSDF)
         np.testing.assert_allclose(np.asarray(g.bsdf.scale), [25.0], rtol=1e-5)
 
-    def test_double_gaussian_bsdf_roundtrips(self, random_key, tmp_path):
-        import jax.numpy as jnp
-
-        from iactrace.core.bsdf import DoubleGaussianBSDF
-
+        # double Gaussian BSDF, carried alongside a non-unit reflectivity
         g = self._roundtrip_mirror(
             bsdf=DoubleGaussianBSDF(
-                scale_narrow=jnp.array([10.0]),
-                scale_wide=jnp.array([120.0]),
-                mix_weight=jnp.array([0.2]),
+                scale_narrow=jnp.array([10.0]), scale_wide=jnp.array([120.0]), mix_weight=jnp.array([0.2])
             ),
             reflectivity=0.9,
             random_key=random_key,
@@ -249,9 +255,7 @@ class TestRoundTrip:
         np.testing.assert_allclose(np.asarray(g.bsdf.scale_narrow), [10.0], rtol=1e-5)
         np.testing.assert_allclose(np.asarray(g.bsdf.scale_wide), [120.0], rtol=1e-5)
         np.testing.assert_allclose(np.asarray(g.bsdf.mix_weight), [0.2], rtol=1e-5)
-        np.testing.assert_allclose(
-            np.asarray(g.interaction_module.reflectivity_scalar), [0.9], rtol=1e-5
-        )
+        np.testing.assert_allclose(np.asarray(g.interaction_module.reflectivity_scalar), [0.9], rtol=1e-5)
 
     def test_polygon_mirror_roundtrip(
         self, n_samples, random_key, polygon_telescope_config, tmp_path
@@ -408,28 +412,25 @@ class TestRoundTrip:
         assert c2.orientation == pytest.approx(c1.orientation)
         assert chain2.gap == pytest.approx(0.003)
 
-    def test_camera_truncated_winston_cone_roundtrip(self, tmp_path):
+        # A genuinely truncated cone (physical mouth at z = L) also round-trips,
+        # exercising the explicit-length serialization branch.
         import math
 
         import jax.numpy as jnp
 
         from iactrace.camera.optics.winston import profile_apothem
 
-        # A genuinely truncated cone, specified by its physical mouth at z = L.
         a2, cutoff_deg, length = 0.01, 20.0, 0.04
         s, c = math.sin(math.radians(cutoff_deg)), math.cos(math.radians(cutoff_deg))
         phys = float(profile_apothem(jnp.asarray(length), a2, s, c))
-        cone = WinstonCone(6, entrance_apothem=phys, exit_apothem=a2, length=length)
-        camera1 = Camera([self._square(concentrator=cone)])
-        filepath = tmp_path / "t.yaml"
-        save_camera(camera1, filepath, precision=12)
-        c1 = camera1.sensor_groups[0].chain.concentrator
-        c2 = Camera.from_yaml(filepath).sensor_groups[0].chain.concentrator
-        assert isinstance(c2, WinstonCone)
-        assert c2.entrance_apothem == pytest.approx(c1.entrance_apothem)
-        assert c2.length == pytest.approx(c1.length)
-        assert (c2.s, c2.c) == pytest.approx((c1.s, c1.c))
-        assert c2.exit_apothem == pytest.approx(c1.exit_apothem)
+        trunc1 = WinstonCone(6, entrance_apothem=phys, exit_apothem=a2, length=length)
+        fp2 = tmp_path / "trunc.yaml"
+        save_camera(Camera([self._square(concentrator=trunc1)]), fp2, precision=12)
+        trunc2 = Camera.from_yaml(fp2).sensor_groups[0].chain.concentrator
+        assert isinstance(trunc2, WinstonCone)
+        assert trunc2.entrance_apothem == pytest.approx(trunc1.entrance_apothem)
+        assert trunc2.length == pytest.approx(trunc1.length)
+        assert (trunc2.s, trunc2.c) == pytest.approx((trunc1.s, trunc1.c))
 
     def test_camera_okumura_cone_roundtrip(self, tmp_path):
         from iactrace import OkumuraCone
@@ -466,11 +467,14 @@ class TestRoundTrip:
     def test_camera_pmt_roundtrip(self, tmp_path):
         from iactrace import PMT
 
+        from ._helpers import spherical_cap_surface
+
         pmt = PMT(
             qe=0.35,
             n_window=1.48,
             face_radius=0.011,
-            face_sag=0.003,
+            surface=spherical_cap_surface(0.011, 0.003),
+            vertex_z=0.003,
             length=0.05,
             n_facets=32,
         )
@@ -484,28 +488,28 @@ class TestRoundTrip:
         assert p2.qe == pytest.approx(pmt.qe)
         assert p2.n_window == pytest.approx(pmt.n_window)
         assert p2.face_radius == pytest.approx(pmt.face_radius)
-        assert p2.face_sag == pytest.approx(pmt.face_sag)
+        assert p2.vertex_z == pytest.approx(pmt.vertex_z)
+        assert p2.shape.curvatures[0] == pytest.approx(pmt.shape.curvatures[0])
         assert p2.length == pytest.approx(pmt.length)
         assert p2.n_facets == pmt.n_facets
 
-    def test_camera_pmt_default_length_roundtrip(self, tmp_path):
-        # length=None resolves to 2*face_radius at construction; the resolved
-        # value is written, so the reload is exact without re-deriving it.
-        from iactrace import PMT
+        # A minimal PMT with length=None resolves to 2*face_radius at
+        # construction; the resolved value is written and reloads exactly.
+        default_pmt = PMT(qe=0.9, face_radius=0.008)
+        fp2 = tmp_path / "pmt2.yaml"
+        save_camera(Camera([self._square(photodetector=default_pmt)]), fp2)
+        p3 = Camera.from_yaml(fp2).sensor_groups[0].chain.photodetector
+        assert isinstance(p3, PMT)
+        assert p3.n_window is None
+        assert p3.length == pytest.approx(2 * 0.008)
 
-        pmt = PMT(qe=0.9, face_radius=0.008)
-        camera1 = Camera([self._square(photodetector=pmt)])
-        filepath = tmp_path / "t.yaml"
-        save_camera(camera1, filepath)
-        p2 = Camera.from_yaml(filepath).sensor_groups[0].chain.photodetector
-        assert isinstance(p2, PMT)
-        assert p2.n_window is None
-        assert p2.length == pytest.approx(2 * 0.008)
-
-    def test_camera_nonuniform_photodetector_warns_and_falls_back(self, tmp_path):
+    def test_nonuniform_chain_elements_raise(self, tmp_path):
+        """Unrepresentable photodetectors and concentrators must raise instead of
+        silently downgrading to ConstantQE(1.0) / no-concentrator."""
         import equinox as eqx
 
-        from iactrace.camera.detector import PhotoDetector
+        from iactrace.camera.detector import DetectionSurface, PhotoDetector
+        from iactrace.camera.optics import Concentrator
         from iactrace.core.ray_bundle import RayBundle
 
         class WeirdSensor(PhotoDetector):
@@ -515,21 +519,21 @@ class TestRoundTrip:
                 self.pde = float(pde)
 
             def detect(self, local_rays: RayBundle) -> RayBundle:
-                return RayBundle(
-                    origins=local_rays.origins,
-                    directions=local_rays.directions,
-                    values=local_rays.values * self.pde,
-                    path_length=local_rays.path_length,
-                    n=local_rays.n,
-                )
+                return local_rays.replace(values=local_rays.values * self.pde)
 
-        camera1 = Camera([self._square(photodetector=WeirdSensor(0.5))])
-        filepath = tmp_path / "t.yaml"
-        with pytest.warns(UserWarning):
-            save_camera(camera1, filepath)
-        chain = Camera.from_yaml(filepath).sensor_groups[0].chain
-        assert isinstance(chain.photodetector, ConstantQE)
-        assert chain.photodetector.qe == pytest.approx(1.0)
+        class WeirdCone(Concentrator):
+            length: float = eqx.field(static=True, default=0.01)
+
+            def to_surface(self, rays: RayBundle, surface: DetectionSurface) -> RayBundle:
+                return surface.stop(rays)
+
+        fp = tmp_path / "t.yaml"
+        with pytest.raises(ValueError, match="WeirdSensor is not representable"):
+            save_camera(Camera([self._square(photodetector=WeirdSensor(0.5))]), fp)
+        assert not fp.exists()
+        with pytest.raises(ValueError, match="WeirdCone is not representable"):
+            save_camera(Camera([self._square(concentrator=WeirdCone())]), fp)
+        assert not fp.exists()
 
     def test_sensor_without_chain_keys_backward_compatible(self):
         # Released camera files are `sensors:`-only with no detection-chain keys;
@@ -681,22 +685,193 @@ class TestRoundTrip:
             rtol=1e-10,
         )
 
-    def test_default_mirror_yaml_unchanged(
-        self,
-        n_samples,
-        random_key,
-        simple_disk_telescope_config,
-    ):
-        """A mirror without curve information saves WITHOUT the new field."""
-        telescope = build_telescope_config(
-            simple_disk_telescope_config,
-            n_samples,
-            random_key,
+
+
+# =============================================================================
+# Zernike figure-surface (de)serialization and round-trips
+# =============================================================================
+
+KEY = jax.random.key(0)
+
+
+def _config(templates, mirrors):
+    return {
+        "telescope": {
+            "name": "z",
+            "units": "m",
+            "camera_position": [0.0, 0.0, 10.0],
+            "camera_rotation": [0.0, 0.0, 0.0],
+        },
+        "mirror_templates": templates,
+        "mirrors": mirrors,
+        "obstructions": [],
+    }
+
+
+def _mirror(id_, pos, template="sph"):
+    return {
+        "id": id_,
+        "template": template,
+        "position": pos,
+        "orientation": [0.0, 0.0, 0.0],
+        "aperture": {"type": "circular", "radius": 0.5},
+    }
+
+
+def _asphere(curvature=0.05, conic=-1.0):
+    return {"type": "aspheric", "curvature": curvature, "conic": conic, "aspheric": []}
+
+
+def _zernike(coeffs, r_norm=0.5):
+    return {"type": "zernike", "coeffs": coeffs, "r_norm": r_norm}
+
+
+class TestSurfaceListLoad:
+    def test_aspheric_plus_zernike_loads_as_sum(self):
+        cfg = _config(
+            {"sph": {"surface": [_asphere(), _zernike([0.0, 0.0, 0.0, 1e-3, 5e-4])]}},
+            [_mirror("M_0", [0.0, 0.0, 0.0])],
         )
-        d = telescope_to_dict(telescope)
-        # No new fields appear in the round-tripped YAML
-        for tpl in d["mirror_templates"].values():
-            assert "reflectivity" not in tpl
-            assert "coating" not in tpl
-        for m in d["mirrors"]:
-            assert "reflectivity" not in m
+        tel = build_telescope_config(cfg, 4, KEY)
+        surface = tel.stage(0).surface
+        assert isinstance(surface, SumSurfaceGroup)
+        zern = next(c for c in surface.components if isinstance(c, ZernikeSurfaceGroup))
+        assert np.allclose(np.asarray(zern.coeffs[0]), [0.0, 0.0, 0.0, 1e-3, 5e-4])
+        assert float(zern.r_norm[0]) == pytest.approx(0.5)
+
+    def test_single_aspheric_stays_bare_asphere(self):
+        cfg = _config({"sph": {"surface": _asphere()}}, [_mirror("M_0", [0.0, 0.0, 0.0])])
+        tel = build_telescope_config(cfg, 4, KEY)
+        assert isinstance(tel.stage(0).surface, AsphericSurfaceGroup)
+
+    def test_standalone_zernike_loads_as_zernike(self):
+        cfg = _config(
+            {"z": {"surface": _zernike([0.0, 0.0, 0.0, 1e-3, 5e-4])}},
+            [_mirror("M_0", [0.0, 0.0, 0.0], template="z")],
+        )
+        tel = build_telescope_config(cfg, 4, KEY)
+        assert isinstance(tel.stage(0).surface, ZernikeSurfaceGroup)
+
+    def test_mixed_templates_zero_fill_absent(self):
+        # two templates in the same stage+aperture bucket: only one has a zernike
+        cfg = _config(
+            {
+                "zt": {"surface": [_asphere(), _zernike([0.0, 0.0, 0.0, 1e-3])]},
+                "at": {"surface": _asphere()},
+            },
+            [
+                _mirror("M_0", [0.0, 0.0, 0.0], template="zt"),
+                _mirror("M_1", [1.0, 0.0, 0.0], template="at"),
+            ],
+        )
+        tel = build_telescope_config(cfg, 4, KEY)
+        surface = tel.stage(0).surface
+        assert isinstance(surface, SumSurfaceGroup)
+        zern = next(c for c in surface.components if isinstance(c, ZernikeSurfaceGroup))
+        assert np.allclose(np.asarray(zern.coeffs[0]), [0.0, 0.0, 0.0, 1e-3])
+        assert np.allclose(np.asarray(zern.coeffs[1]), 0.0)
+
+class TestZernikeRoundTrip:
+    def test_idempotent_dict_round_trip(self):
+        cfg = _config(
+            {
+                "a": {"surface": [_asphere(), _zernike([0.0, 0.0, 0.0, 1e-3, 5e-4, -5e-4])]},
+                "b": {"surface": [_asphere(), _zernike([0.0, 0.0, 0.0, 2e-3])]},
+            },
+            [
+                _mirror("M_0", [0.0, 0.0, 0.0], template="a"),
+                _mirror("M_1", [1.0, 0.0, 0.0], template="b"),
+            ],
+        )
+        tel = build_telescope_config(cfg, 4, KEY)
+        d1 = telescope_to_dict(tel)
+        tel2 = build_telescope_config(d1, 4, KEY)
+        d2 = telescope_to_dict(tel2)
+        assert d1 == d2
+        # Two mirrors, each with its own distinct zernike figure error: the
+        # zernike term is written directly on each mirror, not on a template.
+        assert any(m.get("zernike") is not None for m in d1["mirrors"])
+
+    def test_sag_preserved(self):
+        cfg = _config(
+            {"a": {"surface": [_asphere(), _zernike([0.0, 0.0, 0.0, 1e-3, 5e-4, -5e-4])]}},
+            [_mirror("M_0", [0.0, 0.0, 0.0], template="a")],
+        )
+        tel = build_telescope_config(cfg, 4, KEY)
+        tel2 = build_telescope_config(telescope_to_dict(tel), 4, KEY)
+        s1, s2 = tel.stage(0).surface, tel2.stage(0).surface
+        for x, y in [(0.1, 0.05), (-0.2, 0.1), (0.3, -0.25)]:
+            assert float(s1.sag_at(0, x, y)) == pytest.approx(float(s2.sag_at(0, x, y)), abs=1e-9)
+
+    def test_perturbed_telescope_round_trips(self):
+        cfg = _config(
+            {"sph": {"surface": _asphere()}},
+            [_mirror("M_0", [0.0, 0.0, 0.0]), _mirror("M_1", [1.0, 0.0, 0.0])],
+        )
+        tel = build_telescope_config(cfg, 4, KEY)
+        tel = ops.apply_astigmatism(tel, 0, 1e-3, jax.random.key(5))
+        d1 = telescope_to_dict(tel)
+        tel2 = build_telescope_config(d1, 4, KEY)
+        d2 = telescope_to_dict(tel2)
+        assert d1 == d2
+        # Every facet drew a figure error, written directly on each mirror; the
+        # shared aspheric base (untouched by the perturbation) still templatises.
+        assert any(m.get("zernike") is not None for m in d1["mirrors"])
+        assert len(d1["mirror_templates"]) == 1
+
+
+def _mirror_group(surface, radii, stage=0):
+    n = surface.offsets.shape[0]
+    aperture = DiskAperture(radii=radii, inner_radii=jnp.zeros(n))
+    interaction = ReflectInteraction(reflectivity=None, reflectivity_scalar=jnp.ones(n))
+    return OpticalElementGroup(
+        positions=jnp.zeros((n, 3)),
+        rotations=jnp.zeros((n, 3)),
+        surface=surface,
+        aperture=aperture,
+        interaction_module=interaction,
+        sample_key=jax.random.key(0),
+        optical_stage=stage,
+        n_samples=8,
+    )
+
+
+class TestStandaloneAndGuards:
+    def test_standalone_zernike_serializes_as_zernike_surface(self):
+        zg = ZernikeSurfaceGroup(
+            coeffs=jnp.array([[0.0, 0.0, 0.0, 1e-3, 5e-4]]), r_norm=jnp.array([0.5]),
+        )
+        tel = Telescope(mirror_groups=[_mirror_group(zg, jnp.array([0.5]))], name="z")
+        d = telescope_to_dict(tel)
+        # No aspheric base at all -> self-contained, no template; the zernike
+        # shape is written directly on the mirror.
+        assert "template" not in d["mirrors"][0]
+        assert not d.get("mirror_templates")
+        zern = d["mirrors"][0]["zernike"]
+        assert zern["coeffs"][3] == pytest.approx(1e-3)
+        # reloads to a standalone Zernike surface with an equivalent sag
+        tel2 = build_telescope_config(d, 4, KEY)
+        assert isinstance(tel2.stage(0).surface, ZernikeSurfaceGroup)
+        for x, y in [(0.1, 0.05), (-0.2, 0.1)]:
+            assert float(tel.stage(0).surface.sag_at(0, x, y)) == pytest.approx(
+                float(tel2.stage(0).surface.sag_at(0, x, y)), abs=1e-9
+            )
+
+    def test_nonzero_composite_offset_raises(self):
+        asph = AsphericSurfaceGroup(
+            curvatures=jnp.array([0.05]), conics=jnp.array([-1.0]),
+            aspherics=jnp.zeros((1, 0)), offsets=jnp.zeros((1, 2)),
+        )
+        zg = ZernikeSurfaceGroup(coeffs=jnp.zeros((1, 4)), r_norm=jnp.array([0.5]))
+        bad = SumSurfaceGroup([asph, zg], offsets=jnp.array([[0.1, 0.0]]))
+        tel = Telescope(mirror_groups=[_mirror_group(bad, jnp.array([0.5]))], name="z")
+        with pytest.raises(ValueError, match="composite decenter"):
+            telescope_to_dict(tel)
+
+    def test_zernike_too_many_coeffs_rejected_by_schema(self):
+        cfg = _config(
+            {"z": {"surface": _zernike([0.0] * 12)}},
+            [_mirror("M_0", [0.0, 0.0, 0.0], template="z")],
+        )
+        with pytest.raises(YAMLConfigError):
+            build_telescope_config(cfg, 4, KEY)

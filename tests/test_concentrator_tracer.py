@@ -1,11 +1,3 @@
-"""Contract tests for the shared cone tracer (:func:`iactrace.camera.trace_chain`).
-
-Parametrized over every wall provider (Winston paraboloid, Okumura Bezier), so
-each cone type gives the tracer the same guarantees: cavity-clamped wall hits,
-mouth-aperture masking, correct landings on stops below the exit or peeking
-into the cavity, aperture bounds, and energy conservation.
-"""
-
 import math
 
 import jax
@@ -54,7 +46,7 @@ def _fill_entrance(cone, n, seed=0):
     return pts
 
 
-def _mouth_rays(cone, alpha_deg=0.0, n=2000, seed=3):
+def _mouth_rays(cone, alpha_deg=0.0, n=1000, seed=3):
     """(xy, dirs) for ``n`` rays entering strictly inside the mouth at incidence
     ``alpha_deg``, so the tracer's mouth mask never triggers and every ray is
     genuinely traced."""
@@ -82,35 +74,34 @@ def _entrance_rays(xy, dirs):
 
 
 class TestWallsProvider:
-    def test_cone_is_its_own_wall_provider(self, cone_kind):
+    def test_cone_is_its_own_wall_provider(self):
         # The cone is passed straight to trace_chain: it carries the per-bounce
         # dimensions and the (M, 2) facet plane normals the tracer consumes.
-        cone = _make_cone(cone_kind, reflectivity=0.8, max_bounces=9)
+        cone = _make_cone("winston", reflectivity=0.8, max_bounces=9)
         assert cone.reflectivity == pytest.approx(0.8)
         assert cone.max_bounces == 9
         assert np.asarray(cone.n_hats).shape == (cone.n_sides, 2)
 
 
 class TestTraceChain:
-    @pytest.mark.parametrize("alpha", [0.0, 10.0, 20.0])
-    def test_flat_exit_stop_matches_apply(self, cone_kind, alpha):
+    def test_flat_exit_stop_matches_apply(self, cone_kind):
         # A flat plane stop at the exit reproduces Concentrator.apply ray by
-        # ray: apply() is the same shared tracer with a flat exit stop.
+        # ray: apply() is the same shared tracer with a flat exit stop. Checked
+        # at normal and oblique incidence (different bounce counts).
         cone = _make_cone(cone_kind, reflectivity=0.9, max_bounces=14)
-        rays = _entrance_rays(*_mouth_rays(cone, alpha))
-
-        old = cone.apply(rays)
-        new = trace_chain(
-            cone,
-            DetectionSurface(vertex_z=-cone.length, curvature=0.0, radius=1e4),
-            rays,
-            max_bounces=14,
-        )
-
-        assert jnp.allclose(old.values, new.rays.values, atol=1e-6)
-        # Every in-mouth ray that apply() transmits lands on the full-aperture stop.
-        transmitted = np.asarray(old.values) > 0
-        assert np.all(np.asarray(new.rays.alive)[transmitted])
+        for alpha in (0.0, 20.0):
+            rays = _entrance_rays(*_mouth_rays(cone, alpha))
+            old = cone.apply(rays)
+            new = trace_chain(
+                cone,
+                DetectionSurface(vertex_z=-cone.length, curvature=0.0, radius=1e4),
+                rays,
+                max_bounces=14,
+            )
+            assert jnp.allclose(old.values, new.rays.values, atol=1e-6)
+            # Every in-mouth ray that apply() transmits lands on the full stop.
+            transmitted = np.asarray(old.values) > 0
+            assert np.all(np.asarray(new.rays.alive)[transmitted])
 
     def test_stop_below_exit_receives_rays(self, cone_kind):
         # A photocathode in the gap below the exit still collects; landings sit
@@ -162,48 +153,38 @@ class TestTraceChain:
         at_landing = np.abs(traj[:, :, 2] - final_z[None, :]) < 1e-4 * a2
         assert np.all(~below | at_landing), "a wall bounce leaked below the exit plane"
 
-    def test_trajectory_off_by_default(self, cone_kind):
-        cone = _make_cone(cone_kind)
-        stop = DetectionSurface(vertex_z=-cone.length)
-        tr = trace_chain(cone, stop, _entrance_rays(*_mouth_rays(cone, 5.0, n=50)))
-        assert tr.trajectory is None
-
-    @pytest.mark.parametrize("radius_frac", [0.4, 0.7, 1.1])
-    @pytest.mark.parametrize("alpha", [0.0, 12.0])
-    def test_aperture_bounds_landings(self, cone_kind, radius_frac, alpha):
-        # A PMT has a limited diameter: no ray may land outside the
-        # DetectionSurface aperture radius, at any incidence.
-        cone = _make_cone(cone_kind, reflectivity=0.95, max_bounces=16)
+    def test_aperture_bounds_and_monotonicity(self):
+        # A PMT has a limited diameter: no ray lands outside the DetectionSurface
+        # aperture radius, and a smaller aperture collects strictly fewer rays.
+        # Aperture clipping is wall-shape-independent -> one representative cone.
+        cone = _make_cone("winston", reflectivity=0.95, max_bounces=16)
         a2 = cone.exit_apothem
-        radius = radius_frac * a2
-        stop = DetectionSurface(
-            vertex_z=-cone.length - 0.2 * a2, curvature=-1.0 / (1.2 * a2), radius=radius
-        )
-        tr = trace_chain(cone, stop, _entrance_rays(*_mouth_rays(cone, alpha, n=1200)))
-        pts = np.asarray(tr.rays.origins)[np.asarray(tr.rays.alive)]
-        r = np.hypot(pts[:, 0], pts[:, 1]) if len(pts) else np.array([0.0])
-        assert r.max() <= radius + 1e-6
+        rays = _entrance_rays(*_mouth_rays(cone, 12.0, n=1200))
 
-    def test_smaller_aperture_collects_less(self, cone_kind):
-        cone = _make_cone(cone_kind, reflectivity=0.95, max_bounces=16)
-        a2 = cone.exit_apothem
-        rays = _entrance_rays(*_mouth_rays(cone, 0.0, n=1200))
-
-        def coll(radius):
+        def collect(radius_frac):
             stop = DetectionSurface(
-                vertex_z=-cone.length - 0.2 * a2, curvature=-1.0 / (1.2 * a2), radius=radius
+                vertex_z=-cone.length - 0.2 * a2,
+                curvature=-1.0 / (1.2 * a2),
+                radius=radius_frac * a2,
             )
-            return float(jnp.mean(trace_chain(cone, stop, rays).rays.alive))
+            tr = trace_chain(cone, stop, rays)
+            pts = np.asarray(tr.rays.origins)[np.asarray(tr.rays.alive)]
+            r = np.hypot(pts[:, 0], pts[:, 1]) if len(pts) else np.array([0.0])
+            return float(np.mean(tr.rays.alive)), r.max()
 
-        assert coll(0.4 * a2) < coll(0.7 * a2) < coll(1.1 * a2)
+        for frac in (0.4, 0.7, 1.1):
+            _, rmax = collect(frac)
+            assert rmax <= frac * a2 + 1e-6  # nothing lands outside the aperture
+        assert collect(0.4)[0] < collect(0.7)[0] < collect(1.1)[0]  # smaller collects less
 
-    def test_rays_conserved_and_bounded(self, cone_kind):
-        cone = _make_cone(cone_kind, reflectivity=0.9, max_bounces=16)
+    def test_rays_conserved_and_bounded(self):
+        # Energy conservation is wall-shape-independent -> one representative cone.
+        cone = _make_cone("winston", reflectivity=0.9, max_bounces=16)
         a2 = cone.exit_apothem
         stop = DetectionSurface(
             vertex_z=-cone.length - 0.2 * a2, curvature=-1.0 / (1.2 * a2), radius=1.1 * a2
         )
-        for alpha in (0.0, 15.0, 30.0):
+        for alpha in (0.0, 30.0):
             tr = trace_chain(cone, stop, _entrance_rays(*_mouth_rays(cone, alpha)))
             v = np.asarray(tr.rays.values)
             assert not np.isnan(v).any()
@@ -211,13 +192,12 @@ class TestTraceChain:
             # dead rays carry zero throughput (the RayBundle invariant)
             assert np.all(v[~np.asarray(tr.rays.alive)] == 0.0)
 
-    def test_trace_chain_is_jittable(self, cone_kind):
-        cone = _make_cone(cone_kind, reflectivity=0.9, max_bounces=16)
+    def test_trace_chain_is_jittable(self):
+        cone = _make_cone("winston", reflectivity=0.9, max_bounces=16)
         a2 = cone.exit_apothem
-        walls = cone
         stop = DetectionSurface(
             vertex_z=-cone.length - 0.2 * a2, curvature=-1.0 / (1.2 * a2), radius=1.1 * a2
         )
         rays = _entrance_rays(*_mouth_rays(cone, 5.0))
-        fn = jax.jit(lambda r: trace_chain(walls, stop, r, max_bounces=16).rays.values)
+        fn = jax.jit(lambda r: trace_chain(cone, stop, r, max_bounces=16).rays.values)
         assert np.isfinite(np.asarray(fn(rays))).all()

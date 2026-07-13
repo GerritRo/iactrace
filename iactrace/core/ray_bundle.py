@@ -83,9 +83,6 @@ class RayBundle(eqx.Module):
         self.values = values
         self.path_length = path_length
         self.n = n
-        # A bundle is born fully alive; callers that terminate rays pass an
-        # explicit mask. Kept last with a default so external constructions
-        # (and the whole test suite) that predate the flag still work.
         self.alive = (
             jnp.ones(values.shape[0], dtype=bool)
             if alive is None

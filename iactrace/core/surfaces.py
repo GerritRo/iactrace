@@ -76,8 +76,7 @@ class SurfaceGroup(eqx.Module):
 
         ``True`` lets :meth:`_intersect_t` bypass the Newton iteration
         entirely -- e.g. an :class:`AsphericSurfaceGroup` with no aspheric
-        terms, whose guess is the closed-form conic root. Must be static
-        (decided from array shapes / types, not values), so it is jit-safe.
+        terms, whose guess is the closed-form conic root.
         """
         return False
 
@@ -164,7 +163,50 @@ class SurfaceGroup(eqx.Module):
         return t, point, normal
 
 
-# Asperic helpers
+#  Composite (sum) surface
+
+
+class SumSurfaceGroup(SurfaceGroup):
+    """Composite surface whose sag is the sum of its components' sags.
+
+    The composite's own ``offsets`` decenter the whole patch; component offsets
+    (usually zero) are applied first, inside each component's ``_sag_local``.
+
+    Attributes:
+        components: Tuple of component :class:`SurfaceGroup` instances, each
+            sized to the same ``N``.
+        offsets: Per-element in-surface decenter for the composite (N, 2)
+            (inherited).
+    """
+
+    components: tuple
+
+    def __init__(self, components, offsets=None):
+        comps = tuple(components)
+        if not comps:
+            raise ValueError("SumSurfaceGroup requires at least one component")
+        n = comps[0].offsets.shape[0]
+        for c in comps:
+            if c.offsets.shape[0] != n:
+                raise ValueError(
+                    "all components must describe the same number of elements N; "
+                    f"got {[int(c.offsets.shape[0]) for c in comps]}"
+                )
+        self.components = comps
+        self.offsets = jnp.zeros((n, 2)) if offsets is None else jnp.asarray(offsets)
+
+    def _sag_intrinsic(self, x, y):
+        total = self.components[0]._sag_local(x, y)
+        for c in self.components[1:]:
+            total = total + c._sag_local(x, y)
+        return total
+
+    def _t_guess(self, ray_origin, ray_direction):
+        # Delegate to the base term (first component) for the analytic guess.
+        return self.components[0]._t_guess(ray_origin, ray_direction)
+
+
+# Aspheric helpers
 
 
 def sag_raw(x, y, curvature, conic, aspheric):
@@ -194,60 +236,13 @@ def sag_raw(x, y, curvature, conic, aspheric):
     return z
 
 
-def sag(x, y, offset, curvature, conic, aspheric):
-    """Compute surface sag z(x,y) in local mirror coordinates.
-
-    Args:
-        x: x-coordinate in local mirror frame (scalar)
-        y: y-coordinate in local mirror frame (scalar)
-        offset: (x0, y0) offset on parent surface (2,)
-        curvature: Surface curvature (1/radius)
-        conic: Conic constant k
-        aspheric: Array of aspheric coefficients (K,)
-
-    Returns:
-        z: Surface sag at (x, y) relative to offset point
-    """
-    x0, y0 = offset[0], offset[1]
-    z0 = sag_raw(x0, y0, curvature, conic, aspheric)
-    return sag_raw(x + x0, y + y0, curvature, conic, aspheric) - z0
-
-
-def compute_sag_and_normal(x, y, offset, curvature, conic, aspheric):
-    """Compute surface point and normal at (x, y) with given parameters.
-
-    Args:
-        x: x-coordinate in local mirror frame (scalar)
-        y: y-coordinate in local mirror frame (scalar)
-        offset: (x0, y0) offset on parent surface (2,)
-        curvature: Surface curvature (1/radius)
-        conic: Conic constant k
-        aspheric: Array of aspheric coefficients (K,)
-
-    Returns:
-        point: 3D surface point (3,)
-        normal: Surface normal (3,), normalized
-    """
-    z = sag(x, y, offset, curvature, conic, aspheric)
-    point = jnp.stack([x, y, z], axis=-1)
-
-    x_surf = x + offset[0]
-    y_surf = y + offset[1]
-    dzdx = jax.grad(lambda X: sag_raw(X, y_surf, curvature, conic, aspheric))(x_surf)
-    dzdy = jax.grad(lambda Y: sag_raw(x_surf, Y, curvature, conic, aspheric))(y_surf)
-    n = jnp.array([-dzdx, -dzdy, 1.0])
-    normal = n / jnp.linalg.norm(n)
-
-    return point, normal
-
-
 #  Aspheric surface group
 
 
 class AsphericSurfaceGroup(SurfaceGroup):
     """Batched aspheric surface parameters for N optical elements.
 
-    The standard conic + even-polynomial surface used by ``OpticalElementGroup``.
+    A conic + even-polynomial surface used by ``OpticalElementGroup``.
     When sliced/vmapped to a single element, each becomes a scalar-parameter
     surface; the generic :class:`SurfaceGroup` machinery then handles sag,
     normal, and intersection. The conic provides a closed-form intersection
@@ -269,8 +264,6 @@ class AsphericSurfaceGroup(SurfaceGroup):
 
     @property
     def _t_guess_is_exact(self) -> bool:
-        # With no aspheric terms the surface is a pure conic and _t_guess is
-        # already the closed-form intersection: bypass the Newton polish.
         return self.aspherics.shape[-1] == 0
 
     def _t_guess(self, ray_origin, ray_direction):
@@ -285,6 +278,53 @@ class AsphericSurfaceGroup(SurfaceGroup):
         z0 = sag_raw(x0, y0, c, k, a)
         ray_origin_raw = ray_origin + jnp.array([x0, y0, z0])
         return intersect_conic(ray_origin_raw, ray_direction, c, k)
+
+
+# Ad-hoc (non-batched) sag/normal evaluation
+
+def _single_asphere(offset, curvature, conic, aspheric) -> AsphericSurfaceGroup:
+    """Single-element AsphericSurfaceGroup, sliced back down to scalar parameters."""
+    return AsphericSurfaceGroup(
+        offsets=jnp.asarray(offset).reshape(1, 2),
+        curvatures=jnp.asarray(curvature).reshape(1),
+        conics=jnp.asarray(conic).reshape(1),
+        aspherics=jnp.asarray(aspheric).reshape(1, -1),
+    )._index(0)
+
+
+def sag(x, y, offset, curvature, conic, aspheric):
+    """Compute surface sag z(x,y) in local mirror coordinates.
+
+    Args:
+        x: x-coordinate in local mirror frame (scalar)
+        y: y-coordinate in local mirror frame (scalar)
+        offset: (x0, y0) offset on parent surface (2,)
+        curvature: Surface curvature (1/radius)
+        conic: Conic constant k
+        aspheric: Array of aspheric coefficients (K,)
+
+    Returns:
+        z: Surface sag at (x, y) relative to offset point
+    """
+    return _single_asphere(offset, curvature, conic, aspheric)._sag_local(x, y)
+
+
+def compute_sag_and_normal(x, y, offset, curvature, conic, aspheric):
+    """Compute surface point and normal at (x, y) with given parameters.
+
+    Args:
+        x: x-coordinate in local mirror frame (scalar)
+        y: y-coordinate in local mirror frame (scalar)
+        offset: (x0, y0) offset on parent surface (2,)
+        curvature: Surface curvature (1/radius)
+        conic: Conic constant k
+        aspheric: Array of aspheric coefficients (K,)
+
+    Returns:
+        point: 3D surface point (3,)
+        normal: Surface normal (3,), normalized
+    """
+    return _single_asphere(offset, curvature, conic, aspheric).compute_sag_and_normal_at(x, y)
 
 
 #  Zernike
@@ -342,8 +382,8 @@ class ZernikeSurfaceGroup(SurfaceGroup):
     Represents a surface whose height is a sum of RMS-normalized Noll Zernike
     polynomials, independent of any conic/aspheric base. Use it on its own to
     describe a pure figure-error surface, or as a term inside a
-    :class:`SumSurfaceGroup` to add a measured / random figure error on top of a
-    nominal asphere.
+    :class:`SumSurfaceGroup` to add a measured / random figure error on top of 
+    another surface.
 
     The normal is obtained by autodiff of the sag (inherited from
     :class:`SurfaceGroup`), and the intersection uses the inherited tangent-plane
@@ -383,50 +423,7 @@ class ZernikeSurfaceGroup(SurfaceGroup):
         return jnp.sum(self.coeffs * terms[..., :j], axis=-1)
 
 
-#  Composite (sum) surface
-
-
-class SumSurfaceGroup(SurfaceGroup):
-    """Composite surface whose sag is the sum of its components' sags.
-
-    The composite's own ``offsets`` decenter the whole patch; component offsets
-    (usually zero) are applied first, inside each component's ``_sag_local``.
-
-    Attributes:
-        components: Tuple of component :class:`SurfaceGroup` instances, each
-            sized to the same ``N``.
-        offsets: Per-element in-surface decenter for the composite (N, 2)
-            (inherited).
-    """
-
-    components: tuple
-
-    def __init__(self, components, offsets=None):
-        comps = tuple(components)
-        if not comps:
-            raise ValueError("SumSurfaceGroup requires at least one component")
-        n = comps[0].offsets.shape[0]
-        for c in comps:
-            if c.offsets.shape[0] != n:
-                raise ValueError(
-                    "all components must describe the same number of elements N; "
-                    f"got {[int(c.offsets.shape[0]) for c in comps]}"
-                )
-        self.components = comps
-        self.offsets = jnp.zeros((n, 2)) if offsets is None else jnp.asarray(offsets)
-
-    def _sag_intrinsic(self, x, y):
-        total = self.components[0]._sag_local(x, y)
-        for c in self.components[1:]:
-            total = total + c._sag_local(x, y)
-        return total
-
-    def _t_guess(self, ray_origin, ray_direction):
-        # Delegate to the base term (first component) for the analytic guess.
-        return self.components[0]._t_guess(ray_origin, ray_direction)
-
-
-#  Freeform interpolated surface
+#  Freeform surface
 
 
 def _catmull_rom(p0, p1, p2, p3, t):

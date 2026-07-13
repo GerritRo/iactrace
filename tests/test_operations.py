@@ -1,15 +1,20 @@
 import jax
 import jax.numpy as jnp
+import numpy as np
 import pytest
 
 from iactrace import Telescope
 from iactrace.core.apertures import DiskAperture
 from iactrace.core.interactions import RefractInteraction
 from iactrace.core.optics import OpticalElementGroup
-from iactrace.core.surfaces import AsphericSurfaceGroup
+from iactrace.core.surfaces import (
+    AsphericSurfaceGroup,
+    SumSurfaceGroup,
+    ZernikeSurfaceGroup,
+)
 from iactrace.telescope import operations as ops
 
-from ._helpers import make_disk_mirror_group
+from ._helpers import make_disk_mirror_group, mirror_group_with_surface
 
 
 @pytest.fixture
@@ -42,49 +47,27 @@ class TestMathematicalCorrectness:
     def test_roughness_stored_in_arcseconds(self, simple_telescope):
         """Roughness should be stored in arcseconds on the BSDF."""
         roughness_arcsec = 3600.0  # 1 degree = 3600 arcseconds
-
         modified_tel = ops.apply_roughness(simple_telescope, 0, roughness_arcsec)
-
         actual_scale = modified_tel.mirror_groups[0].bsdf.scale[0]
         assert jnp.isclose(actual_scale, roughness_arcsec, rtol=1e-10)
 
     def test_focal_length_to_curvature_conversion(self, simple_telescope):
-        """Focal length should convert correctly to curvature via c = 1/(2f)."""
-        focal_lengths = jnp.array([5.0, 10.0])  # meters
-        expected_curvatures = jnp.array([0.1, 0.05])  # 1/(2*f)
-
+        """Focal length converts via c = 1/(2f); infinite f gives a flat mirror."""
+        focal_lengths = jnp.array([5.0, jnp.inf])
         modified_tel = ops.set_focal_lengths(simple_telescope, 0, focal_lengths)
+        curvatures = modified_tel.mirror_groups[0].surface.curvatures
+        assert jnp.isclose(curvatures[0], 0.1)  # 1/(2*5)
+        assert curvatures[1] == 0.0  # infinite focal length -> flat
 
-        assert jnp.allclose(
-            modified_tel.mirror_groups[0].surface.curvatures, expected_curvatures, rtol=1e-10
-        )
-
-    def test_infinite_focal_length_gives_zero_curvature(self, simple_telescope):
-        """Infinite focal length (flat mirror) should give zero curvature."""
-        focal_lengths = jnp.array([jnp.inf, 10.0])
-
-        modified_tel = ops.set_focal_lengths(simple_telescope, 0, focal_lengths)
-
-        assert modified_tel.mirror_groups[0].surface.curvatures[0] == 0.0
-        assert jnp.isclose(modified_tel.mirror_groups[0].surface.curvatures[1], 0.05)
-
-    def test_scale_curvatures_multiplies_correctly(self, simple_telescope):
-        """Scaling curvatures should multiply by scale factor."""
+    def test_scale_and_offset_curvatures(self, simple_telescope):
+        """Scaling multiplies and offsetting adds the mirror curvatures."""
         original = simple_telescope.mirror_groups[0].surface.curvatures.copy()
-        scale = 2.5
 
-        modified_tel = ops.scale_curvatures(simple_telescope, 0, scale)
+        scaled = ops.scale_curvatures(simple_telescope, 0, 2.5)
+        assert jnp.allclose(scaled.mirror_groups[0].surface.curvatures, original * 2.5)
 
-        assert jnp.allclose(modified_tel.mirror_groups[0].surface.curvatures, original * scale)
-
-    def test_offset_curvatures_adds_correctly(self, simple_telescope):
-        """Offsetting curvatures should add the offset."""
-        original = simple_telescope.mirror_groups[0].surface.curvatures.copy()
-        offset = 0.05
-
-        modified_tel = ops.offset_curvatures(simple_telescope, 0, offset)
-
-        assert jnp.allclose(modified_tel.mirror_groups[0].surface.curvatures, original + offset)
+        offset = ops.offset_curvatures(simple_telescope, 0, 0.05)
+        assert jnp.allclose(offset.mirror_groups[0].surface.curvatures, original + 0.05)
 
 
 class TestRandomPerturbations:
@@ -197,28 +180,11 @@ class TestErrorHandling:
             ops.remove_obstruction(simple_telescope, 0)
 
 
-class TestOperationComposition:
-    """Test that operations can be composed correctly."""
-
-    def test_multiple_operations_chain(self, simple_telescope):
-        """Multiple operations should compose correctly."""
-        tel = simple_telescope
-
-        tel = ops.scale_curvatures(tel, 0, 1.5)
-        tel = ops.apply_roughness(tel, 0, 10.0)
-
-        assert jnp.allclose(
-            tel.mirror_groups[0].surface.curvatures,
-            simple_telescope.mirror_groups[0].surface.curvatures * 1.5,
-        )
-        assert jnp.allclose(tel.mirror_groups[0].bsdf.scale, jnp.full(2, 10.0))
-
-
 class TestGetInfo:
     """Test the get_info utility function."""
 
-    def test_get_info_returns_correct_counts(self, simple_telescope):
-        """get_info should return correct mirror counts."""
+    def test_get_info_counts_and_bounding_box(self, simple_telescope):
+        """get_info reports mirror counts, stage layout and the bounding box."""
         info = ops.get_info(simple_telescope)
 
         assert info["n_mirror_elements"] == 2
@@ -228,11 +194,6 @@ class TestGetInfo:
             {"stage": 0, "kind": "mirror", "n_elements": 2, "aperture": "disk"}
         ]
         assert info["name"] == "test_telescope"
-
-    def test_get_info_computes_bounding_box(self, simple_telescope):
-        """get_info should compute correct mirror bounding box."""
-        info = ops.get_info(simple_telescope)
-
         # Mirrors at (0,0,0) and (1,0,0)
         assert jnp.allclose(info["bbox_min"], jnp.array([0.0, 0.0, 0.0]))
         assert jnp.allclose(info["bbox_max"], jnp.array([1.0, 0.0, 0.0]))
@@ -265,7 +226,6 @@ def _make_lens_telescope():
         aperture=DiskAperture(radii=jnp.full(n, 0.3), inner_radii=jnp.zeros(n)),
         interaction_module=RefractInteraction(
             n_inside=jnp.full(n, 1.5),
-            n_outside=1.0,
             transmittance=None,
             transmittance_scalar=jnp.full(n, 0.9),
         ),
@@ -276,19 +236,28 @@ def _make_lens_telescope():
 
 
 class TestLensOperations:
-    """Lens stages should accept the same generic ops as mirror stages."""
+    """Lens stages accept the same generic ops as mirror stages, plus a few
+    lens-specific ones (refractive index, transmittance, refractive focal formula)."""
 
-    def test_set_positions_on_lens_stage(self):
+    def test_generic_ops_apply_to_lens_stage(self):
+        """set_positions / set_rotations / apply_misalignment / apply_roughness
+        all work on a lens stage."""
         tel = _make_lens_telescope()
+
         new_pos = jnp.array([[1.0, 0.0, 4.0], [-1.0, 0.0, 4.0]])
         tel = tel.set_positions(stage=1, positions=new_pos)
         assert jnp.allclose(tel.stage(1).positions, new_pos)
 
-    def test_set_rotations_on_lens_stage(self):
-        tel = _make_lens_telescope()
         new_rot = jnp.array([[1.0, 0.0, 0.0], [0.0, 2.0, 0.0]])
         tel = tel.set_rotations(stage=1, rotations=new_rot)
         assert jnp.allclose(tel.stage(1).rotations, new_rot)
+
+        before = tel.stage(1).rotations
+        tel = tel.apply_misalignment(stage=1, sigma_h=10.0, sigma_v=10.0, key=jax.random.key(7))
+        assert not jnp.allclose(before, tel.stage(1).rotations)
+
+        tel = tel.apply_roughness(stage=1, sigma=20.0)
+        assert jnp.allclose(tel.stage(1).bsdf.scale, jnp.full(2, 20.0))
 
     def test_scale_transmittance_clipped(self):
         tel = _make_lens_telescope()
@@ -297,59 +266,171 @@ class TestLensOperations:
         tel2 = _make_lens_telescope().scale_transmittance(stage=1, factor=10.0)
         assert jnp.allclose(tel2.stage(1).interaction_module.transmittance_scalar, 1.0)
 
-    def test_apply_misalignment_on_lens_stage(self):
+    def test_set_refractive_index_and_element_counts(self):
         tel = _make_lens_telescope()
-        original = tel.stage(1).rotations
-        tel = tel.apply_misalignment(
-            stage=1,
-            sigma_h=10.0,
-            sigma_v=10.0,
-            key=jax.random.key(7),
-        )
-        assert not jnp.allclose(original, tel.stage(1).rotations)
-
-    def test_apply_roughness_on_lens_stage(self):
-        tel = _make_lens_telescope()
-        tel = tel.apply_roughness(stage=1, sigma=20.0)
-        assert jnp.allclose(tel.stage(1).bsdf.scale, jnp.full(2, 20.0))
-
-    def test_set_refractive_index(self):
-        tel = _make_lens_telescope()
+        assert tel.n_lens_elements == 2
+        assert tel.n_mirror_elements == 2
         tel = tel.set_refractive_index(stage=1, n_inside=1.6)
         assert jnp.allclose(tel.stage(1).interaction_module.n_inside, 1.6)
 
-    def test_n_lens_elements(self):
-        assert _make_lens_telescope().n_lens_elements == 2
-
-    def test_n_mirror_elements(self):
-        assert _make_lens_telescope().n_mirror_elements == 2
-
     def test_set_focal_length_on_lens_uses_refractive_formula(self):
-        # n_inside=1.5, n_outside=1 -> c = 1/((n-1)*f)
+        # n_inside=1.5, n_outside=1 -> c = 1/((n-1)*f); f=4 -> c = 1/(0.5*4) = 0.5
         tel = _make_lens_telescope().set_focal_lengths(stage=1, focal_lengths=jnp.full(2, 4.0))
-        # expected curvature = 1 / (0.5 * 4) = 0.5
         assert jnp.allclose(tel.stage(1).surface.curvatures, 0.5)
 
 
 class TestKindValidation:
     """Kind-specific operations reject the wrong kind."""
 
-    def test_scale_reflectivity_rejects_lens(self):
+    def test_kind_specific_ops_reject_wrong_kind(self):
+        """Reflectivity/thickness ops reject a lens stage; transmittance rejects
+        a mirror stage."""
         tel = _make_lens_telescope()
         with pytest.raises(ValueError, match="stage 1 is lens"):
             tel.scale_reflectivity(stage=1, factor=0.9)
-
-    def test_scale_transmittance_rejects_mirror(self):
-        tel = _make_lens_telescope()
-        with pytest.raises(ValueError, match="stage 0 is mirror"):
-            tel.scale_transmittance(stage=0, factor=0.9)
-
-    def test_set_thickness_rejects_lens(self):
-        tel = _make_lens_telescope()
         with pytest.raises(ValueError, match="stage 1 is lens"):
             tel.set_thickness(stage=1, thickness=0.005)
+        with pytest.raises(ValueError, match="stage 0 is mirror"):
+            tel.scale_transmittance(stage=0, factor=0.9)
 
     def test_stage_raises_on_missing_index(self):
         tel = _make_lens_telescope()
         with pytest.raises(IndexError, match="no stage 5"):
             tel.stage(5)
+
+
+# =============================================================================
+# Zernike figure-error operations
+# =============================================================================
+
+@pytest.fixture
+def asphere_telescope():
+    n = 2
+    surface = AsphericSurfaceGroup(
+        curvatures=jnp.array([0.1, 0.2]),
+        conics=jnp.array([-1.0, -1.0]),
+        aspherics=jnp.zeros((n, 0)),
+        offsets=jnp.zeros((n, 2)),
+    )
+    group = mirror_group_with_surface(surface, radius=jnp.array([0.5, 0.5]))
+    return Telescope(mirror_groups=[group], name="t")
+
+
+class TestApplyZernikeError:
+    def test_wraps_bare_asphere_in_sum(self, asphere_telescope, random_key):
+        sigmas = jnp.array([0.0, 0.0, 0.0, 1e-3, 5e-4, 5e-4])
+        tel = ops.apply_zernike_error(asphere_telescope, 0, sigmas, random_key)
+        surface = tel.stage(0).surface
+        assert isinstance(surface, SumSurfaceGroup)
+        # asphere component preserved unchanged
+        asph = ops._asphere_of(surface)
+        assert isinstance(asph, AsphericSurfaceGroup)
+        assert np.allclose(np.asarray(asph.curvatures), [0.1, 0.2])
+        # zernike component present
+        zg = ops._zernike_of(surface)
+        assert isinstance(zg, ZernikeSurfaceGroup)
+
+    def test_coefficients_match_draw_and_r_norm_from_aperture(self, asphere_telescope, random_key):
+        sigmas = jnp.array([0.0, 0.0, 0.0, 1e-3, 5e-4, 5e-4])
+        tel = ops.apply_zernike_error(asphere_telescope, 0, sigmas, random_key)
+        zg = ops._zernike_of(tel.stage(0).surface)
+        # coefficients are exactly the sigma-scaled normal draw for this key
+        expected = jax.random.normal(random_key, (2, sigmas.shape[0])) * sigmas[None, :]
+        assert np.allclose(np.asarray(zg.coeffs), np.asarray(expected))
+        # normalization radius is taken from each element's aperture radius (0.5)
+        assert np.allclose(np.asarray(zg.r_norm), [0.5, 0.5])
+
+    def test_accumulates(self, asphere_telescope, random_key):
+        sigmas = jnp.array([0.0, 0.0, 0.0, 1e-3, 5e-4, 5e-4])
+        k1, k2 = jax.random.split(random_key)
+        tel1 = ops.apply_zernike_error(asphere_telescope, 0, sigmas, k1)
+        tel2 = ops.apply_zernike_error(tel1, 0, sigmas, k2)
+        c1 = ops._zernike_of(tel1.stage(0).surface).coeffs
+        c2 = ops._zernike_of(tel2.stage(0).surface).coeffs
+        draw2 = jax.random.normal(k2, (2, sigmas.shape[0])) * sigmas[None, :]
+        # second application adds its draw on top of the first
+        assert np.allclose(np.asarray(c2), np.asarray(c1 + draw2))
+        # still a single Zernike term (not two)
+        comps = tel2.stage(0).surface.components
+        assert sum(isinstance(c, ZernikeSurfaceGroup) for c in comps) == 1
+
+
+    def test_too_many_modes_raises(self, asphere_telescope, random_key):
+        with pytest.raises(ValueError):
+            ops.apply_zernike_error(asphere_telescope, 0, jnp.zeros(12), random_key)
+
+
+class TestNamedAberrations:
+    def _columns(self, tel):
+        zg = ops._zernike_of(tel.stage(0).surface)
+        return np.asarray(zg.coeffs)
+
+    @pytest.mark.parametrize(
+        ("apply", "n_cols", "zero_upto"),
+        [
+            (ops.apply_astigmatism, 6, 4),  # only Z5, Z6 nonzero
+            (ops.apply_coma, 8, 6),  # only Z7, Z8 nonzero
+            (ops.apply_trefoil, 10, 8),  # only Z9, Z10 nonzero
+        ],
+    )
+    def test_named_aberration_masks(self, asphere_telescope, random_key, apply, n_cols, zero_upto):
+        tel = apply(asphere_telescope, 0, 1e-3, random_key)
+        cols = self._columns(tel)
+        assert cols.shape[1] == n_cols
+        assert np.allclose(cols[:, :zero_upto], 0.0)  # lower-order modes untouched
+        assert np.any(cols[:, zero_upto:n_cols] != 0.0)  # the named pair is set
+
+    def test_telescope_method(self, asphere_telescope, random_key):
+        tel = asphere_telescope.apply_astigmatism(0, 1e-3, random_key)
+        assert isinstance(tel.stage(0).surface, SumSurfaceGroup)
+
+
+class TestCapabilityDispatchThroughSum:
+    """Prescription operations keep working after a Zernike term is added."""
+
+    def test_set_curvatures_through_sum(self, asphere_telescope, random_key):
+        tel = ops.apply_zernike_error(
+            asphere_telescope, 0, jnp.array([0.0, 0.0, 0.0, 1e-3]), random_key
+        )
+        tel = ops.set_curvatures(tel, 0, jnp.array([0.3, 0.4]))
+        asph = ops._asphere_of(tel.stage(0).surface)
+        assert np.allclose(np.asarray(asph.curvatures), [0.3, 0.4])
+        # set_conics dispatches through the Sum wrapper too
+        tel = ops.set_conics(tel, 0, jnp.array([0.0, 0.0]))
+        assert np.allclose(np.asarray(ops._asphere_of(tel.stage(0).surface).conics), [0.0, 0.0])
+        # Zernike term untouched throughout
+        assert ops._zernike_of(tel.stage(0).surface) is not None
+
+    def test_focal_error_through_sum(self, asphere_telescope, random_key):
+        k1, k2 = jax.random.split(random_key)
+        tel = ops.apply_zernike_error(asphere_telescope, 0, jnp.array([0.0, 0.0, 0.0, 1e-3]), k1)
+        c_before = ops._asphere_of(tel.stage(0).surface).curvatures
+        tel = ops.apply_focal_error(tel, 0, 0.05, k2)
+        c_after = ops._asphere_of(tel.stage(0).surface).curvatures
+        assert not np.allclose(np.asarray(c_before), np.asarray(c_after))
+
+    def test_no_asphere_raises(self, random_key):
+        """A standalone-Zernike stage rejects aspheric prescription ops."""
+        zg = ZernikeSurfaceGroup(coeffs=jnp.zeros((1, 4)), r_norm=jnp.ones(1))
+        group = mirror_group_with_surface(zg, radius=jnp.array([0.5]))
+        tel = Telescope(mirror_groups=[group], name="z")
+        with pytest.raises(ValueError, match="no aspheric surface"):
+            ops.set_curvatures(tel, 0, jnp.array([0.1]))
+
+
+class TestEndToEndTrace:
+    def test_zernike_error_perturbs_trace(self, asphere_telescope, random_key):
+        n_rays = 64
+        key = jax.random.key(3)
+        xy = jax.random.uniform(key, (n_rays, 2), minval=-0.3, maxval=0.3)
+        origins = jnp.concatenate([xy, jnp.full((n_rays, 1), 5.0)], axis=1)
+        directions = jnp.broadcast_to(jnp.array([0.0, 0.0, -1.0]), (n_rays, 3))
+        values = jnp.ones(n_rays)
+
+        rb_clean = asphere_telescope.trace(origins, directions, values)
+        tel = asphere_telescope.apply_astigmatism(0, 5e-3, random_key)
+        rb_pert = tel.trace(origins, directions, values)
+
+        assert jnp.all(jnp.isfinite(rb_pert.directions))
+        # the reflected directions should change under a real figure error
+        assert not jnp.allclose(rb_clean.directions, rb_pert.directions)

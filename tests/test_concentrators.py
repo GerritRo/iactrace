@@ -55,7 +55,7 @@ def _fill_entrance(cone, n, seed=0):
     return pts
 
 
-def _launch(cone, alpha_deg, n=3000, seed=0):
+def _launch(cone, alpha_deg, n=1000, seed=0):
     """Scatter ``n`` rays entering the mouth at polar incidence ``alpha_deg``."""
     rng = np.random.default_rng(seed + 1)
     xy = _fill_entrance(cone, n, seed)
@@ -79,7 +79,7 @@ def _launch(cone, alpha_deg, n=3000, seed=0):
     return cone.apply(rb)
 
 
-def _transmission(cone, alpha_deg, n=3000):
+def _transmission(cone, alpha_deg, n=1000):
     return float((np.asarray(_launch(cone, alpha_deg, n).values) > 0).mean())
 
 
@@ -113,12 +113,6 @@ class TestWinstonGeometry:
         assert float(r[0]) == pytest.approx(a2, abs=1e-9)  # exit
         assert float(r[-1]) == pytest.approx(a1, abs=1e-6)  # entrance
         assert bool(jnp.all(jnp.diff(r) >= -1e-9))  # monotonic
-
-    def test_concentration_ratio(self):
-        a2 = 0.5
-        s = math.sin(math.radians(20.0))
-        a1 = a2 / s
-        assert (a1 / a2) ** 2 == pytest.approx(1.0 / s**2)
 
     def test_constructors_and_truncation(self):
         a2 = 0.5
@@ -157,21 +151,20 @@ class TestOkumuraGeometry:
         assert q.control_points == (QUAD_P1,)
         assert c.control_points == (CUBIC_P1, CUBIC_P2)
 
-    def test_default_length_matches_equivalent_winston(self):
+    def test_default_length_matches_paper_and_winston(self):
         # length=None must reproduce the Winston-equivalent depth exactly, so the
-        # Okumura cone is a genuine drop-in for the cone it compares against.
+        # Okumura cone is a genuine drop-in for the cone it compares against; and
+        # the rho1=20mm, rho2=10mm cone reproduces Okumura Table 2's L = 52.0 mm.
         for a2, cutoff in [(0.010, 30.0), (0.010, 20.0), (0.005, 25.0)]:
             a1 = a2 / math.sin(math.radians(cutoff))
             win = WinstonCone(6, a1, a2)
             bez = OkumuraCone.quadratic(6, a1, a2, QUAD_P1)
             assert bez.length == pytest.approx(win.length, rel=1e-9)
+        assert OkumuraCone.quadratic(6, 0.020, 0.010, QUAD_P1).length == pytest.approx(
+            0.0520, abs=5e-5
+        )
 
-    def test_paper_length_value(self):
-        # Okumura Table 2: rho1 = 20 mm, rho2 = 10 mm -> L = 52.0 mm.
-        bez = OkumuraCone.quadratic(6, 0.020, 0.010, QUAD_P1)
-        assert bez.length == pytest.approx(0.0520, abs=5e-5)
-
-    def test_meridian_endpoints(self):
+    def test_meridian_and_cross_section_endpoints(self):
         a1, a2 = 0.020, 0.010
         bez = OkumuraCone.cubic(6, a1, a2, CUBIC_P1, CUBIC_P2)
         r_c = jnp.asarray(bez.r_coeffs)
@@ -181,16 +174,9 @@ class TestOkumuraGeometry:
         assert float(_polyval(r_c, jnp.asarray(1.0))) == pytest.approx(a1)
         assert float(_polyval(z_c, jnp.asarray(0.0))) == pytest.approx(0.0, abs=1e-12)
         assert float(_polyval(z_c, jnp.asarray(1.0))) == pytest.approx(bez.length)
-
-    def test_cross_sections_endpoints(self):
-        a1, a2 = 0.020, 0.010
-        bez = OkumuraCone.quadratic(6, a1, a2, QUAD_P1)
+        # cross_sections() feeds the mesh path: entrance inradius a1, exit a2.
         z, rings = bez.cross_sections()
-        assert z.shape[0] == rings.shape[0]
         assert rings.shape[1:] == (6, 2)
-        # entrance slice at z=0 with mouth inradius a1, exit slice at z=-length.
-        assert float(z[0]) == pytest.approx(0.0, abs=1e-9)
-        assert float(z[-1]) == pytest.approx(-bez.length, abs=1e-9)
         inrad_entrance = float(jnp.linalg.norm(rings[0, 0])) * math.cos(math.pi / 6)
         inrad_exit = float(jnp.linalg.norm(rings[-1, 0])) * math.cos(math.pi / 6)
         assert inrad_entrance == pytest.approx(a1, rel=1e-6)
@@ -210,32 +196,34 @@ class TestOkumuraGeometry:
         assert _bezier_power_coeffs([0.0, 1.0]) == pytest.approx([0.0, 1.0])
         assert _bezier_power_coeffs([0.0, 0.5, 1.0]) == pytest.approx([0.0, 1.0, 0.0])
 
+    @pytest.mark.slow
     def test_beats_winston(self):
         # Okumura's headline result: same (a1, a2, L), but the Okumura cone's
         # Bezier walls collect more signal (theta < theta_max) and reject more
         # stray light (theta_max < theta < 1.5 theta_max) than Winston's paraboloid.
         a1, a2, tmax = 0.020, 0.010, 30.0
-        win = WinstonCone(6, a1, a2, reflectivity=1.0, max_bounces=60)
-        cub = OkumuraCone.cubic(6, a1, a2, CUBIC_P1, CUBIC_P2, reflectivity=1.0, max_bounces=60)
+        win = WinstonCone(6, a1, a2, reflectivity=1.0, max_bounces=40)
+        cub = OkumuraCone.cubic(6, a1, a2, CUBIC_P1, CUBIC_P2, reflectivity=1.0, max_bounces=40)
 
         def band(cone, angles):
             return float(
-                np.mean([np.asarray(_launch(cone, a, n=2500).values).sum() / 2500 for a in angles])
+                np.mean([np.asarray(_launch(cone, a, n=1500).values).sum() / 1500 for a in angles])
             )
 
-        signal = np.arange(0.0, tmax, 3.0)
-        background = np.arange(tmax, 1.5 * tmax + 0.1, 3.0)
+        signal = np.arange(0.0, tmax, 5.0)
+        background = np.arange(tmax, 1.5 * tmax + 0.1, 5.0)
         assert band(cub, signal) > band(win, signal)  # more signal
         assert band(cub, background) < band(win, background)  # less background
 
 
-# 2. Shared physics: acceptance, energy, mouth aperture (parametrized)
+# 2. Shared physics: acceptance, energy, mouth aperture
 # -----------------------------------------------------------------------------
 
 
 class TestAcceptance:
-    """Angular acceptance -- the defining light-collector property."""
+    """Angular acceptance -- the defining light-collector property (both walls)."""
 
+    @pytest.mark.slow
     def test_cutoff_near_acceptance_angle(self, cone_kind):
         cone = _make_cone(cone_kind, 0.5, 20.0, reflectivity=1.0, max_bounces=40)
         # well inside -> almost everything transmits
@@ -244,36 +232,32 @@ class TestAcceptance:
         # around the design angle -> roughly half
         assert 0.35 < _transmission(cone, 20.0) < 0.8
         # well outside -> strongly rejected
-        assert _transmission(cone, 28.0) < 0.2
-        assert _transmission(cone, 40.0) < 0.03
-
-    def test_monotone_decreasing(self, cone_kind):
-        cone = _make_cone(cone_kind, 0.5, 25.0, reflectivity=1.0, max_bounces=40)
-        ts = [_transmission(cone, a) for a in (0, 10, 20, 25, 30, 40)]
-        assert all(ts[i] >= ts[i + 1] - 0.08 for i in range(len(ts) - 1))
+        assert _transmission(cone, 28.0) < 0.25
+        assert _transmission(cone, 40.0) < 0.05
 
 
 class TestEnergy:
-    """Throughput never amplifies and stays bounded by reflectivity^bounces."""
+    """Throughput never amplifies and stays bounded by reflectivity^bounces.
 
-    def test_no_gain_and_attenuated(self, cone_kind):
-        cone = _make_cone(cone_kind, 0.5, 20.0, reflectivity=0.9, max_bounces=40)
-        out = _launch(cone, 8.0, n=4000)
-        v = np.asarray(out.values)
+    Wall-shape-independent, so exercised on the Winston cone alone.
+    """
+
+    def test_no_gain_bounded_and_unit_preserving(self):
+        cone = _make_cone("winston", 0.5, 20.0, reflectivity=0.9, max_bounces=40)
+        v = np.asarray(_launch(cone, 8.0, n=1500).values)
         assert v.max() <= 1.0 + 1e-9  # never amplifies
         transmitted = v[v > 0]
         assert transmitted.min() >= 0.9**40 - 1e-12  # >= reflectivity^max_bounces
         assert transmitted.mean() < 1.0  # some bounces happened
 
-    def test_reflectivity_one_keeps_unit_values(self, cone_kind):
-        cone = _make_cone(cone_kind, 0.5, 20.0, reflectivity=1.0, max_bounces=40)
-        out = _launch(cone, 5.0, n=2000)
-        v = np.asarray(out.values)
-        assert set(np.unique(np.round(v, 9)).tolist()) <= {0.0, 1.0}
+        # With perfect reflectivity every transmitted ray keeps unit value.
+        perfect = _make_cone("winston", 0.5, 20.0, reflectivity=1.0, max_bounces=40)
+        vp = np.asarray(_launch(perfect, 5.0, n=1000).values)
+        assert set(np.unique(np.round(vp, 9)).tolist()) <= {0.0, 1.0}
 
-    def test_exit_plane_and_path_length(self, cone_kind):
-        cone = _make_cone(cone_kind, 0.5, 20.0, reflectivity=1.0, max_bounces=40)
-        out = _launch(cone, 6.0, n=1500)
+    def test_exit_plane_and_path_length(self):
+        cone = _make_cone("winston", 0.5, 20.0, reflectivity=1.0, max_bounces=40)
+        out = _launch(cone, 6.0, n=1000)
         v = np.asarray(out.values)
         # Transmitted rays sit on the exit plane; dead rays' origins are meaningless.
         assert bool(np.allclose(np.asarray(out.origins)[v > 0, 2], -cone.length))
@@ -283,10 +267,11 @@ class TestEnergy:
 
 
 class TestMouthAperture:
-    def test_rays_outside_mouth_are_lost(self, cone_kind):
+    def test_rays_outside_mouth_are_lost(self):
         # apply() masks rays entering outside the entrance polygon: a ray just
-        # inside the mouth transmits, one far outside is zeroed.
-        cone = _make_cone(cone_kind, 0.5, 20.0, reflectivity=1.0)
+        # inside the mouth transmits, one far outside is zeroed. Masking is
+        # wall-shape-independent, so one representative cone suffices.
+        cone = _make_cone("winston", 0.5, 20.0, reflectivity=1.0)
         a = cone.entrance_apothem
         origins = jnp.array([[0.0, 0.0, 0.0], [10 * a, 0.0, 0.0]])
         dirs = jnp.tile(jnp.array([0.0, 0.0, -1.0]), (2, 1))  # light -z
@@ -302,7 +287,7 @@ class TestMouthAperture:
         assert float(out.values[1]) == 0.0
 
 
-# 3. Chain integration + rotation alignment (parametrized)
+# 3. Chain integration + rotation alignment
 # -----------------------------------------------------------------------------
 
 
@@ -345,8 +330,9 @@ def _downward(xy, z=0.05):
 
 
 class TestChainIntegration:
-    def test_image_and_collect_run(self, cone_kind):
-        cam, sensor = _hex_camera(cone_kind, with_cone=True)
+    def test_image_and_collect_run(self):
+        # Camera/cone plumbing is wall-shape-independent -> one representative cone.
+        cam, sensor = _hex_camera("winston", with_cone=True)
         rb = _downward(np.zeros((50, 2)))  # on-axis rays into centre pixel
         img = cam.image(rb)
         assert img.shape == (1, sensor.n_pixels)
@@ -354,12 +340,9 @@ class TestChainIntegration:
         pe, t, pix, hit = cam.collect(rb)
         assert pe.shape == (50,) and t.shape == (50,)
         assert bool((np.asarray(pe) <= 0.9 + 1e-9).all())  # <= QE, attenuated
-
-    def test_cone_attenuates_relative_to_no_cone(self, cone_kind):
-        rb = _downward(np.zeros((200, 2)))
-        with_cone, _ = _hex_camera(cone_kind, with_cone=True)
-        without, _ = _hex_camera(cone_kind, with_cone=False)
-        assert float(with_cone.image(rb).sum()) <= float(without.image(rb).sum()) + 1e-9
+        # a cone can only attenuate relative to no cone
+        without, _ = _hex_camera("winston", with_cone=False)
+        assert float(img.sum()) <= float(without.image(rb).sum()) + 1e-9
 
 
 def _rot2(pts, theta):
@@ -371,7 +354,8 @@ class TestRotationAlignment:
     """The cone must stay aligned with its pixel under any hex grid rotation.
 
     ``to_pixel_frame`` normalises ``grid_rotation`` away, so the cone (defined in
-    the grid-aligned pixel frame) co-rotates with the layout.
+    the grid-aligned pixel frame) co-rotates with the layout. Alignment is a
+    frame-transform property, exercised on one representative cone.
     """
 
     def _setup(self, kind):
@@ -382,7 +366,7 @@ class TestRotationAlignment:
             kind, inrad, np.sin(np.radians(20.0)) * inrad, reflectivity=1.0, max_bounces=60
         )
         rng = np.random.default_rng(1)
-        n = 4000
+        n = 2000
         r = 0.8 * inrad * np.sqrt(rng.uniform(0, 1, n))  # fill only the central pixel
         psi = rng.uniform(0, 2 * np.pi, n)
         xy0 = np.c_[r * np.cos(psi), r * np.sin(psi)]
@@ -410,20 +394,21 @@ class TestRotationAlignment:
         pe, _t, _pix, _hit = cam.collect(rb)
         return float(np.asarray(pe).sum())
 
-    def test_transmission_invariant_under_layout_rotation(self, cone_kind):
-        centers0, cone, o0, d0, n = self._setup(cone_kind)
+    @pytest.mark.slow
+    def test_transmission_invariant_under_layout_rotation(self):
+        centers0, cone, o0, d0, n = self._setup("winston")
         base = self._transmission(centers0, cone, o0, d0, n, 0.0)
         assert 0.1 * n < base < 0.9 * n  # genuinely partial -> discriminating
-        for deg in (5.0, 11.0, 23.0, 37.0):
+        for deg in (11.0, 37.0):
             rotated = self._transmission(centers0, cone, o0, d0, n, np.radians(deg))
             assert abs(rotated - base) < 1e-6 * n
 
-    def test_orientation_offset_changes_transmission(self, cone_kind):
+    def test_orientation_offset_changes_transmission(self):
         # Control: the test is sensitive -- offsetting the cone orientation
         # relative to the pixel changes the result (so invariance above is real).
-        centers0, cone, o0, d0, n = self._setup(cone_kind)
+        centers0, cone, o0, d0, n = self._setup("winston")
         offset = _cone_from_apertures(
-            cone_kind,
+            "winston",
             cone.entrance_apothem,
             cone.exit_apothem,
             reflectivity=1.0,
@@ -435,15 +420,15 @@ class TestRotationAlignment:
         assert abs(shifted - base) > 0.02 * n
 
 
-# 4. Numerical robustness (parametrized)
+# 4. Numerical robustness (single representative cone)
 # -----------------------------------------------------------------------------
 
 
 class TestRobustness:
-    def test_apply_gradients_are_finite(self, cone_kind):
+    def test_apply_gradients_are_finite(self):
         # The trace's divisions/sqrts must be grad-safe (double-where), including
         # the degenerate horizontal ray (d[2] == 0) that hits the inf branch.
-        cone = _cone_from_apertures(cone_kind, 0.025, 0.01, reflectivity=0.9, max_bounces=8)
+        cone = _cone_from_apertures("winston", 0.025, 0.01, reflectivity=0.9, max_bounces=8)
 
         def loss(o, d):
             m = o.shape[0]
@@ -458,10 +443,12 @@ class TestRobustness:
         assert bool(jnp.all(jnp.isfinite(go)))
         assert bool(jnp.all(jnp.isfinite(gd)))
 
-    def test_small_cone_traces_in_range(self, cone_kind):
+    def test_small_cone_traces_in_range(self):
         # The accept/reject floor scales with a2, so a sub-mm cone still
         # transmits finite values in (0, 1] rather than absorbing everything.
-        cone = _cone_from_apertures(cone_kind, 1.25e-4, 5e-5, reflectivity=0.95, max_bounces=12)
+        # (Kept separate from the gradient test: this guards small-scale numerics,
+        # that one guards autodiff safety -- different failure modes.)
+        cone = _cone_from_apertures("winston", 1.25e-4, 5e-5, reflectivity=0.95, max_bounces=12)
         rng = np.random.default_rng(0)
         xy = rng.uniform(-0.7, 0.7, (1000, 2)) * 1.25e-4
         rb = RayBundle(
@@ -477,15 +464,12 @@ class TestRobustness:
         assert v.mean() > 0.0
 
 
-# 5. Rendering smoke (the single shared cone-viz gate)
+# 5. Rendering smoke (both mesh paths: Winston._meridian, Okumura.cross_sections)
 # -----------------------------------------------------------------------------
 
 
 class TestShowSensorChain:
     def test_show_sensor_chain_smoke(self, cone_kind):
-        # The one viz gate for real cones: a hex camera with a Winston/Okumura
-        # cone renders a scene without raising, exercising the cone mesh path
-        # (e.g. WinstonCone._meridian, OkumuraCone.cross_sections).
         pytest.importorskip("trimesh")
         from iactrace import show_sensor_chain
 

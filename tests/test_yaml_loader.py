@@ -47,9 +47,11 @@ class TestMirrorConfigErrors:
         with pytest.raises(YAMLConfigError, match="undefined template 'wrong_name'"):
             build_telescope_config(config, n_samples, random_key)
 
-    def test_missing_required_fields_raises(self, n_samples, random_key, valid_template):
-        """Missing required fields should raise clear errors."""
-        # Missing template
+    def test_missing_template_builds_self_contained_flat_mirror(
+        self, n_samples, random_key, valid_template
+    ):
+        """A mirror with no `template` is valid: it's self-contained, defaulting
+        to a flat surface since it also has no curvature/conic/aspheric of its own."""
         config_no_template = {
             "telescope": {"camera_position": [0, 0, 0], "camera_rotation": [0, 0, 0]},
             "mirror_templates": valid_template,
@@ -61,9 +63,11 @@ class TestMirrorConfigErrors:
                 }
             ],
         }
-        with pytest.raises(YAMLConfigError, match="Field required"):
-            build_telescope_config(config_no_template, n_samples, random_key)
+        telescope = build_telescope_config(config_no_template, n_samples, random_key)
+        assert float(telescope.mirror_groups[0].surface.curvatures[0]) == pytest.approx(0.0)
 
+    def test_missing_required_fields_raises(self, n_samples, random_key, valid_template):
+        """Missing required fields should raise clear errors."""
         # Missing aperture
         config_no_aperture = {
             "telescope": {"camera_position": [0, 0, 0], "camera_rotation": [0, 0, 0]},
@@ -96,33 +100,16 @@ class TestMirrorConfigErrors:
         with pytest.raises(YAMLConfigError, match="does not match any of the expected tags"):
             build_telescope_config(config, n_samples, random_key)
 
-    @pytest.mark.parametrize(
-        "extra",
-        [
-            {
-                "sensors": [
-                    {
-                        "type": "square",
-                        "position": [0, 0, 5],
-                        "orientation": [0, 0, 0],
-                        "width": 10,
-                        "height": 10,
-                        "bounds": [-1, 1, -1, 1],
-                    }
-                ]
-            },
-            {"camera": {"quantum_efficiency": 0.5}},
-        ],
-    )
-    def test_telescope_rejects_combined_format_section(self, n_samples, random_key, extra):
+    def test_telescope_rejects_combined_format_section(self, n_samples, random_key):
         """Telescope schema is strict: combined-format sensors/camera blocks are forbidden."""
-        config = {
-            "telescope": {"camera_position": [0, 0, 0], "camera_rotation": [0, 0, 0]},
-            "mirrors": [],
-            **extra,
-        }
-        with pytest.raises(YAMLConfigError):
-            build_telescope_config(config, n_samples, random_key)
+        base = {"telescope": {"camera_position": [0, 0, 0], "camera_rotation": [0, 0, 0]}, "mirrors": []}
+        for extra in (
+            {"sensors": [{"type": "square", "position": [0, 0, 5], "orientation": [0, 0, 0],
+                          "width": 10, "height": 10, "bounds": [-1, 1, -1, 1]}]},
+            {"camera": {"quantum_efficiency": 0.5}},
+        ):
+            with pytest.raises(YAMLConfigError):
+                build_telescope_config({**base, **extra}, n_samples, random_key)
 
 
 # Camera schema errors
@@ -131,61 +118,32 @@ class TestMirrorConfigErrors:
 class TestSensorConfigErrors:
     """Test error handling for sensor configuration issues."""
 
-    def test_invalid_sensor_type_raises(self):
-        """Unknown sensor type should raise YAMLConfigError."""
-        config = {
-            "sensors": [
-                {
-                    "type": "triangular",  # Invalid
-                    "position": [0, 0, 0],
-                    "orientation": [0, 0, 0],
-                }
-            ],
-        }
+    def test_invalid_sensor_type_and_shapes_raise(self):
+        """Unknown sensor type, wrong square bounds count, and mismatched hex
+        center arrays each raise a YAMLConfigError."""
         with pytest.raises(YAMLConfigError, match="does not match any of the expected tags"):
-            build_camera_config(config)
-
-    def test_square_sensor_wrong_bounds_raises(self):
-        """Square sensor with wrong bounds count should raise YAMLConfigError."""
-        config = {
-            "sensors": [
-                {
-                    "type": "square",
-                    "position": [0, 0, 0],
-                    "orientation": [0, 0, 0],
-                    "width": 100,
-                    "height": 100,
-                    "bounds": [-1, 1, -1],  # Only 3 values, need 4
-                }
-            ],
-        }
+            build_camera_config(
+                {"sensors": [{"type": "triangular", "position": [0, 0, 0], "orientation": [0, 0, 0]}]}
+            )
         with pytest.raises(YAMLConfigError, match="at least 4 items"):
-            build_camera_config(config)
-
-    def test_hexagonal_sensor_mismatched_centers_raises(self):
-        """Hexagonal sensor with mismatched center arrays should raise."""
-        config = {
-            "sensors": [
-                {
-                    "type": "hexagonal",
-                    "position": [0, 0, 0],
-                    "orientation": [0, 0, 0],
-                    "centers_x": [0, 1, 2],
-                    "centers_y": [0, 1],  # Different length
-                }
-            ],
-        }
+            build_camera_config(
+                {"sensors": [{
+                    "type": "square", "position": [0, 0, 0], "orientation": [0, 0, 0],
+                    "width": 100, "height": 100, "bounds": [-1, 1, -1],  # need 4
+                }]}
+            )
         with pytest.raises(YAMLConfigError, match="must have same length"):
-            build_camera_config(config)
+            build_camera_config(
+                {"sensors": [{
+                    "type": "hexagonal", "position": [0, 0, 0], "orientation": [0, 0, 0],
+                    "centers_x": [0, 1, 2], "centers_y": [0, 1],  # different length
+                }]}
+            )
 
     def test_camera_rejects_extra_top_level_keys(self):
         """Stray keys (e.g. 'frame: world') are hard errors."""
-        config = {
-            "sensors": [],
-            "frame": "world",
-        }
         with pytest.raises(YAMLConfigError):
-            build_camera_config(config)
+            build_camera_config({"sensors": [], "frame": "world"})
 
 
 # ---------------------------------------------------------------------------
@@ -196,19 +154,15 @@ class TestSensorConfigErrors:
 class TestValidConfigs:
     """Test that valid configurations load correctly."""
 
-    def test_empty_telescope_loads(self, n_samples, random_key):
-        """Empty telescope configuration should load without errors."""
-        tel_config = {
-            "telescope": {"camera_position": [0, 0, 0], "camera_rotation": [0, 0, 0]},
-            "mirrors": [],
-        }
-        telescope = build_telescope_config(tel_config, n_samples, random_key)
+    def test_empty_telescope_and_camera_load(self, n_samples, random_key):
+        """Empty telescope and camera configurations load without errors."""
+        telescope = build_telescope_config(
+            {"telescope": {"camera_position": [0, 0, 0], "camera_rotation": [0, 0, 0]}, "mirrors": []},
+            n_samples,
+            random_key,
+        )
         assert len(telescope.mirror_groups) == 0
-
-    def test_empty_camera_loads(self):
-        """Empty camera configuration should load without errors."""
-        camera = build_camera_config({"sensors": []})
-        assert len(camera.sensor_groups) == 0
+        assert len(build_camera_config({"sensors": []}).sensor_groups) == 0
 
     def test_per_mirror_surface_overrides(self, n_samples, random_key, valid_template):
         """Mirrors can override template surface parameters."""
@@ -238,7 +192,7 @@ class TestValidConfigs:
         # Check per-mirror curvatures
         assert float(group.surface.curvatures[0]) == pytest.approx(0.2)
         assert float(group.surface.curvatures[1]) == pytest.approx(0.1)  # template default
-        
+
 
     def test_untyped_surface_rejected(self, n_samples, random_key):
         """A surface block without a ``type`` discriminator is rejected.
@@ -261,8 +215,8 @@ class TestValidConfigs:
         }
         with pytest.raises(YAMLConfigError):
             build_telescope_config(config, n_samples, random_key)
-            
-    
+
+
     def test_typed_aspheric_lens_surface_loads(self, n_samples, random_key):
         """An aspheric-disk lens reads its shape from a nested typed surface."""
         config = {
@@ -324,9 +278,9 @@ class TestCoatingsFromYaml:
         # Scalar defaults to 1.0 when no per-mirror override
         assert float(interaction.reflectivity_scalar[0]) == pytest.approx(1.0)
 
-    def test_scalar_reflectivity_on_template(self, n_samples, random_key):
-        """A scalar template reflectivity becomes the bulk multiplier, with
-        no coating attached."""
+    def test_scalar_reflectivity_template_and_per_mirror_override(self, n_samples, random_key):
+        """A scalar template reflectivity is the bulk multiplier (no coating),
+        and a mirror-level scalar overrides it while others fall back to 1.0."""
         config = {
             "telescope": {"camera_position": [0, 0, 5], "camera_rotation": [0, 0, 0]},
             "mirror_templates": {
@@ -341,41 +295,23 @@ class TestCoatingsFromYaml:
                     "position": [0, 0, 0],
                     "orientation": [0, 0, 0],
                     "aperture": {"type": "circular", "radius": 0.5},
+                    "reflectivity": 0.7,  # overrides the template's 0.85
+                },
+                {
+                    "template": "matte",
+                    "position": [1, 0, 0],
+                    "orientation": [0, 0, 0],
+                    "aperture": {"type": "circular", "radius": 0.5},
+                    # no override -> inherits the template's 0.85
                 },
             ],
         }
         tel = build_telescope_config(config, n_samples, random_key)
         interaction = tel.mirror_groups[0].interaction_module
-        assert interaction.reflectivity is None
-        assert float(interaction.reflectivity_scalar[0]) == pytest.approx(0.85)
-
-    def test_per_mirror_reflectivity_override(self, n_samples, random_key):
-        """Mirror-level scalar overrides the template's bulk value."""
-        config = {
-            "telescope": {"camera_position": [0, 0, 5], "camera_rotation": [0, 0, 0]},
-            "mirror_templates": {
-                "tpl": {"surface": {"type": "aspheric", "curvature": 0.1, "conic": -1.0}},
-            },
-            "mirrors": [
-                {
-                    "template": "tpl",
-                    "position": [0, 0, 0],
-                    "orientation": [0, 0, 0],
-                    "aperture": {"type": "circular", "radius": 0.5},
-                    "reflectivity": 0.7,
-                },
-                {
-                    "template": "tpl",
-                    "position": [1, 0, 0],
-                    "orientation": [0, 0, 0],
-                    "aperture": {"type": "circular", "radius": 0.5},
-                },
-            ],
-        }
-        tel = build_telescope_config(config, n_samples, random_key)
-        scalars = tel.mirror_groups[0].interaction_module.reflectivity_scalar
+        assert interaction.reflectivity is None  # scalar only, no coating curve
+        scalars = interaction.reflectivity_scalar
         assert float(scalars[0]) == pytest.approx(0.7)
-        assert float(scalars[1]) == pytest.approx(1.0)
+        assert float(scalars[1]) == pytest.approx(0.85)
 
     def test_mismatched_curves_in_same_bucket_raise(self, n_samples, random_key):
         """Different curves on mirrors that would land in the same group fail."""

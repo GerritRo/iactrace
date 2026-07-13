@@ -154,9 +154,6 @@ class FlatFocalPlane(FocalSurface):
         self.rotation = jnp.zeros(3) if rotation is None else jnp.asarray(rotation, dtype=float)
 
     def _intersect_local(self, o_local, d_local):
-        # In the local frame the plane is centred at the origin with the
-        # identity rotation, so intersect_plane reduces to a closed-form
-        # z = 0 hit.
         center = jnp.zeros(3)
         rot = jnp.eye(3)
         xy, t = intersect_plane(o_local, d_local, center, rot)
@@ -206,8 +203,6 @@ class AsphericFocalSurface(FocalSurface):
         k = self.conic
         a = self.aspherics
 
-        # Closed-form conic intersection as initial guess; Newton-Raphson then
-        # refines for the aspheric terms.
         t_init = intersect_conic(o_local, d_local, c, k)
         t, hit_xy, valid = newton_raphson_intersect(
             lambda x, y: sag_raw(x, y, c, k, a),

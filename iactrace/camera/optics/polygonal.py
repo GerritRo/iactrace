@@ -21,9 +21,6 @@ class PolygonalCone(Concentrator):
     meridian: one concrete :class:`~iactrace.camera.optics.concentrator.Concentrator`
     that delivers rays by bouncing them off its reflecting walls.
 
-    Two roles in one object -- the "cone is its own walls, tracer owns the loop"
-    split, collapsed onto the concentrator:
-
     * **Geometry.** The facet plane normals (:attr:`n_hats`) and the drawable
       cross-sections depend only on the polygon (``n_sides``, ``orientation``)
       and on the meridian samples the subclass provides via :meth:`_meridian`.
@@ -105,7 +102,7 @@ class PolygonalCone(Concentrator):
         The wall-based implementation of
         :meth:`~iactrace.camera.optics.concentrator.Concentrator.to_surface`: the
         shared :func:`trace_chain` bounces rays off the cavity walls and lands
-        them on *surface*, co-traced so a photocathode peeking into the cavity is
+        them on *surface*, co-traced so a sensor surface peeking into the cavity is
         hit mid-bounce.
         """
         return trace_chain(self, surface, rays).rays
@@ -130,9 +127,6 @@ class PolygonalCone(Concentrator):
         unit = jnp.stack([jnp.cos(ang), jnp.sin(ang)], axis=-1)  # (M, 2)
         rings = corner_r[:, None, None] * unit[None, :, :]  # (K, M, 2)
         return z_chain, rings
-
-
-# --- the shared bounce loop that PolygonalCone.to_surface drives ---------------
 
 
 class ChainTrace(NamedTuple):

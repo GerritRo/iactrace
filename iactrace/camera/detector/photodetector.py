@@ -10,6 +10,13 @@ from ...core.ray_bundle import RayBundle
 from .surface import DetectionSurface
 
 
+def _validate_qe(qe: float) -> float:
+    """Validate and coerce a quantum efficiency to a plain float in ``[0, 1]``."""
+    if not 0.0 <= qe <= 1.0:
+        raise ValueError(f"qe must be in [0, 1], got {qe}")
+    return float(qe)
+
+
 def incidence_cos(directions: Array, normals: Array) -> Array:
     """Incidence cosine of each ray on a surface with the given outward normals.
 
@@ -22,7 +29,7 @@ def incidence_cos(directions: Array, normals: Array) -> Array:
 
 
 class PhotoDetector(eqx.Module):
-    """Abstract base for photodetector (PMT / SiPM) response models.
+    """Abstract base for photodetector response models.
 
     A photodetector is the terminal element of a detection chain and owns two
     things:
@@ -106,9 +113,7 @@ class ConstantQE(PhotoDetector):
     qe: float = eqx.field(static=True)
 
     def __init__(self, qe: float = 1.0) -> None:
-        if not 0.0 <= qe <= 1.0:
-            raise ValueError(f"qe must be in [0, 1], got {qe}")
-        self.qe = float(qe)
+        self.qe = _validate_qe(qe)
 
     def detect(self, local_rays: RayBundle) -> RayBundle:
         return local_rays.replace(values=local_rays.values * self.qe)

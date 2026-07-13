@@ -256,6 +256,43 @@ def _single_disk_mirror(
     )
 
 
+def _focal_length_disk_mirror(
+    *,
+    conic: float,
+    position: Sequence[float],
+    focal_length: float,
+    radius: float,
+    rotation: Sequence[float] = (0.0, 0.0, 0.0),
+    inner_radius: float = 0.0,
+    reflectivity: float = 1.0,
+    coating: Coating | None = None,
+    bsdf_scale: float = 0.0,
+    optical_stage: int = 0,
+    n_samples: int = 100,
+    key: Array,
+) -> OpticalElementGroup:
+    """Common backing for :func:`spherical` and :func:`parabolic`.
+
+    Both derive ``curvature = 1 / (2 * focal_length)`` and differ only in
+    ``conic`` (``0`` vs ``-1``).
+    """
+    return _single_disk_mirror(
+        position=position,
+        rotation=rotation,
+        curvature=1.0 / (2.0 * float(focal_length)),
+        conic=conic,
+        aspheric_coeffs=None,
+        radius=radius,
+        inner_radius=inner_radius,
+        reflectivity=reflectivity,
+        coating=coating,
+        bsdf_scale=bsdf_scale,
+        optical_stage=optical_stage,
+        n_samples=n_samples,
+        key=key,
+    )
+
+
 def spherical(
     *,
     position: Sequence[float],
@@ -287,13 +324,12 @@ def spherical(
         n_samples: Monte Carlo samples per render call.
         key: JAX PRNG key.
     """
-    return _single_disk_mirror(
-        position=position,
-        rotation=rotation,
-        curvature=1.0 / (2.0 * float(focal_length)),
+    return _focal_length_disk_mirror(
         conic=0.0,
-        aspheric_coeffs=None,
+        position=position,
+        focal_length=focal_length,
         radius=radius,
+        rotation=rotation,
         inner_radius=inner_radius,
         reflectivity=reflectivity,
         coating=coating,
@@ -326,13 +362,12 @@ def parabolic(
 
     Args: see :func:`spherical`.
     """
-    return _single_disk_mirror(
-        position=position,
-        rotation=rotation,
-        curvature=1.0 / (2.0 * float(focal_length)),
+    return _focal_length_disk_mirror(
         conic=-1.0,
-        aspheric_coeffs=None,
+        position=position,
+        focal_length=focal_length,
         radius=radius,
+        rotation=rotation,
         inner_radius=inner_radius,
         reflectivity=reflectivity,
         coating=coating,

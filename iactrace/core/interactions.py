@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import enum
 from abc import abstractmethod
+from typing import Literal
 
 import equinox as eqx
 import jax
@@ -126,6 +127,21 @@ class Interaction(eqx.Module):
     @abstractmethod
     def interaction_type(self) -> InteractionType: ...
 
+    @property
+    @abstractmethod
+    def kind(self) -> Literal["mirror", "lens", "slab"]:
+        """User-facing element kind."""
+
+    def focal_scale(self, n_outside: float = 1.0) -> Array | float | None:
+        """Curvature<->focal-length scale factor for this interaction.
+
+        ``curvature = 1 / (scale * focal_length)``: ``2`` for mirrors,
+        ``n_inside - n_outside`` for a single refracting surface. Returns
+        ``None`` where a focal length is not a meaningful concept (slabs),
+        letting the caller decide how to report that.
+        """
+        return None
+
     @abstractmethod
     def apply(self, directions, normals, points, element_idx, current_n):
         """Apply the interaction at hit points.
@@ -172,6 +188,21 @@ class ReflectInteraction(Interaction):
     def interaction_type(self) -> InteractionType:
         return InteractionType.REFLECT
 
+    @property
+    def kind(self) -> Literal["mirror"]:
+        return "mirror"
+
+    def focal_scale(self, n_outside: float = 1.0) -> float:
+        return 2.0
+
+    def with_reflectivity_scalar(self, reflectivity_scalar: Array) -> ReflectInteraction:
+        """Return a copy with the bulk reflectivity multiplier replaced."""
+        return eqx.tree_at(lambda m: m.reflectivity_scalar, self, reflectivity_scalar)
+
+    def scaled_reflectivity(self, factor: Array) -> ReflectInteraction:
+        """Return a copy with the bulk reflectivity multiplier scaled by ``factor``."""
+        return self.with_reflectivity_scalar(self.reflectivity_scalar * factor)
+
     def apply(self, directions, normals, points, element_idx, current_n):
         reflected, cos_array = jax.vmap(reflect)(directions, normals)
         cos_i = jnp.abs(cos_array.squeeze(-1))
@@ -209,9 +240,6 @@ class RefractInteraction(Interaction):
             per element (N,). "Far side" means the medium the ray
             transmits *into*: for a front surface this is the glass
             index, for a back surface it is the ambient index.
-        n_outside: Retained for back-compat / (de)serialisation
-            (YAML schema). The render loop ignores it and uses the
-            per-ray ``current_n`` as the incident-side index instead.
         transmittance: Angle-dependent coating, or ``None`` for
             bare-interface Fresnel transmittance.
         transmittance_scalar: Per-element bulk multiplier in ``[0, 1]``,
@@ -219,13 +247,32 @@ class RefractInteraction(Interaction):
     """
 
     n_inside: Array
-    n_outside: float
     transmittance: Coating | None
     transmittance_scalar: Array  # (N,)
 
     @property
     def interaction_type(self) -> InteractionType:
         return InteractionType.REFRACT
+
+    @property
+    def kind(self) -> Literal["lens"]:
+        return "lens"
+
+    def focal_scale(self, n_outside: float = 1.0) -> Array:
+        return self.n_inside - n_outside
+
+    def with_n_inside(self, n_inside: Array) -> RefractInteraction:
+        """Return a copy with the refractive index replaced."""
+        return eqx.tree_at(lambda m: m.n_inside, self, n_inside)
+
+    def with_transmittance_scalar(self, transmittance_scalar: Array) -> RefractInteraction:
+        """Return a copy with the bulk transmittance multiplier replaced (clipped to [0, 1])."""
+        clipped = jnp.clip(transmittance_scalar, 0.0, 1.0)
+        return eqx.tree_at(lambda m: m.transmittance_scalar, self, clipped)
+
+    def scaled_transmittance(self, factor: Array) -> RefractInteraction:
+        """Return a copy with the bulk transmittance multiplier scaled by ``factor``."""
+        return self.with_transmittance_scalar(self.transmittance_scalar * factor)
 
     def apply(self, directions, normals, points, element_idx, current_n):
         n_in = self.n_inside[element_idx]
@@ -272,9 +319,6 @@ class SlabInteraction(Interaction):
 
     Attributes:
         n_inside: Per-element slab refractive index, shape ``(N,)``.
-        n_outside: Retained for back-compat / (de)serialisation. The
-            render loop ignores it and uses the per-ray ``current_n``
-            for both entry and exit refraction.
         thickness: Per-element slab thickness, shape ``(N,)``.
         transmittance: Angle-dependent coating, or ``None`` for the
             bare-window Fresnel product.
@@ -283,7 +327,6 @@ class SlabInteraction(Interaction):
     """
 
     n_inside: Array
-    n_outside: float
     thickness: Array
     transmittance: Coating | None
     transmittance_scalar: Array  # (N,)
@@ -291,6 +334,27 @@ class SlabInteraction(Interaction):
     @property
     def interaction_type(self) -> InteractionType:
         return InteractionType.SLAB
+
+    @property
+    def kind(self) -> Literal["slab"]:
+        return "slab"
+
+    def with_n_inside(self, n_inside: Array) -> SlabInteraction:
+        """Return a copy with the slab refractive index replaced."""
+        return eqx.tree_at(lambda m: m.n_inside, self, n_inside)
+
+    def with_thickness(self, thickness: Array) -> SlabInteraction:
+        """Return a copy with the slab thickness replaced."""
+        return eqx.tree_at(lambda m: m.thickness, self, thickness)
+
+    def with_transmittance_scalar(self, transmittance_scalar: Array) -> SlabInteraction:
+        """Return a copy with the bulk transmittance multiplier replaced (clipped to [0, 1])."""
+        clipped = jnp.clip(transmittance_scalar, 0.0, 1.0)
+        return eqx.tree_at(lambda m: m.transmittance_scalar, self, clipped)
+
+    def scaled_transmittance(self, factor: Array) -> SlabInteraction:
+        """Return a copy with the bulk transmittance multiplier scaled by ``factor``."""
+        return self.with_transmittance_scalar(self.transmittance_scalar * factor)
 
     def apply(self, directions, normals, points, element_idx, current_n):
         n_in = self.n_inside[element_idx]

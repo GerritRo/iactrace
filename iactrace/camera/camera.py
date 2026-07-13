@@ -10,7 +10,6 @@ from jax import Array
 from ..core.intersections import intersect_plane
 from ..core.ray_bundle import LazyRayBundle, RayBundle
 from ..core.transforms import euler_to_matrix
-from .detection_chain import DetectionChain
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -279,12 +278,6 @@ class Camera(eqx.Module):
         new_groups[sensor_idx] = new_group
         return eqx.tree_at(lambda c: c.sensor_groups, self, new_groups)
 
-    def _with_chain(self, sensor_idx: int, new_chain: DetectionChain) -> Camera:
-        """Swap a sensor group's detection chain into a copy of the camera."""
-        group = self.sensor_groups[sensor_idx]
-        new_group = eqx.tree_at(lambda g: g.chain, group, new_chain)
-        return self._with_sensor_group(sensor_idx, new_group)
-
     def set_sensor_positions(self, sensor_idx: int, positions: Array) -> Camera:
         """Set positions for sensors in a group."""
         group = self.sensor_groups[sensor_idx]
@@ -299,24 +292,18 @@ class Camera(eqx.Module):
 
     def set_concentrator(self, sensor_idx: int, concentrator: Concentrator | None) -> Camera:
         """Set/replace the concentrator on sensor group ``sensor_idx``'s chain."""
-        chain = self.sensor_groups[sensor_idx].chain
-        return self._with_chain(
-            sensor_idx, DetectionChain(concentrator, chain.photodetector, chain.gap)
-        )
+        group = self.sensor_groups[sensor_idx]
+        return self._with_sensor_group(sensor_idx, group.with_concentrator(concentrator))
 
     def set_photodetector(self, sensor_idx: int, photodetector: PhotoDetector) -> Camera:
         """Set/replace the photodetector on sensor group ``sensor_idx``'s chain."""
-        chain = self.sensor_groups[sensor_idx].chain
-        return self._with_chain(
-            sensor_idx, DetectionChain(chain.concentrator, photodetector, chain.gap)
-        )
+        group = self.sensor_groups[sensor_idx]
+        return self._with_sensor_group(sensor_idx, group.with_photodetector(photodetector))
 
     def set_gap(self, sensor_idx: int, gap: float) -> Camera:
         """Set the gap (upstream exit -> detector spacing) on a group's chain."""
-        chain = self.sensor_groups[sensor_idx].chain
-        return self._with_chain(
-            sensor_idx, DetectionChain(chain.concentrator, chain.photodetector, float(gap))
-        )
+        group = self.sensor_groups[sensor_idx]
+        return self._with_sensor_group(sensor_idx, group.with_gap(gap))
 
     def get_info(self) -> dict[str, Any]:
         """Summary of the camera configuration.

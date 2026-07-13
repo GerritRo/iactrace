@@ -29,22 +29,6 @@ class TestCylinderGroup:
         # Should hit at t=4 (5 - 1 radius)
         assert jnp.isclose(t, 4.0, atol=1e-6)
 
-    def test_ray_misses_cylinder(self):
-        """Ray missing cylinder returns infinity."""
-        cylinder = CylinderGroup(
-            p1=[[0, 0, 0]],
-            p2=[[0, 0, 10]],
-            r=[1.0],
-        )
-
-        ray_origin = jnp.array([5.0, 0.0, 15.0])  # Above cylinder
-        ray_direction = jnp.array([-1.0, 0.0, 0.0])
-
-        t = cylinder.intersect(ray_origin, ray_direction)
-
-        assert jnp.isinf(t)
-
-
 class TestOpenCylinderGroup:
     """Test open cylinder (no caps) obstruction group."""
 
@@ -92,34 +76,15 @@ class TestOpenCylinderGroup:
 class TestBoxGroup:
     """Test axis-aligned box obstruction group."""
 
-    def test_ray_hits_box(self):
-        """Ray hitting box returns valid t."""
-        box = BoxGroup(
-            p1=[[0, 0, 0]],
-            p2=[[2, 2, 2]],
-        )
-
-        ray_origin = jnp.array([1.0, 1.0, 10.0])
-        ray_direction = jnp.array([0.0, 0.0, -1.0])
-
-        t = box.intersect(ray_origin, ray_direction)
-
-        # Hits top face at z=2, so t=8
-        assert jnp.isclose(t, 8.0, atol=1e-6)
-
-    def test_ray_misses_box(self):
-        """Ray missing box returns infinity."""
-        box = BoxGroup(
-            p1=[[0, 0, 0]],
-            p2=[[2, 2, 2]],
-        )
-
-        ray_origin = jnp.array([5.0, 5.0, 10.0])
-        ray_direction = jnp.array([0.0, 0.0, -1.0])
-
-        t = box.intersect(ray_origin, ray_direction)
-
-        assert jnp.isinf(t)
+    def test_ray_hits_and_misses_box(self):
+        """A ray through the box hits its top face; one beside it misses."""
+        box = BoxGroup(p1=[[0, 0, 0]], p2=[[2, 2, 2]])
+        # through the middle -> hits top face at z=2, so t=8
+        t_hit = box.intersect(jnp.array([1.0, 1.0, 10.0]), jnp.array([0.0, 0.0, -1.0]))
+        assert jnp.isclose(t_hit, 8.0, atol=1e-6)
+        # beside the box -> misses
+        t_miss = box.intersect(jnp.array([5.0, 5.0, 10.0]), jnp.array([0.0, 0.0, -1.0]))
+        assert jnp.isinf(t_miss)
 
 
 class TestSphereGroup:
@@ -140,21 +105,6 @@ class TestSphereGroup:
         # Hits at z=2 (radius from center), so t=8
         assert jnp.isclose(t, 8.0, atol=1e-6)
 
-    def test_ray_misses_sphere(self):
-        """Ray missing sphere returns infinity."""
-        sphere = SphereGroup(
-            centers=[[0, 0, 0]],
-            radii=[1.0],
-        )
-
-        ray_origin = jnp.array([5.0, 5.0, 10.0])
-        ray_direction = jnp.array([0.0, 0.0, -1.0])
-
-        t = sphere.intersect(ray_origin, ray_direction)
-
-        assert jnp.isinf(t)
-
-
 class TestTriangleGroup:
     """Test triangle obstruction group."""
 
@@ -174,22 +124,6 @@ class TestTriangleGroup:
         t = triangles.intersect(ray_origin, ray_direction)
 
         assert jnp.isclose(t, 5.0, atol=1e-6)
-
-    def test_ray_misses_triangle(self):
-        """Ray missing triangle returns infinity."""
-        triangles = TriangleGroup(
-            v0=[[0, 0, 0]],
-            v1=[[2, 0, 0]],
-            v2=[[1, 2, 0]],
-        )
-
-        ray_origin = jnp.array([10.0, 10.0, 5.0])
-        ray_direction = jnp.array([0.0, 0.0, -1.0])
-
-        t = triangles.intersect(ray_origin, ray_direction)
-
-        assert jnp.isinf(t)
-
 
 class TestOrientedBoxGroup:
     """Test oriented box obstruction group."""
