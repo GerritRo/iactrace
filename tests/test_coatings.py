@@ -49,11 +49,15 @@ class TestTabulatedCoating:
 
     def test_exact_at_knots_and_linear_between(self):
         # Curve: R(0 deg) = 0.9, R(60 deg) = 0.4 (cos = 0.5); exact at both knots.
-        coating = TabulatedCoating.from_degrees(angles_deg=[0.0, 60.0], values=[0.9, 0.4], n_elements=1)
+        coating = TabulatedCoating.from_degrees(
+            angles_deg=[0.0, 60.0], values=[0.9, 0.4], n_elements=1
+        )
         assert jnp.allclose(coating(jnp.array([1.0]), jnp.array([0])), 0.9, atol=1e-6)
         assert jnp.allclose(coating(jnp.array([0.5]), jnp.array([0])), 0.4, atol=1e-6)
         # Linear in cos between knots: midpoint of a 1.0 -> 0.0 ramp is 0.5.
-        ramp = TabulatedCoating.from_degrees(angles_deg=[0.0, 90.0], values=[1.0, 0.0], n_elements=1)
+        ramp = TabulatedCoating.from_degrees(
+            angles_deg=[0.0, 90.0], values=[1.0, 0.0], n_elements=1
+        )
         assert jnp.allclose(ramp(jnp.array([0.5]), jnp.array([0])), 0.5, atol=1e-6)
 
     def test_unsorted_input_normalized(self):
@@ -108,18 +112,26 @@ class TestDefaults:
         theta = jnp.deg2rad(30.0)
         directions = jnp.tile(jnp.array([jnp.sin(theta), 0.0, -jnp.cos(theta)]), (2, 1))
         normals = jnp.tile(jnp.array([0.0, 0.0, 1.0]), (2, 1))
-        _, _, coeffs, _, _ = refract_it.apply(directions, normals, jnp.zeros((2, 3)), jnp.array([0, 1]), jnp.ones(2))
+        _, _, coeffs, _, _ = refract_it.apply(
+            directions, normals, jnp.zeros((2, 3)), jnp.array([0, 1]), jnp.ones(2)
+        )
         _, T = fresnel_unpolarized(jnp.cos(theta), 1.0, 1.5)
         assert jnp.allclose(coeffs, trans_bulk * T, atol=1e-10)
 
         # SlabInteraction: two-face Fresnel (T_face^2) at normal incidence.
         slab_it = SlabInteraction(
-            n_inside=jnp.array([1.5]), thickness=jnp.array([0.01]), transmittance=None,
+            n_inside=jnp.array([1.5]),
+            thickness=jnp.array([0.01]),
+            transmittance=None,
             transmittance_scalar=jnp.ones(1),
         )
         assert slab_it.transmittance is None
         _, _, coeffs, _, _ = slab_it.apply(
-            jnp.array([[0.0, 0.0, -1.0]]), jnp.array([[0.0, 0.0, 1.0]]), jnp.zeros((1, 3)), jnp.array([0]), jnp.ones(1)
+            jnp.array([[0.0, 0.0, -1.0]]),
+            jnp.array([[0.0, 0.0, 1.0]]),
+            jnp.zeros((1, 3)),
+            jnp.array([0]),
+            jnp.ones(1),
         )
         T_face = 1.0 - ((1.0 - 1.5) / (1.0 + 1.5)) ** 2
         assert jnp.allclose(coeffs, T_face**2, atol=1e-6)
@@ -216,6 +228,7 @@ class TestAngleDependentReflection:
         expected = 1.0 + (0.5 - 1.0) * (1.0 - cos_30) / (1.0 - 0.5)
         assert jnp.allclose(coeffs[1], expected, atol=1e-6)
 
+
 class TestFactoryFlow:
     """``mirror_group``/``refractive_group`` accept an optional ``coating=``."""
 
@@ -235,7 +248,9 @@ class TestFactoryFlow:
             offsets=jnp.zeros((2, 2)),
             aperture=DiskAperture(radii=jnp.array([0.05, 0.05]), inner_radii=jnp.zeros(2)),
             reflectivity=0.95,
-            coating=TabulatedCoating.from_degrees(angles_deg=[0.0, 90.0], values=[0.95, 0.5], n_elements=2),
+            coating=TabulatedCoating.from_degrees(
+                angles_deg=[0.0, 90.0], values=[0.95, 0.5], n_elements=2
+            ),
             sample_key=jax.random.key(0),
         )
         assert isinstance(mirror.interaction_module.reflectivity, TabulatedCoating)
@@ -251,7 +266,9 @@ class TestFactoryFlow:
             aperture=DiskAperture(radii=jnp.array([0.02]), inner_radii=jnp.zeros(1)),
             n_inside=jnp.array([1.5]),
             transmittance=1.0,
-            coating=TabulatedCoating.from_degrees(angles_deg=[0.0, 90.0], values=[0.99, 0.0], n_elements=1),
+            coating=TabulatedCoating.from_degrees(
+                angles_deg=[0.0, 90.0], values=[0.99, 0.0], n_elements=1
+            ),
             sample_key=jax.random.key(0),
         )
         assert isinstance(lens.interaction_module.transmittance, TabulatedCoating)

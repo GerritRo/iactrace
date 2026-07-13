@@ -133,8 +133,8 @@ def show_sensor_chain(camera, sensor_idx=0, **kwargs):
     """
     entrance_color = kwargs.get("entrance_color", [255, 0, 0, 128])
     cone_color = kwargs.get("cone_color", [135, 206, 235, 160])
-    detector_color = kwargs.get("detector_color", [80, 80, 80, 255])
-    sensor_color = kwargs.get("sensor_color", [200, 200, 255, 90])
+    detector_color = kwargs.get("detector_color", [80, 200, 80, 160])
+    sensor_color = kwargs.get("sensor_color", [80, 80, 80, 255])
 
     sensor = camera.sensor_groups[sensor_idx]
     chain = sensor.chain
@@ -223,12 +223,14 @@ def _make_double_sided(mesh):
     mesh.faces = np.vstack([mesh.faces, faces_reversed])
     return mesh
 
+
 def _rigid_transform(rotation, translation):
     """Assemble a 4x4 homogeneous transform from a 3x3 rotation and a translation."""
     transform = np.eye(4)
     transform[:3, :3] = rotation
     transform[:3, 3] = translation
     return transform
+
 
 def _align_z_to(direction_norm):
     """Rotation mapping local +Z onto the unit ``direction_norm`` (Rodrigues)."""
@@ -242,6 +244,7 @@ def _align_z_to(direction_norm):
     c = np.dot(z_axis, direction_norm)
     vx = np.array([[0, -v[2], v[1]], [v[2], 0, -v[0]], [-v[1], v[0], 0]])
     return np.eye(3) + vx + vx @ vx * (1 - c) / (s * s)
+
 
 def _curved_face_meshes(group):
     """One double-sided curved face mesh per element.

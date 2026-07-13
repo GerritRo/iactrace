@@ -282,6 +282,7 @@ class AsphericSurfaceGroup(SurfaceGroup):
 
 # Ad-hoc (non-batched) sag/normal evaluation
 
+
 def _single_asphere(offset, curvature, conic, aspheric) -> AsphericSurfaceGroup:
     """Single-element AsphericSurfaceGroup, sliced back down to scalar parameters."""
     return AsphericSurfaceGroup(
@@ -382,7 +383,7 @@ class ZernikeSurfaceGroup(SurfaceGroup):
     Represents a surface whose height is a sum of RMS-normalized Noll Zernike
     polynomials, independent of any conic/aspheric base. Use it on its own to
     describe a pure figure-error surface, or as a term inside a
-    :class:`SumSurfaceGroup` to add a measured / random figure error on top of 
+    :class:`SumSurfaceGroup` to add a measured / random figure error on top of
     another surface.
 
     The normal is obtained by autodiff of the sag (inherited from

@@ -142,7 +142,9 @@ class TestPolygonHelpers:
         vertices = jnp.array([[-1.0, -1.0], [1.0, -1.0], [1.0, 1.0], [-1.0, 1.0]])
         x = jnp.array([0.0, 0.5, 2.0, -0.5])
         y = jnp.array([0.0, 0.5, 0.0, 2.0])
-        assert jnp.array_equal(_point_in_convex_polygon(x, y, vertices, 4), jnp.array([True, True, False, False]))
+        assert jnp.array_equal(
+            _point_in_convex_polygon(x, y, vertices, 4), jnp.array([True, True, False, False])
+        )
         assert _point_in_convex_polygon(1.0, 0.0, vertices, 4)  # on the +x edge
         assert _point_in_convex_polygon(0.0, 1.0, vertices, 4)  # on the +y edge
 

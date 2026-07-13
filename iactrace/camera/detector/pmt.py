@@ -148,6 +148,7 @@ class PMT(PhotoDetector):
         ang = 2.0 * jnp.pi * jnp.arange(m) / m
         unit = jnp.stack([jnp.cos(ang), jnp.sin(ang)], axis=-1)  # (M, 2)
         r_prof = jnp.array([self.face_radius, self.face_radius])
-        z_prof = jnp.array([self.vertex_z, self.vertex_z - self.length])
+        rim_z = self.vertex_z + self.shape.sag_at(0, self.face_radius, 0.0)
+        z_prof = jnp.array([rim_z, rim_z - self.length])
         rings = r_prof[:, None, None] * unit[None, :, :]  # (2, M, 2)
         return z_prof, rings

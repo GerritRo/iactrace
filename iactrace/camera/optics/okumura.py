@@ -14,8 +14,8 @@ from .winston import cpc_full_length, cpc_ideal_wall_tilt
 
 _T_FLOOR = 1e-6  # spurious-hit rejection floor, scaled by a2
 _N_BRACKET = 12  # sub-intervals used to isolate meridian roots on t in [0, 1]
-_N_BISECT = 20   # bisection steps that shrink each bracket
-_N_POLISH = 2    # Newton steps that give the selected root a clean derivative
+_N_BISECT = 20  # bisection steps that shrink each bracket
+_N_POLISH = 2  # Newton steps that give the selected root a clean derivative
 
 
 def _bezier_power_coeffs(control_values: Sequence[float]) -> list[float]:

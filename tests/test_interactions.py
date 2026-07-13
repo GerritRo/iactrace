@@ -185,6 +185,7 @@ class TestRefractSlab:
         assert offset(30.0, 0.01) > offset(0.0, 0.01) + 1e-10  # grows with angle
         assert offset(30.0, 0.02) > offset(30.0, 0.01)  # grows with thickness
 
+
 class TestReflect:
     """Test reflection function."""
 
@@ -198,6 +199,8 @@ class TestReflect:
         assert jnp.isclose(cos_angle.squeeze(), 1.0, atol=1e-10)
 
         # 45 deg incidence from upper left -> reflects to upper right, cos = 1/sqrt2.
-        r, cos_angle = reflect(jnp.array([1.0, 0.0, -1.0]) / jnp.sqrt(2), jnp.array([0.0, 0.0, 1.0]))
+        r, cos_angle = reflect(
+            jnp.array([1.0, 0.0, -1.0]) / jnp.sqrt(2), jnp.array([0.0, 0.0, 1.0])
+        )
         assert jnp.allclose(r, jnp.array([1.0, 0.0, 1.0]) / jnp.sqrt(2), atol=1e-10)
         assert jnp.isclose(cos_angle.squeeze(), 1.0 / jnp.sqrt(2), atol=1e-10)

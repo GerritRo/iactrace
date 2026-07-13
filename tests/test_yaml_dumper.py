@@ -114,7 +114,9 @@ def telescope_with_obstructions_config():
             "camera_rotation": [0.0, 0.0, 0.0],
         },
         "mirror_templates": {
-            "primary": {"surface": {"type": "aspheric", "curvature": 0.05, "conic": -1.0, "aspheric": []}}
+            "primary": {
+                "surface": {"type": "aspheric", "curvature": 0.05, "conic": -1.0, "aspheric": []}
+            }
         },
         "mirrors": [
             {
@@ -232,12 +234,19 @@ class TestRoundTrip:
         from iactrace.core.bsdf import DoubleGaussianBSDF, GaussianBSDF
 
         # plain reflectivity, no BSDF
-        g = self._roundtrip_mirror(bsdf=None, reflectivity=0.83, random_key=random_key, tmp_path=tmp_path)
-        np.testing.assert_allclose(np.asarray(g.interaction_module.reflectivity_scalar), [0.83], rtol=1e-5)
+        g = self._roundtrip_mirror(
+            bsdf=None, reflectivity=0.83, random_key=random_key, tmp_path=tmp_path
+        )
+        np.testing.assert_allclose(
+            np.asarray(g.interaction_module.reflectivity_scalar), [0.83], rtol=1e-5
+        )
 
         # single Gaussian BSDF
         g = self._roundtrip_mirror(
-            bsdf=GaussianBSDF(scale=jnp.array([25.0])), reflectivity=1.0, random_key=random_key, tmp_path=tmp_path
+            bsdf=GaussianBSDF(scale=jnp.array([25.0])),
+            reflectivity=1.0,
+            random_key=random_key,
+            tmp_path=tmp_path,
         )
         assert isinstance(g.bsdf, GaussianBSDF)
         np.testing.assert_allclose(np.asarray(g.bsdf.scale), [25.0], rtol=1e-5)
@@ -245,7 +254,9 @@ class TestRoundTrip:
         # double Gaussian BSDF, carried alongside a non-unit reflectivity
         g = self._roundtrip_mirror(
             bsdf=DoubleGaussianBSDF(
-                scale_narrow=jnp.array([10.0]), scale_wide=jnp.array([120.0]), mix_weight=jnp.array([0.2])
+                scale_narrow=jnp.array([10.0]),
+                scale_wide=jnp.array([120.0]),
+                mix_weight=jnp.array([0.2]),
             ),
             reflectivity=0.9,
             random_key=random_key,
@@ -255,7 +266,9 @@ class TestRoundTrip:
         np.testing.assert_allclose(np.asarray(g.bsdf.scale_narrow), [10.0], rtol=1e-5)
         np.testing.assert_allclose(np.asarray(g.bsdf.scale_wide), [120.0], rtol=1e-5)
         np.testing.assert_allclose(np.asarray(g.bsdf.mix_weight), [0.2], rtol=1e-5)
-        np.testing.assert_allclose(np.asarray(g.interaction_module.reflectivity_scalar), [0.9], rtol=1e-5)
+        np.testing.assert_allclose(
+            np.asarray(g.interaction_module.reflectivity_scalar), [0.9], rtol=1e-5
+        )
 
     def test_polygon_mirror_roundtrip(
         self, n_samples, random_key, polygon_telescope_config, tmp_path
@@ -591,8 +604,17 @@ class TestRoundTrip:
                 "camera_rotation": [0.0, 0.0, 0.0],
             },
             "mirror_templates": {
-                "primary": {"surface": {"type": "aspheric", "curvature": 0.05, "conic": -1.0, "aspheric": []}},
-                "secondary": {"surface": {"type": "aspheric", "curvature": 0.1, "conic": 0.0, "aspheric": []}},
+                "primary": {
+                    "surface": {
+                        "type": "aspheric",
+                        "curvature": 0.05,
+                        "conic": -1.0,
+                        "aspheric": [],
+                    }
+                },
+                "secondary": {
+                    "surface": {"type": "aspheric", "curvature": 0.1, "conic": 0.0, "aspheric": []}
+                },
             },
             "mirrors": [
                 {
@@ -639,7 +661,12 @@ class TestRoundTrip:
             },
             "mirror_templates": {
                 "silver": {
-                    "surface": {"type": "aspheric", "curvature": 0.05, "conic": -1.0, "aspheric": []},
+                    "surface": {
+                        "type": "aspheric",
+                        "curvature": 0.05,
+                        "conic": -1.0,
+                        "aspheric": [],
+                    },
                     "coating": {
                         "type": "table",
                         "angles_deg": [0.0, 30.0, 60.0, 80.0],
@@ -684,7 +711,6 @@ class TestRoundTrip:
             np.asarray(interaction2.reflectivity_scalar),
             rtol=1e-10,
         )
-
 
 
 # =============================================================================
@@ -771,6 +797,7 @@ class TestSurfaceListLoad:
         assert np.allclose(np.asarray(zern.coeffs[0]), [0.0, 0.0, 0.0, 1e-3])
         assert np.allclose(np.asarray(zern.coeffs[1]), 0.0)
 
+
 class TestZernikeRoundTrip:
     def test_idempotent_dict_round_trip(self):
         cfg = _config(
@@ -839,7 +866,8 @@ def _mirror_group(surface, radii, stage=0):
 class TestStandaloneAndGuards:
     def test_standalone_zernike_serializes_as_zernike_surface(self):
         zg = ZernikeSurfaceGroup(
-            coeffs=jnp.array([[0.0, 0.0, 0.0, 1e-3, 5e-4]]), r_norm=jnp.array([0.5]),
+            coeffs=jnp.array([[0.0, 0.0, 0.0, 1e-3, 5e-4]]),
+            r_norm=jnp.array([0.5]),
         )
         tel = Telescope(mirror_groups=[_mirror_group(zg, jnp.array([0.5]))], name="z")
         d = telescope_to_dict(tel)
@@ -859,8 +887,10 @@ class TestStandaloneAndGuards:
 
     def test_nonzero_composite_offset_raises(self):
         asph = AsphericSurfaceGroup(
-            curvatures=jnp.array([0.05]), conics=jnp.array([-1.0]),
-            aspherics=jnp.zeros((1, 0)), offsets=jnp.zeros((1, 2)),
+            curvatures=jnp.array([0.05]),
+            conics=jnp.array([-1.0]),
+            aspherics=jnp.zeros((1, 0)),
+            offsets=jnp.zeros((1, 2)),
         )
         zg = ZernikeSurfaceGroup(coeffs=jnp.zeros((1, 4)), r_norm=jnp.array([0.5]))
         bad = SumSurfaceGroup([asph, zg], offsets=jnp.array([[0.1, 0.0]]))

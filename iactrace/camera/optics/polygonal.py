@@ -15,6 +15,9 @@ from .concentrator import Concentrator
 
 _NUDGE = 1e-5  # off-wall step, scaled by the exit apothem
 
+# (origins, directions, values, path_length, done, n, hit_stop, bounces)
+_Carry = tuple[Array, Array, Array, Array, Array, Array, Array, Array]
+
 
 class PolygonalCone(Concentrator):
     """A hollow reflective cone whose ``n_sides`` facets are lofted around a
@@ -239,7 +242,7 @@ def trace_chain(
 
     step_fn = jax.vmap(_trace_step, in_axes=(0, 0, 0, 0, 0, 0, 0, 0, None, None, None))
 
-    def step(carry, _):
+    def step(carry: _Carry, _):
         out = step_fn(*carry, walls, stop, vertex)
         # Emit per-step positions only when the trajectory is recorded.
         return out, out[0] if record_trajectory else None

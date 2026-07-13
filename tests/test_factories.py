@@ -36,7 +36,11 @@ class TestMirrorSugarFactories:
     def test_parabolic_matches_cassegrain_yaml_primary(self, random_key):
         # configs/BASIC/Cassegrain_telescope.yaml primary: curvature=1.25, conic=-1
         m = mirrors.parabolic(
-            position=(0.0, 0.0, 0.0), focal_length=0.4, radius=0.1, inner_radius=0.03, key=random_key
+            position=(0.0, 0.0, 0.0),
+            focal_length=0.4,
+            radius=0.1,
+            inner_radius=0.03,
+            key=random_key,
         )
         assert jnp.allclose(m.surface.curvatures, jnp.array([1.25]))
         assert jnp.allclose(m.surface.conics, jnp.array([-1.0]))
@@ -102,7 +106,12 @@ class TestMirrorsDiskArray:
 class TestLensSugarFactories:
     def test_aspheric_lens(self, random_key):
         lens = lenses.aspheric_lens(
-            position=(0, 0, 0.1), curvature=7.5, conic=-0.5, aspheric_coeffs=(1e-3,), radius=0.02, key=random_key
+            position=(0, 0, 0.1),
+            curvature=7.5,
+            conic=-0.5,
+            aspheric_coeffs=(1e-3,),
+            radius=0.02,
+            key=random_key,
         )
         assert jnp.allclose(lens.surface.curvatures, jnp.array([7.5]))
         assert jnp.allclose(lens.surface.conics, jnp.array([-0.5]))
@@ -111,7 +120,12 @@ class TestLensSugarFactories:
 
     def test_plano_slab(self, random_key):
         slab = lenses.plano_slab(
-            position=(0, 0, 0.39), radius=0.05, thickness=0.003, n_inside=1.52, transmittance=0.9, key=random_key
+            position=(0, 0, 0.39),
+            radius=0.05,
+            thickness=0.003,
+            n_inside=1.52,
+            transmittance=0.9,
+            key=random_key,
         )
         assert jnp.allclose(slab.interaction_module.thickness, jnp.array([0.003]))
         assert jnp.allclose(slab.interaction_module.n_inside, jnp.array([1.52]))
@@ -161,7 +175,9 @@ class TestTelescopeEndToEnd:
             obstruction_groups=[housing],
             camera_position=jnp.array([0.0, 0.0, 0.4]),
         )
-        rb = tel.render(jnp.array([[0.0, 0.0, -1.0]]), jnp.array([1.0]), source_type="parallel").materialise()
+        rb = tel.render(
+            jnp.array([[0.0, 0.0, -1.0]]), jnp.array([1.0]), source_type="parallel"
+        ).materialise()
         assert rb.values.shape[0] > 0
         assert float(jnp.sum(rb.values)) > 0.0
 
@@ -172,13 +188,23 @@ class TestTelescopeEndToEnd:
             position=(0, 0, 0), focal_length=0.4, radius=0.1, optical_stage=0, n_samples=64, key=k1
         )
         window = lenses.plano_slab(
-            position=(0, 0, 0.39), radius=0.05, thickness=0.002, n_inside=1.5, optical_stage=1, n_samples=64, key=k2
+            position=(0, 0, 0.39),
+            radius=0.05,
+            thickness=0.002,
+            n_inside=1.5,
+            optical_stage=1,
+            n_samples=64,
+            key=k2,
         )
         tel = Telescope(
-            mirror_groups=[primary], lens_groups=[window], camera_position=jnp.array([0.0, 0.0, 0.4])
+            mirror_groups=[primary],
+            lens_groups=[window],
+            camera_position=jnp.array([0.0, 0.0, 0.4]),
         )
         assert len(tel.optical_groups) == 2
-        rb = tel.render(jnp.array([[0.0, 0.0, -1.0]]), jnp.array([1.0]), source_type="parallel").materialise()
+        rb = tel.render(
+            jnp.array([[0.0, 0.0, -1.0]]), jnp.array([1.0]), source_type="parallel"
+        ).materialise()
         assert rb.values.shape[0] > 0
 
 
@@ -209,7 +235,9 @@ class TestMirrorGroup:
         """mirror_group takes a pre-built BSDF, so advanced roughness models work
         without special helper support."""
         bsdf = DoubleGaussianBSDF(
-            scale_narrow=jnp.array([10.0]), scale_wide=jnp.array([100.0]), mix_weight=jnp.array([0.2])
+            scale_narrow=jnp.array([10.0]),
+            scale_wide=jnp.array([100.0]),
+            mix_weight=jnp.array([0.2]),
         )
         m = mirrors.mirror_group(
             positions=jnp.array([[0.0, 0.0, 0.0]]),
@@ -229,7 +257,9 @@ class TestMirrorGroup:
     def test_sugar_helpers_route_through_mirror_group(self, random_key):
         """Sugar helpers produce groups structurally identical to a direct
         mirror_group call with the same inputs."""
-        sugar = mirrors.parabolic(position=(0.0, 0.0, 0.0), focal_length=0.4, radius=0.1, key=random_key)
+        sugar = mirrors.parabolic(
+            position=(0.0, 0.0, 0.0), focal_length=0.4, radius=0.1, key=random_key
+        )
         direct = mirrors.mirror_group(
             positions=jnp.array([[0.0, 0.0, 0.0]]),
             rotations=jnp.zeros((1, 3)),
@@ -245,7 +275,8 @@ class TestMirrorGroup:
         assert jnp.allclose(sugar.surface.conics, direct.surface.conics)
         assert jnp.allclose(sugar.aperture.radii, direct.aperture.radii)
         assert jnp.allclose(
-            sugar.interaction_module.reflectivity_scalar, direct.interaction_module.reflectivity_scalar
+            sugar.interaction_module.reflectivity_scalar,
+            direct.interaction_module.reflectivity_scalar,
         )
 
 

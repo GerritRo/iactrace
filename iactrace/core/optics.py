@@ -153,9 +153,9 @@ class OpticalElementGroup(eqx.Module):
         o_loc = jnp.einsum("ij,nj->ni", rot.T, origins - pos)
         d_loc = jnp.einsum("ij,nj->ni", rot.T, directions)
 
-        t, pts_loc, norms_loc = jax.vmap(
-            lambda o, d: self.surface.intersect_at(element_idx, o, d)
-        )(o_loc, d_loc)
+        t, pts_loc, norms_loc = jax.vmap(lambda o, d: self.surface.intersect_at(element_idx, o, d))(
+            o_loc, d_loc
+        )
 
         aperture = self.check_aperture(pts_loc[:, 0], pts_loc[:, 1], element_idx)
         t = jnp.where(aperture, t, jnp.inf)

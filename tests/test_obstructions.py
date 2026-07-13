@@ -29,6 +29,7 @@ class TestCylinderGroup:
         # Should hit at t=4 (5 - 1 radius)
         assert jnp.isclose(t, 4.0, atol=1e-6)
 
+
 class TestOpenCylinderGroup:
     """Test open cylinder (no caps) obstruction group."""
 
@@ -105,6 +106,7 @@ class TestSphereGroup:
         # Hits at z=2 (radius from center), so t=8
         assert jnp.isclose(t, 8.0, atol=1e-6)
 
+
 class TestTriangleGroup:
     """Test triangle obstruction group."""
 
@@ -124,6 +126,7 @@ class TestTriangleGroup:
         t = triangles.intersect(ray_origin, ray_direction)
 
         assert jnp.isclose(t, 5.0, atol=1e-6)
+
 
 class TestOrientedBoxGroup:
     """Test oriented box obstruction group."""

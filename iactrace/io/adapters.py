@@ -265,7 +265,9 @@ def _single_element_surface(spec) -> AsphericSurfaceGroup | ZernikeSurfaceGroup 
     )
     if zern is None:
         return aspheric
-    zernike = ZernikeSurfaceGroup(coeffs=jnp.asarray([zern.coeffs]), r_norm=jnp.asarray([zern.r_norm]))
+    zernike = ZernikeSurfaceGroup(
+        coeffs=jnp.asarray([zern.coeffs]), r_norm=jnp.asarray([zern.r_norm])
+    )
     if asph is None:
         return zernike
     return SumSurfaceGroup([aspheric, zernike])
@@ -334,8 +336,10 @@ def _resolve_reflectivity(
         template.reflectivity if template is not None and template.reflectivity is not None else 1.0
     )
     scalar = mirror.reflectivity if mirror.reflectivity is not None else float(template_scalar)
-    coating = mirror.coating if mirror.coating is not None else (
-        template.coating if template is not None else None
+    coating = (
+        mirror.coating
+        if mirror.coating is not None
+        else (template.coating if template is not None else None)
     )
     return float(scalar), coating
 
@@ -690,7 +694,8 @@ def _build_zernike_for_bucket(
             coeffs.append(list(z.coeffs) + [0.0] * (width - len(z.coeffs)))
             r_norms.append(z.r_norm)
     return ZernikeSurfaceGroup(
-        coeffs=jnp.asarray(coeffs), r_norm=jnp.asarray(r_norms),
+        coeffs=jnp.asarray(coeffs),
+        r_norm=jnp.asarray(r_norms),
     )
 
 
@@ -864,23 +869,41 @@ class _ObsSpec(NamedTuple):
 # (core.obstructions) classes; the load/save drivers below are type-agnostic.
 _OBSTRUCTION_SPECS: tuple[_ObsSpec, ...] = (
     _ObsSpec(
-        "cylinder", CylinderObstructionSchema, CylinderGroup,
-        (_ObsField("p1", "p1", "vec3"), _ObsField("p2", "p2", "vec3"), _ObsField("r", "r", "scalar")),
+        "cylinder",
+        CylinderObstructionSchema,
+        CylinderGroup,
+        (
+            _ObsField("p1", "p1", "vec3"),
+            _ObsField("p2", "p2", "vec3"),
+            _ObsField("r", "r", "scalar"),
+        ),
     ),
     _ObsSpec(
-        "open_cylinder", OpenCylinderObstructionSchema, OpenCylinderGroup,
-        (_ObsField("p1", "p1", "vec3"), _ObsField("p2", "p2", "vec3"), _ObsField("r", "r", "scalar")),
+        "open_cylinder",
+        OpenCylinderObstructionSchema,
+        OpenCylinderGroup,
+        (
+            _ObsField("p1", "p1", "vec3"),
+            _ObsField("p2", "p2", "vec3"),
+            _ObsField("r", "r", "scalar"),
+        ),
     ),
     _ObsSpec(
-        "box", BoxObstructionSchema, BoxGroup,
+        "box",
+        BoxObstructionSchema,
+        BoxGroup,
         (_ObsField("p1", "p1", "vec3"), _ObsField("p2", "p2", "vec3")),
     ),
     _ObsSpec(
-        "sphere", SphereObstructionSchema, SphereGroup,
+        "sphere",
+        SphereObstructionSchema,
+        SphereGroup,
         (_ObsField("center", "centers", "vec3"), _ObsField("r", "radii", "scalar")),
     ),
     _ObsSpec(
-        "oriented_box", OrientedBoxObstructionSchema, OrientedBoxGroup,
+        "oriented_box",
+        OrientedBoxObstructionSchema,
+        OrientedBoxGroup,
         (
             _ObsField("center", "centers", "vec3"),
             _ObsField("half_extents", "half_extents", "vec3"),
@@ -888,8 +911,14 @@ _OBSTRUCTION_SPECS: tuple[_ObsSpec, ...] = (
         ),
     ),
     _ObsSpec(
-        "triangle", TriangleObstructionSchema, TriangleGroup,
-        (_ObsField("v0", "v0", "vec3"), _ObsField("v1", "v1", "vec3"), _ObsField("v2", "v2", "vec3")),
+        "triangle",
+        TriangleObstructionSchema,
+        TriangleGroup,
+        (
+            _ObsField("v0", "v0", "vec3"),
+            _ObsField("v1", "v1", "vec3"),
+            _ObsField("v2", "v2", "vec3"),
+        ),
     ),
 )
 
@@ -1011,9 +1040,7 @@ def _surface_components(
         return surface, None
     if isinstance(surface, ZernikeSurfaceGroup):
         if not np.allclose(np.asarray(surface.offsets), 0.0):
-            raise ValueError(
-                "cannot serialise a Zernike surface with a non-zero decenter"
-            )
+            raise ValueError("cannot serialise a Zernike surface with a non-zero decenter")
         return None, surface
     if isinstance(surface, SumSurfaceGroup):
         if not np.allclose(np.asarray(surface.offsets), 0.0):
@@ -1035,18 +1062,12 @@ def _surface_components(
                     "ZernikeSurfaceGroup are supported"
                 )
         if zern is not None and not np.allclose(np.asarray(zern.offsets), 0.0):
-            raise ValueError(
-                "cannot serialise a Zernike term with a non-zero decenter"
-            )
+            raise ValueError("cannot serialise a Zernike term with a non-zero decenter")
         return asph, zern
-    raise ValueError(
-        f"cannot serialise surface type {type(surface).__name__}"
-    )
+    raise ValueError(f"cannot serialise surface type {type(surface).__name__}")
 
 
-def _zernike_to_schema(
-    zernike: ZernikeSurfaceGroup | None, i: int
-) -> ZernikeSurfaceSchema | None:
+def _zernike_to_schema(zernike: ZernikeSurfaceGroup | None, i: int) -> ZernikeSurfaceSchema | None:
     """Project element ``i`` of a Zernike term to a schema, or ``None``.
     Elements whose coefficients are all zero round-trip as ``None`` so default
     (figure-error-free) elements stay clean in the YAML.
@@ -1239,9 +1260,7 @@ def mirrors_to_schemas(
                 stage=d.group.optical_stage,
                 offset=_to_float_list(d.offset),
                 bsdf=d.bsdf_schema,
-                reflectivity=(
-                    d.reflectivity_scalar if d.reflectivity_scalar != 1.0 else None
-                ),
+                reflectivity=(d.reflectivity_scalar if d.reflectivity_scalar != 1.0 else None),
                 coating=coating,
                 id=f"M_{len(mirrors)}",
             )

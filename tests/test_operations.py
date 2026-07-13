@@ -303,6 +303,7 @@ class TestKindValidation:
 # Zernike figure-error operations
 # =============================================================================
 
+
 @pytest.fixture
 def asphere_telescope():
     n = 2
@@ -353,7 +354,6 @@ class TestApplyZernikeError:
         # still a single Zernike term (not two)
         comps = tel2.stage(0).surface.components
         assert sum(isinstance(c, ZernikeSurfaceGroup) for c in comps) == 1
-
 
     def test_too_many_modes_raises(self, asphere_telescope, random_key):
         with pytest.raises(ValueError):

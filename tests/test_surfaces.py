@@ -267,6 +267,7 @@ class TestPureConicBypass:
 # Zernike surfaces + composable Sum surfaces
 # =============================================================================
 
+
 class TestZernikeTerms:
     """The Noll Zernike basis itself."""
 
@@ -274,7 +275,9 @@ class TestZernikeTerms:
         s6 = float(jnp.sqrt(6.0))
         s3 = float(jnp.sqrt(3.0))
         # Z1 (piston) = 1 everywhere
-        assert jnp.allclose(zernike_terms(jnp.array([0.3, -0.7]), jnp.array([-0.4, 0.1]))[..., 0], 1.0)
+        assert jnp.allclose(
+            zernike_terms(jnp.array([0.3, -0.7]), jnp.array([-0.4, 0.1]))[..., 0], 1.0
+        )
         # Z6 = sqrt6 (u^2 - v^2): +s6 at (1,0), -s6 at (0,1)
         assert float(zernike_terms(jnp.array(1.0), jnp.array(0.0))[5]) == pytest.approx(s6)
         assert float(zernike_terms(jnp.array(0.0), jnp.array(1.0))[5]) == pytest.approx(-s6)
@@ -437,7 +440,9 @@ class TestSumSurfaceGroup:
         z_surf = s.sag_at(0, float(hit[0]), float(hit[1]))
         assert float(hit[2]) == pytest.approx(float(z_surf), abs=1e-6)
         # normal vs finite difference of the composite sag
-        dzdx, dzdy = fd_slope(lambda xx, yy: elem._sag_local(xx, yy), float(point[0]), float(point[1]))
+        dzdx, dzdy = fd_slope(
+            lambda xx, yy: elem._sag_local(xx, yy), float(point[0]), float(point[1])
+        )
         expected = np.array([-dzdx, -dzdy, 1.0])
         expected = expected / np.linalg.norm(expected)
         assert np.allclose(np.asarray(normal), expected, atol=1e-4)
@@ -485,6 +490,7 @@ class TestRenderPipeline:
 # =============================================================================
 # Freeform (bicubic-interpolated) surfaces
 # =============================================================================
+
 
 def _grid_from_fn(fn, n=21, half=0.5):
     xs = jnp.linspace(-half, half, n)

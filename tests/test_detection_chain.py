@@ -187,6 +187,7 @@ class TestToPixelFrame:
         assert np.allclose(np.asarray(local.origins[:, 0]) + c[:, 0], np.asarray(x_grid))
         assert np.allclose(np.asarray(local.origins[:, 1]) + c[:, 1], np.asarray(y_grid))
 
+
 # 2. Backward compatibility: no concentrator + ConstantQE
 
 

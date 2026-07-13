@@ -27,7 +27,9 @@ class TestSquareSensor:
         """Hits land in the right pixel; multiple hits to one pixel sum."""
         sensor = _square()
         # single hit -> pixel (5, 5)
-        single = bin_positions(sensor, jnp.array([0]), jnp.array([0.1]), jnp.array([0.1]), jnp.array([1.0]))
+        single = bin_positions(
+            sensor, jnp.array([0]), jnp.array([0.1]), jnp.array([0.1]), jnp.array([1.0])
+        )
         assert single[0, 5, 5] == 1.0
         assert single.sum() == 1.0
         # three hits to the same pixel sum their values
@@ -61,7 +63,9 @@ class TestHexagonalSensor:
         sensor = HexagonalSensorGroup(
             positions=[[0.0, 0.0, 1.0]], rotations=[[0.0, 0.0, 0.0]], hex_centers=hex_centers
         )
-        result = bin_positions(sensor, jnp.array([0]), jnp.array([0.0]), jnp.array([0.0]), jnp.array([1.0]))
+        result = bin_positions(
+            sensor, jnp.array([0]), jnp.array([0.0]), jnp.array([0.0]), jnp.array([1.0])
+        )
         assert result.sum() == 1.0
         assert jnp.max(result) == 1.0
 
@@ -85,10 +89,14 @@ class TestEdgeExclusion:
         """Points near pixel edges are excluded when edge_width > 0."""
         sensor = _square(edge_width=0.05)
         # centre of a pixel is valid
-        center = bin_positions(sensor, jnp.array([0]), jnp.array([0.1]), jnp.array([0.1]), jnp.array([1.0]))
+        center = bin_positions(
+            sensor, jnp.array([0]), jnp.array([0.1]), jnp.array([0.1]), jnp.array([1.0])
+        )
         assert center.sum() == 1.0
         # a point near the pixel edge is excluded
-        edge = bin_positions(sensor, jnp.array([0]), jnp.array([0.01]), jnp.array([0.1]), jnp.array([1.0]))
+        edge = bin_positions(
+            sensor, jnp.array([0]), jnp.array([0.01]), jnp.array([0.1]), jnp.array([1.0])
+        )
         assert edge.sum() == 0.0
 
 
@@ -105,7 +113,10 @@ class TestMultiSensor:
         )
         assert square.n_sensors == 3
         res = bin_positions(
-            square, jnp.array([0, 1, 2]), jnp.array([0.1, 0.1, 0.1]), jnp.array([0.1, 0.1, 0.1]),
+            square,
+            jnp.array([0, 1, 2]),
+            jnp.array([0.1, 0.1, 0.1]),
+            jnp.array([0.1, 0.1, 0.1]),
             jnp.array([1.0, 2.0, 3.0]),
         )
         assert res.shape == (3, 10, 10)
@@ -118,7 +129,11 @@ class TestMultiSensor:
             hex_centers=hex_centers,
         )
         res_h = bin_positions(
-            hexs, jnp.array([0, 1]), jnp.array([0.0, 0.0]), jnp.array([0.0, 0.0]), jnp.array([5.0, 7.0])
+            hexs,
+            jnp.array([0, 1]),
+            jnp.array([0.0, 0.0]),
+            jnp.array([0.0, 0.0]),
+            jnp.array([5.0, 7.0]),
         )
         assert res_h.shape == (2, len(hex_centers))
         assert res_h[0].sum() == 5.0 and res_h[1].sum() == 7.0
@@ -129,7 +144,9 @@ class TestHexGridInfrastructure:
 
     def test_detect_hex_grid_correct_size(self):
         hex_size = 0.005
-        detected_size, _rotation, _offset = _detect_hex_grid(make_hex_centers(n_rings=3, hex_size=hex_size))
+        detected_size, _rotation, _offset = _detect_hex_grid(
+            make_hex_centers(n_rings=3, hex_size=hex_size)
+        )
         assert jnp.isclose(detected_size, hex_size, rtol=1e-5)
 
     def test_lookup_table_all_centers_valid(self):
@@ -153,8 +170,10 @@ class TestPlaneIntersection:
 
     def test_ray_hits_horizontal_plane(self):
         xy, t = intersect_plane(
-            jnp.array([1.0, 2.0, 10.0]), jnp.array([0.0, 0.0, -1.0]),
-            jnp.array([0.0, 0.0, 0.0]), jnp.eye(3),
+            jnp.array([1.0, 2.0, 10.0]),
+            jnp.array([0.0, 0.0, -1.0]),
+            jnp.array([0.0, 0.0, 0.0]),
+            jnp.eye(3),
         )
         assert jnp.allclose(xy, jnp.array([1.0, 2.0]), atol=1e-10)
         assert jnp.allclose(t, 10.0, atol=1e-10)

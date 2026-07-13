@@ -114,8 +114,7 @@ def _require_asphere(surface: SurfaceGroup, stage: int) -> AsphericSurfaceGroup:
     asph = _asphere_of(surface)
     if asph is None:
         raise ValueError(
-            f"stage {stage} has no aspheric surface to modify "
-            f"(surface is {type(surface).__name__})"
+            f"stage {stage} has no aspheric surface to modify (surface is {type(surface).__name__})"
         )
     return asph
 
@@ -141,7 +140,8 @@ def _update_surface_attr(
             f"(surface is {type(group.surface).__name__})"
         )
     return _update_at_stage(
-        telescope, stage,
+        telescope,
+        stage,
         lambda g: attr_getter(locate(g.surface)),
         new_value,
     )
@@ -187,24 +187,19 @@ def _pad_coeffs(coeffs, width: int):
     return jnp.concatenate([coeffs, jnp.zeros((n, width - j))], axis=1)
 
 
-def _replace_zernike(
-    surface: SurfaceGroup, new_zernike: ZernikeSurfaceGroup
-) -> SurfaceGroup:
+def _replace_zernike(surface: SurfaceGroup, new_zernike: ZernikeSurfaceGroup) -> SurfaceGroup:
     """Return ``surface`` with its Zernike term replaced by ``new_zernike``."""
     if isinstance(surface, ZernikeSurfaceGroup):
         return new_zernike
     if isinstance(surface, SumSurfaceGroup):
         comps = tuple(
-            new_zernike if isinstance(c, ZernikeSurfaceGroup) else c
-            for c in surface.components
+            new_zernike if isinstance(c, ZernikeSurfaceGroup) else c for c in surface.components
         )
         return SumSurfaceGroup(comps, offsets=surface.offsets)
     raise ValueError("surface has no Zernike term to replace")
 
 
-def _add_zernike_to_surface(
-    surface: SurfaceGroup, added, r_norm
-) -> SurfaceGroup:
+def _add_zernike_to_surface(surface: SurfaceGroup, added, r_norm) -> SurfaceGroup:
     """Return ``surface`` with ``added`` ``(N, J)`` Zernike coefficients added.
 
     If the surface already carries a :class:`ZernikeSurfaceGroup`, its
@@ -218,7 +213,9 @@ def _add_zernike_to_surface(
         width = max(existing.coeffs.shape[1], added.shape[1])
         new_coeffs = _pad_coeffs(existing.coeffs, width) + _pad_coeffs(added, width)
         new_zernike = ZernikeSurfaceGroup(
-            coeffs=new_coeffs, r_norm=existing.r_norm, offsets=existing.offsets,
+            coeffs=new_coeffs,
+            r_norm=existing.r_norm,
+            offsets=existing.offsets,
         )
         return _replace_zernike(surface, new_zernike)
 
@@ -233,21 +230,15 @@ def _add_zernike_to_surface(
 
 def set_positions(telescope: Telescope, stage: int, positions: Array) -> Telescope:
     """Set element positions for the group at ``stage``."""
-    return _update_at_stage(
-        telescope, stage, lambda g: g.positions, jnp.asarray(positions)
-    )
+    return _update_at_stage(telescope, stage, lambda g: g.positions, jnp.asarray(positions))
 
 
 def set_rotations(telescope: Telescope, stage: int, rotations: Array) -> Telescope:
     """Set element rotations (Euler XYZ degrees) for the group at ``stage``."""
-    return _update_at_stage(
-        telescope, stage, lambda g: g.rotations, jnp.asarray(rotations)
-    )
+    return _update_at_stage(telescope, stage, lambda g: g.rotations, jnp.asarray(rotations))
 
 
-def apply_displacement(
-    telescope: Telescope, stage: int, sigma_z: float, key: Array
-) -> Telescope:
+def apply_displacement(telescope: Telescope, stage: int, sigma_z: float, key: Array) -> Telescope:
     """Apply random Gaussian z-displacement to elements in the group at ``stage``."""
     group = telescope.stage(stage)
     delta_z = jax.random.normal(key, shape=(len(group),)) * sigma_z
@@ -288,46 +279,34 @@ def apply_roughness(telescope: Telescope, stage: int, sigma: float) -> Telescope
 
 def set_curvatures(telescope: Telescope, stage: int, curvatures: Array) -> Telescope:
     """Set surface curvatures (1/R) for the group at ``stage``."""
-    return _update_surface_attr(
-        telescope, stage, lambda a: a.curvatures, jnp.asarray(curvatures)
-    )
+    return _update_surface_attr(telescope, stage, lambda a: a.curvatures, jnp.asarray(curvatures))
 
 
 def set_conics(telescope: Telescope, stage: int, conics: Array) -> Telescope:
     """Set surface conic constants for the group at ``stage``."""
-    return _update_surface_attr(
-        telescope, stage, lambda a: a.conics, jnp.asarray(conics)
-    )
+    return _update_surface_attr(telescope, stage, lambda a: a.conics, jnp.asarray(conics))
 
 
 def set_aspherics(telescope: Telescope, stage: int, aspherics: Array) -> Telescope:
     """Set surface aspheric coefficients for the group at ``stage``."""
-    return _update_surface_attr(
-        telescope, stage, lambda a: a.aspherics, jnp.asarray(aspherics)
-    )
+    return _update_surface_attr(telescope, stage, lambda a: a.aspherics, jnp.asarray(aspherics))
 
 
-def scale_curvatures(
-    telescope: Telescope, stage: int, factor: Array | float
-) -> Telescope:
+def scale_curvatures(telescope: Telescope, stage: int, factor: Array | float) -> Telescope:
     """Multiply curvatures by ``factor`` (scalar or per-element)."""
     asph = _require_asphere(telescope.stage(stage).surface, stage)
     new = asph.curvatures * jnp.asarray(factor)
     return _update_surface_attr(telescope, stage, lambda a: a.curvatures, new)
 
 
-def offset_curvatures(
-    telescope: Telescope, stage: int, offset: Array | float
-) -> Telescope:
+def offset_curvatures(telescope: Telescope, stage: int, offset: Array | float) -> Telescope:
     """Add ``offset`` to curvatures (scalar or per-element)."""
     asph = _require_asphere(telescope.stage(stage).surface, stage)
     new = asph.curvatures + jnp.asarray(offset)
     return _update_surface_attr(telescope, stage, lambda a: a.curvatures, new)
 
 
-def apply_conic_error(
-    telescope: Telescope, stage: int, sigma: float, key: Array
-) -> Telescope:
+def apply_conic_error(telescope: Telescope, stage: int, sigma: float, key: Array) -> Telescope:
     """Apply random Gaussian error to conic constants."""
     group = telescope.stage(stage)
     asph = _require_asphere(group.surface, stage)
@@ -336,9 +315,7 @@ def apply_conic_error(
     return _update_surface_attr(telescope, stage, lambda a: a.conics, new)
 
 
-def apply_aspheric_error(
-    telescope: Telescope, stage: int, sigmas: Array, key: Array
-) -> Telescope:
+def apply_aspheric_error(telescope: Telescope, stage: int, sigmas: Array, key: Array) -> Telescope:
     """Apply random Gaussian errors to aspheric coefficients."""
     group = telescope.stage(stage)
     asph = _require_asphere(group.surface, stage)
@@ -397,31 +374,19 @@ def _named_aberration_sigmas(width: int, indices: tuple[int, ...], sigma: float)
     return s
 
 
-def apply_astigmatism(
-    telescope: Telescope, stage: int, sigma: float, key: Array
-) -> Telescope:
+def apply_astigmatism(telescope: Telescope, stage: int, sigma: float, key: Array) -> Telescope:
     """Add random astigmatism (Noll Z5/Z6) of RMS ``sigma`` metres per component."""
-    return apply_zernike_error(
-        telescope, stage, _named_aberration_sigmas(6, (4, 5), sigma), key
-    )
+    return apply_zernike_error(telescope, stage, _named_aberration_sigmas(6, (4, 5), sigma), key)
 
 
-def apply_coma(
-    telescope: Telescope, stage: int, sigma: float, key: Array
-) -> Telescope:
+def apply_coma(telescope: Telescope, stage: int, sigma: float, key: Array) -> Telescope:
     """Add random coma (Noll Z7/Z8) of RMS ``sigma`` metres per component."""
-    return apply_zernike_error(
-        telescope, stage, _named_aberration_sigmas(8, (6, 7), sigma), key
-    )
+    return apply_zernike_error(telescope, stage, _named_aberration_sigmas(8, (6, 7), sigma), key)
 
 
-def apply_trefoil(
-    telescope: Telescope, stage: int, sigma: float, key: Array
-) -> Telescope:
+def apply_trefoil(telescope: Telescope, stage: int, sigma: float, key: Array) -> Telescope:
     """Add random trefoil (Noll Z9/Z10) of RMS ``sigma`` metres per component."""
-    return apply_zernike_error(
-        telescope, stage, _named_aberration_sigmas(10, (8, 9), sigma), key
-    )
+    return apply_zernike_error(telescope, stage, _named_aberration_sigmas(10, (8, 9), sigma), key)
 
 
 def resample(telescope: Telescope, stage: int, key: Array) -> Telescope:
@@ -432,20 +397,17 @@ def resample(telescope: Telescope, stage: int, key: Array) -> Telescope:
 # Kind-specific operations
 
 
-def set_reflectivity(
-    telescope: Telescope, stage: int, reflectivity: Array | float
-) -> Telescope:
+def set_reflectivity(telescope: Telescope, stage: int, reflectivity: Array | float) -> Telescope:
     """Set per-element mirror reflectivity. Mirror stages only."""
     group = telescope.stage(stage)
     _require_kind(group, stage, (ReflectInteraction,), "mirror")
+    assert isinstance(group.interaction_module, ReflectInteraction)
     r = _broadcast(reflectivity, len(group))
     new_interaction = group.interaction_module.with_reflectivity_scalar(r)
     return _update_at_stage(telescope, stage, lambda g: g.interaction_module, new_interaction)
 
 
-def scale_reflectivity(
-    telescope: Telescope, stage: int, factor: Array | float
-) -> Telescope:
+def scale_reflectivity(telescope: Telescope, stage: int, factor: Array | float) -> Telescope:
     """Multiply mirror reflectivity by ``factor``. Mirror stages only.
 
     Scales the bulk multiplier ``reflectivity_scalar``; the coating on
@@ -453,13 +415,12 @@ def scale_reflectivity(
     """
     group = telescope.stage(stage)
     _require_kind(group, stage, (ReflectInteraction,), "mirror")
+    assert isinstance(group.interaction_module, ReflectInteraction)
     new_interaction = group.interaction_module.scaled_reflectivity(_broadcast(factor, len(group)))
     return _update_at_stage(telescope, stage, lambda g: g.interaction_module, new_interaction)
 
 
-def set_transmittance(
-    telescope: Telescope, stage: int, transmittance: Array | float
-) -> Telescope:
+def set_transmittance(telescope: Telescope, stage: int, transmittance: Array | float) -> Telescope:
     """Set per-element bulk transmittance. Lens or slab stages only.
 
     Writes the bulk multiplier ``transmittance_scalar``; the coating
@@ -467,14 +428,13 @@ def set_transmittance(
     """
     group = telescope.stage(stage)
     _require_kind(group, stage, (RefractInteraction, SlabInteraction), "lens or slab")
+    assert isinstance(group.interaction_module, (RefractInteraction, SlabInteraction))
     t = _broadcast(transmittance, len(group))
     new_interaction = group.interaction_module.with_transmittance_scalar(t)
     return _update_at_stage(telescope, stage, lambda g: g.interaction_module, new_interaction)
 
 
-def scale_transmittance(
-    telescope: Telescope, stage: int, factor: Array | float
-) -> Telescope:
+def scale_transmittance(telescope: Telescope, stage: int, factor: Array | float) -> Telescope:
     """Multiply bulk transmittance by ``factor``. Lens or slab stages only.
 
     Scales the bulk multiplier ``transmittance_scalar``; the coating on
@@ -482,27 +442,26 @@ def scale_transmittance(
     """
     group = telescope.stage(stage)
     _require_kind(group, stage, (RefractInteraction, SlabInteraction), "lens or slab")
+    assert isinstance(group.interaction_module, (RefractInteraction, SlabInteraction))
     new_interaction = group.interaction_module.scaled_transmittance(_broadcast(factor, len(group)))
     return _update_at_stage(telescope, stage, lambda g: g.interaction_module, new_interaction)
 
 
-def set_refractive_index(
-    telescope: Telescope, stage: int, n_inside: Array | float
-) -> Telescope:
+def set_refractive_index(telescope: Telescope, stage: int, n_inside: Array | float) -> Telescope:
     """Set per-element refractive index. Lens or slab stages only."""
     group = telescope.stage(stage)
     _require_kind(group, stage, (RefractInteraction, SlabInteraction), "lens or slab")
+    assert isinstance(group.interaction_module, (RefractInteraction, SlabInteraction))
     n = _broadcast(n_inside, len(group))
     new_interaction = group.interaction_module.with_n_inside(n)
     return _update_at_stage(telescope, stage, lambda g: g.interaction_module, new_interaction)
 
 
-def set_thickness(
-    telescope: Telescope, stage: int, thickness: Array | float
-) -> Telescope:
+def set_thickness(telescope: Telescope, stage: int, thickness: Array | float) -> Telescope:
     """Set slab thickness in metres. Slab stages only."""
     group = telescope.stage(stage)
     _require_kind(group, stage, (SlabInteraction,), "slab")
+    assert isinstance(group.interaction_module, SlabInteraction)
     t = _broadcast(thickness, len(group))
     new_interaction = group.interaction_module.with_thickness(t)
     return _update_at_stage(telescope, stage, lambda g: g.interaction_module, new_interaction)
@@ -549,9 +508,7 @@ def apply_focal_error(
     new_f = f * (1.0 + noise * sigma) if relative else f + noise * sigma
     new_c = jnp.where(curvatures == 0, 0.0, 1.0 / (scale * new_f))
 
-    return _update_surface_attr(
-        telescope, stage, lambda a: a.curvatures, new_c
-    )
+    return _update_surface_attr(telescope, stage, lambda a: a.curvatures, new_c)
 
 
 # Obstruction operations
@@ -572,9 +529,7 @@ def remove_obstruction(telescope: Telescope, group_idx: int) -> Telescope:
             f"Obstruction group index {group_idx} out of range "
             f"(0-{len(telescope.obstruction_groups) - 1})"
         )
-    new_groups = [
-        g for i, g in enumerate(telescope.obstruction_groups) if i != group_idx
-    ]
+    new_groups = [g for i, g in enumerate(telescope.obstruction_groups) if i != group_idx]
     return eqx.tree_at(lambda t: t.obstruction_groups, telescope, new_groups)
 
 
@@ -604,9 +559,7 @@ def get_info(telescope: Telescope) -> dict[str, Any]:
         stages_info.append({"stage": s, "kind": g.kind, "n_elements": g.n_elements, "aperture": ap})
 
     if telescope.optical_groups:
-        all_positions = jnp.concatenate(
-            [g.positions for g in telescope.optical_groups], axis=0
-        )
+        all_positions = jnp.concatenate([g.positions for g in telescope.optical_groups], axis=0)
         bbox_min = all_positions.min(axis=0)
         bbox_max = all_positions.max(axis=0)
     else:

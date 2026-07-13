@@ -102,10 +102,23 @@ class TestMirrorConfigErrors:
 
     def test_telescope_rejects_combined_format_section(self, n_samples, random_key):
         """Telescope schema is strict: combined-format sensors/camera blocks are forbidden."""
-        base = {"telescope": {"camera_position": [0, 0, 0], "camera_rotation": [0, 0, 0]}, "mirrors": []}
+        base = {
+            "telescope": {"camera_position": [0, 0, 0], "camera_rotation": [0, 0, 0]},
+            "mirrors": [],
+        }
         for extra in (
-            {"sensors": [{"type": "square", "position": [0, 0, 5], "orientation": [0, 0, 0],
-                          "width": 10, "height": 10, "bounds": [-1, 1, -1, 1]}]},
+            {
+                "sensors": [
+                    {
+                        "type": "square",
+                        "position": [0, 0, 5],
+                        "orientation": [0, 0, 0],
+                        "width": 10,
+                        "height": 10,
+                        "bounds": [-1, 1, -1, 1],
+                    }
+                ]
+            },
             {"camera": {"quantum_efficiency": 0.5}},
         ):
             with pytest.raises(YAMLConfigError):
@@ -123,21 +136,40 @@ class TestSensorConfigErrors:
         center arrays each raise a YAMLConfigError."""
         with pytest.raises(YAMLConfigError, match="does not match any of the expected tags"):
             build_camera_config(
-                {"sensors": [{"type": "triangular", "position": [0, 0, 0], "orientation": [0, 0, 0]}]}
+                {
+                    "sensors": [
+                        {"type": "triangular", "position": [0, 0, 0], "orientation": [0, 0, 0]}
+                    ]
+                }
             )
         with pytest.raises(YAMLConfigError, match="at least 4 items"):
             build_camera_config(
-                {"sensors": [{
-                    "type": "square", "position": [0, 0, 0], "orientation": [0, 0, 0],
-                    "width": 100, "height": 100, "bounds": [-1, 1, -1],  # need 4
-                }]}
+                {
+                    "sensors": [
+                        {
+                            "type": "square",
+                            "position": [0, 0, 0],
+                            "orientation": [0, 0, 0],
+                            "width": 100,
+                            "height": 100,
+                            "bounds": [-1, 1, -1],  # need 4
+                        }
+                    ]
+                }
             )
         with pytest.raises(YAMLConfigError, match="must have same length"):
             build_camera_config(
-                {"sensors": [{
-                    "type": "hexagonal", "position": [0, 0, 0], "orientation": [0, 0, 0],
-                    "centers_x": [0, 1, 2], "centers_y": [0, 1],  # different length
-                }]}
+                {
+                    "sensors": [
+                        {
+                            "type": "hexagonal",
+                            "position": [0, 0, 0],
+                            "orientation": [0, 0, 0],
+                            "centers_x": [0, 1, 2],
+                            "centers_y": [0, 1],  # different length
+                        }
+                    ]
+                }
             )
 
     def test_camera_rejects_extra_top_level_keys(self):
@@ -157,7 +189,10 @@ class TestValidConfigs:
     def test_empty_telescope_and_camera_load(self, n_samples, random_key):
         """Empty telescope and camera configurations load without errors."""
         telescope = build_telescope_config(
-            {"telescope": {"camera_position": [0, 0, 0], "camera_rotation": [0, 0, 0]}, "mirrors": []},
+            {
+                "telescope": {"camera_position": [0, 0, 0], "camera_rotation": [0, 0, 0]},
+                "mirrors": [],
+            },
             n_samples,
             random_key,
         )
@@ -193,7 +228,6 @@ class TestValidConfigs:
         assert float(group.surface.curvatures[0]) == pytest.approx(0.2)
         assert float(group.surface.curvatures[1]) == pytest.approx(0.1)  # template default
 
-
     def test_untyped_surface_rejected(self, n_samples, random_key):
         """A surface block without a ``type`` discriminator is rejected.
         Surfaces are a typed union (like apertures), so the legacy untyped
@@ -215,7 +249,6 @@ class TestValidConfigs:
         }
         with pytest.raises(YAMLConfigError):
             build_telescope_config(config, n_samples, random_key)
-
 
     def test_typed_aspheric_lens_surface_loads(self, n_samples, random_key):
         """An aspheric-disk lens reads its shape from a nested typed surface."""
