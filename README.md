@@ -13,11 +13,12 @@ IACTrace is a differentiable ray tracing library for simulating the optical prop
 ## Features
 
 - Differentiable ray tracing with JAX
-- Multi-stage optical systems (primary, secondary mirrors)
-- Square and hexagonal sensor arrays
-- Aspheric mirror surfaces with configurable parameters
-- Obstruction modeling (cylinders, boxes, spheres)
-- YAML-based telescope configuration
+- Multi-stage optical systems: segmented primaries, secondary mirrors, lenses and windows
+- Square and hexagonal sensor arrays with per-pixel light concentrators (Winston / Okumura cones)
+- Physical photodetectors: PMTs, SiPMs can be connected in-line with concentrators
+- Aspheric, Zernike and freeform surfaces, plus error models (roughness, misalignment, figure errors)
+- Obstruction modeling (cylinders, boxes, spheres, oriented boxes, triangles)
+- YAML-based telescope and camera configuration
 - Response matrix calculation
 
 ## Installation

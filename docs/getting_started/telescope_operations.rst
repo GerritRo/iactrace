@@ -108,6 +108,30 @@ Curvature, conic constant, aspheric coefficients on the
        key=key,
    )
 
+**Zernike figure errors**
+
+Add random Zernike surface-figure error, composed onto the stage's surface
+(an aspheric surface becomes an asphere + Zernike sum). ``sigmas`` are RMS
+surface errors **in metres**, one per Noll mode (index 0 = piston, 1/2 tilt,
+3 defocus, 4/5 astigmatism, 6/7 coma, 8/9 trefoil, 10 spherical; up to 11):
+
+.. code-block:: python
+
+   telescope = telescope.apply_zernike_error(
+       stage=0,
+       sigmas=jnp.array([0.0, 0.0, 0.0, 1e-6, 1e-6]),  # defocus + astigmatism
+       key=key,
+   )
+
+Named single-aberration shortcuts take one RMS ``sigma`` (metres) applied to
+both components of the aberration:
+
+.. code-block:: python
+
+   telescope = telescope.apply_astigmatism(stage=0, sigma=1e-6, key=key)  # Z5/Z6
+   telescope = telescope.apply_coma(stage=0, sigma=1e-6, key=key)         # Z7/Z8
+   telescope = telescope.apply_trefoil(stage=0, sigma=1e-6, key=key)      # Z9/Z10
+
 **Resample Monte-Carlo**
 
 Refresh the sampling key on a single stage:
