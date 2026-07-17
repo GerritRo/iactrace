@@ -70,6 +70,25 @@ Two camera geometries are supported:
    Hexagonally-packed pixels matching the geometry of PMT-based IACT cameras.
    Proper handling of hexagon rotations.
 
+Detection Chain
+---------------
+
+Each sensor group carries its own detection chain — an optional light
+concentrator, a mounting ``gap``, and a photodetector — so different groups
+in one camera can use different cones or detectors:
+
+**Light concentrators**
+   Per-pixel Winston and Okumura cones funnel light onto the detector and
+   weight throughput by the guide's transmission. Cones are traced through
+   their real wall geometry.
+
+**Photodetectors**
+   From a flat scalar quantum efficiency (:class:`~iactrace.camera.ConstantQE`)
+   to a :class:`~iactrace.camera.PMT` with a curved photocathode surface and an
+   optional Fresnel entrance-window response (angle-dependent).
+
+See :doc:`/getting_started/concept` for how the chain fits into the pipeline.
+
 Obstruction Modeling
 --------------------
 
@@ -103,7 +122,11 @@ Realistic telescope imperfections can be applied:
 **Conic and aspheric errors**
    Perturbations to higher-order surface parameters.
 
-... and more.
+**Zernike figure errors**
+   Per-facet Zernike surface error by Noll mode, with named shortcuts for
+   astigmatism, coma, and trefoil.
+
+See :doc:`/getting_started/telescope_operations` for the full set.
 
 YAML Configuration
 ------------------

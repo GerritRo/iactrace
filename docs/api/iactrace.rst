@@ -19,9 +19,11 @@ Core Classes
    * - :class:`~iactrace.telescope.Telescope`
      - Optical system: mirrors, lenses, obstructions, camera frame
    * - :class:`~iactrace.camera.Camera`
-     - Detection system: sensor groups, concentrator, photosensor
+     - Detection system: sensor groups, concentrator, photodetector
    * - :class:`~iactrace.core.RayBundle`
      - Ray positions/directions/values exchanged between the two
+   * - :class:`~iactrace.core.LazyRayBundle`
+     - Deferred render returned by :meth:`Telescope.render`, folded by the camera
 
 Sensor Classes
 ^^^^^^^^^^^^^^
@@ -33,6 +35,21 @@ Sensor Classes
      - Rectangular pixel grid sensor
    * - :class:`~iactrace.camera.HexagonalSensorGroup`
      - Hexagonally-packed pixel sensor
+
+Photodetectors / Concentrators
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. list-table::
+   :widths: 30 70
+
+   * - :class:`~iactrace.camera.ConstantQE`
+     - Flat scalar quantum efficiency (the default detector)
+   * - :class:`~iactrace.camera.PMT`
+     - Photomultiplier: sensor surface, QE, optional Fresnel window
+   * - :class:`~iactrace.camera.WinstonCone`
+     - Winston light concentrator (per pixel)
+   * - :class:`~iactrace.camera.OkumuraCone`
+     - Okumura-style light concentrator (per pixel)
 
 I/O Functions
 ^^^^^^^^^^^^^

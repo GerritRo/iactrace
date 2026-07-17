@@ -40,14 +40,16 @@ agree by convention only. Mixing units silently produces wrong results.
 Photometry — monochromatic
 --------------------------
 
-**IACTrace 0.7 is monochromatic.** Rays do not carry a wavelength.
-Every coefficient that would in principle depend on wavelength is a
-scalar:
+**IACTrace is monochromatic.** Rays do not carry a wavelength. Every
+coefficient that would in principle depend on wavelength is treated as a
+single value:
 
-- Mirror reflectivity (`ReflectInteraction`)
-- Lens refractive index and bulk transmittance (`RefractInteraction`,
-  `RefractSlabInteraction`)
-- Photodetector quantum efficiency (`UniformQE`)
+- Mirror reflectivity (:class:`~iactrace.core.ReflectInteraction`)
+- Lens refractive index and bulk transmittance
+  (:class:`~iactrace.core.RefractInteraction`,
+  :class:`~iactrace.core.SlabInteraction`)
+- Photodetector quantum efficiency (:class:`~iactrace.camera.ConstantQE`,
+  :class:`~iactrace.camera.PMT`)
 
 This means PSF, throughput, and effective aperture results are
 correctly differentiable and physically sensible *for a single
@@ -56,7 +58,7 @@ spectrum you have in mind. Anything that requires a real spectrum
 (wavelength-dependent QE for PMTs/SiPMs, dispersion through refractive
 optics, reflectivity rolloff in the UV) is not modelled.
 
-Wavelength tracking is targeted for **0.8**.
+Wavelength tracking is planned for a future release.
 
 The throughput-weighted values pipeline
 ---------------------------------------
@@ -109,22 +111,25 @@ Specifically, ``jax.grad`` flows through:
 - mirror surface parameters: ``curvatures``, ``conics``, ``aspherics``,
   positions, rotations
 - mirror reflectivity, lens refractive index and transmittance
-- photosensor QE
+- photodetector QE
 - source positions / directions and source values
 
 What does **not** currently flow:
 
-- gradients through pixel bin assignment. ``SensorGroup.accumulate``
-  uses integer ``floor`` to assign a ray to a pixel, then
-  ``segment_sum`` to bin. Gradients flow w.r.t. the ray *values* (so
-  ``d(image)/d(reflectivity)`` etc. are fine), but not through the bin
-  *index* itself. Optimisations that need a continuous response to
-  pixel boundaries (sensor-position fitting via image gradients) need
-  a straight-through estimator that 0.7 does not ship.
+- gradients through pixel bin assignment.
+  :meth:`SensorGroup.pixel_index_and_mask` uses integer ``floor`` to
+  assign each ray to a pixel, and :meth:`SensorGroup.scatter` bins the
+  values with ``segment_sum``. Gradients flow w.r.t. the ray *values*
+  (so ``d(image)/d(reflectivity)`` etc. are fine), but not through the
+  bin *index* itself. Optimisations that need a continuous response to
+  pixel boundaries (e.g. sensor-position fitting via image gradients)
+  would need a straight-through estimator, which IACTrace does not
+  currently ship.
 
-A differentiable pixel-binning wrapper was implemented in 0.6, but was
-deemed clunky. If you really need the functionality, regress to 0.6 or 
-wait for a new implementation in a future version.
+For gradient-based work, prefer objectives built from the ray *values*
+or from :doc:`focal-surface </api/analysis>` spot statistics, both of
+which are fully differentiable, over ones that depend on which pixel a
+ray falls in.
 
 Optical stages
 --------------

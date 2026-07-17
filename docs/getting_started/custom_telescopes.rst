@@ -9,7 +9,7 @@ Two YAML files
 
 A telescope and its camera are described in **two separate YAML files**.
 The telescope file owns the optics and the camera frame; the camera file
-owns the sensor layout and the photosensor model. This split lets a single
+owns the sensor layout and the photodetector model. This split lets a single
 shared camera file be paired with several telescope files (for example
 ``configs/CTAO/LST_camera.yaml`` is reused by all four LSTs).
 
@@ -320,9 +320,9 @@ After loading, inspect the telescope to verify it parsed correctly:
 .. code-block:: python
 
    info = telescope.get_info()
-   print(f"Mirrors: {info['n_mirrors']}")
-   print(f"Optical stages: {info['optical_stages']}")
-   print(f"Obstructions: {info['n_obstructions']}")
+   print(f"Mirror elements: {info['n_mirror_elements']}")
+   print(f"Optical stages:  {info['n_stages']}")
+   print(f"Obstructions:    {info['n_obstructions']}")
 
    # Visualize to check geometry
    from iactrace.viz import show_telescope

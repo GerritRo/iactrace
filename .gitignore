@@ -24,6 +24,9 @@ wheels/
 *.egg
 .venv/
 
+# Sphinx docs
+docs/_build/
+
 # Jupyter
 .ipynb_checkpoints
 

@@ -92,7 +92,7 @@ Each telescope carries the position and Euler-angle orientation of the
 camera (the ``camera_position`` / ``camera_rotation`` fields in the
 telescope YAML). After tracing, rays are transformed into this local
 camera frame so that the :class:`~iactrace.Camera` works in its own
-coordinate system. Sensors, pixel layout and the photosensor model
+coordinate system. Sensors, pixel layout and the photodetector model
 live on the :class:`~iactrace.Camera` (loaded from a separate camera
 YAML), not on the telescope.
 
@@ -140,10 +140,13 @@ binning:
 .. code-block:: python
 
    ray_bundle = telescope.render(sources, values, source_type='parallel')
-   pe_vals, pe_times, pix_id, hit_mask = camera.collect(ray_bundle)
+   pe_vals, pe_times, pix_id, detected = camera.collect(ray_bundle)
 
-``hit_mask`` flags rays that intersected a sensor (vs missed every
-sensor in the camera). This is useful for:
+``detected`` is the final per-ray mask: ``True`` only for rays that
+stayed alive through the optics, hit a sensor tile, landed on the
+photodetector surface, and fell inside a real pixel. ``pix_id`` and
+``pe_times`` are meaningful only where ``detected`` is ``True``
+(``pe_vals`` is already zeroed elsewhere). This is useful for:
 
 - visualising the raw spot diagram
 - computing custom statistics on ray distributions
