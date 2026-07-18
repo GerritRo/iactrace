@@ -53,6 +53,23 @@ Interactions
 .. autoclass:: iactrace.core.SlabInteraction
    :show-inheritance:
 
+.. autoclass:: iactrace.core.InteractionType
+   :members:
+
+Coatings
+~~~~~~~~
+
+Angle-dependent reflectivity / transmittance applied at an interaction.
+
+.. autoclass:: iactrace.core.Coating
+   :members:
+
+.. autoclass:: iactrace.core.ConstantCoating
+   :show-inheritance:
+
+.. autoclass:: iactrace.core.TabulatedCoating
+   :show-inheritance:
+
 BSDF (surface scattering)
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -76,23 +93,41 @@ Functions for ray-surface interactions:
 
 .. autofunction:: iactrace.core.interactions.refract_slab
 
-.. autofunction:: iactrace.core.interactions.fresnel_unpolarized
+.. autofunction:: iactrace.core.coatings.fresnel_unpolarized
 
 Surfaces
 --------
 
-Aspheric surface calculations:
+Surface-figure models. ``SurfaceGroup`` is the base; the concrete groups
+below can be combined with :class:`~iactrace.core.SumSurfaceGroup` (e.g. an
+aspheric base plus a per-facet Zernike figure error).
 
 .. autoclass:: iactrace.core.SurfaceGroup
    :members:
+   
+.. autoclass:: iactrace.core.SumSurfaceGroup
+   :members:
+   :show-inheritance:
 
 .. autoclass:: iactrace.core.AsphericSurfaceGroup
+   :members:
+   :show-inheritance:
+
+.. autoclass:: iactrace.core.ZernikeSurfaceGroup
+   :members:
+   :show-inheritance:
+
+.. autoclass:: iactrace.core.FreeformSurfaceGroup
    :members:
    :show-inheritance:
 
 .. autofunction:: iactrace.core.surfaces.sag
 
 .. autofunction:: iactrace.core.surfaces.compute_sag_and_normal
+
+.. autofunction:: iactrace.core.zernike_terms
+
+.. autofunction:: iactrace.core.bicubic_interp
 
 Intersection Functions
 ----------------------

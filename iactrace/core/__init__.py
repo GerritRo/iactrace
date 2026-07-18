@@ -1,5 +1,10 @@
 from .apertures import Aperture, DiskAperture, PolygonAperture
 from .bsdf import BSDF, DoubleGaussianBSDF, GaussianBSDF
+from .coatings import (
+    Coating,
+    ConstantCoating,
+    TabulatedCoating,
+)
 from .interactions import (
     Interaction,
     InteractionType,
@@ -19,45 +24,54 @@ from .obstructions import (
 from .optics import OpticalElementGroup
 from .ray_bundle import LazyRayBundle, RayBundle
 from .render import render_optics, trace_optics
-from .surfaces import AsphericSurfaceGroup, SurfaceGroup
+from .surfaces import (
+    AsphericSurfaceGroup,
+    FreeformSurfaceGroup,
+    SumSurfaceGroup,
+    SurfaceGroup,
+    ZernikeSurfaceGroup,
+    bicubic_interp,
+    zernike_terms,
+)
 from .transforms import euler_to_matrix
 
 __all__ = [
     # Optical element group
     "InteractionType",
     "OpticalElementGroup",
-
     # Aperture modules
     "Aperture",
     "DiskAperture",
     "PolygonAperture",
-
     # Interaction modules
     "Interaction",
     "ReflectInteraction",
     "RefractInteraction",
     "SlabInteraction",
-
+    # Angular coatings
+    "Coating",
+    "ConstantCoating",
+    "TabulatedCoating",
     # Surfaces
     "SurfaceGroup",
     "AsphericSurfaceGroup",
-
+    "ZernikeSurfaceGroup",
+    "SumSurfaceGroup",
+    "FreeformSurfaceGroup",
+    "zernike_terms",
+    "bicubic_interp",
     # BSDF
     "BSDF",
     "GaussianBSDF",
     "DoubleGaussianBSDF",
-
     # Transforms
     "euler_to_matrix",
-
     # Ray bundle
     "RayBundle",
     "LazyRayBundle",
-
     # Render engine
     "render_optics",
     "trace_optics",
-
     # Obstructions
     "ObstructionGroup",
     "CylinderGroup",

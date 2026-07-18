@@ -8,7 +8,7 @@ from jax import Array
 from jax.typing import ArrayLike
 
 from ..core.ray_bundle import LazyRayBundle, RayBundle
-from ..core.render import trace_optics
+from ..core.render import apply_final_leg_shadow, trace_optics
 from ..core.transforms import euler_to_matrix
 from . import operations as _ops
 
@@ -35,8 +35,8 @@ class Telescope(eqx.Module):
     mirror_groups: list[OpticalElementGroup]
     lens_groups: list[OpticalElementGroup]
     obstruction_groups: list[ObstructionGroup]
-    camera_position: Array   # (3,) camera origin in world frame
-    camera_rotation: Array   # (3,) Euler angles (degrees) for camera orientation
+    camera_position: Array  # (3,) camera origin in world frame
+    camera_rotation: Array  # (3,) Euler angles (degrees) for camera orientation
     name: str = eqx.field(static=True)
 
     def __init__(
@@ -142,8 +142,18 @@ class Telescope(eqx.Module):
             Pass to ``camera.collect()`` or ``camera.image()`` for detection.
         """
         rb = trace_optics(
-            self.optical_groups, self.obstruction_groups,
-            ray_origins, ray_directions, values,
+            self.optical_groups,
+            self.obstruction_groups,
+            ray_origins,
+            ray_directions,
+            values,
+        )
+        # Handoff = shadow the final leg (explicit), then a pure reframe.
+        rb = apply_final_leg_shadow(
+            rb,
+            self.obstruction_groups,
+            self.camera_position,
+            self.camera_rotation,
         )
         return rb.to_frame(self.camera_position, self.camera_rotation)
 
@@ -283,6 +293,18 @@ class Telescope(eqx.Module):
     def apply_aspheric_error(self, stage: int, sigmas: Array, key: Array) -> Telescope:
         return _ops.apply_aspheric_error(self, stage, sigmas, key)
 
+    def apply_zernike_error(self, stage: int, sigmas: Array, key: Array) -> Telescope:
+        return _ops.apply_zernike_error(self, stage, sigmas, key)
+
+    def apply_astigmatism(self, stage: int, sigma: float, key: Array) -> Telescope:
+        return _ops.apply_astigmatism(self, stage, sigma, key)
+
+    def apply_coma(self, stage: int, sigma: float, key: Array) -> Telescope:
+        return _ops.apply_coma(self, stage, sigma, key)
+
+    def apply_trefoil(self, stage: int, sigma: float, key: Array) -> Telescope:
+        return _ops.apply_trefoil(self, stage, sigma, key)
+
     def resample(self, stage: int, key: Array) -> Telescope:
         return _ops.resample(self, stage, key)
 
@@ -306,13 +328,20 @@ class Telescope(eqx.Module):
     def set_thickness(self, stage: int, thickness: Array | float) -> Telescope:
         return _ops.set_thickness(self, stage, thickness)
 
-    def set_focal_lengths(self, stage: int, focal_lengths: Array) -> Telescope:
-        return _ops.set_focal_lengths(self, stage, focal_lengths)
+    def set_focal_lengths(
+        self, stage: int, focal_lengths: Array, n_outside: float = 1.0
+    ) -> Telescope:
+        return _ops.set_focal_lengths(self, stage, focal_lengths, n_outside)
 
     def apply_focal_error(
-        self, stage: int, sigma: float, key: Array, relative: bool = False
+        self,
+        stage: int,
+        sigma: float,
+        key: Array,
+        relative: bool = False,
+        n_outside: float = 1.0,
     ) -> Telescope:
-        return _ops.apply_focal_error(self, stage, sigma, key, relative)
+        return _ops.apply_focal_error(self, stage, sigma, key, relative, n_outside)
 
     # Obstruction methods
 

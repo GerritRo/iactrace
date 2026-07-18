@@ -13,3 +13,9 @@ def set_jax_precision():
 def random_key():
     """Provide a fresh random key for tests that need randomness."""
     return jax.random.key(42)
+
+
+@pytest.fixture
+def n_samples():
+    """Small primary-sample count for fast I/O round-trip tests."""
+    return 4

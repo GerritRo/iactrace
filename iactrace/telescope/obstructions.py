@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-import jax.numpy as jnp
-
 # Re-export the low-level primitives for convenience
 from ..core.obstructions import (
     BoxGroup,
@@ -14,6 +12,7 @@ from ..core.obstructions import (
     SphereGroup,
     TriangleGroup,
 )
+from ._common import as_vec3
 
 __all__ = [
     # Re-exported core primitives
@@ -33,13 +32,12 @@ __all__ = [
 
 
 def _as_vec3(value, name: str) -> list[float]:
-    arr = jnp.asarray(value)
-    if arr.shape != (3,):
-        raise ValueError(f"{name} must have shape (3,), got {arr.shape}")
-    return [float(v) for v in arr]
+    """Coerce to shape ``(3,)``, then a plain list (these factories build list-of-lists)."""
+    return as_vec3(value, name).tolist()
 
 
 # Single-primitive factories
+
 
 def cylinder(
     *,
@@ -48,10 +46,6 @@ def cylinder(
     r: float,
 ) -> CylinderGroup:
     """Build a single closed cylinder as a ``CylinderGroup`` of size one.
-
-    Closed cylinders include circular end caps — use this for camera housings,
-    secondary-mirror baffles and similar solid obstructions. For a hollow tube
-    without end caps, see :func:`open_cylinder`.
 
     Args:
         p1: One endpoint of the cylinder axis, shape (3,).
@@ -73,7 +67,10 @@ def open_cylinder(
 ) -> OpenCylinderGroup:
     """Build a single open cylinder (no end caps) as a size-one group.
 
-    Args: see :func:`cylinder`.
+    Args:
+        p1: One endpoint of the cylinder axis, shape (3,).
+        p2: The other endpoint, shape (3,).
+        r: Cylinder radius in metres.
     """
     return OpenCylinderGroup(
         p1=[_as_vec3(p1, "p1")],

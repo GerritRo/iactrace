@@ -8,9 +8,12 @@ from jax.typing import ArrayLike
 
 from ..core.apertures import Aperture, DiskAperture
 from ..core.bsdf import BSDF, GaussianBSDF
+from ..core.coatings import Coating
 from ..core.interactions import ReflectInteraction
 from ..core.optics import OpticalElementGroup
 from ..core.surfaces import AsphericSurfaceGroup
+from ._common import as_aspheric_row as _as_aspheric_row
+from ._common import as_vec3 as _as_vec3
 
 __all__ = [
     "mirror_group",
@@ -21,22 +24,8 @@ __all__ = [
 ]
 
 
-# Input-shape helpers
-
-def _as_vec3(value, name: str) -> Array:
-    arr = jnp.asarray(value)
-    if arr.shape != (3,):
-        raise ValueError(f"{name} must have shape (3,), got {arr.shape}")
-    return arr
-
-
-def _as_aspheric_row(coeffs: Sequence[float] | None) -> Array:
-    if coeffs is None:
-        return jnp.zeros((0,))
-    return jnp.asarray(coeffs)
-
-
 # Low-level canonical builder
+
 
 def mirror_group(
     *,
@@ -47,8 +36,9 @@ def mirror_group(
     aspherics: Array,
     offsets: Array,
     aperture: Aperture,
-    reflectivity: Array,
+    reflectivity: Array | float = 1.0,
     sample_key: Array,
+    coating: Coating | None = None,
     bsdf: BSDF | None = None,
     optical_stage: int = 0,
     n_samples: int = 100,
@@ -57,10 +47,7 @@ def mirror_group(
 
     Takes pre-shaped per-element arrays plus a pre-built aperture and an
     optional :class:`BSDF` instance, and assembles the surface + interaction
-    + group wiring. This is the single assembly point for every reflective
-    group in the project — the sugar helpers in this module and the YAML
-    adapter both route through it, so any future additions (new BSDF
-    types, new surface fields, ...) only need to be plumbed once.
+    + group wiring.
 
     Args:
         positions: Per-element vertex positions, shape ``(N, 3)``.
@@ -71,8 +58,7 @@ def mirror_group(
             Use ``(N, 0)`` to disable aspherics.
         offsets: Per-element surface decentering, shape ``(N, 2)``. Use
             ``jnp.zeros((N, 2))`` for a centred disk.
-        aperture: Pre-built aperture — either :class:`DiskAperture` or
-            :class:`PolygonAperture` — sized to ``N``.
+        aperture: Pre-built aperture.
         reflectivity: Per-element reflectivity in ``[0, 1]``, shape ``(N,)``.
         sample_key: JAX PRNG key used for aperture sampling and BSDF.
         bsdf: Optional :class:`BSDF` instance. ``None`` leaves the element
@@ -91,7 +77,11 @@ def mirror_group(
     conics = jnp.asarray(conics)
     aspherics = jnp.asarray(aspherics)
     offsets = jnp.asarray(offsets)
-    reflectivity = jnp.asarray(reflectivity)
+    n = int(positions.shape[0])
+
+    refl_scalar = jnp.asarray(reflectivity)
+    if refl_scalar.ndim == 0:
+        refl_scalar = jnp.full((n,), refl_scalar)
 
     surface = AsphericSurfaceGroup(
         curvatures=curvatures,
@@ -99,7 +89,10 @@ def mirror_group(
         aspherics=aspherics,
         offsets=offsets,
     )
-    interaction = ReflectInteraction(reflectivity=reflectivity)
+    interaction = ReflectInteraction(
+        reflectivity=coating,
+        reflectivity_scalar=refl_scalar,
+    )
 
     return OpticalElementGroup(
         positions=positions,
@@ -116,6 +109,7 @@ def mirror_group(
 
 # High-level sugar: batched disk-aperture mirror group
 
+
 def disk_array(
     *,
     positions: ArrayLike,
@@ -126,6 +120,7 @@ def disk_array(
     aspheric_coeffs: ArrayLike | None = None,
     inner_radii: ArrayLike | None = None,
     reflectivities: ArrayLike | None = None,
+    coating: Coating | None = None,
     bsdf_scales: ArrayLike | None = None,
     offsets: ArrayLike | None = None,
     optical_stage: int = 0,
@@ -162,30 +157,22 @@ def disk_array(
     """
     positions_arr = jnp.asarray(positions)
     if positions_arr.ndim != 2 or positions_arr.shape[1] != 3:
-        raise ValueError(
-            f"positions must have shape (N, 3), got {positions_arr.shape}"
-        )
+        raise ValueError(f"positions must have shape (N, 3), got {positions_arr.shape}")
     n = positions_arr.shape[0]
 
     rotations_arr = jnp.asarray(rotations)
     if rotations_arr.shape != (n, 3):
-        raise ValueError(
-            f"rotations must have shape ({n}, 3), got {rotations_arr.shape}"
-        )
+        raise ValueError(f"rotations must have shape ({n}, 3), got {rotations_arr.shape}")
 
     curvatures_arr = jnp.asarray(curvatures)
     if curvatures_arr.shape != (n,):
-        raise ValueError(
-            f"curvatures must have shape ({n},), got {curvatures_arr.shape}"
-        )
+        raise ValueError(f"curvatures must have shape ({n},), got {curvatures_arr.shape}")
 
     radii_arr = jnp.asarray(radii)
     if radii_arr.shape != (n,):
         raise ValueError(f"radii must have shape ({n},), got {radii_arr.shape}")
 
-    conics_arr = (
-        jnp.zeros(n) if conics is None else jnp.asarray(conics)
-    )
+    conics_arr = jnp.zeros(n) if conics is None else jnp.asarray(conics)
     if conics_arr.shape != (n,):
         raise ValueError(f"conics must have shape ({n},), got {conics_arr.shape}")
 
@@ -194,30 +181,19 @@ def disk_array(
     else:
         aspherics_arr = jnp.asarray(aspheric_coeffs)
         if aspherics_arr.ndim != 2 or aspherics_arr.shape[0] != n:
-            raise ValueError(
-                f"aspheric_coeffs must have shape ({n}, K), "
-                f"got {aspherics_arr.shape}"
-            )
+            raise ValueError(f"aspheric_coeffs must have shape ({n}, K), got {aspherics_arr.shape}")
 
-    inner_arr = (
-        jnp.zeros(n) if inner_radii is None else jnp.asarray(inner_radii)
-    )
-    refl_arr = (
-        jnp.ones(n) if reflectivities is None else jnp.asarray(reflectivities)
-    )
+    inner_arr = jnp.zeros(n) if inner_radii is None else jnp.asarray(inner_radii)
+    refl_arr = jnp.ones(n) if reflectivities is None else jnp.asarray(reflectivities)
 
     if offsets is None:
         offsets_arr = jnp.zeros((n, 2))
     else:
         offsets_arr = jnp.asarray(offsets)
         if offsets_arr.shape != (n, 2):
-            raise ValueError(
-                f"offsets must have shape ({n}, 2), got {offsets_arr.shape}"
-            )
+            raise ValueError(f"offsets must have shape ({n}, 2), got {offsets_arr.shape}")
 
-    bsdf_arr = (
-        jnp.zeros(n) if bsdf_scales is None else jnp.asarray(bsdf_scales)
-    )
+    bsdf_arr = jnp.zeros(n) if bsdf_scales is None else jnp.asarray(bsdf_scales)
     bsdf = None if bool(jnp.all(bsdf_arr == 0)) else GaussianBSDF(scale=bsdf_arr)
 
     aperture = DiskAperture(radii=radii_arr, inner_radii=inner_arr)
@@ -231,6 +207,7 @@ def disk_array(
         offsets=offsets_arr,
         aperture=aperture,
         reflectivity=refl_arr,
+        coating=coating,
         bsdf=bsdf,
         sample_key=key,
         optical_stage=optical_stage,
@@ -239,6 +216,7 @@ def disk_array(
 
 
 # High-level sugar: single-element factories
+
 
 def _single_disk_mirror(
     *,
@@ -250,6 +228,7 @@ def _single_disk_mirror(
     radius,
     inner_radius,
     reflectivity,
+    coating,
     bsdf_scale,
     optical_stage,
     n_samples,
@@ -269,7 +248,45 @@ def _single_disk_mirror(
         radii=jnp.asarray([float(radius)]),
         inner_radii=jnp.asarray([float(inner_radius)]),
         reflectivities=jnp.asarray([float(reflectivity)]),
+        coating=coating,
         bsdf_scales=jnp.asarray([float(bsdf_scale)]),
+        optical_stage=optical_stage,
+        n_samples=n_samples,
+        key=key,
+    )
+
+
+def _focal_length_disk_mirror(
+    *,
+    conic: float,
+    position: Sequence[float],
+    focal_length: float,
+    radius: float,
+    rotation: Sequence[float] = (0.0, 0.0, 0.0),
+    inner_radius: float = 0.0,
+    reflectivity: float = 1.0,
+    coating: Coating | None = None,
+    bsdf_scale: float = 0.0,
+    optical_stage: int = 0,
+    n_samples: int = 100,
+    key: Array,
+) -> OpticalElementGroup:
+    """Common backing for :func:`spherical` and :func:`parabolic`.
+
+    Both derive ``curvature = 1 / (2 * focal_length)`` and differ only in
+    ``conic`` (``0`` vs ``-1``).
+    """
+    return _single_disk_mirror(
+        position=position,
+        rotation=rotation,
+        curvature=1.0 / (2.0 * float(focal_length)),
+        conic=conic,
+        aspheric_coeffs=None,
+        radius=radius,
+        inner_radius=inner_radius,
+        reflectivity=reflectivity,
+        coating=coating,
+        bsdf_scale=bsdf_scale,
         optical_stage=optical_stage,
         n_samples=n_samples,
         key=key,
@@ -284,6 +301,7 @@ def spherical(
     rotation: Sequence[float] = (0.0, 0.0, 0.0),
     inner_radius: float = 0.0,
     reflectivity: float = 1.0,
+    coating: Coating | None = None,
     bsdf_scale: float = 0.0,
     optical_stage: int = 0,
     n_samples: int = 100,
@@ -306,15 +324,15 @@ def spherical(
         n_samples: Monte Carlo samples per render call.
         key: JAX PRNG key.
     """
-    return _single_disk_mirror(
-        position=position,
-        rotation=rotation,
-        curvature=1.0 / (2.0 * float(focal_length)),
+    return _focal_length_disk_mirror(
         conic=0.0,
-        aspheric_coeffs=None,
+        position=position,
+        focal_length=focal_length,
         radius=radius,
+        rotation=rotation,
         inner_radius=inner_radius,
         reflectivity=reflectivity,
+        coating=coating,
         bsdf_scale=bsdf_scale,
         optical_stage=optical_stage,
         n_samples=n_samples,
@@ -330,6 +348,7 @@ def parabolic(
     rotation: Sequence[float] = (0.0, 0.0, 0.0),
     inner_radius: float = 0.0,
     reflectivity: float = 1.0,
+    coating: Coating | None = None,
     bsdf_scale: float = 0.0,
     optical_stage: int = 0,
     n_samples: int = 100,
@@ -339,19 +358,19 @@ def parabolic(
 
     Uses ``c = 1 / (2 * focal_length)`` and ``conic = -1``, matching the
     reference ``configs/BASIC/Cassegrain_telescope.yaml`` primary
-    (``focal_length=0.4`` → ``curvature=1.25``).
+    (``focal_length=0.4`` -> ``curvature=1.25``).
 
     Args: see :func:`spherical`.
     """
-    return _single_disk_mirror(
-        position=position,
-        rotation=rotation,
-        curvature=1.0 / (2.0 * float(focal_length)),
+    return _focal_length_disk_mirror(
         conic=-1.0,
-        aspheric_coeffs=None,
+        position=position,
+        focal_length=focal_length,
         radius=radius,
+        rotation=rotation,
         inner_radius=inner_radius,
         reflectivity=reflectivity,
+        coating=coating,
         bsdf_scale=bsdf_scale,
         optical_stage=optical_stage,
         n_samples=n_samples,
@@ -369,6 +388,7 @@ def aspheric(
     aspheric_coeffs: Sequence[float] | None = None,
     inner_radius: float = 0.0,
     reflectivity: float = 1.0,
+    coating: Coating | None = None,
     bsdf_scale: float = 0.0,
     optical_stage: int = 0,
     n_samples: int = 100,
@@ -383,7 +403,7 @@ def aspheric(
 
     Args:
         position: Mirror vertex in world coordinates, shape (3,).
-        curvature: Paraxial curvature ``1/R`` in m⁻¹.
+        curvature: Paraxial curvature ``1/R`` in m^-1.
         radius: Outer disk radius in metres.
         rotation: Euler angles in degrees. Defaults to no rotation.
         conic: Schwarzschild conic constant. ``0`` spherical, ``-1``
@@ -403,6 +423,7 @@ def aspheric(
         radius=radius,
         inner_radius=inner_radius,
         reflectivity=reflectivity,
+        coating=coating,
         bsdf_scale=bsdf_scale,
         optical_stage=optical_stage,
         n_samples=n_samples,

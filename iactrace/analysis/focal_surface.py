@@ -21,9 +21,9 @@ class FocalSurfaceHits(eqx.Module):
     """Result of intersecting a :class:`RayBundle` with a :class:`FocalSurface`.
 
     All arrays have leading dimension ``n_rays`` and are aligned with the input
-    bundle. Missed rays appear with ``hit_mask = False`` and meaningless values
-    in the position/direction arrays — always filter with ``hit_mask`` before
-    using ``xy_local`` for plotting or statistics.
+    bundle. Dead rays appear with ``hit_mask = False`` and meaningless values
+    in the position/direction arrays: always filter with ``hit_mask`` (or
+    :attr:`alive`) before using ``xy_local`` for plotting or statistics.
 
     Attributes:
         xy_local: Tangent-plane coordinates at the hit, in the surface-local
@@ -32,17 +32,16 @@ class FocalSurfaceHits(eqx.Module):
             focal plane.
         t: Ray parameter at the hit; equals the world-frame distance travelled
             from ``ray_bundle.origins`` to the surface (n_rays,).
-        hit_mask: True for rays that actually crossed the surface (n_rays,).
+        hit_mask: Liveness at the surface (n_rays,): ``True`` for a ray that
+            was still alive on arrival **and** crossed this surface. This is
+            the input bundle's ``alive`` flag ANDed with a real intersection,
+            so a ray lost upstream (shadowed, off-aperture) is ``False`` here
+            even if its stale geometry would formally cross the surface.
         directions_local: Ray directions in the surface-local frame (n_rays, 3).
             Useful for chief-ray / angle-of-incidence analysis.
         opl: Per-ray optical path length from the source wavefront to the
             focal surface, in metres (n_rays,). Equals
-            ``ray_bundle.path_length + t * ray_bundle.n`` — the final
-            geometric leg from the bundle's origin to the focal surface
-            is weighted by the ray's current medium index. Use directly
-            for OPD / wavefront-error analysis; for a parallel source
-            the absolute value carries a per-source constant offset, so
-            differences across rays are the physical quantity.
+            ``ray_bundle.path_length + t * ray_bundle.n``.
     """
 
     xy_local: Array
@@ -51,6 +50,17 @@ class FocalSurfaceHits(eqx.Module):
     hit_mask: Array
     directions_local: Array
     opl: Array
+    values: Array
+
+    @property
+    def alive(self) -> Array:
+        """Rays that reached the surface carrying light (``hit_mask & values > 0``).
+
+        The one-stop filter for photometry / spot diagrams: it excludes both
+        geometry loss (``hit_mask``) and rays attenuated to zero throughput
+        such as absorbed or totally-internally-reflected rays.
+        """
+        return self.hit_mask & (self.values > 0)
 
 
 class FocalSurface(eqx.Module):
@@ -68,7 +78,9 @@ class FocalSurface(eqx.Module):
 
     @abstractmethod
     def _intersect_local(
-        self, o_local: Array, d_local: Array,
+        self,
+        o_local: Array,
+        d_local: Array,
     ) -> tuple[Array, Array, Array, Array]:
         """Intersect a single local-frame ray with the surface.
 
@@ -86,7 +98,8 @@ class FocalSurface(eqx.Module):
         raise NotImplementedError
 
     def intersect(
-        self, ray_bundle: RayBundle | LazyRayBundle,
+        self,
+        ray_bundle: RayBundle | LazyRayBundle,
     ) -> FocalSurfaceHits:
         """Intersect every ray in ``ray_bundle`` with this focal surface.
 
@@ -101,12 +114,17 @@ class FocalSurface(eqx.Module):
         d_local = ray_bundle.directions @ rot
 
         t, xy_local, z_local, valid = jax.vmap(self._intersect_local)(
-            o_local, d_local,
+            o_local,
+            d_local,
         )
-        hit_mask = valid & jnp.isfinite(t)
+        # Liveness at the surface: only rays that were still alive coming in
+        # and land on a real intersection.
+        hit_mask = ray_bundle.alive & valid & jnp.isfinite(t)
 
         opl = ray_bundle.path_length + jnp.where(
-            hit_mask, t * ray_bundle.n, 0.0,
+            hit_mask,
+            t * ray_bundle.n,
+            0.0,
         )
         return FocalSurfaceHits(
             xy_local=xy_local,
@@ -115,6 +133,7 @@ class FocalSurface(eqx.Module):
             hit_mask=hit_mask,
             directions_local=d_local,
             opl=opl,
+            values=ray_bundle.values,
         )
 
 
@@ -131,17 +150,10 @@ class FlatFocalPlane(FocalSurface):
         position: Array | None = None,
         rotation: Array | None = None,
     ) -> None:
-        self.position = (
-            jnp.zeros(3) if position is None else jnp.asarray(position, dtype=float)
-        )
-        self.rotation = (
-            jnp.zeros(3) if rotation is None else jnp.asarray(rotation, dtype=float)
-        )
+        self.position = jnp.zeros(3) if position is None else jnp.asarray(position, dtype=float)
+        self.rotation = jnp.zeros(3) if rotation is None else jnp.asarray(rotation, dtype=float)
 
     def _intersect_local(self, o_local, d_local):
-        # In the local frame the plane is centred at the origin with the
-        # identity rotation, so intersect_plane reduces to a closed-form
-        # z = 0 hit.
         center = jnp.zeros(3)
         rot = jnp.eye(3)
         xy, t = intersect_plane(o_local, d_local, center, rot)
@@ -153,7 +165,7 @@ class FlatFocalPlane(FocalSurface):
 class AsphericFocalSurface(FocalSurface):
     """A rotationally-symmetric aspheric focal surface.
 
-    Parameterisation matches :class:`AsphericSurfaceGroup` — the surface sag is
+    Parameterisation matches :class:`AsphericSurfaceGroup`; the surface sag is
 
         z(r) = c r^2 / (1 + sqrt(1 - (1 + k) c^2 r^2))
                + sum_i a_i r^(2i+2)
@@ -178,18 +190,12 @@ class AsphericFocalSurface(FocalSurface):
         conic: float | Array = 0.0,
         aspherics: Array | None = None,
     ) -> None:
-        self.position = (
-            jnp.zeros(3) if position is None else jnp.asarray(position, dtype=float)
-        )
-        self.rotation = (
-            jnp.zeros(3) if rotation is None else jnp.asarray(rotation, dtype=float)
-        )
+        self.position = jnp.zeros(3) if position is None else jnp.asarray(position, dtype=float)
+        self.rotation = jnp.zeros(3) if rotation is None else jnp.asarray(rotation, dtype=float)
         self.curvature = jnp.asarray(curvature, dtype=float)
         self.conic = jnp.asarray(conic, dtype=float)
         self.aspherics = (
-            jnp.zeros((0,))
-            if aspherics is None
-            else jnp.asarray(aspherics, dtype=float)
+            jnp.zeros((0,)) if aspherics is None else jnp.asarray(aspherics, dtype=float)
         )
 
     def _intersect_local(self, o_local, d_local):
@@ -197,12 +203,12 @@ class AsphericFocalSurface(FocalSurface):
         k = self.conic
         a = self.aspherics
 
-        # Closed-form conic intersection as initial guess; Newton-Raphson then
-        # refines for the aspheric terms.
         t_init = intersect_conic(o_local, d_local, c, k)
         t, hit_xy, valid = newton_raphson_intersect(
             lambda x, y: sag_raw(x, y, c, k, a),
-            o_local, d_local, t_init,
+            o_local,
+            d_local,
+            t_init,
         )
         z = sag_raw(hit_xy[0], hit_xy[1], c, k, a)
         return t, hit_xy, z, valid

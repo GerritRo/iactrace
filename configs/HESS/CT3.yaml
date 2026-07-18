@@ -17,12 +17,13 @@ telescope:
   - 0.000000
   - 15.028000
   camera_rotation:
-  - 0.000000
+  - 180.000000
   - 0.000000
   - 0.000000
 mirror_templates:
   spherical_30m:
     surface:
+      type: aspheric
       aspheric: []
       conic: 0.000000
       curvature: 0.033300
@@ -5324,7 +5325,7 @@ obstructions:
   p1:
   - 0.000000
   - 0.000000
-  - 15.000000
+  - 15.030000
   p2:
   - 0.000000
   - 0.000000

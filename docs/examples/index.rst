@@ -92,6 +92,13 @@ Others
 
       Computing per-source per-pixel effective aperture in a single
       render pass via :meth:`iactrace.Camera.response_matrix`.
+    
+   .. grid-item-card:: Error Models
+      :link: ErrorModels
+      :link-type: doc
+
+      Roughness, misalignment and figure errors.
+
 
 .. toctree::
    :maxdepth: 1
@@ -99,6 +106,7 @@ Others
 
    Parabolic
    Cassegrain
+   ErrorModels
    HESS_I
    HESS_II
    MST

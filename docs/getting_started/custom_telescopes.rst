@@ -9,7 +9,7 @@ Two YAML files
 
 A telescope and its camera are described in **two separate YAML files**.
 The telescope file owns the optics and the camera frame; the camera file
-owns the sensor layout and the photosensor model. This split lets a single
+owns the sensor layout and the photodetector model. This split lets a single
 shared camera file be paired with several telescope files (for example
 ``configs/CTAO/LST_camera.yaml`` is reused by all four LSTs).
 
@@ -111,14 +111,20 @@ Each mirror entry specifies:
         type: polygon
         vertices: [[x1,y1],[x2,y2],[x3,y3],...,[xN,yN]]
 
-**template** (required)
-   Reference to a ``mirror_templates`` entry that supplies the surface
-   parameters. Every mirror must reference a defined template.
+**curvature, conic, aspheric, zernike, bsdf, reflectivity, coating** (all optional)
+   A mirror is self-contained: it can set any of these directly, with no
+   ``template`` at all. A field left unset defaults to flat / unmodified
+   surface, perfect specular reflection, and reflectivity ``1.0`` -- see
+   `Mirror Templates`_ for how ``template`` fills these in instead.
+
+**template** (optional)
+   Reference to a ``mirror_templates`` entry supplying defaults for
+   whichever of the fields above the mirror itself leaves unset.
 
 **stage** (optional)
    Optical stage index. Default is 0 (primary). Set to 1 for secondary
    mirrors, 2 for tertiary, etc. Each optical stage may contain at most
-   one mirror or lens group.
+   one mirror group or lens group.
 
 **id** (optional)
    Unique identifier for the facet.
@@ -126,8 +132,16 @@ Each mirror entry specifies:
 Mirror Templates
 ----------------
 
-For segmented mirrors where many facets share surface parameters, define
-the surface in a template and reference it from each facet:
+A template supplies *defaults*, not requirements: every field it can set
+(``surface``, ``bsdf``, ``reflectivity``, ``coating``) can also be set
+directly on a mirror, and the mirror's own value always wins when both are
+defined. A mirror is the **joint** of itself and its (optional) template,
+resolved field by field -- not a fixed split between "shared" and
+"per-mirror" data.
+
+This makes segmented mirrors (many facets sharing most parameters, with one
+that varies per facet) natural: put the shared parameters in a template and
+override just the varying one on each facet.
 
 .. code-block:: yaml
 
@@ -152,8 +166,26 @@ the surface in a template and reference it from each facet:
          type: circular
          radius: 0.3
        template: primary_facet
+       curvature: 0.0335   # this one facet's curvature overrides the template
 
      # ... more facets with same template
+
+A facet's own ``zernike`` is a common use for this: share a template's
+aspheric base across every panel, but give each panel its own measured
+figure error --
+
+.. code-block:: yaml
+
+   mirrors:
+     - position: [0, 0.6, 0]
+       orientation: [0, 0, 0]
+       aperture:
+         type: circular
+         radius: 0.3
+       template: primary_facet
+       zernike:
+         coeffs: [0.0, 0.0, 0.0, 0.0, 1.2e-4]  # this panel's measured astigmatism
+         r_norm: 0.3
 
 Lens Definitions (optional)
 ---------------------------
@@ -161,7 +193,7 @@ Lens Definitions (optional)
 Refractive elements live under the top-level ``lenses:`` key. Two lens
 types are supported:
 
-Lenses share the same ``aperture`` block as mirrors — ``circular`` and
+Lenses share the same ``aperture`` block as mirrors -- ``circular`` and
 ``polygon`` apertures are both supported, so refractive elements can be
 rectangular, hexagonal, etc.
 
@@ -179,7 +211,6 @@ rectangular, hexagonal, etc.
        curvature: 0.05
        conic: 0.0
        n_inside: 1.5
-       n_outside: 1.0       # default; vacuum on the outside
        transmittance: 0.95  # default 1.0
        stage: 1
 
@@ -289,9 +320,9 @@ After loading, inspect the telescope to verify it parsed correctly:
 .. code-block:: python
 
    info = telescope.get_info()
-   print(f"Mirrors: {info['n_mirrors']}")
-   print(f"Optical stages: {info['optical_stages']}")
-   print(f"Obstructions: {info['n_obstructions']}")
+   print(f"Mirror elements: {info['n_mirror_elements']}")
+   print(f"Optical stages:  {info['n_stages']}")
+   print(f"Obstructions:    {info['n_obstructions']}")
 
    # Visualize to check geometry
    from iactrace.viz import show_telescope

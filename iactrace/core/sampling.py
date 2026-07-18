@@ -6,8 +6,9 @@ def sample_annulus(key, inner_radius, outer_radius, shape):
     """
     Generate uniform random samples within an annulus (ring).
 
-    For uniform sampling in an annulus, r² must be uniform between
-    inner_radius² and outer_radius², so r = sqrt(inner² + u*(outer² - inner²)).
+    For uniform sampling in an annulus, r^2 must be uniform between
+    inner_radius^2 and outer_radius^2, so
+    r = sqrt(inner^2 + u*(outer^2 - inner^2)).
 
     Args:
         key: JAX random key
@@ -20,9 +21,9 @@ def sample_annulus(key, inner_radius, outer_radius, shape):
     """
     key1, key2 = random.split(key)
 
-    # Uniform in r² space, then sqrt to get r
-    inner_sq = inner_radius ** 2
-    outer_sq = outer_radius ** 2
+    # Uniform in r^2 space, then sqrt to get r
+    inner_sq = inner_radius**2
+    outer_sq = outer_radius**2
     r = jnp.sqrt(inner_sq + random.uniform(key1, shape) * (outer_sq - inner_sq))
     theta = random.uniform(key2, shape) * 2 * jnp.pi
 
@@ -45,13 +46,19 @@ def sample_polygon(key, vertices, shape):
     """
     # Fan triangulation from first vertex
     n = len(vertices)
-    triangles = jnp.array([[vertices[0], vertices[i], vertices[i+1]]
-                           for i in range(1, n-1)])  # (n-2, 3, 2)
+    triangles = jnp.array(
+        [[vertices[0], vertices[i], vertices[i + 1]] for i in range(1, n - 1)]
+    )  # (n-2, 3, 2)
 
     # Compute triangle areas
     v0, v1, v2 = triangles[:, 0], triangles[:, 1], triangles[:, 2]
-    areas = jnp.abs((v1[:, 0] - v0[:, 0]) * (v2[:, 1] - v0[:, 1]) -
-                    (v2[:, 0] - v0[:, 0]) * (v1[:, 1] - v0[:, 1])) / 2
+    areas = (
+        jnp.abs(
+            (v1[:, 0] - v0[:, 0]) * (v2[:, 1] - v0[:, 1])
+            - (v2[:, 0] - v0[:, 0]) * (v1[:, 1] - v0[:, 1])
+        )
+        / 2
+    )
     probs = areas / areas.sum()
 
     # Sample triangle index weighted by area
@@ -61,13 +68,15 @@ def sample_polygon(key, vertices, shape):
     # Sample uniformly within selected triangles
     u = jnp.sqrt(random.uniform(key2, shape))
     v = random.uniform(key3, shape)
-    a = (1 - u)
+    a = 1 - u
     b = u * (1 - v)
     c = u * v
 
     tri_verts = triangles[tri_idx]  # (..., 3, 2)
-    points = (a[..., None] * tri_verts[:, 0] +
-              b[..., None] * tri_verts[:, 1] +
-              c[..., None] * tri_verts[:, 2])
+    points = (
+        a[..., None] * tri_verts[:, 0]
+        + b[..., None] * tri_verts[:, 1]
+        + c[..., None] * tri_verts[:, 2]
+    )
 
     return points

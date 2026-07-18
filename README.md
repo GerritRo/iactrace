@@ -1,7 +1,7 @@
 # IACTrace
 
-![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12-blue)
-[![License](https://img.shields.io/badge/license-BSD--3--Clause-green)](licenses/LICENSE.rst)
+![Python](https://img.shields.io/badge/python-3.12%2B-blue)
+[![License](https://img.shields.io/badge/license-BSD--3--Clause-green)](LICENSE)
 [![Checked with mypy](http://www.mypy-lang.org/static/mypy_badge.svg)](http://mypy-lang.org/)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![codecov](https://codecov.io/gh/GerritRo/iactrace/branch/main/graph/badge.svg)](https://codecov.io/gh/GerritRo/iactrace)
@@ -13,11 +13,12 @@ IACTrace is a differentiable ray tracing library for simulating the optical prop
 ## Features
 
 - Differentiable ray tracing with JAX
-- Multi-stage optical systems (primary, secondary mirrors)
-- Square and hexagonal sensor arrays
-- Aspheric mirror surfaces with configurable parameters
-- Obstruction modeling (cylinders, boxes, spheres)
-- YAML-based telescope configuration
+- Multi-stage optical systems: segmented primaries, secondary mirrors, lenses and windows
+- Square and hexagonal sensor arrays with per-pixel light concentrators (Winston / Okumura cones)
+- Physical photodetectors: PMTs, SiPMs can be connected in-line with concentrators
+- Aspheric, Zernike and freeform surfaces, plus error models (roughness, misalignment, figure errors)
+- Obstruction modeling (cylinders, boxes, spheres, oriented boxes, triangles)
+- YAML-based telescope and camera configuration
 - Response matrix calculation
 
 ## Installation
@@ -35,30 +36,33 @@ pip install -e ".[dev]"
 
 ## Quick Start
 
+Telescope and camera are configured with separate YAML files and loaded
+independently.
+
 ```python
 import jax
 import jax.numpy as jnp
-from iactrace import MCIntegrator, load_telescope
+from iactrace import Telescope, Camera
 
-# Load telescope from YAML configuration
+# Random key for Monte Carlo ray sampling.
 key = jax.random.key(0)
-integrator = MCIntegrator(n_samples=128)
-telescope = load_telescope("configs/HESS/CT3.yaml", integrator, key)
 
-# Define point sources
-n_sources = 3
-key, key1, key2 = jax.random.split(key, 3)
+# Load the telescope (optics + camera frame) and the camera (sensor layout).
+telescope = Telescope.from_yaml("configs/HESS/CT3.yaml", n_samples=256, key=key)
+camera = Camera.from_yaml("configs/HESS/HESS1U.yaml")
 
-x = jax.random.uniform(key1, (n_sources,), minval=-1, maxval=1)
-y = jax.random.uniform(key2, (n_sources,), minval=-1, maxval=1)
-z = jnp.ones(n_sources) * 500  # Distance in meters
+# Simulate an on-axis astronomical source (parallel light).
+directions = jnp.array([[0.0, 0.0, -1.0]])
+values = jnp.array([1.0])
 
-sources = jnp.stack([x, y, z], axis=1)  # (N, 3) positions
-values = jnp.ones(n_sources)             # (N,) intensities
-
-# Render image
-image = telescope.render(sources, values, source_type='point')
+# render() traces rays through the optics and returns a lazy ray bundle;
+# camera.image() folds it into the pixel image.
+ray_bundle = telescope.render(directions, values, source_type="parallel")
+image = camera.image(ray_bundle)
 ```
+
+See the [Quick Start guide](https://gerritro.github.io/iactrace/getting_started/quickstart.html)
+for point sources, off-axis geometry, and visualization.
 
 ## Documentation
 

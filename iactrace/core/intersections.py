@@ -3,6 +3,7 @@ import jax.numpy as jnp
 
 ### Primitive intersections
 
+
 def intersect_plane(ray_origin, ray_direction, plane_center, plane_rotation):
     """
     Intersect ray with a plane defined by center and rotation matrix.
@@ -77,13 +78,9 @@ def intersect_cylinder(ray_origin, ray_direction, p1, p2, radius):
     perp_top = oc_perp + t_top * rd_perp
 
     t_bottom = jnp.where(
-        (t_bottom > eps) & (jnp.dot(perp_bottom, perp_bottom) <= radius**2),
-        t_bottom, jnp.inf
+        (t_bottom > eps) & (jnp.dot(perp_bottom, perp_bottom) <= radius**2), t_bottom, jnp.inf
     )
-    t_top = jnp.where(
-        (t_top > eps) & (jnp.dot(perp_top, perp_top) <= radius**2),
-        t_top, jnp.inf
-    )
+    t_top = jnp.where((t_top > eps) & (jnp.dot(perp_top, perp_top) <= radius**2), t_top, jnp.inf)
 
     return jnp.min(jnp.array([t1, t2, t_bottom, t_top]))
 
@@ -208,7 +205,7 @@ def intersect_oriented_box(ray_origin, ray_direction, center, half_extents, rota
 
 def intersect_triangle(ray_origin, ray_direction, v0, v1, v2):
     """
-    Intersect ray with triangle using Möller-Trumbore algorithm.
+    Intersect ray with triangle using Moeller-Trumbore algorithm.
 
     Args:
         ray_origin: Ray origin (3,)
@@ -239,12 +236,7 @@ def intersect_triangle(ray_origin, ray_direction, v0, v1, v2):
     t = f * jnp.dot(edge2, q)
 
     # Check validity: not parallel, barycentric coords valid, t > 0
-    valid = (
-        ~parallel &
-        (u >= 0.0) & (u <= 1.0) &
-        (v >= 0.0) & (u + v <= 1.0) &
-        (t > eps)
-    )
+    valid = ~parallel & (u >= 0.0) & (u <= 1.0) & (v >= 0.0) & (u + v <= 1.0) & (t > eps)
 
     return jnp.where(valid, t, jnp.inf)
 
@@ -288,7 +280,7 @@ def intersect_conic(ray_origin, ray_direction, curvature, conic):
     Compute closed-form ray-conic intersection parameter.
 
     The conic surface is defined by the implicit equation:
-        c*(x² + y²) + (1+k)*c*z² - 2*z = 0
+        c*(x^2 + y^2) + (1+k)*c*z^2 - 2*z = 0
 
     where c is curvature and k is the conic constant.
 
@@ -306,26 +298,33 @@ def intersect_conic(ray_origin, ray_direction, curvature, conic):
     c = curvature
     k = conic
 
-    # Quadratic coefficients: A*t² + B*t + C = 0
-    # From substituting ray into: c*(x² + y²) + (1+k)*c*z² - 2*z = 0
+    # Quadratic coefficients: A*t^2 + B*t + C = 0
+    # From substituting ray into: c*(x^2 + y^2) + (1+k)*c*z^2 - 2*z = 0
     A = c * (dx * dx + dy * dy + (1 + k) * dz * dz)
     B = 2 * (c * (ox * dx + oy * dy + (1 + k) * oz * dz) - dz)
     C = c * (ox * ox + oy * oy + (1 + k) * oz * oz) - 2 * oz
 
-    # Handle near-zero curvature (plane)
+    # Handle near-zero curvature (plane). Grad-safe division (double-where):
+    # a bare -oz/dz would inject nan into the gradient for rays parallel to
+    # the plane (dz == 0), even though the inf branch is the one selected.
     is_plane = jnp.abs(c) < 1e-12
-    t_plane = jnp.where(jnp.abs(dz) > 1e-10, -oz / dz, jnp.inf)
+    dz_ok = jnp.abs(dz) > 1e-10
+    t_plane = jnp.where(dz_ok, -oz / jnp.where(dz_ok, dz, 1.0), jnp.inf)
     t_plane = jnp.where(t_plane > 1e-8, t_plane, jnp.inf)
 
-    # Handle linear case (A ≈ 0, e.g., paraboloid on-axis)
+    # Handle linear case (A ~ 0, e.g., paraboloid on-axis); grad-safe as above.
     is_linear = jnp.abs(A) < 1e-12
-    t_linear = jnp.where(jnp.abs(B) > 1e-12, -C / B, jnp.inf)
+    b_ok = jnp.abs(B) > 1e-12
+    t_linear = jnp.where(b_ok, -C / jnp.where(b_ok, B, 1.0), jnp.inf)
     t_linear = jnp.where(t_linear > 1e-8, t_linear, jnp.inf)
 
-    # Solve quadratic
+    # Solve quadratic. Grad-safe sqrt: at discriminant == 0 (e.g. the fully
+    # degenerate flat-plane case A == B == 0) the sqrt's infinite slope would
+    # otherwise nan the gradient even though the plane branch is selected.
     discriminant = B * B - 4 * A * C
     no_intersection = discriminant < 0
-    sqrt_disc = jnp.sqrt(jnp.maximum(discriminant, 0.0))
+    disc_ok = discriminant > 0.0
+    sqrt_disc = jnp.where(disc_ok, jnp.sqrt(jnp.where(disc_ok, discriminant, 1.0)), 0.0)
 
     # Two roots
     t1 = (-B - sqrt_disc) / (2 * A + 1e-30)
@@ -337,16 +336,17 @@ def intersect_conic(ray_origin, ray_direction, curvature, conic):
     t_conic = jnp.where(
         t1_valid & t2_valid,
         jnp.minimum(t1, t2),
-        jnp.where(t1_valid, t1, jnp.where(t2_valid, t2, jnp.inf))
+        jnp.where(t1_valid, t1, jnp.where(t2_valid, t2, jnp.inf)),
     )
     t_conic = jnp.where(no_intersection, jnp.inf, t_conic)
 
-    # Select: plane → linear → quadratic
+    # Select: plane -> linear -> quadratic
     t_conic = jnp.where(is_linear, t_linear, t_conic)
     return jnp.where(is_plane, t_plane, t_conic)
 
 
 ### Newton-Raphson method
+
 
 def newton_raphson_intersect(sag_fn, ray_origin, ray_direction, t_init=None, max_iter=10, tol=1e-8):
     """
@@ -372,11 +372,7 @@ def newton_raphson_intersect(sag_fn, ray_origin, ray_direction, t_init=None, max
 
     # Initial guess: use provided value or intersect with z=0 plane
     if t_init is None:
-        t_init = jnp.where(
-            jnp.abs(dz) > 1e-10,
-            -oz / dz,
-            0.0
-        )
+        t_init = jnp.where(jnp.abs(dz) > 1e-10, -oz / dz, 0.0)
         t_init = jnp.maximum(t_init, 0.0)
 
     def g(t):
@@ -402,12 +398,7 @@ def newton_raphson_intersect(sag_fn, ray_origin, ray_direction, t_init=None, max
 
         return (t_out, new_converged), None
 
-    (t_final, _), _ = jax.lax.scan(
-        newton_step,
-        (t_init, False),
-        None,
-        length=max_iter
-    )
+    (t_final, _), _ = jax.lax.scan(newton_step, (t_init, False), None, length=max_iter)
 
     # Compute hit coordinates
     x_hit = ox + t_final * dx

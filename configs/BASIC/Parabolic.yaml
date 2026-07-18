@@ -6,12 +6,13 @@ telescope:
   - 0.000000
   - 0.400000
   camera_rotation:
-  - 0.000000
+  - 180.000000
   - 0.000000
   - 0.000000
 mirror_templates:
   primary:
     surface:
+      type: aspheric
       curvature: 1.250000
       conic: -1.000000
       aspheric: []
