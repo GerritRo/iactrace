@@ -1,5 +1,37 @@
 # Changelog
 
+## v0.9.0 (2026-07-18)
+
+### BREAKING CHANGE
+
+- Closes #11
+
+### Feat
+
+- **core,tests,camera**: refactored tests to be more concentrated and better motivated, refactored to reduce code duplication and increase polymorphism, restructured camera module
+- **camera**: created a combined tracing chain, including photosensor surface, allowing for peeking
+- **core**: added an alive flag to ray bundles, to avoid confusing properties regarding value and hit mask
+- **camera**: added okumura cone prototype
+- **camera,configs,io,viz,tests**: implemented a detection chain that allows for concentrators and complicated photosensors
+- **core**: added angle dependent coatings via tabulation
+
+### Fix
+
+- **configs**: changed the ordering of the modules to reflective of the way it is done in sim_telarray
+- **core,-surfaces**: added more surface types, fixed shadowing bug for tracing
+- **configs**: improved telescope shadowing (no baffling instead of monolithic camera enclosure, to avoid incorrect self shadowing. also added a best guess okumura cone to LSTCam
+- **configs**: Added winston cones to flashcam, nectarcam and HESS2cam
+- **configs,viz**: added winston cone to HESS1U, fixed relative position of mirrors in the context of coordinate conventions, added visualization of the sensor grid
+- **core**: fix that there is no shadowing applied in the last leg to the focal plane, improved focal plane analysis
+- **camera**: fixed roundtripping issues with camera and coatings
+- **camera,core,io**: fixed bugs regarding mirroring, io and camera rays
+- **io**: fixed bsdf not bein correctly serialized
+
+### Refactor
+
+- **refactor**: refactored camera module, slimmed tests, better io for surfaces
+- **format,-doc**: ruff formatting and small doc changes regarding conventions
+
 ## v0.8.0 (2026-06-11)
 
 ### Feat
