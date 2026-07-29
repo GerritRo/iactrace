@@ -25,7 +25,7 @@ def _apply_color(mesh, rgba):
         mesh.visual.face_colors = rgba
 
 
-def show_telescope(telescope, camera=None, **kwargs):
+def show_telescope(telescope, camera=None, *, trajectory=None, **kwargs):
     """
     Visualize telescope in 3D.
 
@@ -39,6 +39,11 @@ def show_telescope(telescope, camera=None, **kwargs):
     Args:
         telescope: Telescope object
         camera: Optional Camera object (for rendering sensors)
+        trajectory: Optional recorded ray paths to draw as polylines, in the
+            world frame (the frame the optics are drawn in). A ``(steps + 1, N, 3)``
+            array as returned by ``Telescope.trace(..., record_trajectory=True)``.
+            Trace yourself and pass the result -- this function does not run the
+            tracer. Drawn via :func:`add_trajectories`.
         **kwargs: Additional options:
             - mirror_color: RGBA color for mirrors (default: light blue)
             - obstruction_color: RGBA color for obstructions (default: gray)
@@ -92,6 +97,10 @@ def show_telescope(telescope, camera=None, **kwargs):
                     path.apply_transform(cam_transform)
                     scene.add_geometry(path)
 
+    # Optional recorded ray paths (traced by the caller), drawn as-is.
+    if trajectory is not None:
+        add_trajectories(scene, trajectory, color=kwargs.get("trace_color", [0, 0, 150, 180]))
+
     return scene
 
 
@@ -107,7 +116,7 @@ def export_mesh(telescope, filename):
     scene.export(filename)
 
 
-def show_sensor_chain(camera, sensor_idx=0, **kwargs):
+def show_sensor_chain(camera, sensor_idx=0, *, trajectory=None, **kwargs):
     """Visualize a single pixel's detection chain ("train") in 3D.
 
     Draws, in the canonical pixel-local frame (entrance aperture at ``z = 0``,
@@ -122,11 +131,22 @@ def show_sensor_chain(camera, sensor_idx=0, **kwargs):
     a :class:`~iactrace.camera.detector.pmt.PMT`), its glass body is lofted around
     the detector plane as well.
 
+    Ray paths are *not* traced here -- run the chain tracer yourself and pass the
+    recorded ``trajectory`` (pixel-local frame) to overlay it, e.g.::
+
+        trace = trace_chain(cone, chain.surface, rays, record_trajectory=True)
+        show_sensor_chain(camera, trajectory=trace)  # ChainTrace or its array
+
     Args:
         camera: Camera object (the selected sensor group and its ``chain`` are read).
         sensor_idx: Which sensor group to take the pixel geometry and chain from.
+        trajectory: Optional recorded ray paths to draw as polylines, in the
+            pixel-local frame: a ``(steps + 1, N, 3)`` array or any object exposing
+            a ``trajectory`` attribute (e.g. a
+            :class:`~iactrace.camera.optics.ChainTrace`). Drawn via
+            :func:`add_trajectories`.
         **kwargs: ``entrance_color`` / ``cone_color`` / ``detector_color`` /
-            ``sensor_color`` RGBA.
+            ``sensor_color`` / ``trace_color`` RGBA.
 
     Returns:
         trimesh.Scene
@@ -211,6 +231,10 @@ def show_sensor_chain(camera, sensor_idx=0, **kwargs):
         if body is not None:
             _apply_color(body, sensor_color)
             scene.add_geometry(body)
+
+    # Optional recorded ray paths (traced by the caller), drawn as-is.
+    if trajectory is not None:
+        add_trajectories(scene, trajectory, color=kwargs.get("trace_color", [255, 200, 0, 255]))
 
     return scene
 
@@ -917,6 +941,18 @@ def _aperture_slab_mesh(position, rotation_euler, aperture, i, thickness, sectio
     return mesh
 
 
+def _color_path(path, rgba):
+    """Colour every entity of a ``Path3D`` so the colour survives to the viewer.
+
+    ``Path.colors`` is stored *per entity* and reads back ``None`` until it is
+    assigned, in which case the glTF exporter emits no ``COLOR_0`` attribute and
+    three.js falls back to the default material -- which is why an uncoloured
+    path renders white in a notebook however it was constructed.
+    """
+    path.colors = np.tile(np.asarray(rgba, dtype=np.uint8), (len(path.entities), 1))
+    return path
+
+
 def add_rays(scene, origins, directions, length=10.0, color=None):
     """
     Add rays to scene for debugging.
@@ -926,13 +962,13 @@ def add_rays(scene, origins, directions, length=10.0, color=None):
         origins: Ray origins (N, 3)
         directions: Ray directions (N, 3)
         length: Ray length
-        color: RGBA color (unused, trimesh paths don't support colors well)
+        color: RGBA color for the rays (default: yellow)
 
     Returns:
         scene
     """
     if color is None:
-        color = [255, 255, 0, 255]
+        color = [0, 0, 150, 180]
     origins = np.asarray(origins)
     directions = np.asarray(directions)
     endpoints = origins + directions * length
@@ -947,6 +983,62 @@ def add_rays(scene, origins, directions, length=10.0, color=None):
     entities = [trimesh.path.entities.Line([2 * i, 2 * i + 1]) for i in range(n_rays)]
 
     path = trimesh.path.Path3D(entities=entities, vertices=vertices)
+    _color_path(path, color)
+    scene.add_geometry(path)
+    return scene
+
+
+def add_trajectories(scene, trajectory, color=None):
+    """Add multi-segment ray paths (polylines) to a scene.
+
+    Draws one polyline per ray through its consecutive positions -- the natural
+    way to render a recorded trace from either stage.
+
+    Args:
+        scene: trimesh.Scene
+        trajectory: A :class:`~iactrace.core.trajectory.Trajectory` (as returned
+            by ``Telescope.trace(..., record_trajectory=True)``), a
+            :class:`~iactrace.camera.optics.ChainTrace` (or any object exposing a
+            ``trajectory`` attribute), or a raw ``(steps + 1, N, 3)`` array.
+            ``None`` (recording was off) is a no-op.
+        color: RGBA color for the ray paths (default: amber). Applied per
+            polyline, so it survives the glTF export a notebook renders through.
+
+    Returns:
+        scene
+    """
+    if color is None:
+        color = [0, 0, 150, 180]
+    # Unwrap a ChainTrace-like container to its trajectory; a Trajectory / array
+    # has no such attribute and passes through. np.asarray then handles both a
+    # Trajectory (via __array__) and a raw array.
+    trajectory = getattr(trajectory, "trajectory", trajectory)
+    if trajectory is None:
+        return scene
+    trajectory = np.asarray(trajectory)
+    if trajectory.ndim != 3 or trajectory.shape[0] < 2:
+        return scene
+    steps, n_rays, _ = trajectory.shape
+
+    vertices = []
+    entities = []
+    for j in range(n_rays):
+        pts = trajectory[:, j, :]
+        idx = [len(vertices)]
+        vertices.append(pts[0])
+        # Skip repeated points: a ray frozen after termination (lost/landed)
+        # repeats its final position each remaining step.
+        for k in range(1, steps):
+            if not np.allclose(pts[k], vertices[-1]):
+                idx.append(len(vertices))
+                vertices.append(pts[k])
+        if len(idx) >= 2:
+            entities.append(trimesh.path.entities.Line(idx))
+
+    if not entities:
+        return scene
+    path = trimesh.path.Path3D(entities=entities, vertices=np.asarray(vertices))
+    _color_path(path, color)
     scene.add_geometry(path)
     return scene
 
@@ -964,7 +1056,7 @@ def add_points(scene, points, color=None):
         scene
     """
     if color is None:
-        color = [0, 255, 0, 255]
+        color = [0, 0, 150, 180]
     points = np.asarray(points)
 
     cloud = trimesh.PointCloud(points, colors=np.tile(color, (len(points), 1)))

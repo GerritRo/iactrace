@@ -10,6 +10,7 @@ from jax import Array
 
 from ...core.interactions import reflect
 from ...core.ray_bundle import RayBundle
+from ...core.trajectory import Trajectory
 from ..detector.surface import DetectionSurface
 from .concentrator import Concentrator
 
@@ -142,15 +143,15 @@ class ChainTrace(NamedTuple):
             ``directions`` the true incident direction, ``path_length`` the
             accumulated OPL.
         bounces: ``(N,)`` int -- wall reflections before termination.
-        trajectory: ``(steps + 1, N, 3)`` per-step positions (pixel-local
-            frame) when the trace was run with ``record_trajectory=True``,
-            else ``None``. Diagnostics only -- it costs
-            ``(max_bounces + 2) x N x 3`` floats, so it is off by default.
+        trajectory: A :class:`~iactrace.core.trajectory.Trajectory` of per-step
+            positions (pixel-local frame) when the trace was run with
+            ``record_trajectory=True``, else ``None``. Diagnostics only -- it
+            costs ``(max_bounces + 2) x N x 3`` floats, so it is off by default.
     """
 
     rays: RayBundle
     bounces: jax.Array
-    trajectory: jax.Array | None
+    trajectory: Trajectory | None
 
 
 def _trace_step(o, d, value, path, done, nmed, hit_stop, bounces, walls, stop, vertex):
@@ -219,8 +220,11 @@ def trace_chain(
     strike the dead face around the cone and are lost immediately. Landing on
     ``stop`` is the only surviving outcome: the returned ``rays.alive`` is the
     incoming liveness AND-ed with "landed". Pass ``record_trajectory=True`` to
-    also collect the per-step ray positions (diagnostics; memory scales with
-    ``max_bounces x n_rays``).
+    also collect the per-step ray positions as a
+    :class:`~iactrace.core.trajectory.Trajectory` on
+    :attr:`ChainTrace.trajectory` (diagnostics; memory scales with
+    ``max_bounces x n_rays``). Off by default and free when off -- the per-step
+    positions are simply not emitted from the scan.
     """
     if max_bounces is None:
         max_bounces = walls.max_bounces
@@ -253,7 +257,9 @@ def trace_chain(
     value = jnp.where(done, value, 0.0)  # rays still live at the end are absorbed
     landed = hit_stop & done
     trajectory = (
-        jnp.concatenate([rays.origins[None], traj - lift], axis=0) if record_trajectory else None
+        Trajectory(points=jnp.concatenate([rays.origins[None], traj - lift], axis=0))
+        if record_trajectory
+        else None
     )
     return ChainTrace(
         rays=RayBundle(
