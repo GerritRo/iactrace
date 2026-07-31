@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import equinox as eqx
+import jax.numpy as jnp
 
 from ..core.ray_bundle import RayBundle
+from ..core.trajectory import Trajectory
 from .detector import DetectionSurface, PhotoDetector
 from .optics import Concentrator
 
@@ -64,7 +66,9 @@ class DetectionChain(eqx.Module):
         """
         return self.photodetector.surface.shifted(self.detector_z)
 
-    def propagate(self, local_rays: RayBundle) -> RayBundle:
+    def propagate(
+        self, local_rays: RayBundle, record_trajectory: bool = False
+    ) -> RayBundle | tuple[RayBundle, Trajectory]:
         """Trace *local_rays* to the sensor surface, then hand off to the photodetector.
 
         ``local_rays`` are in the pixel-local frame (entrance at ``z = 0``). With
@@ -79,10 +83,27 @@ class DetectionChain(eqx.Module):
         detection efficiency (reading any geometry it needs from the surface it
         owns). Optical path length is accumulated up to the surface (concentrator
         fill index on its internal leg, ray medium ``n`` on the free legs).
+
+        Pass ``record_trajectory=True`` to also get a
+        :class:`~iactrace.core.trajectory.Trajectory` of the path through the
+        chain (pixel-local frame): the wall-by-wall bounce path where the
+        concentrator can report one, otherwise the straight entrance-to-landing
+        segment. Off by default.
         """
         surface = self.surface
         if self.concentrator is None:
             landed = surface.stop(local_rays)
+            points = None
         else:
-            landed = self.concentrator.to_surface(local_rays, surface)
-        return self.photodetector.detect(landed)
+            if record_trajectory:
+                landed, points = self.concentrator.trace_to_surface(local_rays, surface)
+            else:
+                landed, points = self.concentrator.to_surface(local_rays, surface), None
+
+        pe_rays = self.photodetector.detect(landed)
+        if not record_trajectory:
+            return pe_rays
+        if points is None:
+            # No internal path to report: entrance straight to where it landed.
+            points = jnp.stack([local_rays.origins, landed.origins], axis=0)
+        return pe_rays, Trajectory(points=points)

@@ -74,8 +74,11 @@ def profile_apothem(z: Array, exit_apothem: float, s: float, c: float) -> Array:
     A = c * c
     B = 2.0 * (a2 + s * c * z + s * k)
     C = a2**2 + z**2 - (c * z + k) ** 2
-    disc = jnp.maximum(B * B - 4.0 * A * C, 0.0)
-    return (-B + jnp.sqrt(disc)) / (2.0 * A)
+    # Grad-safe sqrt
+    raw = B * B - 4.0 * A * C
+    pos = raw > 0.0
+    sq = jnp.where(pos, jnp.sqrt(jnp.where(pos, raw, 1.0)), 0.0)
+    return (-B + sq) / (2.0 * A)
 
 
 def _wall_t(o: Array, d: Array, n: Array, a2: float, s: float, c: float, k: float) -> Array:

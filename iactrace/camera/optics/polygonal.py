@@ -111,6 +111,13 @@ class PolygonalCone(Concentrator):
         """
         return trace_chain(self, surface, rays).rays
 
+    def trace_to_surface(
+        self, rays: RayBundle, surface: DetectionSurface
+    ) -> tuple[RayBundle, Array | None]:
+        """:meth:`to_surface`, also returning the per-bounce wall path."""
+        tr = trace_chain(self, surface, rays, record_trajectory=True)
+        return tr.rays, tr.trajectory.points
+
     @abstractmethod
     def _meridian(self) -> tuple[Array, Array]:
         """``(z, apothem)`` samples of the wall meridian, ``_N_SLICES`` each.
@@ -223,8 +230,7 @@ def trace_chain(
     also collect the per-step ray positions as a
     :class:`~iactrace.core.trajectory.Trajectory` on
     :attr:`ChainTrace.trajectory` (diagnostics; memory scales with
-    ``max_bounces x n_rays``). Off by default and free when off -- the per-step
-    positions are simply not emitted from the scan.
+    ``max_bounces x n_rays``).
     """
     if max_bounces is None:
         max_bounces = walls.max_bounces

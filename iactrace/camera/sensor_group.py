@@ -109,6 +109,10 @@ class SensorGroup(eqx.Module):
         """Localize ``(x, y)`` to a flat pixel index plus a validity mask."""
         raise NotImplementedError
 
+    @property
+    def pixel_frame_rotation(self) -> float:
+        return 0.0
+
     def scatter(self, pix_id: Array, valid: Array, values: Array) -> Array:
         """Sum *values* into the pixel accumulator by precomputed assignment."""
         shape = self.get_accumulator_shape()
@@ -139,6 +143,19 @@ class SensorGroup(eqx.Module):
     @abstractmethod
     def to_pixel_frame(self, sensor_rays: RayBundle, pix_id: Array) -> RayBundle:
         """Re-express tile-local rays in their assigned pixel's local frame."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def from_pixel_frame(self, points: Array, pix_id: Array) -> Array:
+        """Map pixel-local *points* back to the tile-local frame.
+
+        The inverse of :meth:`to_pixel_frame` for positions, undoing the pixel
+        centre offset (and any grid alignment) for each ray's assigned pixel.
+        ``points`` is ``(..., n_rays, 3)`` and ``pix_id`` ``(n_rays,)``, so a
+        whole recorded trajectory can be lifted out of the pixel frame in one
+        call -- which is what turns a chain trace into something drawable
+        alongside the rest of the camera.
+        """
         raise NotImplementedError
 
 
@@ -267,6 +284,17 @@ class SquareSensorGroup(SensorGroup):
         local = jnp.stack([x - cx, y - cy, jnp.zeros_like(x)], axis=-1)
         return sensor_rays.replace(origins=local)
 
+    def from_pixel_frame(self, points: Array, pix_id: Array) -> Array:
+        idx = pix_id % (self.height * self.width)
+        xi = idx % self.width
+        yi = idx // self.width
+        cx = self.x0 + (xi + 0.5) * self.dx
+        cy = self.y0 + (yi + 0.5) * self.dy
+        return jnp.stack(
+            [points[..., 0] + cx, points[..., 1] + cy, points[..., 2]],
+            axis=-1,
+        )
+
 
 # HexagonalSensorGroup
 
@@ -361,6 +389,11 @@ class HexagonalSensorGroup(SensorGroup):
     def get_accumulator_shape(self) -> tuple[int]:
         return (self.n_pixels,)
 
+    @property
+    def pixel_frame_rotation(self) -> float:
+        """The detected grid rotation -- see :attr:`SensorGroup.pixel_frame_rotation`."""
+        return self.grid_rotation
+
     def _to_grid_coords(self, x: Array, y: Array) -> tuple[Array, Array]:
         """Transform world coordinates to grid-aligned coordinates."""
         return _rotate(x - self.grid_offset[0], y - self.grid_offset[1], -self.grid_rotation)
@@ -425,4 +458,16 @@ class HexagonalSensorGroup(SensorGroup):
         return sensor_rays.replace(
             origins=jnp.stack([local_x, local_y, jnp.zeros_like(local_x)], axis=-1),
             directions=jnp.stack([dx_g, dy_g, sensor_rays.directions[:, 2]], axis=-1),
+        )
+
+    def from_pixel_frame(self, points: Array, pix_id: Array) -> Array:
+        centers = self.pixel_centers_grid[pix_id % self.n_pixels]  # (n_rays, 2)
+        # Undo the pixel-centre offset in the grid-aligned frame, then undo the
+        # grid alignment itself (rotation and offset) to land back on the tile.
+        x_grid = points[..., 0] + centers[..., 0]
+        y_grid = points[..., 1] + centers[..., 1]
+        x, y = _rotate(x_grid, y_grid, self.grid_rotation)
+        return jnp.stack(
+            [x + self.grid_offset[0], y + self.grid_offset[1], points[..., 2]],
+            axis=-1,
         )

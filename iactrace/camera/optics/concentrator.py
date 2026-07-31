@@ -40,6 +40,20 @@ class Concentrator(eqx.Module):
         """
         raise NotImplementedError
 
+    def trace_to_surface(
+        self, rays: RayBundle, surface: DetectionSurface
+    ) -> tuple[RayBundle, Array | None]:
+        """:meth:`to_surface`, additionally reporting the path rays took.
+
+        Returns ``(landed_rays, points)`` where ``points`` is
+        ``(steps + 1, n_rays, 3)`` in the pixel-local frame, or ``None`` when
+        this concentrator cannot report a path -- the base implementation, which
+        subclasses that trace internally (e.g.
+        :class:`~iactrace.camera.optics.polygonal.PolygonalCone`) override.
+        Callers fall back to a straight entrance-to-landing segment on ``None``.
+        """
+        return self.to_surface(rays, surface), None
+
     def apply(self, rays: RayBundle) -> RayBundle:
         """Transport *rays* to the exit aperture (a flat plane at ``z = -length``).
 

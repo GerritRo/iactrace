@@ -13,12 +13,18 @@ from .camera import (
     SquareSensorGroup,
     WinstonCone,
 )
-from .core import LazyRayBundle, RayBundle
+from .core import LazyRayBundle, RayBundle, Trajectory
 from .io import save_camera, save_telescope
 from .telescope import Telescope
-from .viz import show_camera, show_sensor_chain, show_telescope
+from .viz import (
+    add_trajectories,
+    show_camera,
+    show_image,
+    show_sensor_chain,
+    show_telescope,
+)
 
-__version__ = "0.9.0"
+__version__ = "0.8.0"
 
 jax.config.update("jax_default_matmul_precision", "highest")
 
@@ -27,6 +33,7 @@ __all__ = [
     "Camera",
     "RayBundle",
     "LazyRayBundle",
+    "Trajectory",
     "Concentrator",
     "WinstonCone",
     "OkumuraCone",
@@ -40,9 +47,11 @@ __all__ = [
     "ConstantQE",
     "PMT",
     # Visualization
-    "show_camera",
+    "show_image",
     "show_telescope",
+    "show_camera",
     "show_sensor_chain",
+    "add_trajectories",
     # I/O
     "save_telescope",
     "save_camera",

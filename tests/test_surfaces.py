@@ -137,8 +137,71 @@ class TestConicIntersection:
         ]:
             direction = direction / jnp.linalg.norm(direction)
             t = intersect_conic(origin, direction, c, k)
-            hit = origin + t * direction
-            assert jnp.allclose(self._residual(hit, c, k), 0.0, atol=1e-8)
+            hit = self._hit(origin, direction, t)
+            assert jnp.allclose(self._residual(hit, c, k), 0.0, atol=self._tol(origin))
+
+    def _sag(self, x, y, c, k):
+        """The sag branch: z = c*r^2 / (1 + sqrt(1 - (1+k)*c^2*r^2))."""
+        r2 = x**2 + y**2
+        return r2 * c / (1 + jnp.sqrt(1 - (1 + k) * c * c * r2))
+
+    @staticmethod
+    def _hit(origin, direction, t):
+        """Step to the hit the well-conditioned way, from the closest approach to
+        the vertex. A plain ``origin + t * direction`` cancels two vectors of
+        order the source distance, so in float32 the *test's* own reconstruction
+        would be noisier than what it is trying to measure."""
+        t0 = -jnp.dot(origin, direction)
+        return origin + t0 * direction + (t - t0) * direction
+
+    @staticmethod
+    def _tol(origin):
+        """A few float32 ulps at this ray's magnitude.
+
+        float32 carries ~1.2e-7 relative precision, so the hit is only known to
+        ``eps * |origin|``; the conic residual differentiates that with a factor
+        of about two (the ``-2z`` term). This stays far tighter than the thing
+        under test -- telling the sag branch (z ~ 0.004) from the far sheet
+        (z ~ 60) -- at every distance exercised here.
+        """
+        return 1e-6 * max(1.0, float(jnp.linalg.norm(origin)))
+
+    @pytest.mark.parametrize("z0", [5.0, 30.0, 59.0, 61.0, 100.0, 1000.0])
+    def test_hit_is_on_the_sag_branch_at_any_source_distance(self, z0):
+        """A sphere's implicit conic is closed -- the ball of radius R centred at
+        (0, 0, R), spanning z in [0, 2R]. A ray from beyond 2R crosses the far
+        sheet first, so the *nearest* forward root is the wrong one: the hit must
+        be the vertex sheet, i.e. z = sag(x, y), at every distance.
+        """
+        c, k = 1.0 / 30.0, 0.0  # R = 30 -> the far sheet sits at z ~ 60
+        origin = jnp.array([0.4, -0.3, z0])
+        direction = jnp.array([0.0, 0.0, -1.0])
+
+        t = intersect_conic(origin, direction, c, k)
+        hit = self._hit(origin, direction, t)
+        atol = self._tol(origin)
+
+        assert jnp.isfinite(t)
+        # On the conic at all (the far sheet satisfies this too) ...
+        assert jnp.allclose(self._residual(hit, c, k), 0.0, atol=atol)
+        # ... and specifically on the sag branch near the vertex.
+        assert jnp.allclose(hit[2], self._sag(hit[0], hit[1], c, k), atol=atol)
+        assert (1 + k) * c * hit[2] <= 1.0 + 1e-6
+        # A vertical ray keeps its transverse position.
+        assert jnp.allclose(hit[:2], origin[:2], atol=atol)
+
+    def test_far_sheet_is_never_returned_for_a_tilted_ray(self):
+        """Same trap off-axis and tilted, where both roots are forward."""
+        c, k = 1.0 / 30.0, 0.0
+        origin = jnp.array([2.0, -1.0, 200.0])
+        direction = jnp.array([-0.02, 0.01, -1.0])
+        direction = direction / jnp.linalg.norm(direction)
+
+        t = intersect_conic(origin, direction, c, k)
+        hit = self._hit(origin, direction, t)
+
+        assert jnp.allclose(hit[2], self._sag(hit[0], hit[1], c, k), atol=self._tol(origin))
+        assert hit[2] < 30.0, "returned the far sheet of the sphere"
 
 
 class TestNewtonRaphsonIntersect:
@@ -558,9 +621,10 @@ class TestFreeformSurface:
         surf = FreeformSurfaceGroup.from_extent(jnp.full((1, 9, 9), 0.7), 0.5, 0.5)
         elem = surf._index(0)
         for x, y in [(0.0, 0.0), (0.2, -0.3), (0.4, 0.1)]:
-            assert float(elem._sag_local(x, y)) == pytest.approx(0.0, abs=1e-9)
+            assert float(elem._sag_local(x, y)) == pytest.approx(0.0, abs=1e-6)
             _, normal = elem.compute_sag_and_normal_at(x, y)
-            assert np.allclose(np.asarray(normal), [0.0, 0.0, 1.0], atol=1e-9)
+            # float32: the interpolated slope of a constant grid is eps-level noise
+            assert np.allclose(np.asarray(normal), [0.0, 0.0, 1.0], atol=1e-6)
 
     def test_standalone_intersection_on_surface(self):
         def fn(x, y):
@@ -590,7 +654,7 @@ class TestFreeformSurface:
         expected = float(centered._index(0)._sag_intrinsic(x + ox, y + oy)) - float(
             centered._index(0)._sag_intrinsic(ox, oy)
         )
-        assert float(surf.sag_at(0, x, y)) == pytest.approx(expected, abs=1e-9)
+        assert float(surf.sag_at(0, x, y)) == pytest.approx(expected, abs=1e-6)
 
     def test_validation(self):
         with pytest.raises(ValueError):
