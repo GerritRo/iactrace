@@ -40,8 +40,7 @@ def add_rays(scene, origins, directions, length=10.0, color=None):
 
 
 def _clip_segment(p0, p1, lo, hi):
-    """Portion of the segment ``p0 -> p1`` inside the box, or ``None``.
-    """
+    """Portion of the segment ``p0 -> p1`` inside the box, or ``None``."""
     d = p1 - p0
     t0, t1 = 0.0, 1.0
     for axis in range(3):

@@ -143,14 +143,16 @@ class TestRenderLinearity:
         tel, cam = make_simple_telescope(n_samples=64)
         sources = jnp.array(
             [
-                [0.0003, 0.0001, -1.0],
-                [0.0005, 0.0, -1.0],
-                [-0.0005, 0.0, -1.0],
+                [0.00036, 0.00036, -1.0],
+                [0.00108, 0.00036, -1.0],
+                [-0.00036, -0.00108, -1.0],
             ]
         )
         rb = tel.render(sources, jnp.ones(3), source_type="parallel")
 
         # Lazy fused fold == eager scatter on the materialised flat bundle.
+        print(jnp.sum(jnp.abs(cam.image(rb) - cam.image(rb.materialise()))))
+        print(cam.image(rb).shape, cam.image(rb.materialise()).shape)
         assert jnp.allclose(cam.image(rb), cam.image(rb.materialise()), atol=1e-5)
 
 
