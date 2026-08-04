@@ -64,7 +64,9 @@ def _clipped_runs(points, lo, hi):
     """
     if lo is None:
         return [points]
-    runs, current, joinable = [], [], False
+    runs: list[list[np.ndarray]] = []
+    current: list[np.ndarray] = []
+    joinable = False
     for p0, p1 in zip(points[:-1], points[1:], strict=True):
         piece = _clip_segment(p0, p1, lo, hi)
         if piece is None:
@@ -88,13 +90,13 @@ def _clipped_runs(points, lo, hi):
 def add_trajectories(scene, trajectory, color=None, clip=None):
     """Add multi-segment ray paths (polylines) to a scene.
 
-    Draws one polyline per ray through its consecutive positions -- the natural
-    way to render a recorded trace from either stage.
+    Draws one polyline per ray through its consecutive positions.
 
     Args:
         scene: trimesh.Scene
         trajectory: A :class:`~iactrace.core.trajectory.Trajectory` (as returned
             by ``Telescope.trace(..., record_trajectory=True)``), a
+            :class:`~iactrace.core.trajectory.TraceResult` or
             :class:`~iactrace.camera.optics.ChainTrace` (or any object exposing a
             ``trajectory`` attribute), or a raw ``(steps + 1, N, 3)`` array.
             ``None`` (recording was off) is a no-op.
@@ -112,9 +114,7 @@ def add_trajectories(scene, trajectory, color=None, clip=None):
     """
     if color is None:
         color = [255, 200, 0, 255]
-    # Unwrap a ChainTrace-like container to its trajectory; a Trajectory / array
-    # has no such attribute and passes through. np.asarray then handles both a
-    # Trajectory (via __array__) and a raw array.
+    # Unwrap a TraceResult / ChainTrace-like container to its trajectory
     trajectory = getattr(trajectory, "trajectory", trajectory)
     if trajectory is None:
         return scene
@@ -124,7 +124,7 @@ def add_trajectories(scene, trajectory, color=None, clip=None):
     steps, n_rays, _ = trajectory.shape
     lo, hi = (None, None) if clip is None else (np.asarray(clip[0]), np.asarray(clip[1]))
 
-    vertices = []
+    vertices: list[np.ndarray] = []
     entities = []
     for j in range(n_rays):
         pts = trajectory[:, j, :]

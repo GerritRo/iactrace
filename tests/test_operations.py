@@ -427,9 +427,9 @@ class TestEndToEndTrace:
         directions = jnp.broadcast_to(jnp.array([0.0, 0.0, -1.0]), (n_rays, 3))
         values = jnp.ones(n_rays)
 
-        rb_clean = asphere_telescope.trace(origins, directions, values)
+        rb_clean = asphere_telescope.trace(origins, directions, values).rays
         tel = asphere_telescope.apply_astigmatism(0, 5e-3, random_key)
-        rb_pert = tel.trace(origins, directions, values)
+        rb_pert = tel.trace(origins, directions, values).rays
 
         assert jnp.all(jnp.isfinite(rb_pert.directions))
         # the reflected directions should change under a real figure error

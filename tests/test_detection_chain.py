@@ -252,7 +252,7 @@ class TestDetectionChain:
             path_length=jnp.zeros(3),
             n=jnp.ones(3),
         )
-        out = chain.propagate(rays)
+        out = chain.propagate(rays).rays
         assert jnp.allclose(out.values, 0.9 * 0.8)
         assert jnp.allclose(out.path_length, 0.05 + 0.01)
 
@@ -267,7 +267,7 @@ class TestDetectionChain:
             path_length=jnp.array([0.0]),
             n=jnp.ones(1),
         )
-        out = chain.propagate(rays)
+        out = chain.propagate(rays).rays
         assert jnp.allclose(out.values, 0.5)
         assert jnp.allclose(out.path_length, 0.02)
 
@@ -293,7 +293,7 @@ class TestDetectionChain:
             path_length=jnp.array([0.0]),
             n=jnp.ones(1),
         )
-        out = chain.propagate(rays)
+        out = chain.propagate(rays).rays
         assert jnp.all(jnp.isfinite(out.path_length))
         assert jnp.allclose(out.path_length, 0.0)
 
@@ -452,7 +452,7 @@ class TestDetectionSurface:
             vertex_z=0.003,
         )
         chain = DetectionChain(concentrator=cone, photodetector=pmt, gap=0.002)
-        out = chain.propagate(_slanted_rays(z0=0.0, slope=0.1))
+        out = chain.propagate(_slanted_rays(z0=0.0, slope=0.1)).rays
         v = jnp.asarray(out.values)
         assert float(v.sum()) > 0.0
         # qe and the window transmittance both bite: nothing exceeds qe.

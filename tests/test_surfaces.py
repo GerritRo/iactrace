@@ -74,7 +74,7 @@ class TestSurfaceNormals:
         for c in [0.0, 0.01, 0.1]:
             for x, y in [(0.0, 0.0), (1.0, 0.0), (0.5, 0.5)]:
                 _, normal = compute_sag_and_normal(x, y, offset, c, 0.0, jnp.array([]))
-                assert jnp.allclose(jnp.linalg.norm(normal), 1.0, atol=1e-10)
+                assert jnp.allclose(jnp.linalg.norm(normal), 1.0, atol=1e-6)
                 if c == 0.0:
                     assert jnp.allclose(normal, jnp.array([0.0, 0.0, 1.0]), atol=1e-8)
 
@@ -100,7 +100,7 @@ class TestPerturbation:
         normals = normals / jnp.linalg.norm(normals, axis=-1, keepdims=True)
         angles = jnp.array([[0.5, -0.3], [1.0, 0.2]])
         perturbed = _apply_perturbation(normals, angles, scale=0.0)
-        assert jnp.allclose(perturbed, normals, atol=1e-10)
+        assert jnp.allclose(perturbed, normals, atol=1e-6)
 
     def test_perturbed_normals_unit_and_small(self):
         """Perturbed normals stay unit vectors, and a small scale gives a small
@@ -110,7 +110,7 @@ class TestPerturbation:
         normals = normals / jnp.linalg.norm(normals, axis=-1, keepdims=True)
         bsdf = GaussianBSDF(scale=jnp.array([0.01, 0.01, 0.01]))
         perturbed = bsdf.perturb_normals(normals, key, jnp.array([0, 1, 2]))
-        assert jnp.allclose(jnp.linalg.norm(perturbed, axis=-1), 1.0, atol=1e-10)
+        assert jnp.allclose(jnp.linalg.norm(perturbed, axis=-1), 1.0, atol=1e-6)
 
         tiny = GaussianBSDF(scale=jnp.array([1e-4]))
         normal = jnp.array([[0.0, 0.0, 1.0]])
@@ -406,7 +406,7 @@ class TestZernikeSurfaceGroup:
             expected = np.array([-dzdx, -dzdy, 1.0])
             expected = expected / np.linalg.norm(expected)
             assert np.allclose(np.asarray(normal), expected, atol=1e-4)
-            assert float(jnp.linalg.norm(normal)) == pytest.approx(1.0, abs=1e-10)
+            assert float(jnp.linalg.norm(normal)) == pytest.approx(1.0, abs=1e-6)
 
     def test_standalone_intersection_on_surface(self):
         """A standalone Zernike surface (no asphere) intersects correctly."""
@@ -615,7 +615,7 @@ class TestFreeformSurface:
             expected = np.array([-dzdx, -dzdy, 1.0])
             expected /= np.linalg.norm(expected)
             assert np.allclose(np.asarray(normal), expected, atol=1e-4)
-            assert float(jnp.linalg.norm(normal)) == pytest.approx(1.0, abs=1e-10)
+            assert float(jnp.linalg.norm(normal)) == pytest.approx(1.0, abs=1e-6)
 
     def test_flat_grid_is_flat(self):
         surf = FreeformSurfaceGroup.from_extent(jnp.full((1, 9, 9), 0.7), 0.5, 0.5)

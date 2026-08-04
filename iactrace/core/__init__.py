@@ -33,7 +33,7 @@ from .surfaces import (
     bicubic_interp,
     zernike_terms,
 )
-from .trajectory import Trajectory
+from .trajectory import TraceResult, Trajectory
 from .transforms import euler_to_matrix
 
 __all__ = [
@@ -72,6 +72,7 @@ __all__ = [
     "LazyRayBundle",
     # Trajectory
     "Trajectory",
+    "TraceResult",
     # Render engine
     "render_optics",
     "trace_optics",

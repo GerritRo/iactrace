@@ -124,11 +124,11 @@ patterns):
 
 .. code-block:: python
 
-   ray_bundle = telescope.trace(ray_origins, ray_directions, ray_values)
+   ray_bundle, trajectory = telescope.trace(ray_origins, ray_directions, ray_values)
    image = camera.image(ray_bundle)
 
 ``trace`` does not apply effective-aperture weighting because *you*
-supplied the rays; it just propagates them.
+supplied the rays; it just propagates them. It returns a :class:`~iactrace.core.trajectory.TraceResult`, which is a NamedTuple with ``.rays`` being the ray bundle, and ``.trajectory`` holding the recorded path when called with ``record_trajectory=True``.
 
 Raw ray output
 --------------

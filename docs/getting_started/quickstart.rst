@@ -102,22 +102,23 @@ Render multiple sources simultaneously by stacking them:
 Visualizing Results
 -------------------
 
-IACTrace provides a unified :func:`~iactrace.viz.show_camera` function
+IACTrace provides a unified :func:`~iactrace.viz.show_image` function
 that renders both hexagonal IACT cameras and square pixel grids
 (monitoring cameras, SiPM arrays):
 
 .. code-block:: python
 
    import matplotlib.pyplot as plt
-   from iactrace.viz import show_camera
+   from iactrace.viz import show_image
 
    fig, ax = plt.subplots(figsize=(8, 8))
-   show_camera(image, camera.sensor_groups[0], ax=ax, colorbar=True,
+   show_image(image, camera.sensor_groups[0], ax=ax, colorbar=True,
                cbar_label='Intensity')
    plt.show()
 
 The pixel layout (hexagonal vs. square) is detected automatically from
 the sensor group type.
+
 
 3D Telescope Visualization
 --------------------------
@@ -136,6 +137,36 @@ In Jupyter notebooks, use:
 .. code-block:: python
 
    scene.show(viewer='jupyter')
+
+The camera itself can be rendered the same way, with every pixel's light
+concentrator and photosensor as described in the camera file:
+
+.. code-block:: python
+
+   from iactrace.viz import show_camera, show_sensor_chain
+
+   show_camera(camera).show()          # the whole camera
+   show_sensor_chain(camera).show()    # one pixel's chain, close up
+
+Visualizing Ray Paths
+---------------------
+
+Both stages can report the path rays actually took, through
+:meth:`~iactrace.Telescope.trace` for the optics and
+:meth:`~iactrace.Camera.trace` for the camera:
+
+.. code-block:: python
+
+   from iactrace.viz import show_camera, show_telescope
+
+   rays, traj = telescope.trace(origins, directions, values,
+                                       record_trajectory=True)
+   scene = show_telescope(telescope, trajectory=traj)
+   scene.show()
+
+   rays, traj = camera.trace(rays)
+   show_camera(camera, trajectory=traj)
+   scene.show()
 
 Applying Optical Imperfections
 ------------------------------

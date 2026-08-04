@@ -1,9 +1,10 @@
 import jax
 import jax.numpy as jnp
+from jax import Array
 
 from .intersections import intersect_plane
 from .ray_bundle import RayBundle
-from .trajectory import Trajectory
+from .trajectory import TraceResult, Trajectory
 from .transforms import euler_to_matrix
 
 
@@ -430,13 +431,13 @@ def trace_optics(
             :func:`~iactrace.camera.trace_chain` ``record_trajectory`` option).
 
     Returns:
-        RayBundle with rays in 3D space after all optical stages. When
-        ``record_trajectory`` is True, returns ``(RayBundle, Trajectory)`` where
-        the :class:`~iactrace.core.trajectory.Trajectory` holds the source point
+        A :class:`~iactrace.core.trajectory.TraceResult`. Its ``rays`` are in 3D
+        space after all optical stages; its ``trajectory`` is ``None`` unless
+        ``record_trajectory`` was set, in which case the
+        :class:`~iactrace.core.trajectory.Trajectory` holds the source point
         followed by each stage's landing point (world frame),
         ``(n_stages + 1, n_rays, 3)``. It ends on the **last optic** -- this
-        kernel knows no camera, so the converging leg to the focal plane is
-        appended by :meth:`~iactrace.Telescope.trace`.
+        kernel knows no camera.
     """
     stages = _get_stages(optical_groups)
     stage_indices = sorted(stages.keys())
@@ -447,7 +448,7 @@ def trace_optics(
     alive = jnp.ones(vals.shape[0], dtype=bool)
 
     # First trajectory point is the source; each stage appends its landing point.
-    trajectory = [ray_origins] if record_trajectory else None
+    trajectory: list[Array] | None = [ray_origins] if record_trajectory else None
 
     if stage_indices:
         for stage_idx in stage_indices:
@@ -456,10 +457,7 @@ def trace_optics(
             )
             path_length = path_length + current_n * seg + opl_internal
             current_n = new_n
-            if record_trajectory:
-                # A ray that died here (missed every element, or was shadowed)
-                # carries a meaningless origin -- a miss keeps the zero-init hit
-                # point. Freeze it at its last valid position instead.
+            if trajectory is not None:
                 trajectory.append(jnp.where(alive[:, None], origins, trajectory[-1]))
 
     rays = RayBundle(
@@ -470,6 +468,6 @@ def trace_optics(
         n=current_n,
         alive=alive,
     )
-    if record_trajectory:
-        return rays, Trajectory(points=jnp.stack(trajectory, axis=0))
-    return rays
+    if trajectory is None:
+        return TraceResult(rays)
+    return TraceResult(rays, Trajectory(points=jnp.stack(trajectory, axis=0)))

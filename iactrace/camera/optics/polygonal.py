@@ -10,7 +10,7 @@ from jax import Array
 
 from ...core.interactions import reflect
 from ...core.ray_bundle import RayBundle
-from ...core.trajectory import Trajectory
+from ...core.trajectory import TraceResult, Trajectory
 from ..detector.surface import DetectionSurface
 from .concentrator import Concentrator
 
@@ -111,12 +111,10 @@ class PolygonalCone(Concentrator):
         """
         return trace_chain(self, surface, rays).rays
 
-    def trace_to_surface(
-        self, rays: RayBundle, surface: DetectionSurface
-    ) -> tuple[RayBundle, Array | None]:
+    def trace_to_surface(self, rays: RayBundle, surface: DetectionSurface) -> TraceResult:
         """:meth:`to_surface`, also returning the per-bounce wall path."""
         tr = trace_chain(self, surface, rays, record_trajectory=True)
-        return tr.rays, tr.trajectory.points
+        return TraceResult(tr.rays, tr.trajectory)
 
     @abstractmethod
     def _meridian(self) -> tuple[Array, Array]:

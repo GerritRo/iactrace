@@ -114,7 +114,7 @@ class TestResponseMatrix:
             jnp.zeros((10, 3)).at[:, 2].set(50),
             jnp.broadcast_to(jnp.array([0.0, 0.0, -1.0]), (10, 3)),
             jnp.ones(10),
-        )
+        ).rays
         with pytest.raises(TypeError, match="LazyRayBundle"):
             cam.response_matrix(rb_eager)
 
@@ -329,11 +329,11 @@ class TestRoughnessInTracing:
         telescope, camera = telescope_and_camera
         origins, directions, values = test_rays
 
-        rb_clean = telescope.trace(origins, directions, values)
+        rb_clean = telescope.trace(origins, directions, values).rays
         x_clean, _ = _sensor_xy(camera, rb_clean)
 
         tel_rough = telescope.apply_roughness(0, 60.0)  # 60 arcsec
-        rb_rough = tel_rough.trace(origins, directions, values)
+        rb_rough = tel_rough.trace(origins, directions, values).rays
         x_rough, _ = _sensor_xy(camera, rb_rough)
 
         hit_clean = rb_clean.values > 0
@@ -350,11 +350,11 @@ class TestRoughnessInTracing:
         telescope, camera = telescope_and_camera
         origins, directions, values = test_rays
 
-        rb_clean = telescope.trace(origins, directions, values)
+        rb_clean = telescope.trace(origins, directions, values).rays
         x_clean, y_clean = _sensor_xy(camera, rb_clean)
 
         tel_zero = telescope.apply_roughness(0, 0.0)
-        rb_zero = tel_zero.trace(origins, directions, values)
+        rb_zero = tel_zero.trace(origins, directions, values).rays
         x_zero, y_zero = _sensor_xy(camera, rb_zero)
 
         assert jnp.allclose(jnp.stack([x_clean, y_clean], 1), jnp.stack([x_zero, y_zero], 1))
@@ -366,8 +366,8 @@ class TestRoughnessInTracing:
         origins, directions, values = test_rays
 
         tel_rough = telescope.apply_roughness(0, 30.0)
-        rb1 = tel_rough.trace(origins, directions, values)
-        rb2 = tel_rough.trace(origins, directions, values)
+        rb1 = tel_rough.trace(origins, directions, values).rays
+        rb2 = tel_rough.trace(origins, directions, values).rays
         x1, y1 = _sensor_xy(camera, rb1)
         x2, y2 = _sensor_xy(camera, rb2)
 

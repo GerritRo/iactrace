@@ -13,7 +13,7 @@ from .camera import (
     SquareSensorGroup,
     WinstonCone,
 )
-from .core import LazyRayBundle, RayBundle, Trajectory
+from .core import LazyRayBundle, RayBundle, TraceResult, Trajectory
 from .io import save_camera, save_telescope
 from .telescope import Telescope
 from .viz import (
@@ -24,7 +24,7 @@ from .viz import (
     show_telescope,
 )
 
-__version__ = "0.8.0"
+__version__ = "0.9.0"
 
 jax.config.update("jax_default_matmul_precision", "highest")
 
@@ -34,6 +34,7 @@ __all__ = [
     "RayBundle",
     "LazyRayBundle",
     "Trajectory",
+    "TraceResult",
     "Concentrator",
     "WinstonCone",
     "OkumuraCone",
