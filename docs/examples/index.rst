@@ -99,6 +99,12 @@ Others
 
       Roughness, misalignment and figure errors.
 
+   .. grid-item-card:: Visualization
+      :link: Visualization
+      :link-type: doc
+
+      Visualizing raytracing trajectories.
+
 
 .. toctree::
    :maxdepth: 1

@@ -6,6 +6,7 @@ import equinox as eqx
 import jax
 import jax.numpy as jnp
 
+from ._tolerances import dir_tol
 from .intersections import _reorigin, intersect_conic, newton_raphson_intersect
 
 # Surface group protocol
@@ -66,7 +67,8 @@ class SurfaceGroup(eqx.Module):
         approximation (e.g. a conic) override this for a better start.
         """
         dz = ray_direction[2]
-        safe_dz = jnp.where(jnp.abs(dz) > 1e-10, dz, 1e-10)
+        floor = dir_tol(dz)
+        safe_dz = jnp.where(jnp.abs(dz) > floor, dz, floor)
         t = -ray_origin[2] / safe_dz
         return jnp.maximum(t, 0.0)
 
@@ -80,7 +82,7 @@ class SurfaceGroup(eqx.Module):
         """
         return False
 
-    def _intersect_t(self, ray_origin, ray_direction, max_iter=10, tol=1e-8):
+    def _intersect_t(self, ray_origin, ray_direction, max_iter=10, tol=None):
         """Single-element nearest forward intersection parameter (``inf`` on a miss).
 
         Newton-refines from :meth:`_t_guess`; surfaces whose guess is exact
@@ -132,7 +134,7 @@ class SurfaceGroup(eqx.Module):
         """
         return self._index(element_idx)._sag_local(x, y)
 
-    def intersect_at(self, element_idx, ray_origin, ray_direction, max_iter=10, tol=1e-8):
+    def intersect_at(self, element_idx, ray_origin, ray_direction, max_iter=10, tol=None):
         """Intersect a ray with a single element's surface.
 
         Used by the render pipeline for per-ray intersection. Generic over the
@@ -147,7 +149,9 @@ class SurfaceGroup(eqx.Module):
             ray_origin: Ray origin in local coordinates (3,).
             ray_direction: Ray direction (3,).
             max_iter: Maximum Newton-Raphson iterations.
-            tol: Convergence tolerance.
+            tol: Absolute residual tolerance, or ``None`` (the default) to derive
+                it per ray from the coordinate magnitudes. See
+                :func:`~iactrace.core.intersections.newton_raphson_intersect`.
 
         Returns:
             Tuple of (t, point, normal):

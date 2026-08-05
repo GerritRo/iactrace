@@ -7,6 +7,8 @@ import jax
 import jax.numpy as jnp
 from jax import Array
 
+from ._tolerances import dir_tol
+
 
 def fresnel_unpolarized(cos_theta_i, n1, n2):
     """Unpolarized Fresnel reflection and transmission coefficients.
@@ -34,15 +36,12 @@ def fresnel_unpolarized(cos_theta_i, n1, n2):
     sin2_t = eta**2 * (1.0 - cos_theta_i**2)
     cos_theta_t = jnp.sqrt(jnp.maximum(0.0, 1.0 - sin2_t))
 
-    rs_num = n1 * cos_theta_i - n2 * cos_theta_t
-    rs_den = n1 * cos_theta_i + n2 * cos_theta_t
-    rs_den = jnp.where(jnp.abs(rs_den) < 1e-10, 1e-10, rs_den)
-    rs = (rs_num / rs_den) ** 2
+    def _reflectance(num, den):
+        grazing = jnp.abs(den) < dir_tol(den)
+        return jnp.where(grazing, 1.0, (num / jnp.where(grazing, 1.0, den)) ** 2)
 
-    rp_num = n2 * cos_theta_i - n1 * cos_theta_t
-    rp_den = n2 * cos_theta_i + n1 * cos_theta_t
-    rp_den = jnp.where(jnp.abs(rp_den) < 1e-10, 1e-10, rp_den)
-    rp = (rp_num / rp_den) ** 2
+    rs = _reflectance(n1 * cos_theta_i - n2 * cos_theta_t, n1 * cos_theta_i + n2 * cos_theta_t)
+    rp = _reflectance(n2 * cos_theta_i - n1 * cos_theta_t, n2 * cos_theta_i + n1 * cos_theta_t)
 
     R = 0.5 * (rs + rp)
     return R, 1.0 - R
