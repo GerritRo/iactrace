@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import equinox as eqx
+import jax.numpy as jnp
 
 from ..core.ray_bundle import RayBundle
+from ..core.trajectory import TraceResult, Trajectory
 from .detector import DetectionSurface, PhotoDetector
 from .optics import Concentrator
 
@@ -64,25 +66,39 @@ class DetectionChain(eqx.Module):
         """
         return self.photodetector.surface.shifted(self.detector_z)
 
-    def propagate(self, local_rays: RayBundle) -> RayBundle:
+    def propagate(self, local_rays: RayBundle, record_trajectory: bool = False) -> TraceResult:
         """Trace *local_rays* to the sensor surface, then hand off to the photodetector.
 
         ``local_rays`` are in the pixel-local frame (entrance at ``z = 0``). With
         a concentrator, they are delivered to :attr:`surface` by the
         concentrator's own
-        :meth:`~iactrace.camera.optics.concentrator.Concentrator.to_surface` -- the chain
-        stays agnostic to how (a wall cone co-traces its walls with the surface so
-        a curved or protruding photocathode is hit mid-bounce; a lens concentrator
-        refracts then lands). With no concentrator the rays advance straight onto
+        :meth:`~iactrace.camera.optics.concentrator.Concentrator.to_surface.
+        With no concentrator the rays advance straight onto
         the surface. The handover to the photodetector is just the resulting bundle
         -- rays at the surface, pixel-local frame -- which it weights by its own
         detection efficiency (reading any geometry it needs from the surface it
         owns). Optical path length is accumulated up to the surface (concentrator
         fill index on its internal leg, ray medium ``n`` on the free legs).
+
+        Returns a :class:`~iactrace.core.trajectory.TraceResult`; take its
+        ``rays`` for the detected bundle. Pass ``record_trajectory=True`` to
+        also populate its ``trajectory`` with the path through the chain
+        (pixel-local frame): the wall-by-wall bounce path where the
+        concentrator can report one, otherwise the straight entrance-to-landing
+        segment. Off by default, and ``trajectory`` is then ``None``.
         """
         surface = self.surface
         if self.concentrator is None:
-            landed = surface.stop(local_rays)
+            landed, path = surface.stop(local_rays), None
+        elif record_trajectory:
+            landed, path = self.concentrator.trace_to_surface(local_rays, surface)
         else:
-            landed = self.concentrator.to_surface(local_rays, surface)
-        return self.photodetector.detect(landed)
+            landed, path = self.concentrator.to_surface(local_rays, surface), None
+
+        pe_rays = self.photodetector.detect(landed)
+        if not record_trajectory:
+            return TraceResult(pe_rays)
+        if path is None:
+            # No internal path to report: entrance straight to where it landed.
+            path = Trajectory(points=jnp.stack([local_rays.origins, landed.origins], axis=0))
+        return TraceResult(pe_rays, path)

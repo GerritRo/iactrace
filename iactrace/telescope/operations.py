@@ -500,7 +500,7 @@ def apply_focal_error(
     """
     group = telescope.stage(stage)
     curvatures = _require_asphere(group.surface, stage).curvatures
-    safe = jnp.where(curvatures == 0, 1e-10, curvatures)
+    safe = jnp.where(curvatures == 0, 1.0, curvatures)
 
     scale = _focal_scale(group, stage, n_outside)
     f = 1.0 / (scale * safe)

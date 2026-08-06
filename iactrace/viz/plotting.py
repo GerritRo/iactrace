@@ -7,7 +7,7 @@ from matplotlib.collections import PolyCollection
 from ..core.transforms import euler_to_matrix
 
 
-def show_camera(
+def show_image(
     image,
     sensor,
     ax=None,
@@ -27,6 +27,10 @@ def show_camera(
     every pixel in the camera. Pixel polygons are projected onto the camera
     ``(x, y)`` plane after applying each tile's position and Euler rotation,
     so curvature and tile tilt are reflected faithfully.
+
+    This draws the *image* -- pixel values on the focal plane. For the camera's
+    physical 3D geometry (every pixel's concentrator and photosensor) see
+    :func:`iactrace.viz.show_camera`.
 
     Args:
         image: Pixel image array. Shape ``(n_sensors, height, width)`` for
@@ -54,7 +58,7 @@ def show_camera(
     elif isinstance(sensor, HexagonalSensorGroup):
         polys, values = _hex_polygons(image, sensor)
     else:
-        raise TypeError(f"show_camera does not support sensor type {type(sensor).__name__}")
+        raise TypeError(f"show_image does not support sensor type {type(sensor).__name__}")
 
     if ax is None:
         _, ax = plt.subplots(figsize=(6, 6))

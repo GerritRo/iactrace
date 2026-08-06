@@ -9,6 +9,7 @@ import jax
 import jax.numpy as jnp
 from jax import Array
 
+from ._tolerances import dir_tol
 from .coatings import Coating, fresnel_unpolarized
 
 
@@ -93,7 +94,8 @@ def refract_slab(direction, normal, position, n_out, n_in, thickness):
     dir_inside, cos_i, tir_entry = refract(direction, normal, n_out, n_in)
 
     # Propagation through the bulk
-    cos_to_normal = jnp.maximum(jnp.abs(jnp.dot(dir_inside, normal)), 1e-10)
+    dot_in = jnp.dot(dir_inside, normal)
+    cos_to_normal = jnp.maximum(jnp.abs(dot_in), dir_tol(dot_in))
     path_length = thickness / cos_to_normal
     exit_position = position + path_length * dir_inside
 

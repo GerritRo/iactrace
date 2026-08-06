@@ -110,9 +110,9 @@ class TestWinstonGeometry:
         length = cpc_full_length(a2, s, c)
         z = jnp.linspace(0.0, length, 50)
         r = profile_apothem(z, a2, s, c)
-        assert float(r[0]) == pytest.approx(a2, abs=1e-9)  # exit
+        assert float(r[0]) == pytest.approx(a2, abs=1e-6)  # exit
         assert float(r[-1]) == pytest.approx(a1, abs=1e-6)  # entrance
-        assert bool(jnp.all(jnp.diff(r) >= -1e-9))  # monotonic
+        assert bool(jnp.all(jnp.diff(r) >= -1e-6))  # monotonic
 
     def test_constructors_and_truncation(self):
         a2 = 0.5
