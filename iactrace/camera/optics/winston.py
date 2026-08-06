@@ -7,6 +7,7 @@ import jax
 import jax.numpy as jnp
 from jax import Array
 
+from ...core._tolerances import dir_tol
 from .polygonal import PolygonalCone
 
 _T_FLOOR = 1e-6  # spurious-hit rejection floor, scaled by a2
@@ -74,8 +75,11 @@ def profile_apothem(z: Array, exit_apothem: float, s: float, c: float) -> Array:
     A = c * c
     B = 2.0 * (a2 + s * c * z + s * k)
     C = a2**2 + z**2 - (c * z + k) ** 2
-    disc = jnp.maximum(B * B - 4.0 * A * C, 0.0)
-    return (-B + jnp.sqrt(disc)) / (2.0 * A)
+    # Grad-safe sqrt
+    raw = B * B - 4.0 * A * C
+    pos = raw > 0.0
+    sq = jnp.where(pos, jnp.sqrt(jnp.where(pos, raw, 1.0)), 0.0)
+    return (-B + sq) / (2.0 * A)
 
 
 def _wall_t(o: Array, d: Array, n: Array, a2: float, s: float, c: float, k: float) -> Array:
@@ -93,12 +97,16 @@ def _wall_t(o: Array, d: Array, n: Array, a2: float, s: float, c: float, k: floa
     # Grad-safe roots:
     pos = disc > 0.0
     sq = jnp.where(pos, jnp.sqrt(jnp.where(pos, disc, 1.0)), 0.0)
-    safe_A = jnp.where(jnp.abs(A) < 1e-14, 1.0, A)
+    # A is the square of an order-one dimensionless quantity, so its floor is the
+    # square of the dimensionless floor.
+    a_floor = dir_tol(A) ** 2
+    degenerate = jnp.abs(A) < a_floor
+    safe_A = jnp.where(degenerate, 1.0, A)
     safe_B = jnp.where(jnp.abs(B) > 1e-30, B, 1.0)
     # Inside the cavity C < 0, so the positive root is (-B + sq)/(2A).
     t_quad = (-B + sq) / (2.0 * safe_A)
     t_lin = jnp.where(jnp.abs(B) > 1e-30, -C / safe_B, jnp.inf)
-    t = jnp.where(jnp.abs(A) < 1e-14, t_lin, t_quad)
+    t = jnp.where(degenerate, t_lin, t_quad)
     # Reject backward / spurious near-zero hits with a floor that scales with the
     # cone size.
     bad = (disc < 0) | (t <= _T_FLOOR * a2) | ~jnp.isfinite(t)

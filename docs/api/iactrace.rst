@@ -72,7 +72,7 @@ Visualization Functions
 .. list-table::
    :widths: 30 70
 
-   * - :func:`~iactrace.viz.show_camera`
+   * - :func:`~iactrace.viz.show_image`
      - Display a sensor image (hexagonal or square pixel layout)
 
 Analysis Tools

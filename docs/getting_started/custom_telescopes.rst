@@ -275,13 +275,6 @@ camera origin sits at the telescope's ``camera_position``):
 
 .. code-block:: yaml
 
-   camera:
-     quantum_efficiency: 1.0
-     # concentrator:           # optional
-     #   type: hexagonal_cpc
-     #   exit_inradius: 0.012
-     #   acceptance_angle: 25.0
-
    sensors:
      - type: square
        position: [0, 0, 0]
@@ -290,6 +283,15 @@ camera origin sits at the telescope's ``camera_position``):
        height: 256             # pixels in Y
        bounds: [-0.5, 0.5, -0.5, 0.5]   # [xmin, xmax, ymin, ymax]
        id: main_sensor
+       photodetector:          # optional; defaults to perfect QE = 1
+         type: constant
+         qe: 0.4
+       concentrator:           # optional
+         type: winston         # or: okumura
+         n_sides: 6
+         entrance_apothem: 0.0028
+         exit_apothem: 0.0012  # sin(acceptance angle) = exit / entrance
+       gap: 0.001              # concentrator exit -> detector spacing
 
 Sensor types are ``square`` (``width`` / ``height`` / ``bounds``) and
 ``hexagonal`` (``centers_x`` / ``centers_y`` lists of pixel centers).

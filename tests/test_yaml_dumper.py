@@ -341,12 +341,12 @@ class TestRoundTrip:
             np.testing.assert_allclose(
                 np.asarray(g1.surface.curvatures),
                 np.asarray(g2.surface.curvatures),
-                rtol=1e-10,
+                rtol=1e-6,
             )
             np.testing.assert_allclose(
                 np.asarray(g1.surface.conics),
                 np.asarray(g2.surface.conics),
-                rtol=1e-10,
+                rtol=1e-6,
             )
 
     def test_hexagonal_sensor_roundtrip(self, tmp_path):
@@ -699,17 +699,17 @@ class TestRoundTrip:
         np.testing.assert_allclose(
             np.asarray(interaction1.reflectivity.cos_table),
             np.asarray(interaction2.reflectivity.cos_table),
-            rtol=1e-10,
+            rtol=1e-6,
         )
         np.testing.assert_allclose(
             np.asarray(interaction1.reflectivity.values),
             np.asarray(interaction2.reflectivity.values),
-            rtol=1e-10,
+            rtol=1e-6,
         )
         np.testing.assert_allclose(
             np.asarray(interaction1.reflectivity_scalar),
             np.asarray(interaction2.reflectivity_scalar),
-            rtol=1e-10,
+            rtol=1e-6,
         )
 
 

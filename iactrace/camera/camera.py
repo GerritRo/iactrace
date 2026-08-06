@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, NamedTuple
 
 import equinox as eqx
 import jax
@@ -9,6 +9,7 @@ from jax import Array
 
 from ..core.intersections import intersect_plane
 from ..core.ray_bundle import LazyRayBundle, RayBundle
+from ..core.trajectory import TraceResult, Trajectory
 from ..core.transforms import euler_to_matrix
 
 if TYPE_CHECKING:
@@ -89,11 +90,39 @@ def intersect_sensor(
     return sensor_rays, s_idx
 
 
+def _to_camera_frame(sensor: SensorGroup, points: Array, s_idx: Array) -> Array:
+    """Lift tile-local ``(..., n_rays, 3)`` points into the camera frame.
+
+    Each ray is placed by the tile it actually hit (``s_idx``), so a tiled or
+    curved focal surface comes out right.
+    """
+    rots = jax.vmap(euler_to_matrix)(sensor.rotations)[s_idx]  # (n_rays, 3, 3)
+    return jnp.einsum("nij,...nj->...ni", rots, points) + sensor.positions[s_idx]
+
+
+class _ChainOutput(NamedTuple):
+    """What :func:`_run_chain` hands back.
+
+    Attributes:
+        pix_id: Per-ray pixel index.
+        valid: Per-ray pixel mask (inside a real pixel, outside the deadband).
+        pe_rays: The bundle after the detection chain.
+        trajectory: Camera-frame path through the chain, or ``None`` when the
+            chain was run without ``record_trajectory``.
+    """
+
+    pix_id: Array
+    valid: Array
+    pe_rays: RayBundle
+    trajectory: Trajectory | None = None
+
+
 def _run_chain(
     camera: Camera,
     ray_bundle: RayBundle,
     sensor_idx: int,
-) -> tuple[Array, Array, RayBundle]:
+    record_trajectory: bool = False,
+) -> _ChainOutput:
     """Intersect the sensor, assign pixels, translate to pixel-local, run the chain.
 
     The pixel assignment (``pixel_index_and_mask``) is computed exactly once
@@ -103,16 +132,35 @@ def _run_chain(
     the bundle itself: ``pe_rays.alive`` is ``True`` only for rays that hit a
     sensor tile *and* landed on the photodetector surface.
 
-    Returns ``(pix_id, valid, pe_rays)``; the image / matrix folds take
-    ``pe_rays.values`` and ``collect`` reads the whole bundle.
+    Returns a :class:`_ChainOutput`; the image / matrix folds take
+    ``pe_rays.values`` and ``collect`` reads the whole bundle. With
+    ``record_trajectory`` its ``trajectory`` is a camera-frame
+    :class:`~iactrace.core.trajectory.Trajectory` joining the incoming leg from
+    the last optic to the path through the detection chain.
     """
     sensor = camera.sensor_groups[sensor_idx]
     sensor_rays, s_idx = intersect_sensor(camera, ray_bundle, sensor_idx)
     x, y = sensor_rays.origins[:, 0], sensor_rays.origins[:, 1]
     pix_id, valid = sensor.pixel_index_and_mask(s_idx, x, y)
     local = sensor.to_pixel_frame(sensor_rays, pix_id)
-    pe_rays = sensor.chain.propagate(local)
-    return pix_id, valid, pe_rays
+
+    traced = sensor.chain.propagate(local, record_trajectory=record_trajectory)
+    if traced.trajectory is None:
+        return _ChainOutput(pix_id, valid, traced.rays)
+
+    # pixel-local -> tile-local -> camera, so the chain path joins the optics.
+    points = _to_camera_frame(
+        sensor, sensor.from_pixel_frame(traced.trajectory.points, pix_id), s_idx
+    )
+    # The bundle enters on the last optic; its first chain point is the landing
+    # on the pixel entrance, so prepending it draws the converging final leg.
+    entry = ray_bundle.origins[None]
+    # A ray that never reached a tile has no meaningful path beyond that: freeze
+    # it at the entry point rather than drawing the garbage local coordinates.
+    points = jnp.where(sensor_rays.alive[None, :, None], points, entry)
+    return _ChainOutput(
+        pix_id, valid, traced.rays, Trajectory(points=jnp.concatenate([entry, points], axis=0))
+    )
 
 
 # Camera
@@ -132,6 +180,7 @@ class Camera(eqx.Module):
         camera.image(rb)                  # pixel image (fused, per-element fold)
         camera.response_matrix(rb)        # per-source pixel response (fused)
         camera.collect(rb)                # (pe_vals, pe_times, pix_id, detected)
+        camera.trace(rb)                  # TraceResult through the camera (diagnostics)
         rb.materialise()                  # flat camera-frame RayBundle
 
     Attributes:
@@ -178,15 +227,44 @@ class Camera(eqx.Module):
 
         Materialises a :class:`LazyRayBundle`: per-ray output cannot be
         produced incrementally.
+
+        For the *path* rays took through the camera, see :meth:`trace`.
         """
         self._require_sensor_groups(sensor_idx)
         if isinstance(ray_bundle, LazyRayBundle):
             ray_bundle = ray_bundle.materialise()
 
-        pix_id, valid, pe_rays = _run_chain(self, ray_bundle, sensor_idx)
-        detected = pe_rays.alive & valid
-        pe_vals = jnp.where(detected, pe_rays.values, 0.0)
-        return pe_vals, pe_rays.path_length, pix_id, detected
+        out = _run_chain(self, ray_bundle, sensor_idx)
+        detected = out.pe_rays.alive & out.valid
+        pe_vals = jnp.where(detected, out.pe_rays.values, 0.0)
+        return pe_vals, out.pe_rays.path_length, out.pix_id, detected
+
+    def trace(
+        self,
+        ray_bundle: RayBundle | LazyRayBundle,
+        sensor_idx: int = 0,
+    ) -> TraceResult:
+        """The path rays take through the camera, for diagnostics / visualization.
+
+        Returns a :class:`~iactrace.core.trajectory.TraceResult`, like every
+        other tracer. This one always records, so its ``trajectory`` is never
+        ``None``: a camera-frame
+        :class:`~iactrace.core.trajectory.Trajectory` running from the last
+        optic, through each ray's landing on its pixel, to the end of the
+        detection chain -- the final converging leg and the scattering inside
+        the concentrator as one continuous path. ``rays`` is the bundle the
+        detection chain produced, as :meth:`collect` reports it.
+
+        The viz helpers take the result as-is
+        (``show_camera(camera, trajectory=camera.trace(rb))``); reach for
+        ``.trajectory`` when you want the path itself.
+        """
+        self._require_sensor_groups(sensor_idx)
+        if isinstance(ray_bundle, LazyRayBundle):
+            ray_bundle = ray_bundle.materialise()
+
+        out = _run_chain(self, ray_bundle, sensor_idx, record_trajectory=True)
+        return TraceResult(out.pe_rays, out.trajectory)
 
     def image(
         self,
@@ -200,6 +278,8 @@ class Camera(eqx.Module):
         by :meth:`Telescope.render`. The lazy form folds per
         primary-mirror element so the full ray buffer is never
         materialised; the eager form scatters the buffer in one call.
+
+        For the *path* rays took through the camera, see :meth:`trace`.
         """
         self._require_sensor_groups(sensor_idx)
         sensor = self.sensor_groups[sensor_idx]
@@ -208,13 +288,13 @@ class Camera(eqx.Module):
             init = jnp.zeros((sensor.n_sensors,) + sensor.get_accumulator_shape())
 
             def fold_element(image, rb_cam):
-                pix_id, valid, pe_rays = _run_chain(self, rb_cam, sensor_idx)
-                return image + sensor.scatter(pix_id, valid, pe_rays.values)
+                out = _run_chain(self, rb_cam, sensor_idx)
+                return image + sensor.scatter(out.pix_id, out.valid, out.pe_rays.values)
 
             return ray_bundle.fold(fold_element, init)
 
-        pix_id, valid, pe_rays = _run_chain(self, ray_bundle, sensor_idx)
-        return sensor.scatter(pix_id, valid, pe_rays.values)
+        out = _run_chain(self, ray_bundle, sensor_idx)
+        return sensor.scatter(out.pix_id, out.valid, out.pe_rays.values)
 
     def response_matrix(
         self,
@@ -250,7 +330,7 @@ class Camera(eqx.Module):
         init = jnp.zeros((n_sources, sensor.n_sensors) + sensor.get_accumulator_shape())
 
         def fold_element(matrix, rb_cam):
-            pix_id, valid, pe_rays = _run_chain(self, rb_cam, sensor_idx)
+            out = _run_chain(self, rb_cam, sensor_idx)
 
             # Per-element rays are source-major (see _build_source_rays):
             # the first n_samples rays belong to source 0, etc.
@@ -258,19 +338,15 @@ class Camera(eqx.Module):
                 return a.reshape(n_sources, n_samples)
 
             contrib = jax.vmap(sensor.scatter)(
-                per_source(pix_id),
-                per_source(valid),
-                per_source(pe_rays.values),
+                per_source(out.pix_id),
+                per_source(out.valid),
+                per_source(out.pe_rays.values),
             )
             return matrix + contrib
 
         return lazy_bundle.fold(fold_element, init)
 
     # Composition
-    #
-    # Functional updates: every setter returns a new Camera (Equinox modules are
-    # immutable pytrees), rebuilding only the affected sensor group / chain via
-    # ``eqx.tree_at``.
 
     def _with_sensor_group(self, sensor_idx: int, new_group: SensorGroup) -> Camera:
         """Swap one sensor group into a copy of the camera."""

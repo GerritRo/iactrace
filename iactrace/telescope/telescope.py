@@ -7,8 +7,9 @@ import jax.numpy as jnp
 from jax import Array
 from jax.typing import ArrayLike
 
-from ..core.ray_bundle import LazyRayBundle, RayBundle
-from ..core.render import apply_final_leg_shadow, trace_optics
+from ..core.ray_bundle import LazyRayBundle
+from ..core.render import apply_final_leg_shadow, final_leg_points, trace_optics
+from ..core.trajectory import TraceResult, Trajectory
 from ..core.transforms import euler_to_matrix
 from . import operations as _ops
 
@@ -129,33 +130,67 @@ class Telescope(eqx.Module):
         ray_origins: Array,
         ray_directions: Array,
         values: Array,
-    ) -> RayBundle:
+        record_trajectory: bool = False,
+    ) -> TraceResult:
         """Trace rays from arbitrary origins through the full optical system.
 
         Args:
             ray_origins: Ray starting positions (N, 3)
             ray_directions: Ray directions (N, 3), should be normalized
             values: Ray intensities (N,)
+            record_trajectory: When True, also record the per-stage ray path for
+                diagnostics / 3D visualization (see
+                :func:`iactrace.viz.show_telescope`). Off by default and free when
+                off -- nothing extra is computed. Mirrors the
+                :func:`~iactrace.camera.trace_chain` option on the chain side.
 
         Returns:
-            RayBundle in the camera's local coordinate system.
-            Pass to ``camera.collect()`` or ``camera.image()`` for detection.
+            A :class:`~iactrace.core.trajectory.TraceResult`, as every tracer
+            returns. Its ``rays`` are in the camera's local coordinate system;
+            pass them to ``camera.collect()`` or ``camera.image()`` for
+            detection::
+
+                rays = telescope.trace(origins, directions, values).rays
+                rays, trajectory = telescope.trace(..., record_trajectory=True)
+
+            ``trajectory`` is ``None`` unless ``record_trajectory`` was set, in
+            which case the :class:`~iactrace.core.trajectory.Trajectory` holds
+            the source point, each optical stage's landing point, and finally
+            the converging leg's landing on the camera reference plane --
+            ``(n_stages + 2, N, 3)``, so the beam is seen coming to a focus.
+            ``rays`` stops on the last optic (the sensor intersection happens
+            downstream in ``Camera``); the trajectory adds that last leg for
+            display.
+
+            The trajectory is in the **world frame** (the frame
+            :func:`iactrace.viz.show_telescope` draws the optics in), *not* the
+            camera frame ``rays`` is reframed into.
         """
-        rb = trace_optics(
+        result = trace_optics(
             self.optical_groups,
             self.obstruction_groups,
             ray_origins,
             ray_directions,
             values,
+            record_trajectory=record_trajectory,
         )
         # Handoff = shadow the final leg (explicit), then a pure reframe.
         rb = apply_final_leg_shadow(
-            rb,
+            result.rays,
             self.obstruction_groups,
             self.camera_position,
             self.camera_rotation,
         )
-        return rb.to_frame(self.camera_position, self.camera_rotation)
+        if result.trajectory is None:
+            return TraceResult(rb.to_frame(self.camera_position, self.camera_rotation))
+        # Close the path on the focal plane: the bundle itself stops on the
+        # last optic, so without this the beam is never seen converging.
+        points = result.trajectory.points
+        landing = final_leg_points(
+            rb, self.camera_position, self.camera_rotation, fallback=points[-1]
+        )
+        trajectory = Trajectory(points=jnp.concatenate([points, landing[None]], axis=0))
+        return TraceResult(rb.to_frame(self.camera_position, self.camera_rotation), trajectory)
 
     @classmethod
     def from_yaml(

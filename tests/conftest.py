@@ -4,8 +4,8 @@ import pytest
 
 @pytest.fixture(autouse=True)
 def set_jax_precision():
-    """Enable 64-bit precision for more accurate tests."""
-    jax.config.update("jax_enable_x64", True)
+    """Set to float32 by standard, since this is jax default"""
+    jax.config.update("jax_enable_x64", False)
     yield
 
 

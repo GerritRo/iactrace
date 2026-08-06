@@ -1,8 +1,10 @@
 import jax
 import jax.numpy as jnp
+from jax import Array
 
 from .intersections import intersect_plane
 from .ray_bundle import RayBundle
+from .trajectory import TraceResult, Trajectory
 from .transforms import euler_to_matrix
 
 
@@ -60,6 +62,32 @@ def apply_final_leg_shadow(rb, obstruction_groups, camera_position, camera_rotat
         n=rb.n,
         alive=new_alive,
     )
+
+
+def final_leg_points(rb, camera_position, camera_rotation, fallback):
+    """Where the final last-optic -> focal-plane leg lands, for trajectories.
+
+    ``rb`` must be a world-frame bundle (origins on the last optic, directions
+    pointing toward the focal plane), as produced by :func:`trace_optics` and
+    shadowed by :func:`apply_final_leg_shadow`. Returns the ``(n_rays, 3)``
+    intersection with the **camera reference plane** -- the same cap
+    :func:`apply_final_leg_shadow` uses, so the drawn leg matches the shadowed
+    one.
+
+    Rays that are dead, or whose direction does not cross the plane ahead of
+    them, keep ``fallback`` (their last valid position) instead of a
+    meaningless extrapolation.
+    """
+    rot = euler_to_matrix(camera_rotation)
+    _, t = jax.vmap(intersect_plane, in_axes=(0, 0, None, None))(
+        rb.origins,
+        rb.directions,
+        camera_position,
+        rot,
+    )
+    reaches = rb.alive & jnp.isfinite(t) & (t > 0.0)
+    landing = rb.origins + jnp.where(reaches, t, 0.0)[:, None] * rb.directions
+    return jnp.where(reaches[:, None], landing, fallback)
 
 
 def _trace_stage(origins, directions, values, alive, current_n, group, obstructions):
@@ -180,7 +208,8 @@ def _build_source_rays(
         dirs = deltas / lengths[..., None]
         leg_in = lengths
     else:
-        dirs = jnp.broadcast_to(sources[:, None, :], (n_sources, n_samples, 3))
+        units = sources / jnp.linalg.norm(sources, axis=-1, keepdims=True)
+        dirs = jnp.broadcast_to(units[:, None, :], (n_sources, n_samples, 3))
         leg_in = (points[None, :, :] * dirs).sum(axis=-1)
 
     dirs_flat = dirs.reshape(n_rays, 3)
@@ -380,7 +409,14 @@ def render_optics_accumulate(
     return final
 
 
-def trace_optics(optical_groups, obstruction_groups, ray_origins, ray_directions, values):
+def trace_optics(
+    optical_groups,
+    obstruction_groups,
+    ray_origins,
+    ray_directions,
+    values,
+    record_trajectory=False,
+):
     """Trace rays from arbitrary origins through full optical system.
 
     Args:
@@ -389,9 +425,20 @@ def trace_optics(optical_groups, obstruction_groups, ray_origins, ray_directions
         ray_origins: (n_rays, 3).
         ray_directions: (n_rays, 3), normalized.
         values: (n_rays,).
+        record_trajectory: When True, also collect the per-stage hit points and
+            return them as a :class:`~iactrace.core.trajectory.Trajectory`
+            alongside the RayBundle. Off by default; when off, no trajectory is
+            built and nothing extra is computed (mirrors the
+            :func:`~iactrace.camera.trace_chain` ``record_trajectory`` option).
 
     Returns:
-        RayBundle with rays in 3D space after all optical stages.
+        A :class:`~iactrace.core.trajectory.TraceResult`. Its ``rays`` are in 3D
+        space after all optical stages; its ``trajectory`` is ``None`` unless
+        ``record_trajectory`` was set, in which case the
+        :class:`~iactrace.core.trajectory.Trajectory` holds the source point
+        followed by each stage's landing point (world frame),
+        ``(n_stages + 1, n_rays, 3)``. It ends on the **last optic** -- this
+        kernel knows no camera.
     """
     stages = _get_stages(optical_groups)
     stage_indices = sorted(stages.keys())
@@ -401,6 +448,9 @@ def trace_optics(optical_groups, obstruction_groups, ray_origins, ray_directions
     current_n = jnp.ones(vals.shape[0])
     alive = jnp.ones(vals.shape[0], dtype=bool)
 
+    # First trajectory point is the source; each stage appends its landing point.
+    trajectory: list[Array] | None = [ray_origins] if record_trajectory else None
+
     if stage_indices:
         for stage_idx in stage_indices:
             origins, dirs, vals, alive, seg, opl_internal, new_n = _trace_stage(
@@ -408,8 +458,10 @@ def trace_optics(optical_groups, obstruction_groups, ray_origins, ray_directions
             )
             path_length = path_length + current_n * seg + opl_internal
             current_n = new_n
+            if trajectory is not None:
+                trajectory.append(jnp.where(alive[:, None], origins, trajectory[-1]))
 
-    return RayBundle(
+    rays = RayBundle(
         origins=origins,
         directions=dirs,
         values=vals,
@@ -417,3 +469,6 @@ def trace_optics(optical_groups, obstruction_groups, ray_origins, ray_directions
         n=current_n,
         alive=alive,
     )
+    if trajectory is None:
+        return TraceResult(rays)
+    return TraceResult(rays, Trajectory(points=jnp.stack(trajectory, axis=0)))
