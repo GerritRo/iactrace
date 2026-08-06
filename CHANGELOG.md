@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.9.1 (2026-08-06)
+
+### Fix
+
+- **core, docs**: fixed angle conventions, more info
+
 ## v0.9.0 (2026-07-18)
 
 ### BREAKING CHANGE

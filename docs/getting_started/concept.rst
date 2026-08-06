@@ -13,7 +13,7 @@ IACTrace's ``render`` path supports two source types:
 **Parallel sources** (``source_type='parallel'``)
 
 Light from astronomical sources at effectively infinite distance. The
-input is a direction vector ``[dx, dy, dz]`` pointing *toward* the
+input is a direction vector ``[dx, dy, dz]`` pointing *from* the
 source. For on-axis light coming straight down onto the telescope:
 
 .. code-block:: python
@@ -77,7 +77,8 @@ telescope has one group (the primary). A Cassegrain has two groups
 (primary and secondary). Each facet in a group has:
 
 - Position: ``[x, y, z]`` centre location
-- Orientation: ``[rx, ry, rz]`` Euler angles (degrees)
+- Orientation: ``[rx, ry, rz]`` Euler angles (degrees), applied as
+  ``Rz @ Ry @ Rx``
 - Aperture: shape and size (circular, hexagonal)
 - Surface: curvature, conic constant, aspheric terms
 
