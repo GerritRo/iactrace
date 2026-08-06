@@ -40,20 +40,20 @@ def matrix_to_euler(rotation_matrix):
 
     Args:
         Rotation matrix (3, 3)
-        
+
     Returns:
         tip_tilt_rotation: Euler angles ``(rx, ry, rz)`` in degrees
     """
-    sy = np.sqrt(rotation_matrix[0, 0] ** 2 + rotation_matrix[1, 0] ** 2)
+    sy = jnp.sqrt(rotation_matrix[0, 0] ** 2 + rotation_matrix[1, 0] ** 2)
     if sy > 1e-6:
-        rx = np.arctan2(rotation_matrix[2, 1], rotation_matrix[2, 2])
-        ry = np.arctan2(-rotation_matrix[2, 0], sy)
-        rz = np.arctan2(rotation_matrix[1, 0], rotation_matrix[0, 0])
+        rx = jnp.arctan2(rotation_matrix[2, 1], rotation_matrix[2, 2])
+        ry = jnp.arctan2(-rotation_matrix[2, 0], sy)
+        rz = jnp.arctan2(rotation_matrix[1, 0], rotation_matrix[0, 0])
     else:
-        rx = np.arctan2(-rotation_matrix[1, 2], rotation_matrix[1, 1])
-        ry = np.arctan2(-rotation_matrix[2, 0], sy)
-        rz = 0.0
-    return [float(np.degrees(rx)), float(np.degrees(ry)), float(np.degrees(rz))]
+        rx = jnp.arctan2(-rotation_matrix[1, 2], rotation_matrix[1, 1])
+        ry = jnp.arctan2(-rotation_matrix[2, 0], sy)
+        rz = jnp.array(0.0)
+    return [float(jnp.degrees(rx)), float(jnp.degrees(ry)), float(jnp.degrees(rz))]
 
 
 def transform_to_world(aperture_samples, surface, aperture_data, positions, rotations, area_fn):
