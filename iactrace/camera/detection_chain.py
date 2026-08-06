@@ -72,7 +72,7 @@ class DetectionChain(eqx.Module):
         ``local_rays`` are in the pixel-local frame (entrance at ``z = 0``). With
         a concentrator, they are delivered to :attr:`surface` by the
         concentrator's own
-        :meth:`~iactrace.camera.optics.concentrator.Concentrator.to_surface.
+        :meth:`~iactrace.camera.optics.concentrator.Concentrator.to_surface`.
         With no concentrator the rays advance straight onto
         the surface. The handover to the photodetector is just the resulting bundle
         -- rays at the surface, pixel-local frame -- which it weights by its own

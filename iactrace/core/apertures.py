@@ -9,8 +9,8 @@ from jax import Array
 def _point_in_convex_polygon(x, y, vertices, n_vertices):
     """Check if points (x, y) are inside a convex polygon.
 
-    Assumes vertices are in counter-clockwise order (ensured at load time).
     For CCW vertices, a point is inside if all edge cross products are >= 0.
+    For CW  vertices, a point is inside if all edge cross products are <= 0.
 
     Args:
         x: x-coordinates (can be scalar or array)
@@ -23,12 +23,14 @@ def _point_in_convex_polygon(x, y, vertices, n_vertices):
     """
 
     def edge_check(carry, i):
+        ccw, cw = carry
         v1, v2 = vertices[i], vertices[(i + 1) % n_vertices]
         cross = (v2[0] - v1[0]) * (y - v1[1]) - (v2[1] - v1[1]) * (x - v1[0])
-        return carry & (cross >= 0), None
+        return (ccw & (cross >= 0), cw & (cross <= 0)), None
 
-    inside, _ = jax.lax.scan(edge_check, jnp.ones_like(x, dtype=bool), jnp.arange(n_vertices))
-    return inside
+    ones = jnp.ones_like(x, dtype=bool)
+    (ccw, cw), _ = jax.lax.scan(edge_check, (ones, ones), jnp.arange(n_vertices))
+    return ccw | cw
 
 
 def _polygon_area(vertices):

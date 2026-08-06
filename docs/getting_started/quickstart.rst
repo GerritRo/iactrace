@@ -165,7 +165,7 @@ Both stages can report the path rays actually took, through
    scene.show()
 
    rays, traj = camera.trace(rays)
-   show_camera(camera, trajectory=traj)
+   scene = show_camera(camera, trajectory=traj)
    scene.show()
 
 Applying Optical Imperfections
