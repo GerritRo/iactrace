@@ -18,7 +18,7 @@ from .io import save_camera, save_telescope
 from .telescope import Telescope
 from .viz import show_camera, show_sensor_chain, show_telescope
 
-__version__ = "0.9.0"
+__version__ = "0.9.1"
 
 jax.config.update("jax_default_matmul_precision", "highest")
 
