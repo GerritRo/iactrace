@@ -274,9 +274,7 @@ def intersect_oriented_box(ray_origin, ray_direction, center, half_extents, rota
     Returns:
         t parameter of nearest intersection, jnp.inf if no hit
     """
-    origin, t_offset, t_lo = _localize(
-        ray_origin, ray_direction, center, jnp.max(half_extents)
-    )
+    origin, t_offset, t_lo = _localize(ray_origin, ray_direction, center, jnp.max(half_extents))
     # A rotation preserves lengths, so ``t_lo`` carries into the local frame.
     rot_inv = rotation.T
     local_origin = rot_inv @ (origin - center)
