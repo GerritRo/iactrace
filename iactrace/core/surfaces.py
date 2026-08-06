@@ -7,7 +7,7 @@ import jax
 import jax.numpy as jnp
 
 from ._tolerances import dir_tol
-from .intersections import _reorigin, intersect_conic, newton_raphson_intersect
+from .intersections import _localize, intersect_conic, newton_raphson_intersect
 
 # Surface group protocol
 
@@ -166,7 +166,7 @@ class SurfaceGroup(eqx.Module):
         # ray origin: ``origin + t * direction`` cancels two vectors of order the
         # source distance, so for a distant source the hit's (x, y) -- which is
         # what the aperture test and the sag are evaluated at -- would be noise.
-        origin, t_offset = _reorigin(ray_origin, ray_direction, jnp.zeros(3))
+        origin, t_offset, _ = _localize(ray_origin, ray_direction, jnp.zeros(3))
         hit = origin + (t_safe - t_offset) * ray_direction
         point, normal = elem.compute_sag_and_normal_at(hit[0], hit[1])
         return t, point, normal
