@@ -28,14 +28,58 @@ Units
 Quantity          Unit
 ================  ===========================================================
 Distance          metres
-Angle (Euler)     degrees, XYZ intrinsic order
-Small angles      arcseconds (mirror roughness, misalignment, focal-error
-                  perturbations)
+Angle (Euler)     degrees, extrinsic XYZ (see `Rotations`_)
+Small angles      arcseconds (mirror roughness, mirror misalignment)
+Surface error     metres RMS (Zernike figure errors)
+Focal error       metres, or a dimensionless fraction with ``relative=True``
 Time / path       metres of optical path length (``RayBundle.path_length``)
 ================  ===========================================================
 
 There is no built-in unit system; the YAML configs and the runtime API
 agree by convention only. Mixing units silently produces wrong results.
+
+Rotations
+---------
+
+Every orientation in the library is a triple of Euler angles
+``(rx, ry, rz)`` **in degrees**. They all go through
+:func:`~iactrace.core.transforms.euler_to_matrix`, which composes them as::
+
+    R = Rz(rz) @ Ry(ry) @ Rx(rx)
+
+i.e. **extrinsic X -> Y -> Z**: rotate about the *fixed* x-axis first, then
+the fixed y-axis, then the fixed z-axis. Equivalently, this is the intrinsic
+z-y'-x'' composition with the angles taken in reverse order. 
+
+The camera frame
+----------------
+
+``Telescope.camera_position`` / ``camera_rotation`` place the camera in the
+telescope frame, and every ray leaving :meth:`~iactrace.Telescope.render` or
+:meth:`~iactrace.Telescope.trace` has already been re-expressed there
+(``RayBundle.to_frame`` applies ``R.T``, the inverse of the rotation above).
+Sensor positions in a camera YAML, ``Camera.collect`` output and
+:class:`~iactrace.analysis.FocalSurface` results are all in this frame.
+
+The camera looks *back* at the optics, so its local +Z points towards the
+last optic and rays arrive travelling along local **-Z** -- which is what the
+per-pixel detection chain assumes (light enters a pixel at ``z = 0`` and runs
+towards -z). Every shipped configuration therefore uses
+``camera_rotation: [180, 0, 0]``, a half turn about x, giving
+
+===============  ==========================
+Camera axis      Telescope-frame direction
+===============  ==========================
++x               +x
++y               -y
++z               -z
+===============  ==========================
+
+So a camera-frame image has the **same x** as the telescope frame but a
+**flipped y**: light arriving with a +y direction component lands at -y in
+the image, while light arriving with a +x component lands at +x. Choosing a
+different ``camera_rotation`` changes this mapping.
+
 
 Photometry — monochromatic
 --------------------------

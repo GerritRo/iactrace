@@ -6,8 +6,12 @@ def euler_to_matrix(tip_tilt_rotation):
     """
     Convert Euler angles (degrees) to rotation matrix.
 
+    The angles are applied **extrinsically, x then y then z**:
+
+        R = Rz(rz) @ Ry(ry) @ Rx(rx)
+
     Args:
-        tip_tilt_rotation: List of all 3 transformations(3,)
+        tip_tilt_rotation: Euler angles ``(rx, ry, rz)`` in degrees
 
     Returns:
         Rotation matrix (3, 3)
@@ -26,6 +30,30 @@ def euler_to_matrix(tip_tilt_rotation):
 
     # Apply: Rz * Ry * Rx (extrinsic order)
     return Rz @ Ry @ Rx
+
+
+def matrix_to_euler(rotation_matrix):
+    """Convert a 3x3 rotation matrix to Euler angles (degrees).
+
+    The inverse of :func:`~iactrace.core.transforms.euler_to_matrix`, i.e. it
+    decomposes ``R = Rz(rz) @ Ry(ry) @ Rx(rx)``.
+
+    Args:
+        Rotation matrix (3, 3)
+        
+    Returns:
+        tip_tilt_rotation: Euler angles ``(rx, ry, rz)`` in degrees
+    """
+    sy = np.sqrt(rotation_matrix[0, 0] ** 2 + rotation_matrix[1, 0] ** 2)
+    if sy > 1e-6:
+        rx = np.arctan2(rotation_matrix[2, 1], rotation_matrix[2, 2])
+        ry = np.arctan2(-rotation_matrix[2, 0], sy)
+        rz = np.arctan2(rotation_matrix[1, 0], rotation_matrix[0, 0])
+    else:
+        rx = np.arctan2(-rotation_matrix[1, 2], rotation_matrix[1, 1])
+        ry = np.arctan2(-rotation_matrix[2, 0], sy)
+        rz = 0.0
+    return [float(np.degrees(rx)), float(np.degrees(ry)), float(np.degrees(rz))]
 
 
 def transform_to_world(aperture_samples, surface, aperture_data, positions, rotations, area_fn):

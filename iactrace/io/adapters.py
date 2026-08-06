@@ -38,7 +38,7 @@ from ..core.surfaces import (
     SumSurfaceGroup,
     ZernikeSurfaceGroup,
 )
-from ..core.transforms import euler_to_matrix
+from ..core.transforms import euler_to_matrix, matrix_to_euler
 from .schemas import (
     AsphericDiskLensSchema,
     AsphericSurfaceSchema,
@@ -440,20 +440,6 @@ def _curve_schema_to_key(
     if schema is None:
         return None
     return ("table", tuple(schema.angles_deg), tuple(schema.values))
-
-
-def _rotation_matrix_to_euler(rotation_matrix: np.ndarray) -> list[float]:
-    """Convert a 3x3 rotation matrix to Euler angles (degrees)."""
-    sy = np.sqrt(rotation_matrix[0, 0] ** 2 + rotation_matrix[1, 0] ** 2)
-    if sy > 1e-6:
-        rx = np.arctan2(rotation_matrix[2, 1], rotation_matrix[2, 2])
-        ry = np.arctan2(-rotation_matrix[2, 0], sy)
-        rz = np.arctan2(rotation_matrix[1, 0], rotation_matrix[0, 0])
-    else:
-        rx = np.arctan2(-rotation_matrix[1, 2], rotation_matrix[1, 1])
-        ry = np.arctan2(-rotation_matrix[2, 0], sy)
-        rz = 0.0
-    return [float(np.degrees(rx)), float(np.degrees(ry)), float(np.degrees(rz))]
 
 
 # Schema -> Domain (loading)
@@ -1428,7 +1414,7 @@ def _extract_obstruction(spec: _ObsSpec, group: ObstructionGroup, i: int, counte
         if f.kind == "scalar":
             kwargs[f.schema_attr] = float(col[i])
         elif f.kind == "euler_matrix":
-            kwargs[f.schema_attr] = _rotation_matrix_to_euler(np.asarray(col[i]))
+            kwargs[f.schema_attr] = matrix_to_euler(np.asarray(col[i]))
         else:  # vec3
             kwargs[f.schema_attr] = _to_float_list(col[i])
     return spec.schema(**kwargs)
