@@ -168,9 +168,11 @@ class AsphericFocalSurface(FocalSurface):
     Parameterisation matches :class:`AsphericSurfaceGroup`; the surface sag is
 
         z(r) = c r^2 / (1 + sqrt(1 - (1 + k) c^2 r^2))
-               + sum_i a_i r^(2i+2)
+               + sum_i a_i r^(2i+4)
 
-    with ``r^2 = x^2 + y^2`` in the local frame. The vertex sits at
+    with ``r^2 = x^2 + y^2`` in the local frame, i.e. ``aspherics[i]``
+    multiplies ``r^(2i + 4)`` -- the polynomial starts at ``r^4``, since an
+    ``r^2`` term would be degenerate with ``curvature``. The vertex sits at
     ``position`` and the optical axis points along the local +Z (set by
     ``rotation``). Pure conics are recovered with ``aspherics=None``;
     ``curvature = 0`` reduces to a flat plane (Newton converges in one step

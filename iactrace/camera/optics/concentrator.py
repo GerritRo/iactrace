@@ -23,11 +23,6 @@ class Concentrator(eqx.Module):
 
     length: eqx.AbstractVar[float]
 
-    @property
-    def index(self) -> float:
-        """Refractive index of the medium the concentrator is filled with."""
-        return 1.0
-
     @abstractmethod
     def to_surface(self, rays: RayBundle, surface: DetectionSurface) -> RayBundle:
         """Deliver *rays* from the entrance aperture onto *surface*.
