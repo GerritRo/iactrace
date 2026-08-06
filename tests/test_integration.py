@@ -151,8 +151,6 @@ class TestRenderLinearity:
         rb = tel.render(sources, jnp.ones(3), source_type="parallel")
 
         # Lazy fused fold == eager scatter on the materialised flat bundle.
-        print(jnp.sum(jnp.abs(cam.image(rb) - cam.image(rb.materialise()))))
-        print(cam.image(rb).shape, cam.image(rb.materialise()).shape)
         assert jnp.allclose(cam.image(rb), cam.image(rb.materialise()), atol=1e-5)
 
 

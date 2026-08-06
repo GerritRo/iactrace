@@ -8,7 +8,7 @@ Visualization functions for displaying results and telescope geometry.
 
 Functions for displaying sensor images:
 
-.. autofunction:: iactrace.viz.show_camera
+.. autofunction:: iactrace.viz.show_image
 
 3D Visualization
 ----------------
@@ -16,6 +16,8 @@ Functions for displaying sensor images:
 Functions for visualizing telescope geometry:
 
 .. autofunction:: iactrace.viz.show_telescope
+
+.. autofunction:: iactrace.viz.show_camera
 
 .. autofunction:: iactrace.viz.show_sensor_chain
 

@@ -208,7 +208,8 @@ def _build_source_rays(
         dirs = deltas / lengths[..., None]
         leg_in = lengths
     else:
-        dirs = jnp.broadcast_to(sources[:, None, :], (n_sources, n_samples, 3))
+        units = sources / jnp.linalg.norm(sources, axis=-1, keepdims=True)
+        dirs = jnp.broadcast_to(units[:, None, :], (n_sources, n_samples, 3))
         leg_in = (points[None, :, :] * dirs).sum(axis=-1)
 
     dirs_flat = dirs.reshape(n_rays, 3)
