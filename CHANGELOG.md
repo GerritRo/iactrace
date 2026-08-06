@@ -1,5 +1,23 @@
 # Changelog
 
+## v0.10.0 (2026-08-06)
+
+### Feat
+
+- **trajectory**: unified treatment of trajectories between components, fixed bugs in viz
+- **viz,-core**: added the ability to save trajectories for the optical trace, added methods to visualize traces for optics and detection_chain
+
+### Fix
+
+- **docs,-core**: fixed documentation and removed bugs from formatting. fixed some problems with normalization and polygonal apertures
+- **core**: fixed issue with surface relocalization
+- **core,-viz**: fixed a bug in the intersection logic, leading to the wrong root being chosen for conics. also made float32 computation more stable by propagating to local object reference. improved visualization of traced rays. refactored telescope3d by breaking up into files
+
+### Refactor
+
+- **ruff**: reformat and fixes with ruff
+- **ruff,-tests**: reformated with ruff, changed default setting of laye_vs_eager test to not be on pixel boundary
+
 ## v0.9.1 (2026-08-06)
 
 ### Fix
