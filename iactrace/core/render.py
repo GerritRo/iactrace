@@ -19,7 +19,7 @@ def _get_stages(optical_groups):
     return dict(sorted(by_stage.items()))
 
 
-def _shadow_mask(origins, directions, obstructions, max_t=1e10):
+def _shadow_mask(origins, directions, obstructions, max_t):
     """Returns 1.0 where unoccluded, 0.0 where blocked."""
     if not obstructions:
         return jnp.ones(origins.shape[0])
@@ -223,10 +223,14 @@ def _build_source_rays(
         lengths = jnp.linalg.norm(deltas, axis=-1)
         dirs = deltas / lengths[..., None]
         leg_in = lengths
+        irradiance = 1.0 / (lengths * lengths)
+        shadow_cap = lengths
     else:
         units = sources / jnp.linalg.norm(sources, axis=-1, keepdims=True)
         dirs = jnp.broadcast_to(units[:, None, :], (n_sources, n_samples, 3))
         leg_in = (points[None, :, :] * dirs).sum(axis=-1)
+        irradiance = jnp.ones((n_sources, n_samples), dtype=leg_in.dtype)
+        shadow_cap = jnp.full((n_sources, n_samples), jnp.inf, dtype=leg_in.dtype)
 
     dirs_flat = dirs.reshape(n_rays, 3)
     origins_flat = jnp.broadcast_to(points[None, :, :], (n_sources, n_samples, 3)).reshape(
@@ -237,12 +241,17 @@ def _build_source_rays(
     )
     leg_in_flat = leg_in.reshape(n_rays)
 
-    shadow = _shadow_mask(origins_flat, -dirs_flat, obstruction_groups)
+    shadow = _shadow_mask(
+        origins_flat,
+        -dirs_flat,
+        obstruction_groups,
+        shadow_cap.reshape(n_rays),
+    )
     # A blocked source-to-primary segment terminates the ray (geometry loss).
     alive = shadow > 0
     weights_flat = jnp.broadcast_to(weights[:, 0][None, :], (n_sources, n_samples)).reshape(n_rays)
     vals = jnp.broadcast_to(source_values[:, None], (n_sources, n_samples)).reshape(n_rays)
-    vals = jnp.where(alive, vals / weights_flat, 0.0)
+    vals = jnp.where(alive, vals * irradiance.reshape(n_rays) / weights_flat, 0.0)
 
     return origins_flat, dirs_flat, normals_flat, vals, alive, leg_in_flat
 

@@ -37,6 +37,12 @@ input is a position ``[x, y, z]`` in the telescope coordinate system:
    # LED at 200m distance, slightly off-axis
    position = jnp.array([[0.5, 0.3, 200.0]])
 
+The accompanying ``values`` are **radiant intensities**: each primary
+sample point at distance ``d`` from the source receives ``value / d^2``,
+so moving a source further away dims it as it physically should. For a
+parallel source there is no distance and ``values`` are the irradiance on
+the aperture directly. See :doc:`conventions` for the full chain.
+
 For anything else — extended sources, Cherenkov shower input, custom
 calibration ray patterns — sample the rays yourself and use
 :meth:`Telescope.trace` (see :doc:`conventions`).
