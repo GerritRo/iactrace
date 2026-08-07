@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.10.1 (2026-08-07)
+
+### Fix
+
+- **core**: fixed shadowing bug for point sources, switched to 1/d^2 scaling for point source
+- **core**: account for opl if slab is first element, salt downstream of first surface dependent on id now, clarify aspheric convention
+
 ## v0.10.0 (2026-08-06)
 
 ### Feat
