@@ -52,7 +52,8 @@ def refractive_group(
         rotations: Per-element Euler angles in degrees, shape ``(N, 3)``.
         curvatures: Per-element curvatures ``1/R``, shape ``(N,)``.
         conics: Per-element conic constants, shape ``(N,)``.
-        aspherics: Per-element aspheric coefficients, shape ``(N, K)``.
+        aspherics: Per-element even aspheric coefficients ``[A4, A6, ...]``,
+            shape ``(N, K)``; column ``i`` multiplies ``r^(2i + 4)``.
         offsets: Per-element surface decentering, shape ``(N, 2)``.
         aperture: Pre-built aperture sized to ``N``.
         n_inside: Per-element refractive index, shape ``(N,)``. The ambient
@@ -247,7 +248,8 @@ def aspheric_lens(
         radius: Outer disk radius in metres.
         rotation: Euler angles in degrees. Defaults to no rotation.
         conic: Schwarzschild conic constant.
-        aspheric_coeffs: Even aspheric coefficients ``[a2, a4, ...]``.
+        aspheric_coeffs: Even aspheric coefficients ``[A4, A6, ...]``,
+            i.e. ``aspheric_coeffs[i]`` multiplies ``r^(2i + 4)``.
         n_inside, transmittance, optical_stage, n_samples, key:
             see :func:`thin`.
     """

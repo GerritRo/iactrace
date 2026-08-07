@@ -45,7 +45,13 @@ ApertureSchema = Annotated[
 class AsphericSurfaceSchema(BaseModel):
     """Even-aspheric conic surface: sag from ``curvature``/``conic`` plus
     optional higher-order ``aspheric`` coefficients. Spherical (``conic = 0``)
-    and parabolic (``conic = -1``) surfaces are the natural special cases."""
+    and parabolic (``conic = -1``) surfaces are the natural special cases.
+    ``aspheric`` is ``[A4, A6, A8, ...]``: entry ``i`` multiplies ``r^(2i + 4)``,
+    matching how optical prescriptions tabulate even aspheres. The polynomial
+    starts at ``r^4`` -- there is no ``r^2`` term, which would be degenerate
+    with ``curvature`` -- so prefixing an ``A2`` shifts every coefficient two
+    orders too high.
+    """
 
     type: Literal["aspheric"] = "aspheric"
     curvature: float
