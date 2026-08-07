@@ -22,6 +22,10 @@ IACTrace is a differentiable ray tracing library for simulating the optical prop
 - Response matrix calculation
 
 ## Installation
+```bash
+pip install iactrace
+```
+Or straight from the repository:
 
 ```bash
 pip install git+https://github.com/GerritRo/iactrace/
