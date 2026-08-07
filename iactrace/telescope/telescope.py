@@ -112,7 +112,11 @@ class Telescope(eqx.Module):
 
         Args:
             sources: Source positions ``(N, 3)`` or directions ``(N, 3)``.
-            values: Flux values ``(N,)``.
+            values: Source strengths ``(N,)``. For ``'parallel'`` these are
+                irradiances on the aperture; for ``'point'`` they are
+                radiant intensities, and the irradiance each primary sample
+                sees is ``value / d^2`` for that sample's distance ``d`` to
+                the source.
             source_type: ``'point'`` or ``'parallel'``.
         """
         return LazyRayBundle(
