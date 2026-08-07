@@ -110,12 +110,23 @@ The throughput-weighted values pipeline
 ``RayBundle.values`` is a dimensionless scalar per ray that accumulates
 every multiplicative factor along the optical path::
 
-    primary sampling weight
+    source irradiance at the sample point
+        × primary sampling weight
         × reflectivity / refractivity
         × aperture mask
         × obstruction shadow
         × concentrator throughput
         × quantum efficiency
+
+The first factor is where the two source types differ. A **parallel**
+source is at infinity, so the ``values`` you pass to
+:meth:`Telescope.render` *are* the irradiance on the aperture and enter
+unchanged. A **point** source is at a finite distance, so the ``values``
+are radiant intensities and each primary sample point at distance ``d``
+from the source receives ``value / d^2``. Summing ``values`` over an
+unobstructed render with ``values = 1`` therefore gives the effective
+collecting area in m² for a parallel source, and that area divided by
+``d^2`` for a point source.
 
 By the time a bundle reaches :meth:`Camera.collect`, the entries of
 ``values`` are photoelectrons (per source-photon, per Monte-Carlo

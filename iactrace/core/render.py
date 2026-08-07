@@ -7,6 +7,9 @@ from .ray_bundle import RayBundle
 from .trajectory import TraceResult, Trajectory
 from .transforms import euler_to_matrix
 
+_PRIMARY_ROUGHNESS_SALT = 0xB5DF00
+_ROUGHNESS_SALT = 0xB5DF01
+
 
 def _get_stages(optical_groups):
     """Map optical_groups by optical_stage, return sorted dict (one group per stage)."""
@@ -16,7 +19,7 @@ def _get_stages(optical_groups):
     return dict(sorted(by_stage.items()))
 
 
-def _shadow_mask(origins, directions, obstructions, max_t=1e10):
+def _shadow_mask(origins, directions, obstructions, max_t):
     """Returns 1.0 where unoccluded, 0.0 where blocked."""
     if not obstructions:
         return jnp.ones(origins.shape[0])
@@ -90,9 +93,22 @@ def final_leg_points(rb, camera_position, camera_rotation, fallback):
     return jnp.where(reaches[:, None], landing, fallback)
 
 
-def _trace_stage(origins, directions, values, alive, current_n, group, obstructions):
+def _trace_stage(
+    origins,
+    directions,
+    values,
+    alive,
+    current_n,
+    group,
+    obstructions,
+    roughness_salt=_ROUGHNESS_SALT,
+):
     """Process rays through one optical stage: intersect all elements, apply physics,
     check shadows.
+
+    Args:
+        roughness_salt: Folded into the group's ``sample_key`` to draw this
+            call's surface-roughness perturbation.
 
     Returns ``(new_origins, new_directions, new_values, new_alive,
     segment_length, opl_internal, new_n)``:
@@ -144,7 +160,7 @@ def _trace_stage(origins, directions, values, alive, current_n, group, obstructi
         best_pts,
         best_elem,
         current_n,
-        roughness_salt=0xB5DF01,
+        roughness_salt=roughness_salt,
     )
 
     shadow = _shadow_mask(origins, directions, obstructions, best_t)
@@ -172,7 +188,7 @@ def _build_primary_geometry(group):
         Tuple of (points, normals, weights) arrays in world coordinates,
         each with shape (n_elements, n_samples, ...).
     """
-    return group.sample_primary_geometry(roughness_salt=0xB5DF00)
+    return group.sample_primary_geometry(roughness_salt=_PRIMARY_ROUGHNESS_SALT)
 
 
 def _build_source_rays(
@@ -207,10 +223,14 @@ def _build_source_rays(
         lengths = jnp.linalg.norm(deltas, axis=-1)
         dirs = deltas / lengths[..., None]
         leg_in = lengths
+        irradiance = 1.0 / (lengths * lengths)
+        shadow_cap = lengths
     else:
         units = sources / jnp.linalg.norm(sources, axis=-1, keepdims=True)
         dirs = jnp.broadcast_to(units[:, None, :], (n_sources, n_samples, 3))
         leg_in = (points[None, :, :] * dirs).sum(axis=-1)
+        irradiance = jnp.ones((n_sources, n_samples), dtype=leg_in.dtype)
+        shadow_cap = jnp.full((n_sources, n_samples), jnp.inf, dtype=leg_in.dtype)
 
     dirs_flat = dirs.reshape(n_rays, 3)
     origins_flat = jnp.broadcast_to(points[None, :, :], (n_sources, n_samples, 3)).reshape(
@@ -221,12 +241,17 @@ def _build_source_rays(
     )
     leg_in_flat = leg_in.reshape(n_rays)
 
-    shadow = _shadow_mask(origins_flat, -dirs_flat, obstruction_groups)
+    shadow = _shadow_mask(
+        origins_flat,
+        -dirs_flat,
+        obstruction_groups,
+        shadow_cap.reshape(n_rays),
+    )
     # A blocked source-to-primary segment terminates the ray (geometry loss).
     alive = shadow > 0
     weights_flat = jnp.broadcast_to(weights[:, 0][None, :], (n_sources, n_samples)).reshape(n_rays)
     vals = jnp.broadcast_to(source_values[:, None], (n_sources, n_samples)).reshape(n_rays)
-    vals = jnp.where(alive, vals / weights_flat, 0.0)
+    vals = jnp.where(alive, vals * irradiance.reshape(n_rays) / weights_flat, 0.0)
 
     return origins_flat, dirs_flat, normals_flat, vals, alive, leg_in_flat
 
@@ -235,12 +260,12 @@ def _apply_primary_interaction(group, element_idx, origins, directions, normals,
     """Apply stage-0 physics: interaction + cos-theta weighting.
 
     Returns:
-        (new_origins, new_directions, updated_values, new_n).
+        (new_origins, new_directions, updated_values, opl_internal, new_n).
     """
     n_rays = origins.shape[0]
     elem_indices = jnp.full((n_rays,), element_idx, dtype=jnp.int32)
 
-    new_dirs, new_origins, coeffs, _opl_internal, new_n = group.apply_interaction(
+    new_dirs, new_origins, coeffs, opl_internal, new_n = group.apply_interaction(
         directions,
         normals,
         origins,
@@ -249,7 +274,7 @@ def _apply_primary_interaction(group, element_idx, origins, directions, normals,
     )
 
     cos_theta = jnp.abs(jnp.sum(directions * normals, axis=-1))
-    return new_origins, new_dirs, values * coeffs * cos_theta, new_n
+    return new_origins, new_dirs, values * coeffs * cos_theta, opl_internal, new_n
 
 
 def _empty_bundle() -> RayBundle:
@@ -282,7 +307,7 @@ def _trace_one_element(
         obstructions,
     )
     current_n = jnp.ones(vals.shape[0])
-    origins, dirs, vals, current_n = _apply_primary_interaction(
+    origins, dirs, vals, opl_internal, current_n = _apply_primary_interaction(
         stages[0],
         eidx,
         origins,
@@ -291,7 +316,9 @@ def _trace_one_element(
         vals,
         current_n,
     )
-    path_length = leg_in
+    # ``leg_in`` reaches the primary's front face; a stage-0 slab still adds
+    # its own n * L on top before the ray leaves the element.
+    path_length = leg_in + opl_internal
     for sidx in stage_indices[1:]:
         origins, dirs, vals, alive, seg, opl_internal, new_n = _trace_stage(
             origins,
@@ -301,6 +328,7 @@ def _trace_one_element(
             current_n,
             stages[sidx],
             obstructions,
+            roughness_salt=_ROUGHNESS_SALT + eidx,
         )
         path_length = path_length + current_n * seg + opl_internal
         current_n = new_n

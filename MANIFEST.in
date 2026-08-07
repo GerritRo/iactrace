@@ -1,0 +1,10 @@
+prune configs
+prune licenses
+prune benchmarks
+prune docs
+prune tests
+exclude asv.conf.json
+
+include LICENSE
+include README.md
+include CHANGELOG.md

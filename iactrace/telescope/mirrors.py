@@ -54,8 +54,8 @@ def mirror_group(
         rotations: Per-element Euler angles in degrees, shape ``(N, 3)``.
         curvatures: Per-element curvatures ``1/R``, shape ``(N,)``.
         conics: Per-element Schwarzschild conic constants, shape ``(N,)``.
-        aspherics: Per-element aspheric coefficients, shape ``(N, K)``.
-            Use ``(N, 0)`` to disable aspherics.
+        aspherics: Per-element even aspheric coefficients ``[A4, A6, ...]``,
+            shape ``(N, K)``; column ``i`` multiplies ``r^(2i + 4)``.
         offsets: Per-element surface decentering, shape ``(N, 2)``. Use
             ``jnp.zeros((N, 2))`` for a centred disk.
         aperture: Pre-built aperture.
@@ -409,8 +409,9 @@ def aspheric(
         conic: Schwarzschild conic constant. ``0`` spherical, ``-1``
             parabolic, ``-1 < k < 0`` prolate ellipsoid, ``k < -1``
             hyperboloid.
-        aspheric_coeffs: Even aspheric coefficients ``[a2, a4, ...]``.
-            ``None`` disables aspherics.
+        aspheric_coeffs: Even aspheric coefficients ``[A4, A6, ...]``,
+            i.e. ``aspheric_coeffs[i]`` multiplies ``r^(2i + 4)``. The
+            polynomial starts at ``r^4``.
         inner_radius, reflectivity, bsdf_scale, optical_stage, n_samples, key:
             see :func:`spherical`.
     """

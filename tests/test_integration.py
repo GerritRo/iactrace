@@ -1,3 +1,4 @@
+import equinox as eqx
 import jax
 import jax.numpy as jnp
 import pytest
@@ -161,8 +162,11 @@ class TestEnergyConservation:
         """Total collected flux is ~ the mirror collecting area, and scaling
         mirror reflectivity scales the output proportionally."""
         tel, cam = make_simple_telescope()
-        sources = jnp.array([[0.0, 0.0, 1e6]])
-        values = jnp.array([1.0])
+        distance = 1e6
+        sources = jnp.array([[0.0, 0.0, distance]])
+        # Point-source values are radiant intensities, so d^2 is the intensity
+        # that puts unit irradiance on the aperture.
+        values = jnp.array([distance**2])
 
         flux_full = jnp.sum(cam.image(tel.render(sources, values, source_type="point")))
         mirror_area = jnp.pi * 0.1**2
@@ -171,6 +175,29 @@ class TestEnergyConservation:
         tel_scaled = tel.scale_reflectivity(0, 3)
         flux_scaled = jnp.sum(cam.image(tel_scaled.render(sources, values, source_type="point")))
         assert jnp.isclose(flux_scaled / flux_full, 3.0, rtol=0.01)
+
+    def test_point_source_flux_falls_off_as_inverse_square(self):
+        """Irradiance from a finite-distance source scales as 1 / d^2."""
+        tel, _ = make_simple_telescope()
+
+        def flux(distance, intensity=1.0):
+            sources = jnp.array([[0.0, 0.0, distance]])
+            rb = tel.render(sources, jnp.array([intensity]), source_type="point")
+            return jnp.sum(rb.materialise().values)
+
+        # Both distances are far enough that the beam is effectively collimated
+        # over the aperture, so the only distance dependence left is 1 / d^2.
+        near, far = 500.0, 2000.0
+        assert jnp.isclose(flux(near) / flux(far), (far / near) ** 2, rtol=1e-3)
+
+        # A remote point source of intensity d^2 puts unit irradiance on the
+        # aperture, matching a unit-irradiance parallel source.
+        parallel = tel.render(jnp.array([[0.0, 0.0, -1.0]]), jnp.array([1.0]), "parallel")
+        assert jnp.isclose(
+            flux(far, intensity=far**2),
+            jnp.sum(parallel.materialise().values),
+            rtol=1e-3,
+        )
 
 
 class TestMultiStageRendering:
@@ -208,6 +235,43 @@ class TestObstructionEffects:
 
         assert flux_obstructed < flux_clear
         assert flux_obstructed > 0
+
+    def test_obstruction_behind_point_source_does_not_shadow(self):
+        """The source -> primary occlusion test stops at the source.
+
+        The test runs backwards from each primary sample point, so without a
+        cap at the source it keeps going and collides with whatever sits on
+        the far side -- geometry that is behind the light and cannot shadow
+        anything. Here the sphere spans z = 12..28, entirely beyond a source
+        at z = 5, so it must not remove a single ray.
+        """
+        tel, _ = make_simple_telescope(n_samples=512)
+        behind = SphereGroup(centers=jnp.array([[0.0, 0.0, 20.0]]), radii=jnp.array([8.0]))
+        tel_behind = eqx.tree_at(lambda t: t.obstruction_groups, tel, [behind])
+
+        sources = jnp.array([[0.0, 0.0, 5.0]])
+        values = jnp.array([1.0])
+        clear = tel.render(sources, values, source_type="point").materialise()
+        shadowed = tel_behind.render(sources, values, source_type="point").materialise()
+
+        assert jnp.all(shadowed.alive == clear.alive)
+        assert jnp.allclose(shadowed.values, clear.values)
+
+    def test_obstruction_in_front_of_point_source_still_shadows(self):
+        """Capping the occlusion test at the source must not disarm it.
+
+        The same sphere moved between the source and the dish blocks the
+        whole aperture, so every ray dies.
+        """
+        tel, _ = make_simple_telescope(n_samples=512)
+        between = SphereGroup(centers=jnp.array([[0.0, 0.0, 2.5]]), radii=jnp.array([1.0]))
+        tel_between = eqx.tree_at(lambda t: t.obstruction_groups, tel, [between])
+
+        sources = jnp.array([[0.0, 0.0, 5.0]])
+        rb = tel_between.render(sources, jnp.array([1.0]), source_type="point").materialise()
+
+        assert not jnp.any(rb.alive)
+        assert jnp.sum(rb.values) == 0.0
 
 
 class TestFinalLegShadow:

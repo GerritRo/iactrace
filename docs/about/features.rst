@@ -47,10 +47,13 @@ Mirror surfaces are described by the standard conic + polynomial form:
 
 .. math::
 
-   z(r) = \frac{c r^2}{1 + \sqrt{1 - (1+k) c^2 r^2}} + \sum_{i} A_{2i} r^{2i}
+   z(r) = \frac{c r^2}{1 + \sqrt{1 - (1+k) c^2 r^2}} + \sum_{i \ge 2} A_{2i} r^{2i}
 
 where :math:`c` is the curvature, :math:`k` is the conic constant, and
-:math:`A_{2i}` are aspheric coefficients. This parameterization covers:
+:math:`A_{2i}` are aspheric coefficients. The polynomial starts at
+:math:`r^4`: coefficients are given as ``[A4, A6, A8, ...]``, so entry
+:math:`i` of the list multiplies :math:`r^{2i+4}`. This parameterization
+covers:
 
 - Spherical mirrors (:math:`k = 0`)
 - Parabolic mirrors (:math:`k = -1`)
