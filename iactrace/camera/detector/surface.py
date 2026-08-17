@@ -119,20 +119,22 @@ class DetectionSurface(eqx.Module):
             t = jnp.where(parallel, 0.0, (self.vertex_z - o[:, 2]) / jnp.where(parallel, 1.0, dz))
             point = o + t[:, None] * d
             within = (point[:, 0] ** 2 + point[:, 1] ** 2) <= self.radius**2
+            # Landing outside the photocathode aperture is a geometry loss.
+            landed = rays.alive & within
             return rays.replace(
                 origins=point,
                 values=jnp.where(within, rays.values, 0.0),
-                path_length=rays.path_length + t * rays.n,
-                # Landing outside the photocathode aperture is a geometry loss.
-                alive=rays.alive & within,
+                path_length=rays.path_length + jnp.where(landed, t, 0.0) * rays.n,
+                alive=landed,
             )
         t, point, within = jax.vmap(lambda oi, di: self._hit(oi, di, self.vertex_z))(o, d)
         hit = jnp.isfinite(t) & (t > 0.0)
         ok = hit & within
+        # Missing the surface or landing outside its aperture is geometry loss.
+        landed = rays.alive & ok
         return rays.replace(
             origins=jnp.where(ok[:, None], point, o),
             values=jnp.where(ok, rays.values, 0.0),
-            path_length=rays.path_length + jnp.where(hit, t, 0.0) * rays.n,
-            # Missing the surface or landing outside its aperture is geometry loss.
-            alive=rays.alive & ok,
+            path_length=rays.path_length + jnp.where(landed, t, 0.0) * rays.n,
+            alive=landed,
         )

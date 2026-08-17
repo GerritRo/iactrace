@@ -237,12 +237,15 @@ def trace_chain(
     vertex = stop.vertex_z + walls.length
     n = rays.origins.shape[0]
     inside = walls.in_mouth(rays.origins[:, :2])
+
+    # Only rays that are inside and alive propagate
+    entered = inside & rays.alive
     carry = (
         rays.origins + lift,
         rays.directions,
         jnp.where(inside, rays.values, 0.0),
         rays.path_length,
-        ~inside,
+        ~entered,
         rays.n,
         jnp.zeros(n, bool),
         jnp.zeros(n, jnp.int32),

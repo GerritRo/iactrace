@@ -121,11 +121,9 @@ class FocalSurface(eqx.Module):
         # and land on a real intersection.
         hit_mask = ray_bundle.alive & valid & jnp.isfinite(t)
 
-        opl = ray_bundle.path_length + jnp.where(
-            hit_mask,
-            t * ray_bundle.n,
-            0.0,
-        )
+        safe_t = jnp.where(hit_mask, t, 0.0)
+        opl = ray_bundle.path_length + safe_t * ray_bundle.n
+
         return FocalSurfaceHits(
             xy_local=xy_local,
             z_local=z_local,
