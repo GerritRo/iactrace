@@ -73,11 +73,8 @@ def intersect_sensor(
     # (shadowed, off-aperture, absorbed geometry) stay dead here too.
     hit = jnp.isfinite(t_sensor)
     alive = ray_bundle.alive & hit
-    path_length = ray_bundle.path_length + jnp.where(
-        hit,
-        t_sensor * ray_bundle.n,
-        0.0,
-    )
+    safe_t = jnp.where(alive, t_sensor, 0.0)
+    path_length = ray_bundle.path_length + safe_t * ray_bundle.n
 
     sensor_rays = RayBundle(
         origins=jnp.stack([pts[:, 0], pts[:, 1], jnp.zeros(n_rays)], axis=-1),
