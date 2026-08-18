@@ -5,7 +5,6 @@ from abc import abstractmethod
 import equinox as eqx
 import jax
 import jax.numpy as jnp
-from jax import vmap
 
 from .intersections import (
     intersect_box,
@@ -16,19 +15,61 @@ from .intersections import (
     intersect_triangle,
 )
 
+_VMAP_PAIR_BUDGET = 2_800_000
+
 
 class ObstructionGroup(eqx.Module):
-    """Base class for grouped obstructions."""
+    """Base class for grouped obstructions.
+
+    Subclasses supply their intersection kernel and stacked parameters via
+    :meth:`_primitive`; the two traversal strategies are shared from here.
+    """
 
     @abstractmethod
-    def intersect(self, ray_origin, ray_direction):
-        """Returns min t across all primitives in group."""
+    def _primitive(self):
+        """Return ``(kernel, params)`` for this group.
+
+        ``kernel(ray_origin, ray_direction, *prim)`` intersects one ray with one
+        primitive and returns a scalar ``t`` (``inf`` on a miss). ``params`` is a
+        tuple of stacked parameter arrays whose leading axis indexes the
+        primitives.
+        """
         ...
 
     @abstractmethod
     def __len__(self) -> int:
         """Number of obstruction primitives in this group."""
         ...
+
+    def intersect(self, ray_origin, ray_direction):
+        """Returns min t across all primitives in group."""
+        kernel, params = self._primitive()
+        ts = jax.vmap(kernel, in_axes=(None, None) + (0,) * len(params))(
+            ray_origin, ray_direction, *params
+        )
+        return jnp.min(ts)
+
+    def intersect_batch(self, origins, directions):
+        """Nearest hit distance per ray, for ``(n_rays, 3)`` rays.
+
+        Same answer as ``vmap(self.intersect)``, but chooses how to walk the
+        primitives based on how many rays there are.
+        """
+        if origins.shape[0] * len(self) <= _VMAP_PAIR_BUDGET:
+            return jax.vmap(self.intersect)(origins, directions)
+
+        kernel, params = self._primitive()
+        dtype = jnp.result_type(origins, directions, *params)
+        batched = jax.vmap(kernel, in_axes=(0, 0) + (None,) * len(params))
+
+        def step(best_t, prim):
+            t = batched(origins, directions, *prim)
+            return jnp.minimum(best_t, t.astype(dtype)), None
+
+        best_t, _ = jax.lax.scan(
+            step, jnp.full(origins.shape[0], jnp.inf, dtype=dtype), params
+        )
+        return best_t
 
 
 class CylinderGroup(ObstructionGroup):
@@ -46,12 +87,8 @@ class CylinderGroup(ObstructionGroup):
     def __len__(self) -> int:
         return self.r.shape[0]
 
-    def intersect(self, ray_origin, ray_direction):
-        """Returns min t across all cylinders."""
-        ts = vmap(intersect_cylinder, in_axes=(None, None, 0, 0, 0))(
-            ray_origin, ray_direction, self.p1, self.p2, self.r
-        )
-        return jnp.min(ts)
+    def _primitive(self):
+        return intersect_cylinder, (self.p1, self.p2, self.r)
 
 
 class OpenCylinderGroup(ObstructionGroup):
@@ -74,12 +111,8 @@ class OpenCylinderGroup(ObstructionGroup):
     def __len__(self) -> int:
         return self.r.shape[0]
 
-    def intersect(self, ray_origin, ray_direction):
-        """Returns min t across all open cylinders (curved surface only)."""
-        ts = vmap(intersect_open_cylinder, in_axes=(None, None, 0, 0, 0))(
-            ray_origin, ray_direction, self.p1, self.p2, self.r
-        )
-        return jnp.min(ts)
+    def _primitive(self):
+        return intersect_open_cylinder, (self.p1, self.p2, self.r)
 
 
 class BoxGroup(ObstructionGroup):
@@ -95,12 +128,8 @@ class BoxGroup(ObstructionGroup):
     def __len__(self) -> int:
         return self.p1.shape[0]
 
-    def intersect(self, ray_origin, ray_direction):
-        """Returns min t across all boxes."""
-        ts = vmap(intersect_box, in_axes=(None, None, 0, 0))(
-            ray_origin, ray_direction, self.p1, self.p2
-        )
-        return jnp.min(ts)
+    def _primitive(self):
+        return intersect_box, (self.p1, self.p2)
 
 
 class SphereGroup(ObstructionGroup):
@@ -116,12 +145,8 @@ class SphereGroup(ObstructionGroup):
     def __len__(self) -> int:
         return self.radii.shape[0]
 
-    def intersect(self, ray_origin, ray_direction):
-        """Returns min t across all spheres."""
-        ts = vmap(intersect_sphere, in_axes=(None, None, 0, 0))(
-            ray_origin, ray_direction, self.centers, self.radii
-        )
-        return jnp.min(ts)
+    def _primitive(self):
+        return intersect_sphere, (self.centers, self.radii)
 
 
 class OrientedBoxGroup(ObstructionGroup):
@@ -139,12 +164,8 @@ class OrientedBoxGroup(ObstructionGroup):
     def __len__(self) -> int:
         return self.centers.shape[0]
 
-    def intersect(self, ray_origin, ray_direction):
-        """Returns min t across all oriented boxes."""
-        ts = vmap(intersect_oriented_box, in_axes=(None, None, 0, 0, 0))(
-            ray_origin, ray_direction, self.centers, self.half_extents, self.rotations
-        )
-        return jnp.min(ts)
+    def _primitive(self):
+        return intersect_oriented_box, (self.centers, self.half_extents, self.rotations)
 
 
 class TriangleGroup(ObstructionGroup):
@@ -162,9 +183,5 @@ class TriangleGroup(ObstructionGroup):
     def __len__(self) -> int:
         return self.v0.shape[0]
 
-    def intersect(self, ray_origin, ray_direction):
-        """Returns min t across all triangles."""
-        ts = vmap(intersect_triangle, in_axes=(None, None, 0, 0, 0))(
-            ray_origin, ray_direction, self.v0, self.v1, self.v2
-        )
-        return jnp.min(ts)
+    def _primitive(self):
+        return intersect_triangle, (self.v0, self.v1, self.v2)

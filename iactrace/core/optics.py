@@ -21,6 +21,23 @@ from .transforms import euler_to_matrix, transform_to_world
 InteractionModule = ReflectInteraction | RefractInteraction | SlabInteraction
 
 
+def _rotate_into_local(rot, vx, vy, vz):
+    """``rot.T @ v`` for batched ``v``, written out componentwise.
+
+    Args:
+        rot: ``(3, 3)`` rotation, element-local to world.
+        vx, vy, vz: ``(n_rays,)`` components of the vectors to transform.
+
+    Returns:
+        The three transformed components, each ``(n_rays,)``.
+    """
+    return (
+        rot[0, 0] * vx + rot[1, 0] * vy + rot[2, 0] * vz,
+        rot[0, 1] * vx + rot[1, 1] * vy + rot[2, 1] * vz,
+        rot[0, 2] * vx + rot[1, 2] * vy + rot[2, 2] * vz,
+    )
+
+
 class OpticalElementGroup(eqx.Module):
     """Optical element group composing surface + aperture + interaction.
 
@@ -163,6 +180,67 @@ class OpticalElementGroup(eqx.Module):
         pts_world = jnp.einsum("ij,nj->ni", rot, pts_loc) + pos
         norms_world = jnp.einsum("ij,nj->ni", rot, norms_loc)
         return t, pts_world, norms_world
+
+    def intersect_t(self, element_idx, origins, directions):
+        """Hit distance only, for the nearest-hit search over a stage.
+
+        Same ``t`` as :meth:`intersect`, minus the surface point and normal.
+
+        Args:
+            element_idx: Index of the element within this group.
+            origins, directions: ``(n_rays, 3)`` rays in world coordinates.
+
+        Returns:
+            ``(n_rays,)`` hit distances, ``inf`` where the ray misses the
+            surface or lands outside the element's aperture.
+        """
+        pos = self.positions[element_idx]
+        rot = euler_to_matrix(self.rotations[element_idx])
+
+        o_loc = jnp.stack(
+            _rotate_into_local(
+                rot,
+                origins[:, 0] - pos[0],
+                origins[:, 1] - pos[1],
+                origins[:, 2] - pos[2],
+            ),
+            axis=-1,
+        )
+        d_loc = jnp.stack(
+            _rotate_into_local(rot, directions[:, 0], directions[:, 1], directions[:, 2]),
+            axis=-1,
+        )
+
+        t, x, y = jax.vmap(
+            lambda o, d: self.surface.intersect_t_at(element_idx, o, d)
+        )(o_loc, d_loc)
+        return jnp.where(self.check_aperture(x, y, element_idx), t, jnp.inf)
+
+    def hit_geometry(self, element_idx, origins, directions):
+        """World-frame hit point and normal, for a **per-ray** element index.
+
+        The counterpart to :meth:`intersect_t`: once the search knows which
+        element each ray settled on, this evaluates the surface there, once.
+
+        Args:
+            element_idx: ``(n_rays,)`` per-ray element index.
+            origins, directions: ``(n_rays, 3)`` rays in world coordinates.
+
+        Returns:
+            Tuple of ``(points_world, normals_world)``, each ``(n_rays, 3)``.
+        """
+        pos = self.positions[element_idx]
+        rot = jax.vmap(euler_to_matrix)(self.rotations[element_idx])
+        rot_t = jnp.swapaxes(rot, 1, 2)
+
+        o_loc = jnp.einsum("nij,nj->ni", rot_t, origins - pos)
+        d_loc = jnp.einsum("nij,nj->ni", rot_t, directions)
+
+        _, pts_loc, norms_loc = jax.vmap(self.surface.intersect_at)(element_idx, o_loc, d_loc)
+
+        pts_world = jnp.einsum("nij,nj->ni", rot, pts_loc) + pos
+        norms_world = jnp.einsum("nij,nj->ni", rot, norms_loc)
+        return pts_world, norms_world
 
     def perturb_normals(self, normals, roughness_salt, element_idx=None):
         """Apply this group's own BSDF surface-roughness perturbation.

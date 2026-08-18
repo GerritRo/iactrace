@@ -134,6 +134,29 @@ class SurfaceGroup(eqx.Module):
         """
         return self._index(element_idx)._sag_local(x, y)
 
+    def intersect_t_at(self, element_idx, ray_origin, ray_direction, max_iter=10, tol=None):
+        """Ray parameter and local landing point, without evaluating the surface.
+
+        Args:
+            element_idx: Element index within the group.
+            ray_origin: Ray origin in local coordinates (3,).
+            ray_direction: Ray direction (3,).
+            max_iter: Maximum Newton-Raphson iterations.
+            tol: Absolute residual tolerance, or ``None`` to derive it per ray.
+
+        Returns:
+            Tuple of ``(t, x, y)``: the intersection distance (``inf`` on a
+            miss) and the local in-surface coordinates of the landing point. On
+            a miss the coordinates are those of the ray's closest approach, so
+            they stay finite for downstream masking.
+        """
+        elem = self._index(element_idx)
+        t = elem._intersect_t(ray_origin, ray_direction, max_iter, tol)
+        t_safe = jnp.where(jnp.isfinite(t), t, 0.0)
+        origin, t_offset, _ = _localize(ray_origin, ray_direction, jnp.zeros(3))
+        hit = origin + (t_safe - t_offset) * ray_direction
+        return t, hit[0], hit[1]
+
     def intersect_at(self, element_idx, ray_origin, ray_direction, max_iter=10, tol=None):
         """Intersect a ray with a single element's surface.
 
@@ -159,12 +182,8 @@ class SurfaceGroup(eqx.Module):
                 - point: Intersection point (3,).
                 - normal: Surface normal at intersection (3,).
         """
-        elem = self._index(element_idx)
-        t = elem._intersect_t(ray_origin, ray_direction, max_iter, tol)
-        t_safe = jnp.where(jnp.isfinite(t), t, 0.0)
-        origin, t_offset, _ = _localize(ray_origin, ray_direction, jnp.zeros(3))
-        hit = origin + (t_safe - t_offset) * ray_direction
-        point, normal = elem.compute_sag_and_normal_at(hit[0], hit[1])
+        t, x, y = self.intersect_t_at(element_idx, ray_origin, ray_direction, max_iter, tol)
+        point, normal = self._index(element_idx).compute_sag_and_normal_at(x, y)
         return t, point, normal
 
 
