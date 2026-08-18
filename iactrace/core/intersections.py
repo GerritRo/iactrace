@@ -52,10 +52,21 @@ def _localize(ray_origin, ray_direction, reference, scale=0.0):
         ``(origin, t_offset, t_lo)``: the shifted origin, the ray parameter that
         reaches it, and the smallest local ``t`` distinguishable from a re-hit of
         the surface the ray just left.
+
+    Note:
+        Written componentwise for better fusion.
     """
-    t_offset = jnp.dot(reference - ray_origin, ray_direction)
-    origin = ray_origin + t_offset * ray_direction
-    t_floor = len_rel(origin) * (jnp.abs(t_offset) + jnp.linalg.norm(origin) + scale)
+    ox, oy, oz = ray_origin[0], ray_origin[1], ray_origin[2]
+    dx, dy, dz = ray_direction[0], ray_direction[1], ray_direction[2]
+
+    t_offset = (reference[0] - ox) * dx + (reference[1] - oy) * dy + (reference[2] - oz) * dz
+    px = ox + t_offset * dx
+    py = oy + t_offset * dy
+    pz = oz + t_offset * dz
+    origin = jnp.stack([px, py, pz], axis=-1)
+
+    norm = jnp.sqrt(px * px + py * py + pz * pz)
+    t_floor = len_rel(origin) * (jnp.abs(t_offset) + norm + scale)
     return origin, t_offset, t_floor - t_offset
 
 

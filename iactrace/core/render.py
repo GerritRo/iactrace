@@ -25,7 +25,7 @@ def _shadow_mask(origins, directions, obstructions, max_t):
         return jnp.ones(origins.shape[0])
     mask = jnp.ones(origins.shape[0])
     for g in obstructions:
-        t = jax.vmap(g.intersect)(origins, directions)
+        t = g.intersect_batch(origins, directions)
         mask = mask * jnp.where(t < max_t, 0.0, 1.0)
     return mask
 
@@ -93,6 +93,31 @@ def final_leg_points(rb, camera_position, camera_rotation, fallback):
     return jnp.where(reaches[:, None], landing, fallback)
 
 
+def _nearest_hit(group, origins, directions):
+    """Nearest element each ray hits in ``group``: ``(t, element index)``.
+
+    Every ray is tested against every element, and the
+    smallest forward ``t`` wins.
+    """
+    n_rays = origins.shape[0]
+    init_carry = (
+        jnp.full(n_rays, jnp.inf, dtype=origins.dtype),  # best_t
+        jnp.zeros(n_rays, dtype=jnp.int32),  # best_elem
+    )
+
+    def scan_step(carry, eidx):
+        best_t, best_elem = carry
+        ts = group.intersect_t(eidx, origins, directions)
+        closer = ts < best_t
+        return (
+            jnp.where(closer, ts, best_t),
+            jnp.where(closer, eidx.astype(jnp.int32), best_elem),
+        ), None
+
+    (best_t, best_elem), _ = jax.lax.scan(scan_step, init_carry, jnp.arange(len(group)))
+    return best_t, best_elem
+
+
 def _trace_stage(
     origins,
     directions,
@@ -127,30 +152,10 @@ def _trace_stage(
     Uses lax.scan over elements, keeping only the closest hit per ray.
     Memory usage is O(n_rays) regardless of element count.
     """
-    n_rays = origins.shape[0]
+    best_t, best_elem = _nearest_hit(group, origins, directions)
+    best_pts, best_norms = group.hit_geometry(best_elem, origins, directions)
 
-    init_carry = (
-        jnp.full(n_rays, jnp.inf),  # best_t
-        jnp.zeros((n_rays, 3)),  # best_pts
-        jnp.zeros((n_rays, 3)),  # best_norms
-        jnp.zeros(n_rays, dtype=jnp.int32),  # best_elem
-    )
-
-    def scan_step(carry, eidx):
-        best_t, best_pts, best_norms, best_elem = carry
-        ts, pts_w, norms_w = group.intersect(eidx, origins, directions)
-        closer = ts < best_t
-        new_best_t = jnp.where(closer, ts, best_t)
-        new_best_pts = jnp.where(closer[:, None], pts_w, best_pts)
-        new_best_norms = jnp.where(closer[:, None], norms_w, best_norms)
-        new_best_elem = jnp.where(closer, eidx.astype(jnp.int32), best_elem)
-        return (new_best_t, new_best_pts, new_best_norms, new_best_elem), None
-
-    (best_t, best_pts, best_norms, best_elem), _ = jax.lax.scan(
-        scan_step, init_carry, jnp.arange(len(group))
-    )
-
-    # Guard against the degenerate init-carry normal for rays that hit nothing.
+    # Rays that hit nothing kept element 0's geometry
     hit = best_t < 1e10
     safe_norms = jnp.where(hit[:, None], best_norms, jnp.array([0.0, 0.0, 1.0]))
 
