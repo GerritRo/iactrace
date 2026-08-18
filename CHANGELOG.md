@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.10.2 (2026-08-18)
+
+### Fix
+
+- **camera**: unified the aliveness flag, stop rays from unnecessarily propagating through detection chain
+
 ## v0.10.1 (2026-08-07)
 
 ### Fix
