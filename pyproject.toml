@@ -123,7 +123,7 @@ omit = ["iactrace/viz/*"]
 # -- Commitizen (conventional commits + changelog) --
 [tool.commitizen]
 name = "cz_conventional_commits"
-version = "0.10.1"
+version = "0.10.2"
 version_files = [
     "iactrace/__init__.py:__version__",
 ]
