@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.10.3 (2026-08-19)
+
+### Perf
+
+- **core**: improved performance via better kernel fusion
+
 ## v0.10.2 (2026-08-18)
 
 ### Fix

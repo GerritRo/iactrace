@@ -1,6 +1,8 @@
+import jax
 import jax.numpy as jnp
 
 from iactrace.core.obstructions import (
+    _VMAP_PAIR_BUDGET,
     BoxGroup,
     CylinderGroup,
     OpenCylinderGroup,
@@ -193,3 +195,22 @@ class TestMultipleObstructions:
 
         # Hits larger cylinder (r=2) first at t=3
         assert jnp.isclose(t, 3.0, atol=1e-6)
+
+    def test_batch_intersect_equal_to_intersect(self):
+        """batch_intersect returns equal value to intersect."""
+        cylinders = CylinderGroup(
+            p1=[[0, 0, 0], [0, 0, 0]],
+            p2=[[0, 0, 10], [0, 0, 10]],
+            r=[0.5, 2.0],  # One small, one large
+        )
+
+        # Equal path on single ray
+        ray_origins = jnp.repeat(jnp.array([[5.0, 0.0, 5.0]]), _VMAP_PAIR_BUDGET, axis=0)
+        ray_directions = jnp.repeat(jnp.array([[-1.0, 0.0, 0.0]]), _VMAP_PAIR_BUDGET, axis=0)
+
+
+        t_vmap = jax.vmap(cylinders.intersect)(ray_origins, ray_directions)
+        t_batch = cylinders.intersect_batch(ray_origins, ray_directions)
+
+        # Check if hits are equal between both methods
+        assert jnp.allclose(t_vmap, t_batch, atol=1e-6)
