@@ -9,6 +9,8 @@ import jax.numpy as jnp
 from jax import Array
 
 from ..core.interactions import ReflectInteraction, RefractInteraction, SlabInteraction
+from ..core.ray_bundle import DEFAULT_WAVELENGTH
+from ..core.refractive_index import RefractiveIndex, as_refractive_index
 from ..core.surfaces import (
     AsphericSurfaceGroup,
     SumSurfaceGroup,
@@ -66,7 +68,9 @@ def _broadcast(value: Array | float, n: int) -> Array:
     return jnp.full((n,), arr) if arr.ndim == 0 else arr
 
 
-def _focal_scale(group, stage: int, n_outside: float = 1.0) -> Array | float:
+def _focal_scale(
+    group, stage: int, n_outside: float = 1.0, wavelength: float | Array = DEFAULT_WAVELENGTH
+) -> Array | float:
     """Curvature<->focal-length scale: ``2`` for mirrors, ``n_in - n_out`` for lenses.
 
     ``n_outside`` is a design-time paraxial assumption, not a value read from
@@ -76,9 +80,13 @@ def _focal_scale(group, stage: int, n_outside: float = 1.0) -> Array | float:
     Defaults to ``1.0`` (vacuum/air), matching the initial medium every ray
     starts in.
 
+    ``wavelength`` is the design wavelength at which a dispersive lens index is
+    evaluated (ignored by a constant lens); defaults to
+    :data:`~iactrace.core.ray_bundle.DEFAULT_WAVELENGTH`.
+
     Raises for slabs, where a focal length is not meaningful.
     """
-    scale = group.interaction_module.focal_scale(n_outside)
+    scale = group.interaction_module.focal_scale(n_outside, wavelength)
     if scale is None:
         raise ValueError(f"stage {stage} is slab; focal length is not meaningful")
     return scale
@@ -403,14 +411,14 @@ def set_reflectivity(telescope: Telescope, stage: int, reflectivity: Array | flo
     _require_kind(group, stage, (ReflectInteraction,), "mirror")
     assert isinstance(group.interaction_module, ReflectInteraction)
     r = _broadcast(reflectivity, len(group))
-    new_interaction = group.interaction_module.with_reflectivity_scalar(r)
+    new_interaction = group.interaction_module.with_reflectivity(r)
     return _update_at_stage(telescope, stage, lambda g: g.interaction_module, new_interaction)
 
 
 def scale_reflectivity(telescope: Telescope, stage: int, factor: Array | float) -> Telescope:
     """Multiply mirror reflectivity by ``factor``. Mirror stages only.
 
-    Scales the bulk multiplier ``reflectivity_scalar``; the coating on
+    Scales the bulk multiplier ``reflectivity``; the response curve on
     the interaction is left untouched.
     """
     group = telescope.stage(stage)
@@ -423,21 +431,21 @@ def scale_reflectivity(telescope: Telescope, stage: int, factor: Array | float) 
 def set_transmittance(telescope: Telescope, stage: int, transmittance: Array | float) -> Telescope:
     """Set per-element bulk transmittance. Lens or slab stages only.
 
-    Writes the bulk multiplier ``transmittance_scalar``; the coating
+    Writes the bulk multiplier ``transmittance``; the response curve
     on the interaction is left untouched.
     """
     group = telescope.stage(stage)
     _require_kind(group, stage, (RefractInteraction, SlabInteraction), "lens or slab")
     assert isinstance(group.interaction_module, (RefractInteraction, SlabInteraction))
     t = _broadcast(transmittance, len(group))
-    new_interaction = group.interaction_module.with_transmittance_scalar(t)
+    new_interaction = group.interaction_module.with_transmittance(t)
     return _update_at_stage(telescope, stage, lambda g: g.interaction_module, new_interaction)
 
 
 def scale_transmittance(telescope: Telescope, stage: int, factor: Array | float) -> Telescope:
     """Multiply bulk transmittance by ``factor``. Lens or slab stages only.
 
-    Scales the bulk multiplier ``transmittance_scalar``; the coating on
+    Scales the bulk multiplier ``transmittance``; the response curve on
     the interaction is left untouched.
     """
     group = telescope.stage(stage)
@@ -447,13 +455,15 @@ def scale_transmittance(telescope: Telescope, stage: int, factor: Array | float)
     return _update_at_stage(telescope, stage, lambda g: g.interaction_module, new_interaction)
 
 
-def set_refractive_index(telescope: Telescope, stage: int, n_inside: Array | float) -> Telescope:
-    """Set per-element refractive index. Lens or slab stages only."""
+def set_refractive_index(
+    telescope: Telescope, stage: int, index: Array | float | RefractiveIndex
+) -> Telescope:
+    """Set the refractive index of a lens or slab stage."""
     group = telescope.stage(stage)
     _require_kind(group, stage, (RefractInteraction, SlabInteraction), "lens or slab")
     assert isinstance(group.interaction_module, (RefractInteraction, SlabInteraction))
-    n = _broadcast(n_inside, len(group))
-    new_interaction = group.interaction_module.with_n_inside(n)
+    resolved = index if isinstance(index, RefractiveIndex) else _broadcast(index, len(group))
+    new_interaction = group.interaction_module.with_index(as_refractive_index(resolved, len(group)))
     return _update_at_stage(telescope, stage, lambda g: g.interaction_module, new_interaction)
 
 
@@ -468,18 +478,24 @@ def set_thickness(telescope: Telescope, stage: int, thickness: Array | float) ->
 
 
 def set_focal_lengths(
-    telescope: Telescope, stage: int, focal_lengths: Array, n_outside: float = 1.0
+    telescope: Telescope,
+    stage: int,
+    focal_lengths: Array,
+    n_outside: float = 1.0,
+    wavelength: float | Array = DEFAULT_WAVELENGTH,
 ) -> Telescope:
     """Set focal lengths via curvature.
 
     Mirror stages: ``c = 1 / (2 f)``.
-    Lens stages (single refracting surface): ``c = 1 / ((n_inside - n_outside) f)``,
+    Lens stages (single refracting surface): ``c = 1 / ((n - n_outside) f)``,
     where ``n_outside`` is a design-time ambient-index assumption (default
-    ``1.0``), not a value stored on the lens.
+    ``1.0``), not a value stored on the lens, and ``n`` is the lens index at
+    the design ``wavelength`` (matters only for a dispersive lens; a constant
+    lens ignores it).
     """
     group = telescope.stage(stage)
     f = jnp.asarray(focal_lengths)
-    scale = _focal_scale(group, stage, n_outside)
+    scale = _focal_scale(group, stage, n_outside, wavelength)
     new_c = jnp.where(jnp.isinf(f), 0.0, 1.0 / (scale * f))
     return set_curvatures(telescope, stage, new_c)
 
@@ -491,18 +507,20 @@ def apply_focal_error(
     key: Array,
     relative: bool = False,
     n_outside: float = 1.0,
+    wavelength: float | Array = DEFAULT_WAVELENGTH,
 ) -> Telescope:
     """Perturb focal lengths by Gaussian noise; update curvatures accordingly.
 
     Kind-aware: uses the mirror or single-refracting-lens formula. Slabs
     are rejected. ``n_outside`` is the design-time ambient index for the
-    lens formula (default ``1.0``); see :func:`set_focal_lengths`.
+    lens formula (default ``1.0``); ``wavelength`` is the design wavelength
+    for a dispersive lens index (see :func:`set_focal_lengths`).
     """
     group = telescope.stage(stage)
     curvatures = _require_asphere(group.surface, stage).curvatures
     safe = jnp.where(curvatures == 0, 1.0, curvatures)
 
-    scale = _focal_scale(group, stage, n_outside)
+    scale = _focal_scale(group, stage, n_outside, wavelength)
     f = 1.0 / (scale * safe)
     noise = jax.random.normal(key, shape=(len(group),))
     new_f = f * (1.0 + noise * sigma) if relative else f + noise * sigma

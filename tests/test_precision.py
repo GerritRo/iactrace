@@ -201,7 +201,7 @@ class TestKernelPrecision:
         denominator turns that 0/0 into 0 and transmits a ray that should have
         been reflected outright.
         """
-        from iactrace.core.coatings import fresnel_unpolarized
+        from iactrace.core.responses import fresnel_unpolarized
 
         def grazing():
             cos_i = jnp.asarray(np.array([0.0, 1e-9, 1e-7, 1e-5, 1e-3]))

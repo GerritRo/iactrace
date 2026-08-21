@@ -42,6 +42,9 @@ class FocalSurfaceHits(eqx.Module):
         opl: Per-ray optical path length from the source wavefront to the
             focal surface, in metres (n_rays,). Equals
             ``ray_bundle.path_length + t * ray_bundle.n``.
+        values: Throughput-weighted intensity carried to the surface (n_rays,),
+            in the input bundle's units.
+        wavelength: Per-ray wavelength carried from the input bundle (n_rays,).
     """
 
     xy_local: Array
@@ -51,6 +54,7 @@ class FocalSurfaceHits(eqx.Module):
     directions_local: Array
     opl: Array
     values: Array
+    wavelength: Array
 
     @property
     def alive(self) -> Array:
@@ -132,6 +136,7 @@ class FocalSurface(eqx.Module):
             directions_local=d_local,
             opl=opl,
             values=ray_bundle.values,
+            wavelength=ray_bundle.wavelength,
         )
 
 

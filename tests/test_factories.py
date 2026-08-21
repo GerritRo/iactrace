@@ -84,7 +84,7 @@ class TestMirrorsDiskArray:
         # conic/inner_radius default to zero; reflectivity to one
         assert jnp.allclose(m.surface.conics, jnp.zeros(n))
         assert jnp.allclose(m.aperture.inner_radii, jnp.zeros(n))
-        assert jnp.allclose(m.interaction_module.reflectivity_scalar, jnp.ones(n))
+        assert jnp.allclose(m.interaction_module.reflectivity, jnp.ones(n))
         # any non-zero bsdf scale enables a GaussianBSDF across the group
         assert isinstance(m.bsdf, GaussianBSDF)
         assert jnp.allclose(m.bsdf.scale, jnp.array([0.0, 30.0, 0.0, 0.0]))
@@ -123,13 +123,13 @@ class TestLensSugarFactories:
             position=(0, 0, 0.39),
             radius=0.05,
             thickness=0.003,
-            n_inside=1.52,
+            index=1.52,
             transmittance=0.9,
             key=random_key,
         )
         assert jnp.allclose(slab.interaction_module.thickness, jnp.array([0.003]))
-        assert jnp.allclose(slab.interaction_module.n_inside, jnp.array([1.52]))
-        assert jnp.allclose(slab.interaction_module.transmittance_scalar, jnp.array([0.9]))
+        assert jnp.allclose(slab.interaction_module.index.reference(), jnp.array([1.52]))
+        assert jnp.allclose(slab.interaction_module.transmittance, jnp.array([0.9]))
         assert slab.interaction == InteractionType.SLAB
 
 
@@ -191,7 +191,7 @@ class TestTelescopeEndToEnd:
             position=(0, 0, 0.39),
             radius=0.05,
             thickness=0.002,
-            n_inside=1.5,
+            index=1.5,
             optical_stage=1,
             n_samples=64,
             key=k2,
@@ -275,8 +275,8 @@ class TestMirrorGroup:
         assert jnp.allclose(sugar.surface.conics, direct.surface.conics)
         assert jnp.allclose(sugar.aperture.radii, direct.aperture.radii)
         assert jnp.allclose(
-            sugar.interaction_module.reflectivity_scalar,
-            direct.interaction_module.reflectivity_scalar,
+            sugar.interaction_module.reflectivity,
+            direct.interaction_module.reflectivity,
         )
 
 
@@ -292,19 +292,19 @@ class TestRefractiveAndSlabGroups:
             aspherics=jnp.zeros((1, 0)),
             offsets=jnp.zeros((1, 2)),
             aperture=DiskAperture(radii=jnp.array([0.02]), inner_radii=jnp.zeros(1)),
-            n_inside=jnp.array([1.5]),
+            index=jnp.array([1.5]),
             transmittance=jnp.array([1.0]),
             sample_key=random_key,
         )
         assert isinstance(lens.interaction_module, RefractInteraction)
         assert lens.interaction == InteractionType.REFRACT
-        assert jnp.allclose(lens.interaction_module.n_inside, jnp.array([1.5]))
+        assert jnp.allclose(lens.interaction_module.index.reference(), jnp.array([1.5]))
 
         slab = lenses.slab_group(
             positions=jnp.array([[0.0, 0.0, 0.39]]),
             rotations=jnp.zeros((1, 3)),
             aperture=DiskAperture(radii=jnp.array([0.05]), inner_radii=jnp.zeros(1)),
-            n_inside=jnp.array([1.5]),
+            index=jnp.array([1.5]),
             thickness=jnp.array([0.002]),
             transmittance=jnp.array([1.0]),
             sample_key=random_key,

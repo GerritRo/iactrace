@@ -10,6 +10,7 @@ from jax import Array
 
 from ...core.interactions import reflect
 from ...core.ray_bundle import RayBundle
+from ...core.responses import ResponseCurve
 from ...core.trajectory import TraceResult, Trajectory
 from ..detector.surface import DetectionSurface
 from .concentrator import Concentrator
@@ -34,11 +35,8 @@ class PolygonalCone(Concentrator):
       mouth-aperture mask (:meth:`in_mouth`) and the off-wall reflection
       book-keeping (:meth:`reflect_ray`) are shared here. All tracer coordinates
       are the cone frame (exit ``z = 0``, mouth ``z = length``).
-
-    A new cone type therefore only describes its meridian profile
-    (:meth:`_meridian`) and its per-facet intersection (:meth:`_nearest_hit`).
-    Every field is static, so the whole cone is a leaf-free pytree the tracer
-    can broadcast through ``vmap`` at no runtime cost.
+    * **Wall response.** Every bounce costs :meth:`wall_reflectivity`, evaluated
+      at the incidence angle of *that* bounce and at the ray's wavelength.
     """
 
     _N_SLICES = 24  # meridian samples for cross_sections (plain class constant)
@@ -47,8 +45,29 @@ class PolygonalCone(Concentrator):
     orientation: eqx.AbstractVar[float]  # rotation about the optical axis, radians
     entrance_apothem: eqx.AbstractVar[float]  # mouth inradius a1 (at z = length)
     exit_apothem: eqx.AbstractVar[float]  # exit inradius a2 (at z = 0)
-    reflectivity: eqx.AbstractVar[float]  # per-bounce wall reflectivity
+    reflectivity: eqx.AbstractVar[float]  # per-bounce wall reflectivity (bulk scalar)
+    reflectivity_curve: eqx.AbstractVar[ResponseCurve | None]  # optional R(angle, wavelength)
     max_bounces: eqx.AbstractVar[int]  # reflections traced before absorption
+
+    def wall_reflectivity(self, cos_theta_i: Array, wavelength: Array) -> Array:
+        """Per-ray wall reflectivity, shape ``(n_rays,)``.
+
+        The scalar :attr:`reflectivity` is the flat bulk value; an optional
+        :attr:`reflectivity_curve` multiplies in the coating response,
+        evaluated at each ray's *actual* incidence angle on the wall and at its
+        wavelength.
+
+        Args:
+            cos_theta_i: Cosine of the angle between the ray and the wall
+                normal at the hit point, shape ``(n_rays,)``. ``1`` is normal
+                incidence, ``0`` grazing.
+            wavelength: Per-ray wavelength, shape ``(n_rays,)``.
+        """
+        if self.reflectivity_curve is None:
+            return jnp.full(cos_theta_i.shape, self.reflectivity)
+        idx = jnp.zeros(cos_theta_i.shape, dtype=jnp.int32)  # the cone is one element
+        curve = self.reflectivity_curve(cos_theta_i, idx, wavelength)
+        return self.reflectivity * curve
 
     @property
     def n_hats(self) -> Array:
@@ -84,17 +103,18 @@ class PolygonalCone(Concentrator):
 
     def reflect_ray(
         self, o: Array, d: Array, t: Array, normal: Array
-    ) -> tuple[Array, Array, Array]:
+    ) -> tuple[Array, Array, Array, Array]:
         """Reflect one ray off a wall hit at parameter ``t``.
 
-        Returns ``(new_origin, new_direction, path_added)``. The new origin is
-        nudged just off the wall along the reflected ray so the next intersection
-        test sees this wall behind it; the nudge lies on the outgoing ray, so it
-        is added back to the optical path and the geometry stays exact.
+        Returns ``(new_origin, new_direction, path_added, cos_theta_i)``. The new
+        origin is nudged just off the wall along the reflected ray so the next
+        intersection test sees this wall behind it; the nudge lies on the outgoing
+        ray, so it is added back to the optical path and the geometry stays exact.
         """
-        refl_d, _ = reflect(d, normal)
+        refl_d, cos_i = reflect(d, normal)
         nudge = _NUDGE * self.exit_apothem
-        return o + t * d + nudge * refl_d, refl_d, t + nudge
+        cos_theta_i = jnp.clip(jnp.abs(cos_i.squeeze(-1)), 0.0, 1.0)
+        return o + t * d + nudge * refl_d, refl_d, t + nudge, cos_theta_i
 
     def in_mouth(self, xy: Array) -> Array:
         """True where the transverse position ``xy`` lies inside the mouth polygon."""
@@ -159,8 +179,37 @@ class ChainTrace(NamedTuple):
     trajectory: Trajectory | None
 
 
-def _trace_step(o, d, value, path, done, nmed, hit_stop, bounces, walls, stop, vertex):
-    """One trace event for one ray (frozen once ``done``)."""
+class _Event(NamedTuple):
+    """The nearest trace event, as seen by :func:`_hit_event`.
+
+    Attributes:
+        o_wall, refl_d, seg_wall: reflected ray and path increment, valid where
+            ``is_wall``.
+        cos_theta_i: incidence cosine of *this* bounce, what the wall coating is
+            evaluated at.
+        p_stop, t_stop: landing point and ray parameter, valid where ``is_stop``.
+        is_stop, is_wall: which of the two happened; neither means the ray left
+            through the entrance (lost).
+    """
+
+    o_wall: Array
+    refl_d: Array
+    seg_wall: Array
+    cos_theta_i: Array
+    p_stop: Array
+    t_stop: Array
+    is_stop: Array
+    is_wall: Array
+
+
+def _hit_event(o, d, walls, stop, vertex) -> _Event:
+    """Nearest event for one ray: a wall bounce, a landing on ``stop``, or a loss.
+
+    Pure geometry -- no throughput book-keeping -- so the per-bounce wall
+    reflectivity can be evaluated on the whole bundle at once (a
+    :class:`~iactrace.core.responses.ResponseCurve` is a batched callable) before
+    :func:`_advance` folds it in.
+    """
     t_wall, wall_nrm = walls.nearest_hit(o, d)
 
     t_stop, p_stop, within = stop._hit(o, d, vertex)
@@ -171,24 +220,36 @@ def _trace_step(o, d, value, path, done, nmed, hit_stop, bounces, walls, stop, v
 
     is_stop = jnp.isfinite(t_stop) & (t_stop <= t_wall) & (t_stop <= t_ent)
     is_wall = jnp.isfinite(t_wall) & (t_wall < t_stop) & (t_wall <= t_ent)
-    is_lost = ~is_stop & ~is_wall
 
     tw = jnp.where(jnp.isfinite(t_wall), t_wall, 0.0)
-    o_wall, refl_d, seg_wall = walls.reflect_ray(o, d, tw, wall_nrm)
+    o_wall, refl_d, seg_wall, cos_theta_i = walls.reflect_ray(o, d, tw, wall_nrm)
 
     # Terminate on the surface: keep the throughput and the true incident direction
     ts = jnp.where(jnp.isfinite(t_stop), t_stop, 0.0)
+    return _Event(o_wall, refl_d, seg_wall, cos_theta_i, p_stop, ts, is_stop, is_wall)
 
-    o_new = jnp.where(is_wall, o_wall, jnp.where(is_stop, p_stop, o))
-    d_new = jnp.where(is_wall, refl_d, d)
-    value_new = jnp.where(is_lost, 0.0, jnp.where(is_wall, value * walls.reflectivity, value))
-    path_new = path + jnp.where(is_wall, seg_wall, jnp.where(is_stop, ts * nmed, 0.0))
+
+def _advance(carry: _Carry, ev: _Event, refl: Array) -> _Carry:
+    """Apply one trace event to the whole bundle (rays frozen once ``done``).
+
+    ``refl`` is the per-ray wall reflectivity of *this* bounce, already
+    evaluated at each ray's incidence angle and wavelength.
+    """
+    o, d, value, path, done, nmed, hit_stop, bounces = carry
+    is_wall, is_stop = ev.is_wall, ev.is_stop
+    is_lost = ~is_stop & ~is_wall
+
+    vec_wall, vec_stop = is_wall[:, None], is_stop[:, None]
+    o_new = jnp.where(vec_wall, ev.o_wall, jnp.where(vec_stop, ev.p_stop, o))
+    d_new = jnp.where(vec_wall, ev.refl_d, d)
+    value_new = jnp.where(is_lost, 0.0, jnp.where(is_wall, value * refl, value))
+    path_new = path + jnp.where(is_wall, ev.seg_wall, jnp.where(is_stop, ev.t_stop * nmed, 0.0))
     done_new = done | is_stop | is_lost
 
     live = ~done
     return (
-        jnp.where(live, o_new, o),
-        jnp.where(live, d_new, d),
+        jnp.where(live[:, None], o_new, o),
+        jnp.where(live[:, None], d_new, d),
         jnp.where(live, value_new, value),
         jnp.where(live, path_new, path),
         jnp.where(live, done_new, done),
@@ -221,12 +282,8 @@ def trace_chain(
     Each step every live ray takes the nearest of a wall reflection, a landing
     on ``stop``, or a back-loss through the entrance, until it terminates or
     ``max_bounces`` (default ``walls.max_bounces``) is exhausted (then
-    absorbed). Rays whose transverse position lies outside the mouth polygon
-    strike the dead face around the cone and are lost immediately. Landing on
-    ``stop`` is the only surviving outcome: the returned ``rays.alive`` is the
-    incoming liveness AND-ed with "landed". Pass ``record_trajectory=True`` to
-    also collect the per-step ray positions as a
-    :class:`~iactrace.core.trajectory.Trajectory` on
+    absorbed). Pass ``record_trajectory=True`` to also collect the per-step
+     ray positions as a :class:`~iactrace.core.trajectory.Trajectory` on
     :attr:`ChainTrace.trajectory` (diagnostics; memory scales with
     ``max_bounces x n_rays``).
     """
@@ -251,10 +308,12 @@ def trace_chain(
         jnp.zeros(n, jnp.int32),
     )
 
-    step_fn = jax.vmap(_trace_step, in_axes=(0, 0, 0, 0, 0, 0, 0, 0, None, None, None))
+    event_fn = jax.vmap(_hit_event, in_axes=(0, 0, None, None, None))
 
     def step(carry: _Carry, _):
-        out = step_fn(*carry, walls, stop, vertex)
+        ev = event_fn(carry[0], carry[1], walls, stop, vertex)
+        refl = walls.wall_reflectivity(ev.cos_theta_i, rays.wavelength)
+        out = _advance(carry, ev, refl)
         # Emit per-step positions only when the trajectory is recorded.
         return out, out[0] if record_trajectory else None
 
@@ -275,6 +334,7 @@ def trace_chain(
             values=value,
             path_length=path,
             n=nmed,
+            wavelength=rays.wavelength,
             alive=rays.alive & landed,
         ),
         bounces=bounces,

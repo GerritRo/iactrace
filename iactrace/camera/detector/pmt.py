@@ -4,10 +4,11 @@ import equinox as eqx
 import jax.numpy as jnp
 from jax import Array
 
-from ...core.coatings import fresnel_unpolarized
 from ...core.ray_bundle import RayBundle
+from ...core.refractive_index import ConstantIndex, RefractiveIndex, as_refractive_index
+from ...core.responses import ResponseCurve, fresnel_unpolarized
 from ...core.surfaces import AsphericSurfaceGroup, SurfaceGroup
-from .photodetector import PhotoDetector, _validate_qe, incidence_cos
+from .photodetector import PhotoDetector, _validate_qe, apply_qe, incidence_cos
 from .surface import DetectionSurface
 
 
@@ -21,27 +22,40 @@ class PMT(PhotoDetector):
       rays onto (:attr:`surface`): bounded by ``face_radius`` and placed with
       its vertex at ``vertex_z`` (relative to the detector plane; ``0`` = flush
       with the mount, ``> 0`` peeks toward the light, as for a domed window).
-    * **Efficiency.** A single detection efficiency ``qe`` is applied to every
-      ray landing on the sensor surface. Real PMT efficiencies are measured with
-      the entrance glass in place, so ``qe`` is the whole measured number and
-      needs no separate window term -- this is the default (``n_window = None``).
-    * **Optional entrance window.** Set ``n_window`` to also weight each ray by
-      the unpolarized Fresnel transmittance at the air/window interface for its
-      incident angle -- the angular response a single measured scalar cannot
+    * **Efficiency.** The usual ``qe`` / ``qe_curve`` pair, applied to every ray
+      landing on the sensor surface. By default this is the single bulk scalar
+      ``qe`` (real PMT efficiencies are measured with the entrance glass in
+      place, so ``qe`` is the whole measured number). For a wavelength- or
+      angle-dependent photocathode, pass ``qe_curve`` -- the same
+      :class:`~iactrace.core.responses.ResponseCurve` type a mirror or lens
+      takes, so ``QE(lambda)`` is built with
+      :meth:`~iactrace.core.responses.TabulatedResponse.from_wavelengths`.
+    * **Optional entrance window.** Set ``window_index`` to also weight each ray
+      by the unpolarized Fresnel transmittance at the air/window interface for
+      its incident angle -- the angular response a single measured scalar cannot
       capture. When you do, ``qe`` should be the intrinsic photocathode QE (the
       glass loss is then modelled by the Fresnel term, not folded into ``qe``).
+      A number gives a non-dispersive window; a
+      :class:`~iactrace.core.refractive_index.RefractiveIndex` model gives a
+      dispersive one, ``n(lambda)``.
 
     A :class:`~iactrace.core.surfaces.FreeformSurfaceGroup` sensor is
     supported at the Python level (pass it as ``surface``), but -- like a
     freeform mirror or lens surface -- is not representable in YAML.
 
     Args:
-        qe: Detection efficiency in ``[0, 1]`` applied at the photocathode.
-            Defaults to ``1.0``.
-        n_window: Refractive index of the entrance window. ``None`` (default)
-            applies ``qe`` alone. A value ``> 1`` (e.g. ``1.48`` for borosilicate
-            glass) additionally weights each ray by the incident-angle Fresnel
-            transmittance through the window.
+        qe: Bulk detection efficiency in ``[0, 1]`` applied at the
+            photocathode. Defaults to ``1.0``. With ``qe_curve`` it acts as a
+            bulk multiplier.
+        qe_curve: Optional ``QE(theta, lambda)``
+            :class:`~iactrace.core.responses.ResponseCurve` multiplying ``qe``
+            per ray; ``None`` (default) is flat.
+        window_index: Refractive index of the entrance window. ``None``
+            (default) applies ``qe`` alone. A number ``> 1`` (e.g. ``1.48`` for
+            borosilicate glass) additionally weights each ray by the
+            incident-angle Fresnel transmittance through the window; a
+            :class:`~iactrace.core.refractive_index.RefractiveIndex` model does
+            the same with a dispersive ``n(lambda)``.
         face_radius: Sensor surface aperture radius (and the body radius).
         surface: The sensor surface figure, a single-element
             :class:`~iactrace.core.surfaces.SurfaceGroup` (typically an
@@ -57,12 +71,14 @@ class PMT(PhotoDetector):
         n_facets: Facets of the revolved body (``48`` ~ round).
 
     Raises:
-        ValueError: on ``qe`` outside ``[0, 1]``, ``n_window <= 1``, non-positive
-            ``face_radius``, negative ``length``, or ``n_facets < 3``.
+        ValueError: on ``qe`` outside ``[0, 1]``, a constant ``window_index``
+            ``<= 1``, non-positive ``face_radius``, negative ``length``, or
+            ``n_facets < 3``.
     """
 
     qe: float = eqx.field(static=True)
-    n_window: float | None = eqx.field(static=True)
+    qe_curve: ResponseCurve | None
+    window_index: RefractiveIndex | None
     face_radius: float = eqx.field(static=True)
     shape: SurfaceGroup
     vertex_z: float = eqx.field(static=True)
@@ -73,15 +89,14 @@ class PMT(PhotoDetector):
         self,
         qe: float = 1.0,
         *,
-        n_window: float | None = None,
+        qe_curve: ResponseCurve | None = None,
+        window_index: RefractiveIndex | Array | float | None = None,
         face_radius: float,
         surface: SurfaceGroup | None = None,
         vertex_z: float = 0.0,
         length: float | None = None,
         n_facets: int = 48,
     ) -> None:
-        if n_window is not None and n_window <= 1.0:
-            raise ValueError(f"n_window must be > 1.0, got {n_window}")
         if face_radius <= 0.0:
             raise ValueError(f"face_radius must be > 0, got {face_radius}")
         if length is not None and length < 0.0:
@@ -89,7 +104,13 @@ class PMT(PhotoDetector):
         if n_facets < 3:
             raise ValueError(f"n_facets must be >= 3, got {n_facets}")
         self.qe = _validate_qe(qe)
-        self.n_window = None if n_window is None else float(n_window)
+        self.qe_curve = qe_curve
+        self.window_index = None if window_index is None else as_refractive_index(window_index, 1)
+        if (
+            isinstance(self.window_index, ConstantIndex)
+            and float(self.window_index.values[0]) <= 1.0
+        ):
+            raise ValueError(f"window_index must be > 1.0, got {window_index}")
         self.face_radius = float(face_radius)
         self.shape = (
             surface
@@ -106,14 +127,15 @@ class PMT(PhotoDetector):
         self.n_facets = int(n_facets)
 
     def detect(self, local_rays: RayBundle) -> RayBundle:
-        values = local_rays.values * self.qe
-        if self.n_window is not None:
-            # Incidence from the true surface normal at each landing position
-            # (the PMT owns its sensor surface geometry), so the Fresnel weight
-            # is correct on the curved sensor surface too.
-            normals = self.surface.normals_at(local_rays.origins)
-            cos_theta_i = incidence_cos(local_rays.directions, normals)
-            _, T = fresnel_unpolarized(cos_theta_i, 1.0, self.n_window)
+        # The photocathode sees the true incidence angle on the sensor surface,
+        # so an angle-dependent qe_curve resolves at the right angle.
+        normals = self.surface.normals_at(local_rays.origins)
+        cos_theta_i = incidence_cos(local_rays.directions, normals)
+        values = apply_qe(local_rays, self.qe, self.qe_curve, cos_theta_i)
+        if self.window_index is not None:
+            elem = jnp.zeros(local_rays.wavelength.shape[0], dtype=jnp.int32)
+            n_window = self.window_index.n_at(elem, local_rays.wavelength)
+            _, T = fresnel_unpolarized(cos_theta_i, 1.0, n_window)
             values = values * T
         return local_rays.replace(values=values)
 

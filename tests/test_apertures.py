@@ -59,7 +59,7 @@ def _disk_group(radii, inner_radii, curvatures=None, conics=None):
         offsets=jnp.zeros((n, 2)),
     )
     aperture = DiskAperture(radii=radii, inner_radii=inner_radii)
-    interaction = ReflectInteraction(reflectivity=None, reflectivity_scalar=jnp.ones(n))
+    interaction = ReflectInteraction(reflectivity_curve=None, reflectivity=jnp.ones(n))
     return OpticalElementGroup(
         positions=jnp.zeros((n, 3)),
         rotations=jnp.zeros((n, 3)),
@@ -159,7 +159,7 @@ def _polygon_group(vertices, n_vertices, curvatures, conics):
         offsets=jnp.zeros((n, 2)),
     )
     aperture = PolygonAperture(vertices=vertices, n_vertices=n_vertices)
-    interaction = ReflectInteraction(reflectivity=None, reflectivity_scalar=jnp.ones(n))
+    interaction = ReflectInteraction(reflectivity_curve=None, reflectivity=jnp.ones(n))
     return OpticalElementGroup(
         positions=jnp.array([[0.0, 0.0, 0.0], [2.0, 0.0, 0.0]])[:n],
         rotations=jnp.zeros((n, 3)),

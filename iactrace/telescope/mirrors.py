@@ -8,9 +8,9 @@ from jax.typing import ArrayLike
 
 from ..core.apertures import Aperture, DiskAperture
 from ..core.bsdf import BSDF, GaussianBSDF
-from ..core.coatings import Coating
 from ..core.interactions import ReflectInteraction
 from ..core.optics import OpticalElementGroup
+from ..core.responses import ResponseCurve
 from ..core.surfaces import AsphericSurfaceGroup
 from ._common import as_aspheric_row as _as_aspheric_row
 from ._common import as_vec3 as _as_vec3
@@ -38,7 +38,7 @@ def mirror_group(
     aperture: Aperture,
     reflectivity: Array | float = 1.0,
     sample_key: Array,
-    coating: Coating | None = None,
+    reflectivity_curve: ResponseCurve | None = None,
     bsdf: BSDF | None = None,
     optical_stage: int = 0,
     n_samples: int = 100,
@@ -59,7 +59,11 @@ def mirror_group(
         offsets: Per-element surface decentering, shape ``(N, 2)``. Use
             ``jnp.zeros((N, 2))`` for a centred disk.
         aperture: Pre-built aperture.
-        reflectivity: Per-element reflectivity in ``[0, 1]``, shape ``(N,)``.
+        reflectivity: Per-element bulk reflectivity in ``[0, 1]``, shape
+            ``(N,)``.
+        reflectivity_curve: Optional ``R(theta, lambda)``
+            :class:`~iactrace.core.responses.ResponseCurve` multiplying
+            ``reflectivity`` per ray; ``None`` (default) is a flat response.
         sample_key: JAX PRNG key used for aperture sampling and BSDF.
         bsdf: Optional :class:`BSDF` instance. ``None`` leaves the element
             perfectly specular (the :class:`OpticalElementGroup` constructor
@@ -79,9 +83,9 @@ def mirror_group(
     offsets = jnp.asarray(offsets)
     n = int(positions.shape[0])
 
-    refl_scalar = jnp.asarray(reflectivity)
-    if refl_scalar.ndim == 0:
-        refl_scalar = jnp.full((n,), refl_scalar)
+    refl = jnp.asarray(reflectivity)
+    if refl.ndim == 0:
+        refl = jnp.full((n,), refl)
 
     surface = AsphericSurfaceGroup(
         curvatures=curvatures,
@@ -90,8 +94,8 @@ def mirror_group(
         offsets=offsets,
     )
     interaction = ReflectInteraction(
-        reflectivity=coating,
-        reflectivity_scalar=refl_scalar,
+        reflectivity=refl,
+        reflectivity_curve=reflectivity_curve,
     )
 
     return OpticalElementGroup(
@@ -120,7 +124,7 @@ def disk_array(
     aspheric_coeffs: ArrayLike | None = None,
     inner_radii: ArrayLike | None = None,
     reflectivities: ArrayLike | None = None,
-    coating: Coating | None = None,
+    reflectivity_curve: ResponseCurve | None = None,
     bsdf_scales: ArrayLike | None = None,
     offsets: ArrayLike | None = None,
     optical_stage: int = 0,
@@ -145,8 +149,11 @@ def disk_array(
             ``None`` disables aspherics.
         inner_radii: Per-element central hole radii, shape ``(N,)``.
             Defaults to zeros.
-        reflectivities: Per-element reflectivities, shape ``(N,)``. Defaults
-            to ones.
+        reflectivities: Per-element bulk reflectivities, shape ``(N,)``.
+            Defaults to ones.
+        reflectivity_curve: Optional ``R(theta, lambda)``
+            :class:`~iactrace.core.responses.ResponseCurve` shared by every
+            element, multiplying ``reflectivities`` per ray.
         bsdf_scales: Per-element Gaussian BSDF roughness in arcseconds,
             shape ``(N,)``. Zero (the default) disables the BSDF.
         offsets: Per-element surface decentering, shape ``(N, 2)``. Defaults
@@ -207,7 +214,7 @@ def disk_array(
         offsets=offsets_arr,
         aperture=aperture,
         reflectivity=refl_arr,
-        coating=coating,
+        reflectivity_curve=reflectivity_curve,
         bsdf=bsdf,
         sample_key=key,
         optical_stage=optical_stage,
@@ -228,7 +235,7 @@ def _single_disk_mirror(
     radius,
     inner_radius,
     reflectivity,
-    coating,
+    reflectivity_curve,
     bsdf_scale,
     optical_stage,
     n_samples,
@@ -248,7 +255,7 @@ def _single_disk_mirror(
         radii=jnp.asarray([float(radius)]),
         inner_radii=jnp.asarray([float(inner_radius)]),
         reflectivities=jnp.asarray([float(reflectivity)]),
-        coating=coating,
+        reflectivity_curve=reflectivity_curve,
         bsdf_scales=jnp.asarray([float(bsdf_scale)]),
         optical_stage=optical_stage,
         n_samples=n_samples,
@@ -265,7 +272,7 @@ def _focal_length_disk_mirror(
     rotation: Sequence[float] = (0.0, 0.0, 0.0),
     inner_radius: float = 0.0,
     reflectivity: float = 1.0,
-    coating: Coating | None = None,
+    reflectivity_curve: ResponseCurve | None = None,
     bsdf_scale: float = 0.0,
     optical_stage: int = 0,
     n_samples: int = 100,
@@ -285,7 +292,7 @@ def _focal_length_disk_mirror(
         radius=radius,
         inner_radius=inner_radius,
         reflectivity=reflectivity,
-        coating=coating,
+        reflectivity_curve=reflectivity_curve,
         bsdf_scale=bsdf_scale,
         optical_stage=optical_stage,
         n_samples=n_samples,
@@ -301,7 +308,7 @@ def spherical(
     rotation: Sequence[float] = (0.0, 0.0, 0.0),
     inner_radius: float = 0.0,
     reflectivity: float = 1.0,
-    coating: Coating | None = None,
+    reflectivity_curve: ResponseCurve | None = None,
     bsdf_scale: float = 0.0,
     optical_stage: int = 0,
     n_samples: int = 100,
@@ -318,7 +325,9 @@ def spherical(
         radius: Outer disk radius in metres.
         rotation: Euler angles in degrees. Defaults to no rotation.
         inner_radius: Inner hole radius in metres. Zero for a solid disk.
-        reflectivity: Per-element reflectivity in ``[0, 1]``.
+        reflectivity: Bulk reflectivity in ``[0, 1]``.
+        reflectivity_curve: Optional ``R(theta, lambda)``
+            :class:`~iactrace.core.responses.ResponseCurve` multiplying it.
         bsdf_scale: Gaussian roughness sigma in arcseconds (0 disables).
         optical_stage: Stage index within the Telescope.
         n_samples: Monte Carlo samples per render call.
@@ -332,7 +341,7 @@ def spherical(
         rotation=rotation,
         inner_radius=inner_radius,
         reflectivity=reflectivity,
-        coating=coating,
+        reflectivity_curve=reflectivity_curve,
         bsdf_scale=bsdf_scale,
         optical_stage=optical_stage,
         n_samples=n_samples,
@@ -348,7 +357,7 @@ def parabolic(
     rotation: Sequence[float] = (0.0, 0.0, 0.0),
     inner_radius: float = 0.0,
     reflectivity: float = 1.0,
-    coating: Coating | None = None,
+    reflectivity_curve: ResponseCurve | None = None,
     bsdf_scale: float = 0.0,
     optical_stage: int = 0,
     n_samples: int = 100,
@@ -370,7 +379,7 @@ def parabolic(
         rotation=rotation,
         inner_radius=inner_radius,
         reflectivity=reflectivity,
-        coating=coating,
+        reflectivity_curve=reflectivity_curve,
         bsdf_scale=bsdf_scale,
         optical_stage=optical_stage,
         n_samples=n_samples,
@@ -388,7 +397,7 @@ def aspheric(
     aspheric_coeffs: Sequence[float] | None = None,
     inner_radius: float = 0.0,
     reflectivity: float = 1.0,
-    coating: Coating | None = None,
+    reflectivity_curve: ResponseCurve | None = None,
     bsdf_scale: float = 0.0,
     optical_stage: int = 0,
     n_samples: int = 100,
@@ -412,7 +421,8 @@ def aspheric(
         aspheric_coeffs: Even aspheric coefficients ``[A4, A6, ...]``,
             i.e. ``aspheric_coeffs[i]`` multiplies ``r^(2i + 4)``. The
             polynomial starts at ``r^4``.
-        inner_radius, reflectivity, bsdf_scale, optical_stage, n_samples, key:
+        inner_radius, reflectivity, reflectivity_curve, bsdf_scale, optical_stage,
+        n_samples, key:
             see :func:`spherical`.
     """
     return _single_disk_mirror(
@@ -424,7 +434,7 @@ def aspheric(
         radius=radius,
         inner_radius=inner_radius,
         reflectivity=reflectivity,
-        coating=coating,
+        reflectivity_curve=reflectivity_curve,
         bsdf_scale=bsdf_scale,
         optical_stage=optical_stage,
         n_samples=n_samples,

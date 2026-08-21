@@ -7,6 +7,7 @@ import jax.numpy as jnp
 from jax import Array
 
 from ...core.ray_bundle import RayBundle
+from ...core.responses import ResponseCurve, TabulatedResponse
 from .surface import DetectionSurface
 
 
@@ -97,14 +98,41 @@ class PhotoDetector(eqx.Module):
         return None
 
 
-class ConstantQE(PhotoDetector):
-    """Flat scalar quantum efficiency with no spatial or angular structure.
+def apply_qe(
+    rays: RayBundle,
+    qe: float,
+    qe_curve: ResponseCurve | None,
+    cos_theta_i: Array | None = None,
+) -> Array:
+    """Photoelectron-weighted ``values`` for *rays*: ``qe * qe_curve(theta, lambda)``.
 
-    The simplest photodetector and the default detector response: a single
-    efficiency ``qe`` applied uniformly to every ray reaching the surface
-    (the inherited flat detector at the chain's detector plane). Use it for a
-    measured detection efficiency you want applied as a plain scalar, or as a
-    perfect (``qe = 1``) pass-through.
+    The detector-side reading of the ``X`` / ``X_curve`` pair every optical
+    element follows: ``qe`` is the bulk number and ``qe_curve`` an optional
+    :class:`~iactrace.core.responses.ResponseCurve` multiplying it per ray.
+    Shared by every photodetector so they weight light identically.
+
+    Args:
+        rays: Rays landed on the sensor surface.
+        qe: Bulk quantum efficiency in ``[0, 1]``.
+        qe_curve: Optional response curve, or ``None`` for a flat response.
+        cos_theta_i: Incidence cosines at the surface, shape ``(n_rays,)``.
+            ``None`` (the default) evaluates the curve at normal incidence,
+            which is exact for the usual wavelength-only ``QE(lambda)``.
+    """
+    values = rays.values * qe
+    if qe_curve is None:
+        return values
+    n = rays.wavelength.shape[0]
+    cos_i = jnp.ones(n) if cos_theta_i is None else cos_theta_i
+    idx = jnp.zeros(n, dtype=jnp.int32)  # one photodetector = one element
+    return values * qe_curve(cos_i, idx, rays.wavelength)
+
+
+class ConstantQE(PhotoDetector):
+    """Flat scalar quantum efficiency with no spatial, angular or spectral structure.
+
+    The degenerate member of the family: :class:`TabulatedQE` is the same
+    thing with a :attr:`~TabulatedQE.qe_curve` attached.
 
     Args:
         qe: Quantum efficiency in ``[0, 1]``.
@@ -116,4 +144,48 @@ class ConstantQE(PhotoDetector):
         self.qe = _validate_qe(qe)
 
     def detect(self, local_rays: RayBundle) -> RayBundle:
-        return local_rays.replace(values=local_rays.values * self.qe)
+        return local_rays.replace(values=apply_qe(local_rays, self.qe, None))
+
+
+class TabulatedQE(PhotoDetector):
+    """Quantum efficiency from a :class:`~iactrace.core.responses.ResponseCurve`.
+
+    The same ``qe`` / ``qe_curve`` pair a :class:`~iactrace.camera.detector.pmt.PMT`
+    uses, without the body or entrance window: the bulk :attr:`qe` scaled per
+    ray by :attr:`qe_curve`. Build the usual ``QE(lambda)`` case with
+    :meth:`from_table`.
+
+    Attributes:
+        qe: Bulk quantum efficiency in ``[0, 1]``, multiplying the curve.
+        qe_curve: The ``QE(theta, lambda)`` response curve.
+    """
+
+    qe: float = eqx.field(static=True)
+    qe_curve: ResponseCurve
+
+    def __init__(self, qe_curve: ResponseCurve, qe: float = 1.0) -> None:
+        self.qe_curve = qe_curve
+        self.qe = _validate_qe(qe)
+
+    def detect(self, local_rays: RayBundle) -> RayBundle:
+        # Read the incidence angle off the sensor surface, exactly as a PMT
+        # does, so an angle-dependent qe_curve resolves at the right angle.
+        cos_theta_i = incidence_cos(
+            local_rays.directions, self.surface.normals_at(local_rays.origins)
+        )
+        return local_rays.replace(values=apply_qe(local_rays, self.qe, self.qe_curve, cos_theta_i))
+
+    @classmethod
+    def from_table(cls, wavelengths, qe, bulk_qe: float = 1.0) -> TabulatedQE:
+        """Build from measured ``QE(lambda)`` samples.
+
+        Args:
+            wavelengths: Sample wavelengths ``(K,)`` (sorted internally).
+            qe: Detection efficiency in ``[0, 1]`` aligned with
+                ``wavelengths``, shape ``(K,)``.
+            bulk_qe: Optional bulk multiplier applied on top of the curve.
+        """
+        return cls(
+            qe_curve=TabulatedResponse.from_wavelengths(wavelengths, qe, n_elements=1),
+            qe=bulk_qe,
+        )

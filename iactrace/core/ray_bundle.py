@@ -1,12 +1,17 @@
 from __future__ import annotations
 
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 import equinox as eqx
 import jax.numpy as jnp
 from jax import Array
 
 from .transforms import euler_to_matrix
+
+if TYPE_CHECKING:
+    from .spectrum import Spectrum
+
+DEFAULT_WAVELENGTH = 400.0
 
 
 class RayBundle(eqx.Module):
@@ -57,6 +62,7 @@ class RayBundle(eqx.Module):
             currently propagating in (n_rays,). Carried so downstream
             consumers (sensor intersection, focal-surface analysis)
             can weight the final geometric leg correctly.
+        wavelength: Per-ray wavelength (n_rays,).
         alive: Per-ray liveness flag (n_rays,), boolean. ``True`` for a
             valid, still-propagating ray. Defaults to all-``True`` at
             construction, i.e. a freshly built bundle is fully alive.
@@ -67,6 +73,7 @@ class RayBundle(eqx.Module):
     values: Array
     path_length: Array
     n: Array
+    wavelength: Array
     alive: Array
 
     def __init__(
@@ -77,12 +84,18 @@ class RayBundle(eqx.Module):
         path_length: Array,
         n: Array,
         alive: Array | None = None,
+        wavelength: Array | None = None,
     ) -> None:
         self.origins = origins
         self.directions = directions
         self.values = values
         self.path_length = path_length
         self.n = n
+        self.wavelength = (
+            jnp.full(values.shape[0], DEFAULT_WAVELENGTH)
+            if wavelength is None
+            else jnp.asarray(wavelength)
+        )
         self.alive = (
             jnp.ones(values.shape[0], dtype=bool)
             if alive is None
@@ -101,6 +114,7 @@ class RayBundle(eqx.Module):
             "values": self.values,
             "path_length": self.path_length,
             "n": self.n,
+            "wavelength": self.wavelength,
             "alive": self.alive,
         }
         unknown = set(changes) - set(fields)
@@ -117,7 +131,7 @@ class RayBundle(eqx.Module):
 
         This is a **pure coordinate transform**: it moves ``origins`` and
         ``directions`` and leaves ``values`` / ``path_length`` / ``n`` /
-        ``alive`` untouched.
+        ``wavelength`` / ``alive`` untouched.
         """
         rot = euler_to_matrix(rotation)
         return RayBundle(
@@ -126,6 +140,7 @@ class RayBundle(eqx.Module):
             values=self.values,
             path_length=self.path_length,
             n=self.n,
+            wavelength=self.wavelength,
             alive=self.alive,
         )
 
@@ -155,6 +170,7 @@ class LazyRayBundle(eqx.Module):
     camera_rotation: Array
     sources: Array
     source_values: Array
+    spectrum: Spectrum
     source_type: Literal["point", "parallel"] = eqx.field(static=True)
 
     def fold(self, accumulator, init):
@@ -181,6 +197,7 @@ class LazyRayBundle(eqx.Module):
             self.source_type,
             in_local_frame,
             init,
+            spectrum=self.spectrum,
         )
 
     def materialise(self) -> RayBundle:
@@ -193,6 +210,7 @@ class LazyRayBundle(eqx.Module):
             self.sources,
             self.source_values,
             self.source_type,
+            spectrum=self.spectrum,
         )
         # Handoff = shadow the final leg (explicit), then a pure reframe.
         rb_world = apply_final_leg_shadow(

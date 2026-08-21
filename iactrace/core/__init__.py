@@ -1,10 +1,5 @@
 from .apertures import Aperture, DiskAperture, PolygonAperture
 from .bsdf import BSDF, DoubleGaussianBSDF, GaussianBSDF
-from .coatings import (
-    Coating,
-    ConstantCoating,
-    TabulatedCoating,
-)
 from .interactions import (
     Interaction,
     InteractionType,
@@ -22,8 +17,21 @@ from .obstructions import (
     TriangleGroup,
 )
 from .optics import OpticalElementGroup
-from .ray_bundle import LazyRayBundle, RayBundle
+from .ray_bundle import DEFAULT_WAVELENGTH, LazyRayBundle, RayBundle
+from .refractive_index import (
+    ConstantIndex,
+    RefractiveIndex,
+    SellmeierIndex,
+    TabulatedIndex,
+    as_refractive_index,
+)
 from .render import render_optics, trace_optics
+from .responses import (
+    ConstantResponse,
+    ResponseCurve,
+    TabulatedResponse,
+)
+from .spectrum import ConstantSpectrum, Spectrum, TabulatedSpectrum
 from .surfaces import (
     AsphericSurfaceGroup,
     FreeformSurfaceGroup,
@@ -49,10 +57,20 @@ __all__ = [
     "ReflectInteraction",
     "RefractInteraction",
     "SlabInteraction",
-    # Angular coatings
-    "Coating",
-    "ConstantCoating",
-    "TabulatedCoating",
+    # Response curves: R/T/QE(angle, wavelength)
+    "ResponseCurve",
+    "ConstantResponse",
+    "TabulatedResponse",
+    # Refractive index n(wavelength)
+    "RefractiveIndex",
+    "as_refractive_index",
+    "ConstantIndex",
+    "TabulatedIndex",
+    "SellmeierIndex",
+    # Source spectrum
+    "Spectrum",
+    "ConstantSpectrum",
+    "TabulatedSpectrum",
     # Surfaces
     "SurfaceGroup",
     "AsphericSurfaceGroup",
@@ -70,6 +88,7 @@ __all__ = [
     # Ray bundle
     "RayBundle",
     "LazyRayBundle",
+    "DEFAULT_WAVELENGTH",
     # Trajectory
     "Trajectory",
     "TraceResult",

@@ -8,6 +8,7 @@ import jax.numpy as jnp
 from jax import Array
 
 from ...core._tolerances import dir_tol
+from ...core.responses import ResponseCurve
 from .polygonal import PolygonalCone
 
 _T_FLOOR = 1e-6  # spurious-hit rejection floor, scaled by a2
@@ -144,7 +145,11 @@ class WinstonCone(PolygonalCone):
         length: Physical depth. ``None`` builds the full (untruncated) CPC and
             derives the length from ``a1``/``a2``; a value truncates the cone (then
             ``entrance_apothem`` is the entry at that depth).
-        reflectivity: Per-bounce wall reflectivity (scalar).
+        reflectivity: Per-bounce wall reflectivity (scalar bulk value).
+        reflectivity_curve: Optional coating curve
+            (:class:`~iactrace.core.responses.ResponseCurve`) multiplying the scalar,
+            evaluated at each bounce's actual incidence angle and at the ray's
+            wavelength; ``None`` (default) is a flat wall response.
         max_bounces: Maximum reflections traced before a ray is absorbed.
         orientation_deg: Rotation of the polygon about the optical axis.
     """
@@ -153,6 +158,7 @@ class WinstonCone(PolygonalCone):
     exit_apothem: float = eqx.field(static=True)
     entrance_apothem: float = eqx.field(static=True)
     reflectivity: float = eqx.field(static=True)
+    reflectivity_curve: ResponseCurve | None
     max_bounces: int = eqx.field(static=True)
     orientation: float = eqx.field(static=True)  # radians
     length: float = eqx.field(static=True)
@@ -168,6 +174,7 @@ class WinstonCone(PolygonalCone):
         reflectivity: float = 0.9,
         max_bounces: int = 10,
         orientation_deg: float = 0.0,
+        reflectivity_curve: ResponseCurve | None = None,
     ) -> None:
         if not 0.0 < exit_apothem < entrance_apothem:
             raise ValueError(
@@ -178,6 +185,7 @@ class WinstonCone(PolygonalCone):
         self.exit_apothem = float(exit_apothem)
         self.entrance_apothem = float(entrance_apothem)
         self.reflectivity = float(reflectivity)
+        self.reflectivity_curve = reflectivity_curve
         self.max_bounces = int(max_bounces)
         self.orientation = math.radians(float(orientation_deg))
 

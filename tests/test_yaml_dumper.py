@@ -237,9 +237,7 @@ class TestRoundTrip:
         g = self._roundtrip_mirror(
             bsdf=None, reflectivity=0.83, random_key=random_key, tmp_path=tmp_path
         )
-        np.testing.assert_allclose(
-            np.asarray(g.interaction_module.reflectivity_scalar), [0.83], rtol=1e-5
-        )
+        np.testing.assert_allclose(np.asarray(g.interaction_module.reflectivity), [0.83], rtol=1e-5)
 
         # single Gaussian BSDF
         g = self._roundtrip_mirror(
@@ -266,9 +264,7 @@ class TestRoundTrip:
         np.testing.assert_allclose(np.asarray(g.bsdf.scale_narrow), [10.0], rtol=1e-5)
         np.testing.assert_allclose(np.asarray(g.bsdf.scale_wide), [120.0], rtol=1e-5)
         np.testing.assert_allclose(np.asarray(g.bsdf.mix_weight), [0.2], rtol=1e-5)
-        np.testing.assert_allclose(
-            np.asarray(g.interaction_module.reflectivity_scalar), [0.9], rtol=1e-5
-        )
+        np.testing.assert_allclose(np.asarray(g.interaction_module.reflectivity), [0.9], rtol=1e-5)
 
     def test_polygon_mirror_roundtrip(
         self, n_samples, random_key, polygon_telescope_config, tmp_path
@@ -484,7 +480,7 @@ class TestRoundTrip:
 
         pmt = PMT(
             qe=0.35,
-            n_window=1.48,
+            window_index=1.48,
             face_radius=0.011,
             surface=spherical_cap_surface(0.011, 0.003),
             vertex_z=0.003,
@@ -499,7 +495,12 @@ class TestRoundTrip:
         p2 = Camera.from_yaml(filepath).sensor_groups[0].chain.photodetector
         assert isinstance(p2, PMT)
         assert p2.qe == pytest.approx(pmt.qe)
-        assert p2.n_window == pytest.approx(pmt.n_window)
+        wl, idx = jnp.array([400.0]), jnp.zeros(1, dtype=jnp.int32)
+        np.testing.assert_allclose(
+            np.asarray(p2.window_index.n_at(idx, wl)),
+            np.asarray(pmt.window_index.n_at(idx, wl)),
+            rtol=1e-6,
+        )
         assert p2.face_radius == pytest.approx(pmt.face_radius)
         assert p2.vertex_z == pytest.approx(pmt.vertex_z)
         assert p2.shape.curvatures[0] == pytest.approx(pmt.shape.curvatures[0])
@@ -513,7 +514,7 @@ class TestRoundTrip:
         save_camera(Camera([self._square(photodetector=default_pmt)]), fp2)
         p3 = Camera.from_yaml(fp2).sensor_groups[0].chain.photodetector
         assert isinstance(p3, PMT)
-        assert p3.n_window is None
+        assert p3.window_index is None
         assert p3.length == pytest.approx(2 * 0.008)
 
     def test_nonuniform_chain_elements_raise(self, tmp_path):
@@ -648,8 +649,8 @@ class TestRoundTrip:
 
     def test_reflectivity_curve_roundtrip(self, n_samples, random_key, tmp_path):
         """A tabulated R(theta) curve survives save -> load."""
-        from iactrace.core.coatings import (
-            TabulatedCoating,
+        from iactrace.core.responses import (
+            TabulatedResponse,
         )
 
         config = {
@@ -694,21 +695,21 @@ class TestRoundTrip:
         interaction2 = telescope2.mirror_groups[0].interaction_module
 
         # Both have a tabulated curve, byte-identical scalar
-        assert isinstance(interaction1.reflectivity, TabulatedCoating)
-        assert isinstance(interaction2.reflectivity, TabulatedCoating)
+        assert isinstance(interaction1.reflectivity_curve, TabulatedResponse)
+        assert isinstance(interaction2.reflectivity_curve, TabulatedResponse)
         np.testing.assert_allclose(
-            np.asarray(interaction1.reflectivity.cos_table),
-            np.asarray(interaction2.reflectivity.cos_table),
+            np.asarray(interaction1.reflectivity_curve.cos_table),
+            np.asarray(interaction2.reflectivity_curve.cos_table),
             rtol=1e-6,
         )
         np.testing.assert_allclose(
-            np.asarray(interaction1.reflectivity.values),
-            np.asarray(interaction2.reflectivity.values),
+            np.asarray(interaction1.reflectivity_curve.values),
+            np.asarray(interaction2.reflectivity_curve.values),
             rtol=1e-6,
         )
         np.testing.assert_allclose(
-            np.asarray(interaction1.reflectivity_scalar),
-            np.asarray(interaction2.reflectivity_scalar),
+            np.asarray(interaction1.reflectivity),
+            np.asarray(interaction2.reflectivity),
             rtol=1e-6,
         )
 
@@ -850,7 +851,7 @@ class TestZernikeRoundTrip:
 def _mirror_group(surface, radii, stage=0):
     n = surface.offsets.shape[0]
     aperture = DiskAperture(radii=radii, inner_radii=jnp.zeros(n))
-    interaction = ReflectInteraction(reflectivity=None, reflectivity_scalar=jnp.ones(n))
+    interaction = ReflectInteraction(reflectivity_curve=None, reflectivity=jnp.ones(n))
     return OpticalElementGroup(
         positions=jnp.zeros((n, 3)),
         rotations=jnp.zeros((n, 3)),

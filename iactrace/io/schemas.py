@@ -116,18 +116,47 @@ BSDFSchema = Annotated[
 ]
 
 
-class TabulatedCurveSchema(BaseModel):
-    """Inline tabulated angle-dependent coating curve.
+def rename_legacy_keys(values: Any, renames: dict[str, str]) -> Any:
+    """Accept a legacy YAML key by moving it onto its current name.
 
-    ``angles_deg`` are sample angles in degrees in ``[0, 90]``;
-    ``values`` are the corresponding coefficients in ``[0, 1]``. The
-    two lists must have the same length. See
-    :class:`~iactrace.core.coatings.TabulatedCoating`.
+    Keeps files written for older versions loadable after the ``X`` /
+    ``X_curve`` naming pass. Giving both the old and the new key is an error
+    rather than a silent pick.
+    """
+    if not isinstance(values, dict):
+        return values
+    for old, new in renames.items():
+        if old not in values:
+            continue
+        if values.get(new) is not None:
+            raise ValueError(
+                f"give either `{old}` (legacy) or `{new}`, not both; `{old}` was renamed to `{new}`"
+            )
+        values = {**values}
+        values[new] = values.pop(old)
+    return values
+
+
+class TabulatedCurveSchema(BaseModel):
+    """Inline tabulated response curve: angle-only or an angle-wavelength grid.
+
+    ``angles_deg`` are sample angles in degrees in ``[0, 90]`` and all
+    coefficients are in ``[0, 1]``.
+
+    * **Angle-only** (``wavelengths_nm`` omitted): ``values`` is a 1-D list
+      aligned with ``angles_deg`` -- ``R(theta)``.
+    * **Angle-wavelength grid** (``wavelengths_nm`` given): ``values`` is a 2-D
+      list with ``values[i][j] = R(angles_deg[i], wavelengths_nm[j])``.
+
+    See :class:`~iactrace.core.responses.TabulatedResponse`.
     """
 
     type: Literal["table"] = "table"
-    angles_deg: list[float] = Field(min_length=2)
-    values: list[float] = Field(min_length=2)
+    # A single angle is allowed: it means "angle-flat", the natural shape of a
+    # wavelength-only R(lambda) curve (see TabulatedResponse.from_wavelengths).
+    angles_deg: list[float] = Field(min_length=1)
+    values: list[float] | list[list[float]] = Field(min_length=1)
+    wavelengths_nm: list[float] | None = None
 
     @field_validator("angles_deg")
     @classmethod
@@ -137,30 +166,113 @@ class TabulatedCurveSchema(BaseModel):
                 raise ValueError(f"angles_deg must lie in [0, 90]; got {a}")
         return v
 
-    @field_validator("values")
+    @field_validator("wavelengths_nm")
     @classmethod
-    def _values_in_range(cls, v):
-        for x in v:
-            if x < 0.0 or x > 1.0:
-                raise ValueError(f"values must lie in [0, 1]; got {x}")
+    def _wavelengths_positive(cls, v):
+        if v is not None:
+            if len(v) < 1:
+                raise ValueError("wavelengths_nm must be non-empty when given")
+            for w in v:
+                if w <= 0.0:
+                    raise ValueError(f"wavelengths_nm must be > 0; got {w}")
         return v
 
     @model_validator(mode="after")
-    def _same_length(self) -> TabulatedCurveSchema:
-        if len(self.angles_deg) != len(self.values):
+    def _check_shape(self) -> TabulatedCurveSchema:
+        if self.wavelengths_nm is None:
+            # Angle-only: a flat list of coefficients, one per angle.
+            if len(self.values) != len(self.angles_deg):
+                raise ValueError(
+                    f"angles_deg ({len(self.angles_deg)}) and values "
+                    f"({len(self.values)}) must have the same length"
+                )
+            for x in self.values:
+                if isinstance(x, list):
+                    raise ValueError(
+                        "values must be a 1-D list when wavelengths_nm is omitted; "
+                        "give wavelengths_nm for an (angle, wavelength) grid"
+                    )
+                if not 0.0 <= x <= 1.0:
+                    raise ValueError(f"values must lie in [0, 1]; got {x}")
+        else:
+            # Grid: one row per angle, one column per wavelength.
+            nwl = len(self.wavelengths_nm)
+            if len(self.values) != len(self.angles_deg):
+                raise ValueError(
+                    f"values must have one row per angle: got {len(self.values)} "
+                    f"rows for {len(self.angles_deg)} angles"
+                )
+            for row in self.values:
+                if not isinstance(row, list) or len(row) != nwl:
+                    raise ValueError(
+                        "each values row must be a list of length "
+                        f"len(wavelengths_nm)={nwl}"
+                    )
+                for x in row:
+                    if not 0.0 <= x <= 1.0:
+                        raise ValueError(f"values must lie in [0, 1]; got {x}")
+        return self
+
+
+# Discriminated union of response curves (one member today). Adding a curve
+# model is a schema class here plus an arm in ``iactrace.io.adapters``.
+ResponseCurveSchema = Annotated[
+    TabulatedCurveSchema,
+    Field(discriminator="type"),
+]
+
+
+class SellmeierIndexSchema(BaseModel):
+    """Sellmeier ``n(lambda)`` coefficients for a dispersive glass.
+
+    ``n(lambda)**2 = 1 + sum_j b_j lambda**2 / (lambda**2 - c_j)``. The ``c``
+    coefficients carry units of wavelength squared and must match the bundle's
+    wavelength unit (nanometres by convention). See
+    :class:`~iactrace.core.refractive_index.SellmeierIndex`.
+    """
+
+    type: Literal["sellmeier"] = "sellmeier"
+    b: list[float] = Field(min_length=1)
+    c: list[float] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def _same_length(self) -> SellmeierIndexSchema:
+        if len(self.b) != len(self.c):
+            raise ValueError(f"b ({len(self.b)}) and c ({len(self.c)}) must have equal length")
+        return self
+
+
+class TabulatedIndexSchema(BaseModel):
+    """Tabulated ``n(lambda)`` samples, linearly interpolated in wavelength.
+
+    See :class:`~iactrace.core.refractive_index.TabulatedIndex`.
+    """
+
+    type: Literal["index_table"] = "index_table"
+    wavelengths_nm: list[float] = Field(min_length=2)
+    n: list[float] = Field(min_length=2)
+
+    @model_validator(mode="after")
+    def _same_length(self) -> TabulatedIndexSchema:
+        if len(self.wavelengths_nm) != len(self.n):
             raise ValueError(
-                f"angles_deg ({len(self.angles_deg)}) and values "
-                f"({len(self.values)}) must have the same length"
+                f"wavelengths_nm ({len(self.wavelengths_nm)}) and n ({len(self.n)}) "
+                "must have the same length"
             )
         return self
 
 
-# Discriminated union of coating curves (one member today). Adding a curve
-# model is a schema class here plus an arm in ``iactrace.io.adapters``.
-CoatingSchema = Annotated[
-    TabulatedCurveSchema,
+# A dispersive refractive-index model.
+RefractiveIndexSchema = Annotated[
+    SellmeierIndexSchema | TabulatedIndexSchema,
     Field(discriminator="type"),
 ]
+
+# The one index field: a plain number for a non-dispersive element, or a model
+# for a dispersive one -- mirroring the single polymorphic ``index`` argument
+# of :func:`~iactrace.core.refractive_index.as_refractive_index`. The legacy
+# ``n_inside`` key is accepted and maps onto the number form.
+IndexSchema = Annotated[float, Field(gt=0)] | RefractiveIndexSchema
 
 
 class MirrorTemplateSchema(BaseModel):
@@ -168,21 +280,26 @@ class MirrorTemplateSchema(BaseModel):
 
     Every field here can also be set directly on the mirror; see
     :class:`MirrorSchema` for the override rule. A template with no
-    ``surface`` is valid (e.g. one that only shares a ``coating``), since a
+    ``surface`` is valid (e.g. one that only shares a ``reflectivity_curve``), since a
     mirror without an aspheric base of its own defaults to flat.
     """
 
     surface: SurfaceSpec | None = None
     bsdf: BSDFSchema | None = None
     reflectivity: float | None = None
-    coating: CoatingSchema | None = None
+    reflectivity_curve: ResponseCurveSchema | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _accept_legacy(cls, values):
+        return rename_legacy_keys(values, {"coating": "reflectivity_curve"})
 
 
 class MirrorSchema(BaseModel):
     """A mirror facet.
 
     Fully self-contained by default: ``curvature`` / ``conic`` / ``aspheric``
-    / ``zernike`` / ``bsdf`` / ``reflectivity`` / ``coating`` can all be set
+    / ``zernike`` / ``bsdf`` / ``reflectivity`` / ``reflectivity_curve`` can all be set
     directly here, with no ``template`` required. ``template`` (optional)
     names a :class:`MirrorTemplateSchema` entry supplying defaults for
     whichever of those fields the mirror itself leaves unset -- a mirror's
@@ -203,8 +320,13 @@ class MirrorSchema(BaseModel):
     stage: int = Field(ge=0, default=0)
     bsdf: BSDFSchema | None = None
     reflectivity: float | None = None
-    coating: CoatingSchema | None = None
+    reflectivity_curve: ResponseCurveSchema | None = None
     id: str | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _accept_legacy(cls, values):
+        return rename_legacy_keys(values, {"coating": "reflectivity_curve"})
 
 
 # Lens schemas
@@ -216,12 +338,19 @@ class AsphericDiskLensSchema(BaseModel):
     orientation: Vec3
     aperture: ApertureSchema
     surface: SurfaceSpec
-    n_inside: float = Field(gt=0)
+    index: IndexSchema
     offset: Vec2 = Field(default_factory=lambda: [0.0, 0.0])
     transmittance: float = Field(ge=0, le=1, default=1.0)
-    coating: CoatingSchema | None = None
+    transmittance_curve: ResponseCurveSchema | None = None
     stage: int = Field(ge=0, default=0)
     id: str | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _accept_legacy(cls, values):
+        return rename_legacy_keys(
+            values, {"coating": "transmittance_curve", "n_inside": "index"}
+        )
 
 
 class PlanoSlabSchema(BaseModel):
@@ -230,11 +359,18 @@ class PlanoSlabSchema(BaseModel):
     orientation: Vec3
     aperture: ApertureSchema
     thickness: float = Field(gt=0)
-    n_inside: float = Field(gt=0)
+    index: IndexSchema
     transmittance: float = Field(ge=0, le=1, default=1.0)
-    coating: CoatingSchema | None = None
+    transmittance_curve: ResponseCurveSchema | None = None
     stage: int = Field(ge=0, default=0)
     id: str | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _accept_legacy(cls, values):
+        return rename_legacy_keys(
+            values, {"coating": "transmittance_curve", "n_inside": "index"}
+        )
 
 
 LensSchema = Annotated[
@@ -323,8 +459,14 @@ class WinstonConeSchema(BaseModel):
     exit_apothem: float = Field(gt=0)
     length: float | None = Field(default=None, gt=0)
     reflectivity: float = Field(ge=0, le=1, default=0.9)
+    reflectivity_curve: ResponseCurveSchema | None = None
     max_bounces: int = Field(ge=0, default=10)
     orientation_deg: float = 0.0
+
+    @model_validator(mode="before")
+    @classmethod
+    def _accept_legacy(cls, values):
+        return rename_legacy_keys(values, {"reflectivity_coating": "reflectivity_curve"})
 
 
 class OkumuraConeSchema(BaseModel):
@@ -346,8 +488,14 @@ class OkumuraConeSchema(BaseModel):
     control_points: list[Vec2] = Field(min_length=1)
     length: float | None = Field(default=None, gt=0)
     reflectivity: float = Field(ge=0, le=1, default=0.9)
+    reflectivity_curve: ResponseCurveSchema | None = None
     max_bounces: int = Field(ge=0, default=10)
     orientation_deg: float = 0.0
+
+    @model_validator(mode="before")
+    @classmethod
+    def _accept_legacy(cls, values):
+        return rename_legacy_keys(values, {"reflectivity_coating": "reflectivity_curve"})
 
 
 class ConstantQESchema(BaseModel):
@@ -359,11 +507,66 @@ class ConstantQESchema(BaseModel):
     qe: float = Field(ge=0, le=1, default=1.0)
 
 
+def qe_curve_from_legacy(value: Any) -> Any:
+    """Convert a legacy ``QE(lambda)`` block into a response-curve block.
+
+    Older files wrote a photodetector's spectral response inline as
+    ``{wavelengths_nm: [...], qe: [...]}``; a quantum efficiency is now the
+    same :class:`TabulatedCurveSchema` a mirror or lens uses, so the legacy
+    pair is folded into an angle-flat ``{type: table, ...}`` curve. Detected
+    by ``qe`` being a *list* (the current ``qe`` is the bulk scalar).
+    """
+    if not isinstance(value, dict) or "wavelengths_nm" not in value:
+        return value
+    qe = value.get("qe")
+    if not isinstance(qe, list):
+        return value
+    wavelengths = list(value["wavelengths_nm"])
+    if len(wavelengths) != len(qe):
+        raise ValueError(
+            f"wavelengths_nm ({len(wavelengths)}) and qe ({len(qe)}) "
+            "must have the same length"
+        )
+    return {
+        "type": "table",
+        "angles_deg": [0.0],
+        "values": [[float(x) for x in qe]],
+        "wavelengths_nm": wavelengths,
+    }
+
+
+class TabulatedQESchema(BaseModel):
+    """Serialized :class:`~iactrace.camera.detector.photodetector.TabulatedQE`.
+
+    The detector-side ``qe`` / ``qe_curve`` pair: ``qe`` is the bulk scalar and
+    ``qe_curve`` the response curve multiplying it, in the same
+    ``{type: table, ...}`` form a mirror's ``reflectivity_curve`` takes. The
+    legacy inline form (``wavelengths_nm`` plus a *list* of ``qe`` values) is
+    still accepted and folded into an angle-flat curve.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal["tabulated"] = "tabulated"
+    qe: float = Field(ge=0, le=1, default=1.0)
+    qe_curve: ResponseCurveSchema
+
+    @model_validator(mode="before")
+    @classmethod
+    def _accept_legacy(cls, values):
+        if not isinstance(values, dict) or "wavelengths_nm" not in values:
+            return values
+        curve = qe_curve_from_legacy({k: v for k, v in values.items() if k != "type"})
+        return {"type": values.get("type", "tabulated"), "qe": 1.0, "qe_curve": curve}
+
+
 class PMTSchema(BaseModel):
     """Serialized :class:`~iactrace.camera.detector.pmt.PMT`.
 
-    A photomultiplier response: photocathode QE plus an optional entrance
-    window (``n_window``, Fresnel angular response). The photocathode
+    A photomultiplier response: the ``qe`` / ``qe_curve`` photocathode pair
+    plus an optional entrance ``index`` window (Fresnel angular response) --
+    a plain number for a non-dispersive window, or a model for a dispersive
+    one, the same field either way. The photocathode
     *figure* uses the exact same ``surface`` spec as mirrors and lenses
     (:data:`SurfaceSpec`: an ``aspheric`` shape, a ``zernike`` shape, or a
     summed list of both) -- any surface an optical element can describe, a
@@ -377,7 +580,8 @@ class PMTSchema(BaseModel):
 
     type: Literal["pmt"] = "pmt"
     qe: float = Field(ge=0, le=1, default=1.0)
-    n_window: float | None = Field(default=None, gt=1)
+    qe_curve: ResponseCurveSchema | None = None
+    window_index: IndexSchema | None = None
     face_radius: float = Field(gt=0)
     surface: SurfaceSpec = Field(
         default_factory=lambda: AsphericSurfaceSchema(curvature=0.0, conic=0.0)
@@ -385,6 +589,14 @@ class PMTSchema(BaseModel):
     vertex_z: float = 0.0
     length: float | None = Field(default=None, ge=0)
     n_facets: int = Field(ge=3, default=48)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _accept_legacy(cls, values):
+        values = rename_legacy_keys(values, {"n_window": "window_index"})
+        if isinstance(values, dict) and values.get("qe_curve") is not None:
+            values = {**values, "qe_curve": qe_curve_from_legacy(values["qe_curve"])}
+        return values
 
 
 # Discriminated-union slots for the detection chain, keyed on the ``type``
@@ -394,7 +606,7 @@ ConcentratorSchema = Annotated[
     Field(discriminator="type"),
 ]
 PhotoDetectorSchema = Annotated[
-    ConstantQESchema | PMTSchema,
+    ConstantQESchema | TabulatedQESchema | PMTSchema,
     Field(discriminator="type"),
 ]
 

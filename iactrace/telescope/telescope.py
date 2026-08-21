@@ -7,8 +7,9 @@ import jax.numpy as jnp
 from jax import Array
 from jax.typing import ArrayLike
 
-from ..core.ray_bundle import LazyRayBundle
+from ..core.ray_bundle import DEFAULT_WAVELENGTH, LazyRayBundle
 from ..core.render import apply_final_leg_shadow, final_leg_points, trace_optics
+from ..core.spectrum import Spectrum, as_spectrum
 from ..core.trajectory import TraceResult, Trajectory
 from ..core.transforms import euler_to_matrix
 from . import operations as _ops
@@ -18,6 +19,7 @@ if TYPE_CHECKING:
 
     from ..core.obstructions import ObstructionGroup
     from ..core.optics import OpticalElementGroup
+    from ..core.refractive_index import RefractiveIndex
 
 
 class Telescope(eqx.Module):
@@ -99,6 +101,8 @@ class Telescope(eqx.Module):
         sources: Array,
         values: Array,
         source_type: Literal["point", "parallel"] = "point",
+        *,
+        wavelength: ArrayLike | Spectrum | None = None,
     ) -> LazyRayBundle:
         """Describe a render through the optics; do not execute yet.
 
@@ -118,7 +122,31 @@ class Telescope(eqx.Module):
                 sees is ``value / d^2`` for that sample's distance ``d`` to
                 the source.
             source_type: ``'point'`` or ``'parallel'``.
+            wavelength: What the source emits:
+
+                * a scalar, or ``None`` ->
+                  :data:`~iactrace.core.ray_bundle.DEFAULT_WAVELENGTH` --
+                  **monochromatic**;
+                * a :class:`~iactrace.core.spectrum.Spectrum` -- **broadband**:
+                  each ray draws its own wavelength from the distribution, so
+                  the band is integrated by the Monte Carlo ensemble at no
+                  extra ray cost. The draw is reparameterised, so gradients
+                  still flow to the spectrum's parameters.
+
+        Raises:
+            ValueError: if ``wavelength`` is an array. A render generates its
+                own rays, so an array has nothing to line up with.
         """
+        if not isinstance(wavelength, Spectrum) and jnp.asarray(
+            DEFAULT_WAVELENGTH if wavelength is None else wavelength
+        ).ndim:
+            raise ValueError(
+                "render takes a scalar wavelength or a Spectrum, not an array: it "
+                "generates its own rays, so an array has nothing to line up with. "
+                "For several wavelengths, render each one separately (see "
+                "Spectrum.bins), or pass a Spectrum to draw one per ray."
+            )
+        spectrum = as_spectrum(DEFAULT_WAVELENGTH if wavelength is None else wavelength)
         return LazyRayBundle(
             optical_groups=self.optical_groups,
             obstruction_groups=self.obstruction_groups,
@@ -126,6 +154,7 @@ class Telescope(eqx.Module):
             camera_rotation=self.camera_rotation,
             sources=sources,
             source_values=values,
+            spectrum=spectrum,
             source_type=source_type,
         )
 
@@ -135,6 +164,8 @@ class Telescope(eqx.Module):
         ray_directions: Array,
         values: Array,
         record_trajectory: bool = False,
+        *,
+        wavelength: ArrayLike | Spectrum | None = None,
     ) -> TraceResult:
         """Trace rays from arbitrary origins through the full optical system.
 
@@ -147,6 +178,13 @@ class Telescope(eqx.Module):
                 :func:`iactrace.viz.show_telescope`). Off by default and free when
                 off -- nothing extra is computed. Mirrors the
                 :func:`~iactrace.camera.trace_chain` option on the chain side.
+            wavelength: A scalar (``None`` ->
+                :data:`~iactrace.core.ray_bundle.DEFAULT_WAVELENGTH`), a
+                **per-ray** ``(N,)`` array, or a
+                :class:`~iactrace.core.spectrum.Spectrum` (swept over its bins,
+                returning ``K * N`` weighted rays). You supply the rays here,
+                so an array is per-ray -- unlike :meth:`render`, where an array
+                is a sweep.
 
         Returns:
             A :class:`~iactrace.core.trajectory.TraceResult`, as every tracer
@@ -177,6 +215,7 @@ class Telescope(eqx.Module):
             ray_directions,
             values,
             record_trajectory=record_trajectory,
+            wavelength=wavelength,
         )
         # Handoff = shadow the final leg (explicit), then a pure reframe.
         rb = apply_final_leg_shadow(
@@ -361,16 +400,20 @@ class Telescope(eqx.Module):
     def scale_transmittance(self, stage: int, factor: Array | float) -> Telescope:
         return _ops.scale_transmittance(self, stage, factor)
 
-    def set_refractive_index(self, stage: int, n_inside: Array | float) -> Telescope:
-        return _ops.set_refractive_index(self, stage, n_inside)
+    def set_refractive_index(self, stage: int, index: Array | float | RefractiveIndex) -> Telescope:
+        return _ops.set_refractive_index(self, stage, index)
 
     def set_thickness(self, stage: int, thickness: Array | float) -> Telescope:
         return _ops.set_thickness(self, stage, thickness)
 
     def set_focal_lengths(
-        self, stage: int, focal_lengths: Array, n_outside: float = 1.0
+        self,
+        stage: int,
+        focal_lengths: Array,
+        n_outside: float = 1.0,
+        wavelength: float | Array = DEFAULT_WAVELENGTH,
     ) -> Telescope:
-        return _ops.set_focal_lengths(self, stage, focal_lengths, n_outside)
+        return _ops.set_focal_lengths(self, stage, focal_lengths, n_outside, wavelength)
 
     def apply_focal_error(
         self,
@@ -379,8 +422,9 @@ class Telescope(eqx.Module):
         key: Array,
         relative: bool = False,
         n_outside: float = 1.0,
+        wavelength: float | Array = DEFAULT_WAVELENGTH,
     ) -> Telescope:
-        return _ops.apply_focal_error(self, stage, sigma, key, relative, n_outside)
+        return _ops.apply_focal_error(self, stage, sigma, key, relative, n_outside, wavelength)
 
     # Obstruction methods
 

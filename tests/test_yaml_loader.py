@@ -278,18 +278,18 @@ class TestValidConfigs:
         assert float(surface.aspherics[0][0]) == pytest.approx(1e-6)
 
 
-class TestCoatingsFromYaml:
+class TestResponseCurvesFromYaml:
     """Inline R(theta) / T(theta) curves loaded from YAML."""
 
     def test_tabulated_reflectivity_loads(self, n_samples, random_key):
-        from iactrace.core.coatings import TabulatedCoating
+        from iactrace.core.responses import TabulatedResponse
 
         config = {
             "telescope": {"camera_position": [0, 0, 5], "camera_rotation": [0, 0, 0]},
             "mirror_templates": {
                 "protected_silver": {
                     "surface": {"type": "aspheric", "curvature": 0.1, "conic": -1.0},
-                    "coating": {
+                    "reflectivity_curve": {
                         "type": "table",
                         "angles_deg": [0.0, 30.0, 60.0, 80.0],
                         "values": [0.96, 0.95, 0.90, 0.60],
@@ -307,9 +307,9 @@ class TestCoatingsFromYaml:
         }
         tel = build_telescope_config(config, n_samples, random_key)
         interaction = tel.mirror_groups[0].interaction_module
-        assert isinstance(interaction.reflectivity, TabulatedCoating)
+        assert isinstance(interaction.reflectivity_curve, TabulatedResponse)
         # Scalar defaults to 1.0 when no per-mirror override
-        assert float(interaction.reflectivity_scalar[0]) == pytest.approx(1.0)
+        assert float(interaction.reflectivity[0]) == pytest.approx(1.0)
 
     def test_scalar_reflectivity_template_and_per_mirror_override(self, n_samples, random_key):
         """A scalar template reflectivity is the bulk multiplier (no coating),
@@ -341,8 +341,8 @@ class TestCoatingsFromYaml:
         }
         tel = build_telescope_config(config, n_samples, random_key)
         interaction = tel.mirror_groups[0].interaction_module
-        assert interaction.reflectivity is None  # scalar only, no coating curve
-        scalars = interaction.reflectivity_scalar
+        assert interaction.reflectivity_curve is None  # bulk scalar only, no curve
+        scalars = interaction.reflectivity
         assert float(scalars[0]) == pytest.approx(0.7)
         assert float(scalars[1]) == pytest.approx(0.85)
 
@@ -353,7 +353,7 @@ class TestCoatingsFromYaml:
             "mirror_templates": {
                 "tpl_a": {
                     "surface": {"type": "aspheric", "curvature": 0.1, "conic": -1.0},
-                    "coating": {
+                    "reflectivity_curve": {
                         "type": "table",
                         "angles_deg": [0.0, 90.0],
                         "values": [0.9, 0.1],
@@ -361,7 +361,7 @@ class TestCoatingsFromYaml:
                 },
                 "tpl_b": {
                     "surface": {"type": "aspheric", "curvature": 0.2, "conic": -1.0},
-                    "coating": {
+                    "reflectivity_curve": {
                         "type": "table",
                         "angles_deg": [0.0, 90.0],
                         "values": [0.8, 0.2],
@@ -383,11 +383,11 @@ class TestCoatingsFromYaml:
                 },
             ],
         }
-        with pytest.raises(YAMLConfigError, match="single coating"):
+        with pytest.raises(YAMLConfigError, match="single response curve"):
             build_telescope_config(config, n_samples, random_key)
 
     def test_tabulated_transmittance_on_lens(self, n_samples, random_key):
-        from iactrace.core.coatings import TabulatedCoating
+        from iactrace.core.responses import TabulatedResponse
 
         config = {
             "telescope": {"camera_position": [0, 0, 5], "camera_rotation": [0, 0, 0]},
@@ -398,9 +398,9 @@ class TestCoatingsFromYaml:
                     "orientation": [0, 0, 0],
                     "aperture": {"type": "circular", "radius": 0.05},
                     "surface": {"type": "aspheric", "curvature": 5.0, "conic": 0.0},
-                    "n_inside": 1.5,
+                    "index": 1.5,
                     "stage": 1,
-                    "coating": {
+                    "transmittance_curve": {
                         "type": "table",
                         "angles_deg": [0.0, 60.0, 89.0],
                         "values": [0.98, 0.95, 0.10],
@@ -410,11 +410,11 @@ class TestCoatingsFromYaml:
         }
         tel = build_telescope_config(config, n_samples, random_key)
         interaction = tel.lens_groups[0].interaction_module
-        assert isinstance(interaction.transmittance, TabulatedCoating)
+        assert isinstance(interaction.transmittance_curve, TabulatedResponse)
 
-    def test_lens_with_no_coating_defaults_to_fresnel(self, n_samples, random_key):
-        """A lens with no ``coating`` field falls back to bare-interface Fresnel,
-        which is represented internally as ``transmittance=None``.
+    def test_lens_with_no_curve_defaults_to_fresnel(self, n_samples, random_key):
+        """A lens with no ``transmittance_curve`` falls back to bare-interface
+        Fresnel, which is represented internally as ``transmittance_curve=None``.
         """
         config = {
             "telescope": {"camera_position": [0, 0, 5], "camera_rotation": [0, 0, 0]},
@@ -425,14 +425,14 @@ class TestCoatingsFromYaml:
                     "orientation": [0, 0, 0],
                     "aperture": {"type": "circular", "radius": 0.05},
                     "surface": {"type": "aspheric", "curvature": 5.0, "conic": 0.0},
-                    "n_inside": 1.5,
+                    "index": 1.5,
                     "stage": 1,
                 },
             ],
         }
         tel = build_telescope_config(config, n_samples, random_key)
         interaction = tel.lens_groups[0].interaction_module
-        assert interaction.transmittance is None
+        assert interaction.transmittance_curve is None
 
     def test_invalid_curve_value_rejected(self, n_samples, random_key):
         """Values outside [0, 1] should raise."""
@@ -441,7 +441,7 @@ class TestCoatingsFromYaml:
             "mirror_templates": {
                 "bad": {
                     "surface": {"type": "aspheric", "curvature": 0.1, "conic": -1.0},
-                    "coating": {
+                    "reflectivity_curve": {
                         "type": "table",
                         "angles_deg": [0.0, 45.0],
                         "values": [1.5, 0.1],  # 1.5 > 1.0

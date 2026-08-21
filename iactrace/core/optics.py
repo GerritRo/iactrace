@@ -252,17 +252,25 @@ class OpticalElementGroup(eqx.Module):
         key = jax.random.fold_in(self.sample_key, roughness_salt)
         return self.bsdf.perturb_normals(normals, key, element_idx)
 
-    def apply_interaction(self, directions, normals, points, element_idx, current_n):
+    def apply_interaction(
+        self, directions, normals, points, element_idx, current_n, wavelength=None
+    ):
         """Apply this group's physical interaction (reflect/refract/slab) at a hit.
 
         See :meth:`Interaction.apply` for the return value.
         """
-        return self.interaction_module.apply(directions, normals, points, element_idx, current_n)
+        return self.interaction_module.apply(
+            directions, normals, points, element_idx, current_n, wavelength
+        )
 
-    def interact(self, directions, normals, points, element_idx, current_n, roughness_salt):
+    def interact(
+        self, directions, normals, points, element_idx, current_n, roughness_salt, wavelength=None
+    ):
         """Perturb normals for roughness, then apply the physical interaction.
 
         See :meth:`Interaction.apply` for the return value.
         """
         perturbed = self.perturb_normals(normals, roughness_salt, element_idx)
-        return self.apply_interaction(directions, perturbed, points, element_idx, current_n)
+        return self.apply_interaction(
+            directions, perturbed, points, element_idx, current_n, wavelength
+        )

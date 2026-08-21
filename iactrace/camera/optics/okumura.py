@@ -9,6 +9,7 @@ import jax.numpy as jnp
 import numpy as np
 from jax import Array
 
+from ...core.responses import ResponseCurve
 from .polygonal import PolygonalCone
 from .winston import cpc_full_length, cpc_ideal_wall_tilt
 
@@ -196,6 +197,10 @@ class OkumuraCone(PolygonalCone):
             with ``sin(theta_max) = a2 / a1`` -- the same ``L`` Okumura compares
             against, so the Okumura cone is a true drop-in for that Winston cone.
         reflectivity: Per-bounce wall reflectivity (scalar).
+        reflectivity_curve: Optional coating curve
+            (:class:`~iactrace.core.responses.ResponseCurve`) multiplying the scalar,
+            evaluated at each bounce's actual incidence angle and at the ray's
+            wavelength; ``None`` (default) is a flat wall response.
         max_bounces: Maximum reflections traced before a ray is absorbed.
         orientation_deg: Rotation of the polygon about the optical axis.
 
@@ -213,6 +218,7 @@ class OkumuraCone(PolygonalCone):
     r_coeffs: tuple[float, ...] = eqx.field(static=True)
     z_coeffs: tuple[float, ...] = eqx.field(static=True)
     reflectivity: float = eqx.field(static=True)
+    reflectivity_curve: ResponseCurve | None
     max_bounces: int = eqx.field(static=True)
     orientation: float = eqx.field(static=True)  # radians
 
@@ -226,6 +232,7 @@ class OkumuraCone(PolygonalCone):
         reflectivity: float = 0.9,
         max_bounces: int = 10,
         orientation_deg: float = 0.0,
+        reflectivity_curve: ResponseCurve | None = None,
     ) -> None:
         a1, a2 = float(entrance_apothem), float(exit_apothem)
         if not 0.0 < a2 < a1:
@@ -268,6 +275,7 @@ class OkumuraCone(PolygonalCone):
         self.r_coeffs = tuple(r_coeffs)
         self.z_coeffs = tuple(z_coeffs)
         self.reflectivity = float(reflectivity)
+        self.reflectivity_curve = reflectivity_curve
         self.max_bounces = int(max_bounces)
         self.orientation = math.radians(float(orientation_deg))
 

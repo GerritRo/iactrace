@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 from collections import defaultdict
 from collections.abc import Callable
-from typing import TYPE_CHECKING, NamedTuple
+from typing import TYPE_CHECKING, NamedTuple, cast
 
 import equinox as eqx
 import jax
@@ -11,13 +11,12 @@ import jax.numpy as jnp
 import numpy as np
 from jax import Array
 
-from ..camera.detector import PMT, ConstantQE
+from ..camera.detector import PMT, ConstantQE, TabulatedQE
 from ..camera.optics import OkumuraCone, WinstonCone
 from ..camera.optics.winston import cpc_full_length
 from ..camera.sensor_group import HexagonalSensorGroup, SquareSensorGroup
 from ..core.apertures import Aperture, DiskAperture, PolygonAperture
 from ..core.bsdf import BSDF, DoubleGaussianBSDF, GaussianBSDF
-from ..core.coatings import Coating, TabulatedCoating
 from ..core.interactions import (
     ReflectInteraction,
     RefractInteraction,
@@ -33,6 +32,13 @@ from ..core.obstructions import (
     TriangleGroup,
 )
 from ..core.optics import OpticalElementGroup
+from ..core.refractive_index import (
+    ConstantIndex,
+    RefractiveIndex,
+    SellmeierIndex,
+    TabulatedIndex,
+)
+from ..core.responses import ResponseCurve, TabulatedResponse
 from ..core.surfaces import (
     AsphericSurfaceGroup,
     SumSurfaceGroup,
@@ -61,9 +67,13 @@ from .schemas import (
     PlanoSlabSchema,
     PMTSchema,
     PolygonApertureSchema,
+    RefractiveIndexSchema,
+    SellmeierIndexSchema,
     SphereObstructionSchema,
     SquareSensorSchema,
     TabulatedCurveSchema,
+    TabulatedIndexSchema,
+    TabulatedQESchema,
     TelescopeConfigSchema,
     TelescopeMetadataSchema,
     TriangleObstructionSchema,
@@ -108,8 +118,8 @@ class _ParsedMirror(NamedTuple):
     stage: int
     aperture: CircularApertureSchema | PolygonApertureSchema
     bsdf: BSDFSchema | None
-    reflectivity_scalar: float
-    coating_curve: TabulatedCurveSchema | None
+    reflectivity: float
+    reflectivity_curve: TabulatedCurveSchema | None
     zernike: ZernikeSurfaceSchema | None
 
 
@@ -327,21 +337,21 @@ def _resolve_reflectivity(
     mirror: MirrorSchema,
     template: MirrorTemplateSchema | None,
 ) -> tuple[float, TabulatedCurveSchema | None]:
-    """Resolve (bulk_scalar, coating_curve) from mirror + template.
+    """Resolve ``(reflectivity, reflectivity_curve)`` from mirror + template.
 
-    Both the scalar and the coating follow the same mirror-wins-if-defined
-    rule as every other joint field.
+    Both halves of the pair follow the same mirror-wins-if-defined rule as
+    every other joint field.
     """
     template_scalar = (
         template.reflectivity if template is not None and template.reflectivity is not None else 1.0
     )
     scalar = mirror.reflectivity if mirror.reflectivity is not None else float(template_scalar)
-    coating = (
-        mirror.coating
-        if mirror.coating is not None
-        else (template.coating if template is not None else None)
+    curve = (
+        mirror.reflectivity_curve
+        if mirror.reflectivity_curve is not None
+        else (template.reflectivity_curve if template is not None else None)
     )
-    return float(scalar), coating
+    return float(scalar), curve
 
 
 def _curves_equal(
@@ -349,14 +359,18 @@ def _curves_equal(
     b: TabulatedCurveSchema,
 ) -> bool:
     """Structural equality of two tabulated curve schemas."""
-    return a.angles_deg == b.angles_deg and a.values == b.values
+    return (
+        a.angles_deg == b.angles_deg
+        and a.values == b.values
+        and a.wavelengths_nm == b.wavelengths_nm
+    )
 
 
-def _build_coating_for_bucket(
+def _build_curve_for_bucket(
     curves: list[TabulatedCurveSchema | None],
     n_elements: int,
-) -> Coating | None:
-    """Resolve a list of per-element curve schemas into a single coating.
+) -> ResponseCurve | None:
+    """Resolve a list of per-element curve schemas into a single response curve.
 
     All ``None`` -> ``None`` (caller's default physics applies).
     One distinct curve -> broadcast across all elements.
@@ -374,62 +388,116 @@ def _build_coating_for_bucket(
     if any(c is None for c in curves):
         raise ValueError(
             "Elements grouped at the same stage with the same aperture "
-            "must either all define a `coating` or all omit it; mixing "
-            "coated and uncoated elements would silently apply one "
-            "element's coating to the rest. Split them across stages or "
-            "harmonize their `coating` fields."
+            "must either all define a response curve or all omit it; mixing "
+            "curved and flat elements would silently apply one element's "
+            "curve to the rest. Split them across stages or harmonize their "
+            "`*_curve` fields."
         )
     if len(distinct) > 1:
         raise ValueError(
             "Elements grouped at the same stage with the same aperture "
-            "must resolve to a single coating, but multiple distinct "
-            "coating curves were found; broadcasting one would silently "
-            "apply it to the rest. Split them across stages or harmonize "
-            "their `coating` fields."
+            "must resolve to a single response curve, but multiple distinct "
+            "curves were found; broadcasting one would silently apply it to "
+            "the rest. Split them across stages or harmonize their "
+            "`*_curve` fields."
         )
 
     curve = distinct[0]
-    return TabulatedCoating.from_degrees(
+    return TabulatedResponse.from_degrees(
         angles_deg=curve.angles_deg,
         values=curve.values,
         n_elements=n_elements,
+        wavelengths=curve.wavelengths_nm,
     )
 
 
-def _coating_to_curve_schema(
-    coating: Coating | None,
-) -> TabulatedCurveSchema | None:
-    """Project a Coating to a serialisable curve, or ``None`` if trivial.
+def _indices_equal(a: RefractiveIndexSchema, b: RefractiveIndexSchema) -> bool:
+    """Structural equality of two refractive-index schemas."""
+    return a.model_dump() == b.model_dump()
 
-    ``None`` and :class:`ConstantCoating` round-trip as ``None`` so
-    existing YAMLs stay byte-identical. A :class:`TabulatedCoating`
-    emits the inline ``{type: table, ...}`` form. The YAML schema holds
-    one shared curve per template, so a per-element coating (rows that
-    differ across elements) raises :class:`ValueError` rather than
-    silently serialising only the first element's row.
+
+def _build_index_for_bucket(
+    schemas: list[float | RefractiveIndexSchema],
+    n_elements: int,
+) -> RefractiveIndex | Array:
+    """Resolve per-element ``index`` fields into one bucket-wide index argument.
+
+    Plain numbers stay per-element and come back as an ``(N,)`` array (a
+    non-dispersive bucket may mix values freely). A dispersive model is
+    bucket-wide, so mixing a model with numbers, or two distinct models,
+    raises rather than silently applying one element's dispersion to the rest.
+    """
+    models = [s for s in schemas if not isinstance(s, float | int)]
+    if not models:
+        return jnp.asarray([float(cast("float", s)) for s in schemas])
+    if len(models) != len(schemas):
+        raise ValueError(
+            "Elements grouped at the same stage with the same aperture must "
+            "either all define a dispersive `index` model or all give a plain "
+            "number; mixing them would silently apply one element's dispersion "
+            "to the rest. Split them across stages."
+        )
+    first = models[0]
+    if any(not _indices_equal(first, s) for s in models[1:]):
+        raise ValueError(
+            "Elements grouped at the same stage with the same aperture must "
+            "resolve to a single `index` model, but multiple distinct models "
+            "were found. Split them across stages or harmonise their `index`."
+        )
+    if isinstance(first, SellmeierIndexSchema):
+        b = jnp.broadcast_to(jnp.asarray(first.b), (n_elements, len(first.b)))
+        c = jnp.broadcast_to(jnp.asarray(first.c), (n_elements, len(first.c)))
+        return SellmeierIndex(b=b, c=c)
+    return TabulatedIndex.from_table(first.wavelengths_nm, first.n, n_elements)
+
+
+def _curve_to_schema(
+    curve: ResponseCurve | None,
+) -> TabulatedCurveSchema | None:
+    """Project a ResponseCurve to a serialisable curve, or ``None`` if trivial.
+
+    ``None`` and :class:`ConstantResponse` round-trip as ``None`` so
+    existing YAMLs stay byte-identical. A :class:`TabulatedResponse`
+    emits the inline ``{type: table, ...}`` form -- an angle-only 1-D
+    ``values`` list when the curve has no wavelength axis (byte-identical
+    to before), or an ``(angle, wavelength)`` grid with ``wavelengths_nm``
+    when it does. The YAML schema holds one shared curve per template, so a
+    per-element curve (rows that differ across elements) raises
+    :class:`ValueError` rather than silently serialising only the first
+    element's row.
 
     Raises:
-        ValueError: If ``coating`` is a per-element
-            :class:`TabulatedCoating` whose rows are not all equal.
+        ValueError: If ``curve`` is a per-element
+            :class:`TabulatedResponse` whose rows are not all equal.
     """
-    if isinstance(coating, TabulatedCoating):
-        value_rows = np.asarray(coating.values)
+    if isinstance(curve, TabulatedResponse):
+        value_rows = np.asarray(curve.values)  # (N, Kc, Kw)
         # YAML expresses one shared curve per template. A per-element
-        # coating (rows differ) cannot be represented; fail loudly rather
+        # curve (rows differ) cannot be represented; fail loudly rather
         # than silently serialising only element 0's row. Mirrors the
-        # loader guard in _build_coating_for_bucket.
+        # loader guard in _build_curve_for_bucket.
         if value_rows.shape[0] > 1 and not np.allclose(value_rows, value_rows[0]):
             raise ValueError(
-                "Cannot serialise a per-element TabulatedCoating to YAML: "
+                "Cannot serialise a per-element TabulatedResponse to YAML: "
                 "all elements in a group must share one curve. Split them "
                 "across groups, or harmonise their rows before saving."
             )
-        cos_table = np.asarray(coating.cos_table)
-        values_row = value_rows[0]
+        grid = value_rows[0]  # (Kc, Kw)
+        cos_table = np.asarray(curve.cos_table)
         order = np.argsort(-cos_table)  # cos descending -> angles ascending
         angles_deg = [float(x) for x in np.degrees(np.arccos(cos_table[order]))]
-        values = [float(x) for x in values_row[order]]
-        return TabulatedCurveSchema(angles_deg=angles_deg, values=values)
+        if curve.wl_table.shape[0] == 1:
+            # Angle-only curve: emit the 1-D form (byte-identical to before).
+            values = [float(x) for x in grid[order, 0]]
+            return TabulatedCurveSchema(angles_deg=angles_deg, values=values)
+        # (angle, wavelength) grid; wl_table is already ascending.
+        wl_table = np.asarray(curve.wl_table)
+        values2d = [[float(x) for x in grid[a, :]] for a in order]
+        return TabulatedCurveSchema(
+            angles_deg=angles_deg,
+            values=values2d,
+            wavelengths_nm=[float(w) for w in wl_table],
+        )
     return None
 
 
@@ -439,7 +507,14 @@ def _curve_schema_to_key(
     """Hashable key used by ``mirrors_to_schemas`` to dedup templates."""
     if schema is None:
         return None
-    return ("table", tuple(schema.angles_deg), tuple(schema.values))
+    if schema.wavelengths_nm is None:
+        values_key: tuple = tuple(cast("list[float]", schema.values))
+        wl_key: tuple | None = None
+    else:
+        rows = cast("list[list[float]]", schema.values)
+        values_key = tuple(tuple(row) for row in rows)
+        wl_key = tuple(schema.wavelengths_nm)
+    return ("table", tuple(schema.angles_deg), values_key, wl_key)
 
 
 # Schema -> Domain (loading)
@@ -468,7 +543,7 @@ def mirrors_from_schemas(
         template = templates[mirror.template] if mirror.template is not None else None
         surface = _resolve_surface(mirror, template)
         bsdf = _resolve_bsdf(mirror, template)
-        refl_scalar, coating_curve = _resolve_reflectivity(mirror, template)
+        refl, refl_curve = _resolve_reflectivity(mirror, template)
 
         parsed.append(
             _ParsedMirror(
@@ -482,8 +557,8 @@ def mirrors_from_schemas(
                 stage=mirror.stage,
                 aperture=mirror.aperture,
                 bsdf=bsdf,
-                reflectivity_scalar=refl_scalar,
-                coating_curve=coating_curve,
+                reflectivity=refl,
+                reflectivity_curve=refl_curve,
                 zernike=surface.zernike,
             )
         )
@@ -586,8 +661,8 @@ def _build_bsdf_for_bucket(
     that declares a BSDF must share the same ``type``; per-element
     parameters are stacked into the model's arrays, and elements without
     a BSDF default to zero (specular for that element). Mixed types
-    raise ``ValueError``, mirroring the per-bucket coating guard in
-    :func:`_build_coating_for_bucket`.
+    raise ``ValueError``, mirroring the per-bucket curve guard in
+    :func:`_build_curve_for_bucket`.
     """
     present = [s for s in schemas if s is not None]
     if not present:
@@ -630,9 +705,9 @@ def _build_mirror_group(
 
     bsdf = _build_bsdf_for_bucket([m.bsdf for m in mirrors])
 
-    reflectivity_scalars = jnp.asarray([m.reflectivity_scalar for m in mirrors])
-    coating = _build_coating_for_bucket(
-        [m.coating_curve for m in mirrors],
+    reflectivities = jnp.asarray([m.reflectivity for m in mirrors])
+    curve = _build_curve_for_bucket(
+        [m.reflectivity_curve for m in mirrors],
         n_elements,
     )
     group = mirror_group(
@@ -643,8 +718,8 @@ def _build_mirror_group(
         aspherics=_pad_aspherics([m.aspheric for m in mirrors]),
         offsets=jnp.asarray([m.offset for m in mirrors]),
         aperture=aperture,
-        reflectivity=reflectivity_scalars,
-        coating=coating,
+        reflectivity=reflectivities,
+        reflectivity_curve=curve,
         bsdf=bsdf,
         sample_key=sample_key,
         optical_stage=stage,
@@ -769,8 +844,8 @@ def _build_aspheric_disk_lens_group(
     from ..telescope.lenses import refractive_group
 
     n = len(lenses)
-    coating = _build_coating_for_bucket(
-        [lens.coating for lens in lenses],
+    curve = _build_curve_for_bucket(
+        [lens.transmittance_curve for lens in lenses],
         n,
     )
     split = [_split_surface(lens.surface) for lens in lenses]  # (aspheric, zernike) per lens
@@ -783,9 +858,9 @@ def _build_aspheric_disk_lens_group(
         aspherics=_pad_aspherics([a.aspheric if a else [] for a, _ in split]),
         offsets=jnp.asarray([lens.offset for lens in lenses]),
         aperture=aperture,
-        n_inside=jnp.asarray([lens.n_inside for lens in lenses]),
+        index=_build_index_for_bucket([lens.index for lens in lenses], n),
         transmittance=jnp.asarray([lens.transmittance for lens in lenses]),
-        coating=coating,
+        transmittance_curve=curve,
         sample_key=sample_key,
         optical_stage=stage,
     )
@@ -810,8 +885,8 @@ def _build_plano_slab_group(
     from ..telescope.lenses import slab_group
 
     n = len(lenses)
-    coating = _build_coating_for_bucket(
-        [lens.coating for lens in lenses],
+    curve = _build_curve_for_bucket(
+        [lens.transmittance_curve for lens in lenses],
         n,
     )
 
@@ -819,10 +894,10 @@ def _build_plano_slab_group(
         positions=jnp.asarray([lens.position for lens in lenses]),
         rotations=jnp.asarray([lens.orientation for lens in lenses]),
         aperture=aperture,
-        n_inside=jnp.asarray([lens.n_inside for lens in lenses]),
+        index=_build_index_for_bucket([lens.index for lens in lenses], n),
         thickness=jnp.asarray([lens.thickness for lens in lenses]),
         transmittance=jnp.asarray([lens.transmittance for lens in lenses]),
-        coating=coating,
+        transmittance_curve=curve,
         sample_key=sample_key,
         optical_stage=stage,
     )
@@ -1128,14 +1203,14 @@ class _MirrorData(NamedTuple):
     i: int
     asph_schema: AsphericSurfaceSchema | None
     zern_schema: ZernikeSurfaceSchema | None
-    coating_schema: TabulatedCurveSchema | None
+    curve_schema: TabulatedCurveSchema | None
     offset: Array
     bsdf_schema: BSDFSchema | None
-    reflectivity_scalar: float
+    reflectivity: float
 
 
 def _mirror_base_key(d: _MirrorData) -> tuple | None:
-    """Dedup key for a mirror's templatable fields (aspheric base + coating).
+    """Dedup key for a mirror's templatable fields (aspheric base + curve).
 
     ``None`` when the mirror has no aspheric base at all (a standalone
     Zernike surface); such mirrors never join a template. ``zernike`` and
@@ -1144,7 +1219,7 @@ def _mirror_base_key(d: _MirrorData) -> tuple | None:
     """
     if d.asph_schema is None:
         return None
-    return (_surface_spec_key(d.asph_schema), _curve_schema_to_key(d.coating_schema))
+    return (_surface_spec_key(d.asph_schema), _curve_schema_to_key(d.curve_schema))
 
 
 def mirrors_to_schemas(
@@ -1155,11 +1230,12 @@ def mirrors_to_schemas(
     Each mirror is written as the joint of an optional template and its own
     fields, mirroring how loading resolves them (:func:`_resolve_surface`):
 
-    * The *aspheric* base (curvature/conic/aspheric) plus ``coating`` are
-      deduplicated into a shared template when two or more mirrors have the
+    * The *aspheric* base (curvature/conic/aspheric) plus ``reflectivity_curve``
+      are deduplicated into a shared template when two or more mirrors have the
       exact same combination. A mirror whose combination is unique to it (or
       has no aspheric base at all -- a standalone Zernike surface) gets no
-      template: its curvature/conic/aspheric/coating are written directly.
+      template: its curvature/conic/aspheric/reflectivity_curve are written
+      directly.
     * ``zernike`` is always written directly on the mirror, never folded into
       a template, since it typically represents a per-panel measured figure
       error even when every panel shares the same base prescription.
@@ -1173,7 +1249,7 @@ def mirrors_to_schemas(
             case _:
                 continue
 
-        coating_schema = _coating_to_curve_schema(interaction.reflectivity)
+        curve_schema = _curve_to_schema(interaction.reflectivity_curve)
         asph, zern, offsets = _asphere_surface_arrays(group.surface, len(group))
 
         for i in range(len(group)):
@@ -1192,10 +1268,10 @@ def mirrors_to_schemas(
                     i=i,
                     asph_schema=asph_schema,
                     zern_schema=_zernike_to_schema(zern, i),
-                    coating_schema=coating_schema,
+                    curve_schema=curve_schema,
                     offset=offsets[i],
                     bsdf_schema=_bsdf_to_schema(group.bsdf, i),
-                    reflectivity_scalar=float(interaction.reflectivity_scalar[i]),
+                    reflectivity=float(interaction.reflectivity[i]),
                 )
             )
 
@@ -1219,13 +1295,13 @@ def mirrors_to_schemas(
                 key_to_template[key] = template_name
                 templates[template_name] = MirrorTemplateSchema(
                     surface=d.asph_schema,
-                    coating=d.coating_schema,
+                    reflectivity_curve=d.curve_schema,
                 )
             curvature = conic = aspheric = None
-            coating = None
+            reflectivity_curve = None
         else:
             template_name = None
-            coating = d.coating_schema
+            reflectivity_curve = d.curve_schema
             if d.asph_schema is None:
                 curvature = conic = aspheric = None
             else:
@@ -1246,8 +1322,8 @@ def mirrors_to_schemas(
                 stage=d.group.optical_stage,
                 offset=_to_float_list(d.offset),
                 bsdf=d.bsdf_schema,
-                reflectivity=(d.reflectivity_scalar if d.reflectivity_scalar != 1.0 else None),
-                coating=coating,
+                reflectivity=(d.reflectivity if d.reflectivity != 1.0 else None),
+                reflectivity_curve=reflectivity_curve,
                 id=f"M_{len(mirrors)}",
             )
         )
@@ -1289,6 +1365,28 @@ def lenses_to_schemas(
     return lenses
 
 
+def _index_to_schema(index: RefractiveIndex, i: int) -> float | RefractiveIndexSchema:
+    """Serialise element ``i`` of an index model to the YAML ``index`` field.
+
+    The one field takes either form, mirroring the Python argument: a
+    :class:`ConstantIndex` emits the plain number, a dispersive model emits
+    its schema.
+    """
+    if isinstance(index, ConstantIndex):
+        return float(index.values[i])
+    if isinstance(index, SellmeierIndex):
+        return SellmeierIndexSchema(
+            b=[float(x) for x in np.asarray(index.b[i])],
+            c=[float(x) for x in np.asarray(index.c[i])],
+        )
+    if isinstance(index, TabulatedIndex):
+        return TabulatedIndexSchema(
+            wavelengths_nm=[float(x) for x in np.asarray(index.wavelengths)],
+            n=[float(x) for x in np.asarray(index.n_values[i])],
+        )
+    raise ValueError(f"Cannot serialise refractive index of type {type(index).__name__} to YAML.")
+
+
 def _extract_aspheric_disk_lens(
     group: OpticalElementGroup,
     interaction: RefractInteraction,
@@ -1299,16 +1397,16 @@ def _extract_aspheric_disk_lens(
     offsets: Array,
 ) -> AsphericDiskLensSchema:
     """Extract an AsphericDiskLensSchema from element i of a group."""
-    coating_schema = _coating_to_curve_schema(interaction.transmittance)
+    curve_schema = _curve_to_schema(interaction.transmittance_curve)
     return AsphericDiskLensSchema(
         position=_to_float_list(group.positions[i]),
         orientation=_to_float_list(group.rotations[i]),
         aperture=_aperture_to_schema(group.aperture, i),
         surface=_surface_to_spec(asph, zern, i),
-        n_inside=float(interaction.n_inside[i]),
+        index=_index_to_schema(interaction.index, i),
         offset=_to_float_list(offsets[i]),
-        transmittance=float(interaction.transmittance_scalar[i]),
-        coating=coating_schema,
+        transmittance=float(interaction.transmittance[i]),
+        transmittance_curve=curve_schema,
         stage=group.optical_stage,
         id=f"lens_{counter}",
     )
@@ -1321,15 +1419,15 @@ def _extract_plano_slab_lens(
     counter: int,
 ) -> PlanoSlabSchema:
     """Extract a PlanoSlabSchema from element i of a group."""
-    coating_schema = _coating_to_curve_schema(interaction.transmittance)
+    curve_schema = _curve_to_schema(interaction.transmittance_curve)
     return PlanoSlabSchema(
         position=_to_float_list(group.positions[i]),
         orientation=_to_float_list(group.rotations[i]),
         aperture=_aperture_to_schema(group.aperture, i),
         thickness=float(interaction.thickness[i]),
-        n_inside=float(interaction.n_inside[i]),
-        transmittance=float(interaction.transmittance_scalar[i]),
-        coating=coating_schema,
+        index=_index_to_schema(interaction.index, i),
+        transmittance=float(interaction.transmittance[i]),
+        transmittance_curve=curve_schema,
         stage=group.optical_stage,
         id=f"lens_{counter}",
     )
@@ -1547,6 +1645,17 @@ class _ConcentratorSpec(NamedTuple):
     from_schema: Callable[..., Concentrator]
 
 
+def _wall_curve_to_schema(concentrator: Concentrator) -> TabulatedCurveSchema | None:
+    """Serialise a concentrator's optional wall ``reflectivity_curve``.
+
+    Reuses :func:`_curve_to_schema` (the cone holds a single-element
+    :class:`~iactrace.core.responses.ResponseCurve`), so a ``ConstantResponse`` or no
+    coating round-trips as ``None`` and a wavelength curve emits the same
+    ``{type: table, ...}`` form used for mirror / lens coatings.
+    """
+    return _curve_to_schema(getattr(concentrator, "reflectivity_curve", None))
+
+
 def _winston_to_schema(concentrator: WinstonCone) -> WinstonConeSchema:
     # entrance_apothem is the physical mouth at z=length; for a truncated
     # cone the depth reconstructs the wall on load. An untruncated cone is
@@ -1560,6 +1669,7 @@ def _winston_to_schema(concentrator: WinstonCone) -> WinstonConeSchema:
         exit_apothem=concentrator.exit_apothem,
         length=concentrator.length if truncated else None,
         reflectivity=concentrator.reflectivity,
+        reflectivity_curve=_wall_curve_to_schema(concentrator),
         max_bounces=concentrator.max_bounces,
         orientation_deg=math.degrees(concentrator.orientation),
     )
@@ -1572,6 +1682,7 @@ def _winston_from_schema(schema: WinstonConeSchema) -> WinstonCone:
         exit_apothem=schema.exit_apothem,
         length=schema.length,
         reflectivity=schema.reflectivity,
+        reflectivity_curve=_build_curve_for_bucket([schema.reflectivity_curve], 1),
         max_bounces=schema.max_bounces,
         orientation_deg=schema.orientation_deg,
     )
@@ -1590,6 +1701,7 @@ def _okumura_to_schema(concentrator: OkumuraCone) -> OkumuraConeSchema:
         control_points=[[r, z] for r, z in concentrator.control_points],
         length=concentrator.length if truncated else None,
         reflectivity=concentrator.reflectivity,
+        reflectivity_curve=_wall_curve_to_schema(concentrator),
         max_bounces=concentrator.max_bounces,
         orientation_deg=math.degrees(concentrator.orientation),
     )
@@ -1603,6 +1715,7 @@ def _okumura_from_schema(schema: OkumuraConeSchema) -> OkumuraCone:
         control_points=[(r, z) for r, z in schema.control_points],
         length=schema.length,
         reflectivity=schema.reflectivity,
+        reflectivity_curve=_build_curve_for_bucket([schema.reflectivity_curve], 1),
         max_bounces=schema.max_bounces,
         orientation_deg=schema.orientation_deg,
     )
@@ -1683,13 +1796,48 @@ def _constant_qe_from_schema(schema: ConstantQESchema) -> ConstantQE:
     return ConstantQE(schema.qe)
 
 
+def _qe_curve_to_schema(qe_curve: ResponseCurve, owner: str) -> TabulatedCurveSchema:
+    """Serialise a photodetector's ``qe_curve``, or explain why it cannot be."""
+    schema = _curve_to_schema(qe_curve)
+    if schema is None:
+        raise ValueError(
+            f"Cannot serialise the qe_curve of {owner} to YAML: only a "
+            "TabulatedResponse has a written form."
+        )
+    return schema
+
+
+def _tabulated_qe_to_schema(photodetector: TabulatedQE) -> TabulatedQESchema:
+    return TabulatedQESchema(
+        qe=float(photodetector.qe),
+        qe_curve=_qe_curve_to_schema(photodetector.qe_curve, "TabulatedQE"),
+    )
+
+
+def _tabulated_qe_from_schema(schema: TabulatedQESchema) -> TabulatedQE:
+    curve = _build_curve_for_bucket([schema.qe_curve], 1)
+    assert curve is not None  # the schema requires a curve
+    return TabulatedQE(qe_curve=curve, qe=schema.qe)
+
+
 def _pmt_to_schema(photodetector: PMT) -> PMTSchema:
     # The photocathode figure round-trips through the exact same
     # (aspheric, zernike) decomposition mirrors and lenses use.
     asph, zern = _surface_components(photodetector.shape)
+    qe_curve = (
+        _qe_curve_to_schema(photodetector.qe_curve, "PMT")
+        if photodetector.qe_curve is not None
+        else None
+    )
+    window_index = (
+        _index_to_schema(photodetector.window_index, 0)
+        if photodetector.window_index is not None
+        else None
+    )
     return PMTSchema(
         qe=float(photodetector.qe),
-        n_window=None if photodetector.n_window is None else float(photodetector.n_window),
+        qe_curve=qe_curve,
+        window_index=window_index,
         face_radius=float(photodetector.face_radius),
         surface=_surface_to_spec(asph, zern, 0),
         vertex_z=float(photodetector.vertex_z),
@@ -1703,7 +1851,14 @@ def _pmt_to_schema(photodetector: PMT) -> PMTSchema:
 def _pmt_from_schema(schema: PMTSchema) -> PMT:
     return PMT(
         qe=schema.qe,
-        n_window=schema.n_window,
+        qe_curve=(
+            _build_curve_for_bucket([schema.qe_curve], 1) if schema.qe_curve is not None else None
+        ),
+        window_index=(
+            _build_index_for_bucket([schema.window_index], 1)
+            if schema.window_index is not None
+            else None
+        ),
         face_radius=schema.face_radius,
         surface=_single_element_surface(schema.surface),
         vertex_z=schema.vertex_z,
@@ -1717,6 +1872,13 @@ def _pmt_from_schema(schema: PMTSchema) -> PMT:
 _PHOTODETECTOR_SPECS: tuple[_PhotoDetectorSpec, ...] = (
     _PhotoDetectorSpec(
         "constant", ConstantQESchema, ConstantQE, _constant_qe_to_schema, _constant_qe_from_schema
+    ),
+    _PhotoDetectorSpec(
+        "tabulated",
+        TabulatedQESchema,
+        TabulatedQE,
+        _tabulated_qe_to_schema,
+        _tabulated_qe_from_schema,
     ),
     _PhotoDetectorSpec("pmt", PMTSchema, PMT, _pmt_to_schema, _pmt_from_schema),
 )

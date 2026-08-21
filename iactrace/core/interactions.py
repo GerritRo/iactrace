@@ -10,7 +10,9 @@ import jax.numpy as jnp
 from jax import Array
 
 from ._tolerances import dir_tol
-from .coatings import Coating, fresnel_unpolarized
+from .ray_bundle import DEFAULT_WAVELENGTH
+from .refractive_index import RefractiveIndex, as_refractive_index
+from .responses import ResponseCurve, fresnel_unpolarized
 
 
 def reflect(direction, normal):
@@ -134,18 +136,19 @@ class Interaction(eqx.Module):
     def kind(self) -> Literal["mirror", "lens", "slab"]:
         """User-facing element kind."""
 
-    def focal_scale(self, n_outside: float = 1.0) -> Array | float | None:
+    def focal_scale(
+        self, n_outside: float = 1.0, wavelength: float | Array = DEFAULT_WAVELENGTH
+    ) -> Array | float | None:
         """Curvature<->focal-length scale factor for this interaction.
 
         ``curvature = 1 / (scale * focal_length)``: ``2`` for mirrors,
-        ``n_inside - n_outside`` for a single refracting surface. Returns
-        ``None`` where a focal length is not a meaningful concept (slabs),
-        letting the caller decide how to report that.
+        ``n(wavelength) - n_outside`` for a single refracting surface at the
+        design ``wavelength``.
         """
         return None
 
     @abstractmethod
-    def apply(self, directions, normals, points, element_idx, current_n):
+    def apply(self, directions, normals, points, element_idx, current_n, wavelength=None):
         """Apply the interaction at hit points.
 
         Args:
@@ -155,6 +158,7 @@ class Interaction(eqx.Module):
                 is currently propagating in. Used as the incident-side
                 index for refraction physics, so OPL is exact even
                 through stacked refractive surfaces.
+            wavelength: per-ray wavelength
 
         Returns a 5-tuple
         ``(new_directions, new_positions, coefficients, opl_internal, new_n)``.
@@ -166,25 +170,24 @@ class ReflectInteraction(Interaction):
 
     Per-ray coefficient::
 
-        reflectivity_scalar[idx] * reflectivity(cos_theta_i, idx)
+        reflectivity[idx] * reflectivity_curve(cos_theta_i, idx)
 
-    When ``reflectivity is None`` (the default) the angular factor is
-    unity, i.e. an ideal angle-independent mirror with response
-    ``reflectivity_scalar``. Provide a :class:`TabulatedCoating` (or
-    any :class:`Coating`) to model a measured R(theta) curve. Reflection
-    does not change the medium: ``new_n == current_n``.
+    With no curve (the default) the angular factor is unity, i.e. an ideal
+    angle- and wavelength-independent mirror of response
+    :attr:`reflectivity`. Reflection does not change the medium:
+    ``new_n == current_n``.
 
     Attributes:
-        reflectivity: Angle-dependent coating, or ``None`` for a flat
-            angular response.
-        reflectivity_scalar: Per-element bulk multiplier in ``[0, 1]``,
+        reflectivity_curve: ``R(theta, lambda)`` response curve, or ``None``
+            for a flat angular and spectral response.
+        reflectivity: Per-element bulk multiplier in ``[0, 1]``,
             shape ``(N,)``. Operations such as
             :func:`~iactrace.telescope.operations.set_reflectivity`
-            write here, leaving the coating untouched.
+            write here, leaving the curve untouched.
     """
 
-    reflectivity: Coating | None
-    reflectivity_scalar: Array  # (N,)
+    reflectivity_curve: ResponseCurve | None
+    reflectivity: Array  # (N,)
 
     @property
     def interaction_type(self) -> InteractionType:
@@ -194,25 +197,27 @@ class ReflectInteraction(Interaction):
     def kind(self) -> Literal["mirror"]:
         return "mirror"
 
-    def focal_scale(self, n_outside: float = 1.0) -> float:
+    def focal_scale(
+        self, n_outside: float = 1.0, wavelength: float | Array = DEFAULT_WAVELENGTH
+    ) -> float:
         return 2.0
 
-    def with_reflectivity_scalar(self, reflectivity_scalar: Array) -> ReflectInteraction:
-        """Return a copy with the bulk reflectivity multiplier replaced."""
-        return eqx.tree_at(lambda m: m.reflectivity_scalar, self, reflectivity_scalar)
+    def with_reflectivity(self, reflectivity: Array) -> ReflectInteraction:
+        """Return a copy with the bulk reflectivity replaced."""
+        return eqx.tree_at(lambda m: m.reflectivity, self, reflectivity)
 
     def scaled_reflectivity(self, factor: Array) -> ReflectInteraction:
-        """Return a copy with the bulk reflectivity multiplier scaled by ``factor``."""
-        return self.with_reflectivity_scalar(self.reflectivity_scalar * factor)
+        """Return a copy with the bulk reflectivity scaled by ``factor``."""
+        return self.with_reflectivity(self.reflectivity * factor)
 
-    def apply(self, directions, normals, points, element_idx, current_n):
+    def apply(self, directions, normals, points, element_idx, current_n, wavelength=None):
         reflected, cos_array = jax.vmap(reflect)(directions, normals)
         cos_i = jnp.abs(cos_array.squeeze(-1))
-        scalar = self.reflectivity_scalar[element_idx]
-        if self.reflectivity is None:
+        scalar = self.reflectivity[element_idx]
+        if self.reflectivity_curve is None:
             coeff = scalar
         else:
-            coeff = scalar * self.reflectivity(cos_i, element_idx)
+            coeff = scalar * self.reflectivity_curve(cos_i, element_idx, wavelength)
         opl_internal = jnp.zeros(directions.shape[0])
         return reflected, points, coeff, opl_internal, current_n
 
@@ -222,13 +227,12 @@ class RefractInteraction(Interaction):
 
     Per-ray coefficient::
 
-        transmittance_scalar[idx] * angular_response(cos_theta_i)
+        transmittance[idx] * angular_response(cos_theta_i)
 
-    When ``transmittance is None`` (the default) the angular response
-    is :func:`~iactrace.core.coatings.fresnel_unpolarized` evaluated
-    from ``current_n`` (the medium the ray is currently in) and
-    ``n_inside`` (the far side of this surface). Snell's law is always
-    applied to bend the ray.
+    With no curve (the default) the angular response is
+    :func:`~iactrace.core.responses.fresnel_unpolarized` evaluated from
+    ``current_n`` (the medium the ray is currently in) and the far-side
+    ``index`` of this surface. Snell's law is always applied to bend the ray.
 
     Semantically, this represents the ray crossing a single interface
     from one medium into another. A real glass body (e.g. a biconvex
@@ -238,19 +242,18 @@ class RefractInteraction(Interaction):
     interior between them, so OPL is exact.
 
     Attributes:
-        n_inside: Refractive index on the far side of this surface,
-            per element (N,). "Far side" means the medium the ray
-            transmits *into*: for a front surface this is the glass
-            index, for a back surface it is the ambient index.
-        transmittance: Angle-dependent coating, or ``None`` for
-            bare-interface Fresnel transmittance.
-        transmittance_scalar: Per-element bulk multiplier in ``[0, 1]``,
+        index: Refractive index on the far side of this surface, a
+            :class:`~iactrace.core.refractive_index.RefractiveIndex`
+            model evaluated per ray at that ray's wavelength.
+        transmittance_curve: ``T(theta, lambda)`` response curve, or ``None``
+            for the bare-interface Fresnel transmittance.
+        transmittance: Per-element bulk multiplier in ``[0, 1]``,
             shape ``(N,)``.
     """
 
-    n_inside: Array
-    transmittance: Coating | None
-    transmittance_scalar: Array  # (N,)
+    index: RefractiveIndex
+    transmittance_curve: ResponseCurve | None
+    transmittance: Array  # (N,)
 
     @property
     def interaction_type(self) -> InteractionType:
@@ -260,24 +263,28 @@ class RefractInteraction(Interaction):
     def kind(self) -> Literal["lens"]:
         return "lens"
 
-    def focal_scale(self, n_outside: float = 1.0) -> Array:
-        return self.n_inside - n_outside
+    def focal_scale(
+        self, n_outside: float = 1.0, wavelength: float | Array = DEFAULT_WAVELENGTH
+    ) -> Array:
+        return self.index.reference(wavelength) - n_outside
 
-    def with_n_inside(self, n_inside: Array) -> RefractInteraction:
+    def with_index(self, index: RefractiveIndex | Array | float) -> RefractInteraction:
         """Return a copy with the refractive index replaced."""
-        return eqx.tree_at(lambda m: m.n_inside, self, n_inside)
+        return eqx.tree_at(
+            lambda m: m.index, self, as_refractive_index(index, self.index.n_elements)
+        )
 
-    def with_transmittance_scalar(self, transmittance_scalar: Array) -> RefractInteraction:
-        """Return a copy with the bulk transmittance multiplier replaced (clipped to [0, 1])."""
-        clipped = jnp.clip(transmittance_scalar, 0.0, 1.0)
-        return eqx.tree_at(lambda m: m.transmittance_scalar, self, clipped)
+    def with_transmittance(self, transmittance: Array) -> RefractInteraction:
+        """Return a copy with the bulk transmittance replaced (clipped to [0, 1])."""
+        clipped = jnp.clip(transmittance, 0.0, 1.0)
+        return eqx.tree_at(lambda m: m.transmittance, self, clipped)
 
     def scaled_transmittance(self, factor: Array) -> RefractInteraction:
-        """Return a copy with the bulk transmittance multiplier scaled by ``factor``."""
-        return self.with_transmittance_scalar(self.transmittance_scalar * factor)
+        """Return a copy with the bulk transmittance scaled by ``factor``."""
+        return self.with_transmittance(self.transmittance * factor)
 
-    def apply(self, directions, normals, points, element_idx, current_n):
-        n_in = self.n_inside[element_idx]
+    def apply(self, directions, normals, points, element_idx, current_n, wavelength=None):
+        n_in = self.index.n_at(element_idx, wavelength)
 
         refracted, cos_i, tir = jax.vmap(refract)(
             directions,
@@ -286,14 +293,14 @@ class RefractInteraction(Interaction):
             n_in,
         )
 
-        if self.transmittance is None:
+        if self.transmittance_curve is None:
             _, t = fresnel_unpolarized(cos_i, current_n, n_in)
         else:
-            t = self.transmittance(cos_i, element_idx)
+            t = self.transmittance_curve(cos_i, element_idx, wavelength)
         t = jnp.where(tir, 0.0, t)
 
         opl_internal = jnp.zeros(directions.shape[0])
-        coeff = self.transmittance_scalar[element_idx] * t
+        coeff = self.transmittance[element_idx] * t
         return refracted, points, coeff, opl_internal, n_in
 
 
@@ -302,16 +309,15 @@ class SlabInteraction(Interaction):
 
     Per-ray coefficient::
 
-        transmittance_scalar[idx] * angular_response
+        transmittance[idx] * angular_response
 
-    When ``transmittance is None`` (the default) the angular response
-    is the standard Fresnel product at the two faces: by parallel-slab
-    symmetry and Stokes reciprocity, both faces share the same
-    single-face Fresnel coefficient so the result simplifies to
-    ``T_face^2``. Provide a :class:`Coating` to override with a vendor-
-    supplied T(theta) curve for the *complete* slab; the coating fully
-    replaces the Fresnel product. The TIR mask from the underlying
-    geometry gates out invalid rays either way.
+    With no curve (the default) the angular response is the standard Fresnel
+    product at the two faces: by parallel-slab symmetry and Stokes
+    reciprocity, both faces share the same single-face Fresnel coefficient so
+    the result simplifies to ``T_face^2``. A curve overrides that with a
+    vendor-supplied ``T(theta, lambda)`` for the *complete* slab, fully
+    replacing the Fresnel product. The TIR mask from the underlying geometry
+    gates out invalid rays either way.
 
     The ray enters from its current medium (``current_n``), refracts
     into the slab material, traverses it, and refracts back out into
@@ -320,18 +326,22 @@ class SlabInteraction(Interaction):
     the per-ray ``n_in * L`` inside the slab.
 
     Attributes:
-        n_inside: Per-element slab refractive index, shape ``(N,)``.
+        index: Per-element slab refractive index, a
+            :class:`~iactrace.core.refractive_index.RefractiveIndex`
+            model evaluated per ray at that ray's wavelength. A constant
+            window is
+            :class:`~iactrace.core.refractive_index.ConstantIndex`.
         thickness: Per-element slab thickness, shape ``(N,)``.
-        transmittance: Angle-dependent coating, or ``None`` for the
-            bare-window Fresnel product.
-        transmittance_scalar: Per-element bulk multiplier in ``[0, 1]``,
+        transmittance_curve: ``T(theta, lambda)`` response curve for the whole
+            slab, or ``None`` for the bare-window Fresnel product.
+        transmittance: Per-element bulk multiplier in ``[0, 1]``,
             shape ``(N,)``.
     """
 
-    n_inside: Array
+    index: RefractiveIndex
     thickness: Array
-    transmittance: Coating | None
-    transmittance_scalar: Array  # (N,)
+    transmittance_curve: ResponseCurve | None
+    transmittance: Array  # (N,)
 
     @property
     def interaction_type(self) -> InteractionType:
@@ -341,25 +351,27 @@ class SlabInteraction(Interaction):
     def kind(self) -> Literal["slab"]:
         return "slab"
 
-    def with_n_inside(self, n_inside: Array) -> SlabInteraction:
-        """Return a copy with the slab refractive index replaced."""
-        return eqx.tree_at(lambda m: m.n_inside, self, n_inside)
+    def with_index(self, index: RefractiveIndex | Array | float) -> SlabInteraction:
+        """Return a copy with the refractive index replaced."""
+        return eqx.tree_at(
+            lambda m: m.index, self, as_refractive_index(index, self.index.n_elements)
+        )
 
     def with_thickness(self, thickness: Array) -> SlabInteraction:
         """Return a copy with the slab thickness replaced."""
         return eqx.tree_at(lambda m: m.thickness, self, thickness)
 
-    def with_transmittance_scalar(self, transmittance_scalar: Array) -> SlabInteraction:
-        """Return a copy with the bulk transmittance multiplier replaced (clipped to [0, 1])."""
-        clipped = jnp.clip(transmittance_scalar, 0.0, 1.0)
-        return eqx.tree_at(lambda m: m.transmittance_scalar, self, clipped)
+    def with_transmittance(self, transmittance: Array) -> SlabInteraction:
+        """Return a copy with the bulk transmittance replaced (clipped to [0, 1])."""
+        clipped = jnp.clip(transmittance, 0.0, 1.0)
+        return eqx.tree_at(lambda m: m.transmittance, self, clipped)
 
     def scaled_transmittance(self, factor: Array) -> SlabInteraction:
-        """Return a copy with the bulk transmittance multiplier scaled by ``factor``."""
-        return self.with_transmittance_scalar(self.transmittance_scalar * factor)
+        """Return a copy with the bulk transmittance scaled by ``factor``."""
+        return self.with_transmittance(self.transmittance * factor)
 
-    def apply(self, directions, normals, points, element_idx, current_n):
-        n_in = self.n_inside[element_idx]
+    def apply(self, directions, normals, points, element_idx, current_n, wavelength=None):
+        n_in = self.index.n_at(element_idx, wavelength)
         thick = self.thickness[element_idx]
 
         exit_dir, exit_pos, cos_i, valid, path_length = jax.vmap(
@@ -373,13 +385,13 @@ class SlabInteraction(Interaction):
             )
         )(directions, normals, points, current_n, n_in, thick)
 
-        if self.transmittance is None:
+        if self.transmittance_curve is None:
             _, T_face = fresnel_unpolarized(cos_i, current_n, n_in)
             t = T_face * T_face
         else:
-            t = self.transmittance(cos_i, element_idx)
+            t = self.transmittance_curve(cos_i, element_idx, wavelength)
         t = jnp.where(valid, t, 0.0)
 
         opl_internal = jnp.where(valid, n_in * path_length, 0.0)
-        coeff = self.transmittance_scalar[element_idx] * t
+        coeff = self.transmittance[element_idx] * t
         return exit_dir, exit_pos, coeff, opl_internal, current_n

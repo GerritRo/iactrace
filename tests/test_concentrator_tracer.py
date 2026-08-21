@@ -5,7 +5,7 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from iactrace import OkumuraCone, WinstonCone
+from iactrace import OkumuraCone, TabulatedResponse, WinstonCone
 from iactrace.camera import trace_chain
 from iactrace.camera.detector import DetectionSurface
 from iactrace.core.ray_bundle import RayBundle
@@ -201,3 +201,223 @@ class TestTraceChain:
         rays = _entrance_rays(*_mouth_rays(cone, 5.0))
         fn = jax.jit(lambda r: trace_chain(cone, stop, r, max_bounces=16).rays.values)
         assert np.isfinite(np.asarray(fn(rays))).all()
+
+
+def _rays_at(cone, alpha_deg, wavelength, n=2000, seed=3):
+    """Mouth rays entering *cone* at incidence ``alpha_deg`` and one wavelength."""
+    xy, dirs = _mouth_rays(cone, alpha_deg, n=n, seed=seed)
+    m = xy.shape[0]
+    return RayBundle(
+        origins=jnp.concatenate([xy, jnp.zeros((m, 1))], axis=1),
+        directions=dirs,
+        values=jnp.ones(m),
+        path_length=jnp.zeros(m),
+        n=jnp.ones(m),
+        wavelength=jnp.full(m, float(wavelength)),
+    )
+
+
+# A wavelength-only reflectivity curve
+def _refl_curve():
+    return TabulatedResponse.from_degrees(
+        angles_deg=[0.0, 90.0],
+        values=[[0.5, 1.0], [0.5, 1.0]],
+        n_elements=1,
+        wavelengths=[300.0, 500.0],
+    )
+
+
+# An angle-only reflectivity curve, rising from normal incidence toward grazing.
+_ANGLES_DEG = [0.0, 30.0, 60.0, 90.0]
+_ANGLE_VALUES = [0.2, 0.5, 0.75, 1.0]
+
+
+def _angle_curve():
+    return TabulatedResponse.from_degrees(
+        angles_deg=_ANGLES_DEG, values=_ANGLE_VALUES, n_elements=1
+    )
+
+
+def _flat_curve(value):
+    """An angle-flat curve pinned to ``value`` (what cos = 1 alone would give)."""
+    return TabulatedResponse.from_degrees(
+        angles_deg=[0.0, 90.0], values=[value, value], n_elements=1
+    )
+
+
+def _ones(x):
+    return jnp.ones_like(jnp.asarray(x, dtype=float))
+
+
+class TestWavelengthReflectivity:
+    def test_uncoated_cone_is_wavelength_flat(self, cone_kind):
+        cone = _make_cone(cone_kind, reflectivity=0.85)
+        assert cone.reflectivity_curve is None
+        wl = jnp.array([250.0, 400.0, 650.0])
+        r = np.asarray(cone.wall_reflectivity(_ones(wl), wl))
+        assert np.allclose(r, 0.85)
+
+    def test_wall_reflectivity_follows_curve(self, cone_kind):
+        cone = _make_cone(cone_kind, reflectivity=0.9, reflectivity_curve=_refl_curve())
+        wl = jnp.array([300.0, 400.0, 500.0])
+        r = np.asarray(cone.wall_reflectivity(_ones(wl), wl))
+        assert np.allclose(r, 0.9 * np.array([0.5, 0.75, 1.0]), atol=1e-5)
+        # This curve is angle-flat, so an oblique incidence gives the same values.
+        oblique = np.asarray(cone.wall_reflectivity(jnp.full(wl.shape, 0.3), wl))
+        assert np.allclose(oblique, r, atol=1e-5)
+
+    def test_throughput_matches_reflectivity_power(self, cone_kind):
+        cone = _make_cone(cone_kind, reflectivity=0.9, max_bounces=16,
+                          reflectivity_curve=_refl_curve())
+        stop = DetectionSurface(vertex_z=-cone.length, curvature=0.0, radius=1e4)
+
+        def deliver(wl):
+            tr = trace_chain(cone, stop, _rays_at(cone, 20.0, wl))
+            return (
+                np.asarray(tr.rays.values),
+                np.asarray(tr.bounces),
+                np.asarray(tr.rays.alive),
+            )
+
+        v_lo, b_lo, alive = deliver(300.0)  # multiplier 0.5 -> R = 0.45
+        v_hi, b_hi, _ = deliver(500.0)  # multiplier 1.0 -> R = 0.90
+        assert np.array_equal(b_lo, b_hi)
+        # Per landed ray, the throughput is the reflectivity raised to the count
+        for b in np.unique(b_hi[alive]):
+            m = alive & (b_hi == b)
+            assert np.allclose(v_lo[m], 0.45**b, atol=1e-5)
+            assert np.allclose(v_hi[m], 0.90**b, atol=1e-5)
+        # Higher reflectivity delivers strictly more light overall
+        assert v_hi[alive].sum() > v_lo[alive].sum()
+        z0 = alive & (b_hi == 0)
+        assert np.allclose(v_lo[z0], v_hi[z0])
+
+    def test_constant_curve_equals_scaled_scalar(self, cone_kind):
+        # A flat ConstantResponse multiplier is exactly equivalent to folding that
+        # factor into the scalar reflectivity.
+        curve = TabulatedResponse.from_degrees(
+            angles_deg=[0.0, 90.0], values=[0.8, 0.8], n_elements=1
+        )
+        coated = _make_cone(cone_kind, reflectivity=0.9, max_bounces=16,
+                            reflectivity_curve=curve)
+        scalar = _make_cone(cone_kind, reflectivity=0.9 * 0.8, max_bounces=16)
+        stop = DetectionSurface(vertex_z=-coated.length, curvature=0.0, radius=1e4)
+        rays = _rays_at(coated, 18.0, 450.0)
+        vc = np.asarray(trace_chain(coated, stop, rays).rays.values)
+        vs = np.asarray(trace_chain(scalar, stop, rays).rays.values)
+        assert np.allclose(vc, vs, atol=1e-6)
+
+    def test_wavelength_reflectivity_is_differentiable(self):
+        # grad of delivered light w.r.t. the reflectivity curve value flows
+        # through the bounce loop.
+        cone = _make_cone("winston", reflectivity=0.9, max_bounces=16)
+        stop = DetectionSurface(vertex_z=-cone.length, curvature=0.0, radius=1e4)
+        rays = _rays_at(cone, 20.0, 400.0)
+
+        def total(mult):
+            curve = TabulatedResponse.from_degrees(
+                angles_deg=[0.0, 90.0],
+                values=[[mult, mult], [mult, mult]],
+                n_elements=1,
+                wavelengths=[300.0, 500.0],
+            )
+            coned = WinstonCone(
+                cone.n_sides, cone.entrance_apothem, cone.exit_apothem,
+                length=cone.length, reflectivity=0.9, max_bounces=16,
+                reflectivity_curve=curve,
+            )
+            return trace_chain(coned, stop, rays).rays.values.sum()
+
+        g = jax.grad(total)(0.7)
+        assert np.isfinite(float(g))
+        # More reflective walls can only deliver more light
+        assert float(g) > 0.0
+
+
+class TestAngularReflectivity:
+    def test_wall_reflectivity_follows_angle(self, cone_kind):
+        cone = _make_cone(cone_kind, reflectivity=0.9, reflectivity_curve=_angle_curve())
+        cos = jnp.cos(jnp.deg2rad(jnp.asarray(_ANGLES_DEG)))
+        r = np.asarray(cone.wall_reflectivity(cos, jnp.full(cos.shape, 400.0)))
+        assert np.allclose(r, 0.9 * np.asarray(_ANGLE_VALUES), atol=1e-6)
+        # Between the tabulated nodes the curve stays monotone toward grazing.
+        cos_fine = jnp.cos(jnp.deg2rad(jnp.linspace(0.0, 90.0, 40)))
+        r_fine = np.asarray(cone.wall_reflectivity(cos_fine, jnp.full(cos_fine.shape, 400.0)))
+        assert np.all(np.diff(r_fine) > 0.0)
+
+    def test_bounce_uses_actual_incidence_angle(self, cone_kind):
+        # For a ray that bounces exactly once, the delivered throughput must be
+        # the coating evaluated at *that bounce's* incidence angle. The angle is
+        # recovered from the trajectory without touching the tracer's own
+        # bookkeeping: d_in . d_out = 1 - 2 cos^2(theta_i) for a specular bounce.
+        cone = _make_cone(
+            cone_kind, reflectivity=0.9, max_bounces=16, reflectivity_curve=_angle_curve()
+        )
+        stop = DetectionSurface(vertex_z=-cone.length, curvature=0.0, radius=1e4)
+        rays = _rays_at(cone, 15.0, 400.0)
+        tr = trace_chain(cone, stop, rays, record_trajectory=True)
+
+        traj = np.asarray(tr.trajectory)  # (steps+1, N, 3)
+        sel = np.asarray(tr.rays.alive) & (np.asarray(tr.bounces) == 1)
+        assert sel.sum() > 20, "need a decent sample of single-bounce rays"
+
+        d_in = np.asarray(rays.directions)[sel]
+        seg = traj[2, sel] - traj[1, sel]  # bounce point -> landing point
+        d_out = seg / np.linalg.norm(seg, axis=1, keepdims=True)
+        cos_i = np.sqrt(np.clip(0.5 * (1.0 - np.sum(d_in * d_out, axis=1)), 0.0, 1.0))
+        assert cos_i.max() < 0.99, "these bounces should be genuinely off-normal"
+
+        expected = np.asarray(
+            cone.wall_reflectivity(jnp.asarray(cos_i), jnp.full(cos_i.shape, 400.0))
+        )
+        assert np.allclose(np.asarray(tr.rays.values)[sel], expected, atol=1e-4)
+
+    def test_angle_curve_beats_its_normal_incidence_value(self, cone_kind):
+        # Regression: the walls used to evaluate the coating at cos = 1 for every
+        # bounce, which is exactly an angle-flat curve pinned to the
+        # normal-incidence value. With R rising toward grazing, every bounced ray
+        # must now come out strictly brighter than that.
+        angled = _make_cone(
+            cone_kind, reflectivity=0.9, max_bounces=16, reflectivity_curve=_angle_curve()
+        )
+        pinned = _make_cone(
+            cone_kind,
+            reflectivity=0.9,
+            max_bounces=16,
+            reflectivity_curve=_flat_curve(_ANGLE_VALUES[0]),
+        )
+        stop = DetectionSurface(vertex_z=-angled.length, curvature=0.0, radius=1e4)
+        rays = _rays_at(angled, 15.0, 400.0)
+
+        tr_a = trace_chain(angled, stop, rays)
+        tr_p = trace_chain(pinned, stop, rays)
+        # Reflectivity never moves a ray, so both runs share the same geometry.
+        assert np.array_equal(np.asarray(tr_a.bounces), np.asarray(tr_p.bounces))
+
+        alive = np.asarray(tr_a.rays.alive)
+        bounces = np.asarray(tr_a.bounces)
+        v_a, v_p = np.asarray(tr_a.rays.values), np.asarray(tr_p.rays.values)
+        straight, bounced = alive & (bounces == 0), alive & (bounces > 0)
+        assert bounced.sum() > 0
+        assert np.allclose(v_a[straight], v_p[straight])  # no bounce, no coating
+        assert np.all(v_a[bounced] > v_p[bounced] + 1e-6)
+
+    def test_angle_reflectivity_is_differentiable(self, cone_kind):
+        # grad of delivered light w.r.t. the grazing end of the R(theta) curve
+        # flows through the per-bounce coating lookup.
+        cone = _make_cone(cone_kind, reflectivity=0.9, max_bounces=16)
+        stop = DetectionSurface(vertex_z=-cone.length, curvature=0.0, radius=1e4)
+        rays = _rays_at(cone, 20.0, 400.0)
+
+        def total(grazing):
+            curve = TabulatedResponse.from_degrees(
+                angles_deg=[0.0, 90.0], values=jnp.stack([jnp.asarray(0.2), grazing]), n_elements=1
+            )
+            coned = _make_cone(
+                cone_kind, reflectivity=0.9, max_bounces=16, reflectivity_curve=curve
+            )
+            return trace_chain(coned, stop, rays).rays.values.sum()
+
+        g = jax.grad(total)(0.8)
+        assert np.isfinite(float(g))
+        assert float(g) > 0.0  # more reflective at grazing -> more light delivered

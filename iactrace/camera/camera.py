@@ -82,6 +82,7 @@ def intersect_sensor(
         values=jnp.where(alive, ray_bundle.values, 0.0),
         path_length=path_length,
         n=ray_bundle.n,
+        wavelength=ray_bundle.wavelength,
         alive=alive,
     )
     return sensor_rays, s_idx
@@ -114,6 +115,11 @@ class _ChainOutput(NamedTuple):
     trajectory: Trajectory | None = None
 
 
+def _repeat_rays(rays: RayBundle, k: int) -> RayBundle:
+    """Repeat every ray ``k`` times, each ray's copies contiguous (ray-major)."""
+    return jax.tree_util.tree_map(lambda leaf: jnp.repeat(leaf, k, axis=0), rays)
+
+
 def _run_chain(
     camera: Camera,
     ray_bundle: RayBundle,
@@ -122,12 +128,6 @@ def _run_chain(
 ) -> _ChainOutput:
     """Intersect the sensor, assign pixels, translate to pixel-local, run the chain.
 
-    The pixel assignment (``pixel_index_and_mask``) is computed exactly once
-    here and drives both the pixel-local reframing (``to_pixel_frame``) and
-    the downstream binning / detection masks, so the frame a ray is traced in
-    and the pixel its signal lands in can never disagree. Liveness travels on
-    the bundle itself: ``pe_rays.alive`` is ``True`` only for rays that hit a
-    sensor tile *and* landed on the photodetector surface.
 
     Returns a :class:`_ChainOutput`; the image / matrix folds take
     ``pe_rays.values`` and ``collect`` reads the whole bundle. With
@@ -320,7 +320,6 @@ class Camera(eqx.Module):
         )
         if stage0 is None:
             raise ValueError("response_matrix requires a stage-0 optical group.")
-        n_samples = stage0.n_samples
         n_sources = lazy_bundle.sources.shape[0]
 
         sensor = self.sensor_groups[sensor_idx]
@@ -329,10 +328,8 @@ class Camera(eqx.Module):
         def fold_element(matrix, rb_cam):
             out = _run_chain(self, rb_cam, sensor_idx)
 
-            # Per-element rays are source-major (see _build_source_rays):
-            # the first n_samples rays belong to source 0, etc.
             def per_source(a):
-                return a.reshape(n_sources, n_samples)
+                return a.reshape(n_sources, -1)
 
             contrib = jax.vmap(sensor.scatter)(
                 per_source(out.pix_id),
