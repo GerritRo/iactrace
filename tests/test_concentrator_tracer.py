@@ -267,8 +267,9 @@ class TestWavelengthReflectivity:
         assert np.allclose(oblique, r, atol=1e-5)
 
     def test_throughput_matches_reflectivity_power(self, cone_kind):
-        cone = _make_cone(cone_kind, reflectivity=0.9, max_bounces=16,
-                          reflectivity_curve=_refl_curve())
+        cone = _make_cone(
+            cone_kind, reflectivity=0.9, max_bounces=16, reflectivity_curve=_refl_curve()
+        )
         stop = DetectionSurface(vertex_z=-cone.length, curvature=0.0, radius=1e4)
 
         def deliver(wl):
@@ -298,8 +299,7 @@ class TestWavelengthReflectivity:
         curve = TabulatedResponse.from_degrees(
             angles_deg=[0.0, 90.0], values=[0.8, 0.8], n_elements=1
         )
-        coated = _make_cone(cone_kind, reflectivity=0.9, max_bounces=16,
-                            reflectivity_curve=curve)
+        coated = _make_cone(cone_kind, reflectivity=0.9, max_bounces=16, reflectivity_curve=curve)
         scalar = _make_cone(cone_kind, reflectivity=0.9 * 0.8, max_bounces=16)
         stop = DetectionSurface(vertex_z=-coated.length, curvature=0.0, radius=1e4)
         rays = _rays_at(coated, 18.0, 450.0)
@@ -322,8 +322,12 @@ class TestWavelengthReflectivity:
                 wavelengths=[300.0, 500.0],
             )
             coned = WinstonCone(
-                cone.n_sides, cone.entrance_apothem, cone.exit_apothem,
-                length=cone.length, reflectivity=0.9, max_bounces=16,
+                cone.n_sides,
+                cone.entrance_apothem,
+                cone.exit_apothem,
+                length=cone.length,
+                reflectivity=0.9,
+                max_bounces=16,
                 reflectivity_curve=curve,
             )
             return trace_chain(coned, stop, rays).rays.values.sum()

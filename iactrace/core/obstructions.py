@@ -66,9 +66,7 @@ class ObstructionGroup(eqx.Module):
             t = batched(origins, directions, *prim)
             return jnp.minimum(best_t, t.astype(dtype)), None
 
-        best_t, _ = jax.lax.scan(
-            step, jnp.full(origins.shape[0], jnp.inf, dtype=dtype), params
-        )
+        best_t, _ = jax.lax.scan(step, jnp.full(origins.shape[0], jnp.inf, dtype=dtype), params)
         return best_t
 
 

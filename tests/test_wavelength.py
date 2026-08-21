@@ -496,9 +496,7 @@ class TestWavelengthSampling:
         telescope, _, directions, val = self._setup(n_samples=256)
         flat = TabulatedSpectrum.from_density([300.0, 600.0], [1.0, 1.0])
         wl = np.asarray(
-            telescope.render(directions, val, "parallel", wavelength=flat)
-            .materialise()
-            .wavelength
+            telescope.render(directions, val, "parallel", wavelength=flat).materialise().wavelength
         )
         assert wl.min() >= 300.0 - 1e-6 and wl.max() <= 600.0 + 1e-6
         assert wl.std() > 50.0  # genuinely drawn, not one shared value
@@ -540,13 +538,9 @@ class TestWavelengthSampling:
         # match a monochromatic render, since a Spectrum is a distribution and
         # not a multiplier.
         telescope_plain, _ = make_simple_telescope(n_samples=512)
-        mono = telescope_plain.render(
-            directions, val, "parallel", wavelength=450.0
-        ).materialise()
+        mono = telescope_plain.render(directions, val, "parallel", wavelength=450.0).materialise()
         flat = TabulatedSpectrum.from_density([300.0, 600.0], [1.0, 1.0])
-        broad = telescope_plain.render(
-            directions, val, "parallel", wavelength=flat
-        ).materialise()
+        broad = telescope_plain.render(directions, val, "parallel", wavelength=flat).materialise()
         assert float(broad.values.sum()) == pytest.approx(float(mono.values.sum()), rel=1e-5)
 
     def test_manual_sweep_reproduces_the_sampled_broadband_image(self):
@@ -554,15 +548,11 @@ class TestWavelengthSampling:
         telescope, camera, directions, val = self._setup(n_samples=4096)
         spectrum = TabulatedSpectrum.from_density([300.0, 600.0], [1.0, 1.0])
 
-        sampled = camera.image(
-            telescope.render(directions, val, "parallel", wavelength=spectrum)
-        )
+        sampled = camera.image(telescope.render(directions, val, "parallel", wavelength=spectrum))
         wavelengths, weights = spectrum.bins()
         swept = sum(
             float(w)
-            * camera.image(
-                telescope.render(directions, val, "parallel", wavelength=float(wl))
-            )
+            * camera.image(telescope.render(directions, val, "parallel", wavelength=float(wl)))
             for wl, w in zip(wavelengths, weights, strict=True)
         )
         # Monte Carlo vs quadrature: totals agree, within sampling noise.
@@ -674,14 +664,12 @@ class TestFocalSurfaceWavelength:
 
         telescope, _ = make_simple_telescope(n_samples=64)
         n = 32
-        o = jnp.stack(
-            [jnp.linspace(-0.3, 0.3, n), jnp.zeros(n), jnp.full(n, 10.0)], axis=1
-        )
+        o = jnp.stack([jnp.linspace(-0.3, 0.3, n), jnp.zeros(n), jnp.full(n, 10.0)], axis=1)
         d = jnp.tile(jnp.array([0.0, 0.0, -1.0]), (n, 1))
         rays = telescope.trace(o, d, jnp.ones(n), wavelength=477.0).rays
-        hits = FlatFocalPlane(position=jnp.array([0.0, 0.0, -5.0]), rotation=jnp.zeros(3)).intersect(
-            rays
-        )
+        hits = FlatFocalPlane(
+            position=jnp.array([0.0, 0.0, -5.0]), rotation=jnp.zeros(3)
+        ).intersect(rays)
         assert hits.wavelength.shape == (n,)
         np.testing.assert_allclose(np.asarray(hits.wavelength), 477.0)
 
@@ -696,9 +684,9 @@ class TestFocalSurfaceWavelength:
         d = jnp.tile(jnp.array([0.0, 0.0, -1.0]), (n, 1))
         wl = jnp.linspace(300.0, 600.0, n)
         rays = telescope.trace(o, d, jnp.ones(n), wavelength=wl).rays
-        hits = FlatFocalPlane(position=jnp.array([0.0, 0.0, -5.0]), rotation=jnp.zeros(3)).intersect(
-            rays
-        )
+        hits = FlatFocalPlane(
+            position=jnp.array([0.0, 0.0, -5.0]), rotation=jnp.zeros(3)
+        ).intersect(rays)
         np.testing.assert_allclose(np.asarray(hits.wavelength), np.asarray(wl))
 
 

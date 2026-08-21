@@ -205,8 +205,7 @@ class TabulatedCurveSchema(BaseModel):
             for row in self.values:
                 if not isinstance(row, list) or len(row) != nwl:
                     raise ValueError(
-                        "each values row must be a list of length "
-                        f"len(wavelengths_nm)={nwl}"
+                        f"each values row must be a list of length len(wavelengths_nm)={nwl}"
                     )
                 for x in row:
                     if not 0.0 <= x <= 1.0:
@@ -348,9 +347,7 @@ class AsphericDiskLensSchema(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def _accept_legacy(cls, values):
-        return rename_legacy_keys(
-            values, {"coating": "transmittance_curve", "n_inside": "index"}
-        )
+        return rename_legacy_keys(values, {"coating": "transmittance_curve", "n_inside": "index"})
 
 
 class PlanoSlabSchema(BaseModel):
@@ -368,9 +365,7 @@ class PlanoSlabSchema(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def _accept_legacy(cls, values):
-        return rename_legacy_keys(
-            values, {"coating": "transmittance_curve", "n_inside": "index"}
-        )
+        return rename_legacy_keys(values, {"coating": "transmittance_curve", "n_inside": "index"})
 
 
 LensSchema = Annotated[
@@ -524,8 +519,7 @@ def qe_curve_from_legacy(value: Any) -> Any:
     wavelengths = list(value["wavelengths_nm"])
     if len(wavelengths) != len(qe):
         raise ValueError(
-            f"wavelengths_nm ({len(wavelengths)}) and qe ({len(qe)}) "
-            "must have the same length"
+            f"wavelengths_nm ({len(wavelengths)}) and qe ({len(qe)}) must have the same length"
         )
     return {
         "type": "table",

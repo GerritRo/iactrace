@@ -211,9 +211,9 @@ class OpticalElementGroup(eqx.Module):
             axis=-1,
         )
 
-        t, x, y = jax.vmap(
-            lambda o, d: self.surface.intersect_t_at(element_idx, o, d)
-        )(o_loc, d_loc)
+        t, x, y = jax.vmap(lambda o, d: self.surface.intersect_t_at(element_idx, o, d))(
+            o_loc, d_loc
+        )
         return jnp.where(self.check_aperture(x, y, element_idx), t, jnp.inf)
 
     def hit_geometry(self, element_idx, origins, directions):

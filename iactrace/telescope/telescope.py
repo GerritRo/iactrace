@@ -137,9 +137,10 @@ class Telescope(eqx.Module):
             ValueError: if ``wavelength`` is an array. A render generates its
                 own rays, so an array has nothing to line up with.
         """
-        if not isinstance(wavelength, Spectrum) and jnp.asarray(
-            DEFAULT_WAVELENGTH if wavelength is None else wavelength
-        ).ndim:
+        if (
+            not isinstance(wavelength, Spectrum)
+            and jnp.asarray(DEFAULT_WAVELENGTH if wavelength is None else wavelength).ndim
+        ):
             raise ValueError(
                 "render takes a scalar wavelength or a Spectrum, not an array: it "
                 "generates its own rays, so an array has nothing to line up with. "
