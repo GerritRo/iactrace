@@ -56,7 +56,7 @@ used within the CTAO collaboration.
 - Established in the CTAO community
 - Handles complex segmented mirrors and aspherical lenses
 - Integrates with ROOT analysis ecosystem
-- Supports Winston cone / light concentrator simulations
+- Non-sequential raytracing is more physically accurate
 
 **When to use IACTrace instead:**
 
@@ -101,13 +101,8 @@ Summary Table
      - No
      - Varies
      - No
-   * - Open source
-     - Yes
-     - Partial
+   * - Light Concentrators
+     - Yes (in-line)
      - No
      - Yes
-   * - Cost
-     - Free
-     - Free
-     - $$$$
-     - Free
+     - Yes
