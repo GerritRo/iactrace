@@ -21,8 +21,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - name: Install build tooling
@@ -54,7 +54,7 @@ jobs:
           tag="${GITHUB_REF_NAME#v}"
           pkg=$(ls dist/*.tar.gz | sed -E 's/.*iactrace-(.*)\.tar\.gz/\1/')
           test "$tag" = "$pkg" || { echo "::error::tag $tag != version $pkg" && exit 1; }
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         with:
           name: dist
           path: dist/
@@ -70,7 +70,7 @@ jobs:
     permissions:
       id-token: write  # required for trusted publishing
     steps:
-      - uses: actions/download-artifact@v6
+      - uses: actions/download-artifact@v8
         with:
           name: dist
           path: dist/
@@ -89,7 +89,7 @@ jobs:
     permissions:
       id-token: write  # required for trusted publishing
     steps:
-      - uses: actions/download-artifact@v6
+      - uses: actions/download-artifact@v8
         with:
           name: dist
           path: dist/
