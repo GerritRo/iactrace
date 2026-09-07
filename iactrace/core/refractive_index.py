@@ -11,16 +11,16 @@ from .ray_bundle import DEFAULT_WAVELENGTH
 
 
 class RefractiveIndex(eqx.Module):
-    """A refracting element's index as a function of wavelength, ``n(lambda)``.
+    """A refracting element's index as a function of wavelength, n(lambda).
 
     Subclasses provide:
 
-    * :meth:`n_at` -- per-ray index ``(n_rays,)`` at the given wavelengths,
-      selecting per-element parameters with ``element_idx``.
-    * :meth:`reference` -- a per-element nominal index ``(N,)`` at a single
-      *design* wavelength, used by the focal-length <-> curvature maths
-      (:func:`~iactrace.telescope.operations.set_focal_lengths`).
-    * :attr:`n_elements` -- the number of elements ``N`` the model sizes.
+    - n_at -- per-ray index (n_rays,) at the given wavelengths,
+      selecting per-element parameters with element_idx.
+    - reference -- a per-element nominal index (N,) at a single
+      design wavelength, used by the focal-length <-> curvature maths
+      (set_focal_lengths).
+    - n_elements -- the number of elements N the model sizes.
     """
 
     @abstractmethod
@@ -37,8 +37,10 @@ class RefractiveIndex(eqx.Module):
 class ConstantIndex(RefractiveIndex):
     """Wavelength-independent per-element index (the monochromatic case).
 
-    Attributes:
-        values: Per-element refractive index, shape ``(N,)``.
+    Attributes
+    ----------
+    values : array, shape (N,)
+        Per-element refractive index.
     """
 
     values: Array  # (N,)
@@ -57,18 +59,19 @@ class ConstantIndex(RefractiveIndex):
 class TabulatedIndex(RefractiveIndex):
     """Per-element refractive index, linearly interpolated in wavelength.
 
-    Attributes:
-        wavelengths: Lookup axis, sorted ascending, shape ``(K,)``. Same
-            units as :attr:`~iactrace.core.ray_bundle.RayBundle.wavelength`.
-        n_values: Per-element index samples aligned with ``wavelengths``,
-            shape ``(N, K)``.
+    Attributes
+    ----------
+    wavelengths : array, shape (K,)
+        Lookup axis, sorted ascending. Same units as wavelength.
+    n_values : array, shape (N, K)
+        Per-element index samples aligned with wavelengths.
     """
 
     wavelengths: Array  # (K,)
-    n_values: Array  # (N, K)
+    n_values: Array     # (N, K)
 
     def n_at(self, element_idx, wavelength):
-        rows = self.n_values[element_idx]  # (n_rays, K)
+        rows = self.n_values[element_idx]
         return jax.vmap(lambda w, r: jnp.interp(w, self.wavelengths, r))(wavelength, rows)
 
     def reference(self, wavelength=DEFAULT_WAVELENGTH):
@@ -80,14 +83,10 @@ class TabulatedIndex(RefractiveIndex):
 
     @classmethod
     def from_table(cls, wavelengths, n_values, n_elements: int) -> TabulatedIndex:
-        """Build from measured ``n(lambda)`` samples.
+        """Build from measured n(lambda) samples.
 
-        Args:
-            wavelengths: Sample wavelengths, shape ``(K,)`` (sorted
-                internally).
-            n_values: Index samples. ``(K,)`` is broadcast to all
-                ``n_elements`` elements; ``(N, K)`` is used as-is.
-            n_elements: Number of elements ``N`` in the group.
+        wavelengths (K,) is sorted internally; n_values is (K,)
+        broadcast to all n_elements elements, or (N, K) as-is.
         """
         wl = jnp.asarray(wavelengths)
         order = jnp.argsort(wl)
@@ -115,15 +114,18 @@ class TabulatedIndex(RefractiveIndex):
 class SellmeierIndex(RefractiveIndex):
     """Sellmeier-equation refractive index per element.
 
-    ``n(lambda)^2 = 1 + sum_j b_j * lambda^2 / (lambda^2 - c_j)``.
+    n(lambda)^2 = 1 + sum_j b_j * lambda^2 / (lambda^2 - c_j).
 
-    The ``b`` coefficients are dimensionless; the ``c`` coefficients carry
-    units of wavelength squared and **must match the unit of
-    :attr:`~iactrace.core.ray_bundle.RayBundle.wavelength`**.
+    The b coefficients are dimensionless; the c coefficients carry
+    units of wavelength squared and must match the unit of
+    wavelength.
 
-    Attributes:
-        b: Per-element Sellmeier B coefficients, shape ``(N, M)``.
-        c: Per-element Sellmeier C coefficients, shape ``(N, M)``.
+    Attributes
+    ----------
+    b : array, shape (N, M)
+        Per-element Sellmeier B coefficients.
+    c : array, shape (N, M)
+        Per-element Sellmeier C coefficients.
     """
 
     b: Array  # (N, M)
@@ -146,16 +148,11 @@ class SellmeierIndex(RefractiveIndex):
 
 
 def as_refractive_index(index, n_elements: int) -> RefractiveIndex:
-    """Coerce an index argument to a :class:`RefractiveIndex` sized ``n_elements``.
+    """Coerce an index argument to a RefractiveIndex sized n_elements.
 
-    Args:
-        index: A :class:`RefractiveIndex` model, a scalar, or a per-element
-            ``(N,)`` array.
-        n_elements: Number of elements ``N`` the model must size.
-
-    Raises:
-        ValueError: if ``index`` is ``None``, or a model sized for a
-            different number of elements.
+    index may be a model, a scalar, or a per-element (N,) array.
+    Raises ValueError if it is None, or a model sized for a different
+    number of elements.
     """
     if index is None:
         raise ValueError(

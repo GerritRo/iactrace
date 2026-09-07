@@ -32,7 +32,7 @@ __all__ = [
 
 
 def _as_vec3(value, name: str) -> list[float]:
-    """Coerce to shape ``(3,)``, then a plain list (these factories build list-of-lists)."""
+    """Coerce to shape (3,), then a plain list (these factories build list-of-lists)."""
     return as_vec3(value, name).tolist()
 
 
@@ -45,12 +45,16 @@ def cylinder(
     p2: Sequence[float],
     r: float,
 ) -> CylinderGroup:
-    """Build a single closed cylinder as a ``CylinderGroup`` of size one.
+    """Build a single closed cylinder as a CylinderGroup of size one.
 
-    Args:
-        p1: One endpoint of the cylinder axis, shape (3,).
-        p2: The other endpoint, shape (3,).
-        r: Cylinder radius in metres.
+    Parameters
+    ----------
+    p1 : array, shape (3,)
+        One endpoint of the cylinder axis.
+    p2 : array, shape (3,)
+        The other endpoint.
+    r
+        Cylinder radius in metres.
     """
     return CylinderGroup(
         p1=[_as_vec3(p1, "p1")],
@@ -67,10 +71,14 @@ def open_cylinder(
 ) -> OpenCylinderGroup:
     """Build a single open cylinder (no end caps) as a size-one group.
 
-    Args:
-        p1: One endpoint of the cylinder axis, shape (3,).
-        p2: The other endpoint, shape (3,).
-        r: Cylinder radius in metres.
+    Parameters
+    ----------
+    p1 : array, shape (3,)
+        One endpoint of the cylinder axis.
+    p2 : array, shape (3,)
+        The other endpoint.
+    r
+        Cylinder radius in metres.
     """
     return OpenCylinderGroup(
         p1=[_as_vec3(p1, "p1")],
@@ -84,11 +92,14 @@ def box(
     p1: Sequence[float],
     p2: Sequence[float],
 ) -> BoxGroup:
-    """Build a single axis-aligned box as a ``BoxGroup`` of size one.
+    """Build a single axis-aligned box as a BoxGroup of size one.
 
-    Args:
-        p1: One corner of the box, shape (3,).
-        p2: The diagonally opposite corner, shape (3,).
+    Parameters
+    ----------
+    p1 : array, shape (3,)
+        One corner of the box.
+    p2 : array, shape (3,)
+        The diagonally opposite corner.
     """
     return BoxGroup(
         p1=[_as_vec3(p1, "p1")],
@@ -101,11 +112,14 @@ def sphere(
     center: Sequence[float],
     r: float,
 ) -> SphereGroup:
-    """Build a single sphere as a ``SphereGroup`` of size one.
+    """Build a single sphere as a SphereGroup of size one.
 
-    Args:
-        center: Sphere centre, shape (3,).
-        r: Sphere radius in metres.
+    Parameters
+    ----------
+    center : array, shape (3,)
+        Sphere centre.
+    r
+        Sphere radius in metres.
     """
     return SphereGroup(
         centers=[_as_vec3(center, "center")],

@@ -9,46 +9,36 @@ import jax
 import jax.numpy as jnp
 from jax import Array
 
-from ._tolerances import dir_tol
 from .ray_bundle import DEFAULT_WAVELENGTH
 from .refractive_index import RefractiveIndex, as_refractive_index
 from .responses import ResponseCurve, fresnel_unpolarized
+from .tolerances import dir_tol
 
 
 def reflect(direction, normal):
-    """Reflect a ray's direction off a surface.
-
-    Args:
-        direction: Ray direction (3,), pointing into the surface.
-        normal: Surface normal (3,), pointing outward.
-
-    Returns:
-        reflected: Reflected direction (3,).
-        cos_i: Cosine of the incidence angle (non-negative).
-    """
+    """Reflect a ray off a surface: (reflected direction, cos_i)."""
     d_dot_n = jnp.sum(direction * normal, axis=-1, keepdims=True)
     reflected = direction - 2.0 * d_dot_n * normal
     return reflected, -d_dot_n
 
 
 def refract(direction, normal, n1, n2):
-    """Refract a ray's direction through an interface (Snell's law).
+    """Refract a ray through an interface by Snell's law.
 
-    Handles rays from either side of the surface by flipping the normal
-    if needed. On total internal reflection, the *reflected* direction
-    is returned in place of the refracted one and ``tir`` is ``True``.
+    Returns (refracted, cos_i, tir). Rays arriving from either side are handled
+    by flipping the outward normal as needed, so cos_i is always the
+    non-negative incidence cosine with the ambient-vs-internal side correctly
+    resolved. On total internal reflection tir is True and the reflected
+    direction is returned in place of the refracted one.
 
-    Args:
-        direction: Ray direction (3,), normalized.
-        normal: Surface normal (3,), normalized, pointing outward.
-        n1: Refractive index of the incident medium.
-        n2: Refractive index of the transmitted medium.
-
-    Returns:
-        refracted: Refracted direction (3,), or reflected if TIR.
-        cos_i: Cosine of the incidence angle (non-negative, with the
-            ambient-vs-internal side correctly resolved).
-        tir: True if total internal reflection occurred.
+    Parameters
+    ----------
+    direction : array, shape (3,)
+        Ray direction, normalized.
+    normal : array, shape (3,)
+        Surface normal, normalized, pointing outward.
+    n1, n2
+        Refractive index of the incident and transmitted media.
     """
     cos_i = -jnp.dot(direction, normal)
 
@@ -73,24 +63,29 @@ def refract(direction, normal, n1, n2):
 def refract_slab(direction, normal, position, n_out, n_in, thickness):
     """Refract a ray through a parallel-sided slab (window).
 
-    Args:
-        direction: Ray direction (3,), normalized.
-        normal: Front-surface normal (3,), pointing outward.
-        position: Entry point in world coordinates (3,).
-        n_out: Refractive index of the ambient medium.
-        n_in: Refractive index of the slab material.
-        thickness: Slab thickness in the same units as ``position``.
+    Enters through the front face at position (whose outward normal is given),
+    crosses the bulk, and exits the far face.
 
-    Returns:
-        exit_direction: Ray direction after leaving the slab.
-        exit_position: World-space point where the ray exits.
-        cos_i: Cosine of the incidence angle on the slab from outside.
-        valid: ``True`` iff no total internal reflection occurred at
-            either face.
-        path_length: Geometric distance the ray travels inside the
-            slab, in the same units as ``thickness``. Multiplied by
-            ``n_in`` by the caller to obtain the OPL contribution
-            ``n_in * L``.
+    Parameters
+    ----------
+    direction : array, shape (3,)
+        Ray direction, normalized.
+    normal : array, shape (3,)
+        Front-surface normal, pointing outward.
+    position : array, shape (3,)
+        Entry point in world coordinates.
+    n_out, n_in
+        Refractive index of the ambient medium and of the slab material.
+    thickness
+        Slab thickness, in the units of position.
+
+    Returns
+    -------
+    tuple
+        (exit_direction, exit_position, cos_i, valid, path_length). cos_i is
+        the incidence cosine on the slab from outside, valid is False if
+        either face totally internally reflected, and path_length is the
+        geometric distance travelled inside.
     """
     # Entry refraction; cos_i is the incidence cosine
     dir_inside, cos_i, tir_entry = refract(direction, normal, n_out, n_in)
@@ -141,9 +136,9 @@ class Interaction(eqx.Module):
     ) -> Array | float | None:
         """Curvature<->focal-length scale factor for this interaction.
 
-        ``curvature = 1 / (scale * focal_length)``: ``2`` for mirrors,
-        ``n(wavelength) - n_outside`` for a single refracting surface at the
-        design ``wavelength``.
+        curvature = 1 / (scale * focal_length): 2 for mirrors,
+        n(wavelength) - n_outside for a single refracting surface at the
+        design wavelength.
         """
         return None
 
@@ -151,39 +146,42 @@ class Interaction(eqx.Module):
     def apply(self, directions, normals, points, element_idx, current_n, wavelength=None):
         """Apply the interaction at hit points.
 
-        Args:
-            directions, normals, points, element_idx: per-ray geometry
-                at the surface hit.
-            current_n: per-ray refractive index of the medium the ray
-                is currently propagating in. Used as the incident-side
-                index for refraction physics, so OPL is exact even
-                through stacked refractive surfaces.
-            wavelength: per-ray wavelength
+        Parameters
+        ----------
+        directions, normals, points, element_idx
+            Per-ray geometry at the surface hit.
+        current_n
+            Per-ray refractive index of the medium the ray is currently
+            propagating in. Used as the incident-side index for refraction
+            physics, so OPL is exact even through stacked refractive surfaces.
+        wavelength
+            Per-ray wavelength.
 
-        Returns a 5-tuple
-        ``(new_directions, new_positions, coefficients, opl_internal, new_n)``.
+        Returns
+        -------
+        tuple
+            (new_directions, new_positions, coefficients, opl_internal, new_n).
         """
 
 
 class ReflectInteraction(Interaction):
     """Reflection interaction for mirrors.
 
-    Per-ray coefficient::
+    Per-ray coefficient:
 
         reflectivity[idx] * reflectivity_curve(cos_theta_i, idx)
 
     With no curve (the default) the angular factor is unity, i.e. an ideal
     angle- and wavelength-independent mirror of response
-    :attr:`reflectivity`. Reflection does not change the medium:
-    ``new_n == current_n``.
-
-    Attributes:
-        reflectivity_curve: ``R(theta, lambda)`` response curve, or ``None``
-            for a flat angular and spectral response.
-        reflectivity: Per-element bulk multiplier in ``[0, 1]``,
-            shape ``(N,)``. Operations such as
-            :func:`~iactrace.telescope.operations.set_reflectivity`
-            write here, leaving the curve untouched.
+    reflectivity.
+    Attributes
+    ----------
+    reflectivity_curve
+        R(theta, lambda) response curve, or None
+        for a flat angular and spectral response.
+    reflectivity : array, shape (N,)
+        Per-element bulk multiplier in [0, 1]. Operations such as set_reflectivity write
+        here, leaving the curve untouched.
     """
 
     reflectivity_curve: ResponseCurve | None
@@ -207,7 +205,7 @@ class ReflectInteraction(Interaction):
         return eqx.tree_at(lambda m: m.reflectivity, self, reflectivity)
 
     def scaled_reflectivity(self, factor: Array) -> ReflectInteraction:
-        """Return a copy with the bulk reflectivity scaled by ``factor``."""
+        """Return a copy with the bulk reflectivity scaled by factor."""
         return self.with_reflectivity(self.reflectivity * factor)
 
     def apply(self, directions, normals, points, element_idx, current_n, wavelength=None):
@@ -225,30 +223,33 @@ class ReflectInteraction(Interaction):
 class RefractInteraction(Interaction):
     """Single-surface refraction interaction for lenses.
 
-    Per-ray coefficient::
+    Per-ray coefficient:
 
         transmittance[idx] * angular_response(cos_theta_i)
 
     With no curve (the default) the angular response is
-    :func:`~iactrace.core.responses.fresnel_unpolarized` evaluated from
-    ``current_n`` (the medium the ray is currently in) and the far-side
-    ``index`` of this surface. Snell's law is always applied to bend the ray.
+    fresnel_unpolarized evaluated from
+    current_n (the medium the ray is currently in) and the far-side
+    index of this surface. Snell's law is always applied to bend the ray.
 
     Semantically, this represents the ray crossing a single interface
     from one medium into another. A real glass body (e.g. a biconvex
-    lens) is modelled as two consecutive :class:`RefractInteraction`
+    lens) should be modelled as two consecutive RefractInteraction
     stages, front then back surface, and the render loop's per-ray
     medium tracker carries the correct index through the glass
-    interior between them, so OPL is exact.
+    interior between them.
 
-    Attributes:
-        index: Refractive index on the far side of this surface, a
-            :class:`~iactrace.core.refractive_index.RefractiveIndex`
-            model evaluated per ray at that ray's wavelength.
-        transmittance_curve: ``T(theta, lambda)`` response curve, or ``None``
-            for the bare-interface Fresnel transmittance.
-        transmittance: Per-element bulk multiplier in ``[0, 1]``,
-            shape ``(N,)``.
+    Attributes
+    ----------
+    index
+        Refractive index on the far side of this surface, a
+        RefractiveIndex
+        model evaluated per ray at that ray's wavelength.
+    transmittance_curve
+        T(theta, lambda) response curve, or None
+        for the bare-interface Fresnel transmittance.
+    transmittance : array, shape (N,)
+        Per-element bulk multiplier in [0, 1].
     """
 
     index: RefractiveIndex
@@ -280,7 +281,7 @@ class RefractInteraction(Interaction):
         return eqx.tree_at(lambda m: m.transmittance, self, clipped)
 
     def scaled_transmittance(self, factor: Array) -> RefractInteraction:
-        """Return a copy with the bulk transmittance scaled by ``factor``."""
+        """Return a copy with the bulk transmittance scaled by factor."""
         return self.with_transmittance(self.transmittance * factor)
 
     def apply(self, directions, normals, points, element_idx, current_n, wavelength=None):
@@ -307,35 +308,38 @@ class RefractInteraction(Interaction):
 class SlabInteraction(Interaction):
     """Parallel-sided slab (window) interaction.
 
-    Per-ray coefficient::
+    Per-ray coefficient:
 
         transmittance[idx] * angular_response
 
     With no curve (the default) the angular response is the standard Fresnel
     product at the two faces: by parallel-slab symmetry and Stokes
     reciprocity, both faces share the same single-face Fresnel coefficient so
-    the result simplifies to ``T_face^2``. A curve overrides that with a
-    vendor-supplied ``T(theta, lambda)`` for the *complete* slab, fully
-    replacing the Fresnel product. The TIR mask from the underlying geometry
-    gates out invalid rays either way.
+    the result simplifies to T_face^2. A curve overrides that with a
+    T(theta, lambda) for the complete slab, fully replacing the Fresnel product.
+    The TIR mask from the underlying geometry gates out invalid rays.
 
-    The ray enters from its current medium (``current_n``), refracts
+    The ray enters from its current medium (current_n), refracts
     into the slab material, traverses it, and refracts back out into
-    the *same* medium; slabs assume the ambient is symmetric across
-    them, which is the usual case for a window. ``opl_internal`` is
-    the per-ray ``n_in * L`` inside the slab.
+    the same medium; slabs assume the ambient is symmetric across
+    them, which is the usual case for a window. opl_internal is
+    the per-ray n_in * L inside the slab.
 
-    Attributes:
-        index: Per-element slab refractive index, a
-            :class:`~iactrace.core.refractive_index.RefractiveIndex`
-            model evaluated per ray at that ray's wavelength. A constant
-            window is
-            :class:`~iactrace.core.refractive_index.ConstantIndex`.
-        thickness: Per-element slab thickness, shape ``(N,)``.
-        transmittance_curve: ``T(theta, lambda)`` response curve for the whole
-            slab, or ``None`` for the bare-window Fresnel product.
-        transmittance: Per-element bulk multiplier in ``[0, 1]``,
-            shape ``(N,)``.
+    Attributes
+    ----------
+    index
+        Per-element slab refractive index, a
+        RefractiveIndex
+        model evaluated per ray at that ray's wavelength. A constant
+        window is
+        ConstantIndex.
+    thickness : array, shape (N,)
+        Per-element slab thickness.
+    transmittance_curve
+        T(theta, lambda) response curve for the whole
+        slab, or None for the bare-window Fresnel product.
+    transmittance : array, shape (N,)
+        Per-element bulk multiplier in [0, 1].
     """
 
     index: RefractiveIndex
@@ -367,7 +371,7 @@ class SlabInteraction(Interaction):
         return eqx.tree_at(lambda m: m.transmittance, self, clipped)
 
     def scaled_transmittance(self, factor: Array) -> SlabInteraction:
-        """Return a copy with the bulk transmittance scaled by ``factor``."""
+        """Return a copy with the bulk transmittance scaled by factor."""
         return self.with_transmittance(self.transmittance * factor)
 
     def apply(self, directions, normals, points, element_idx, current_n, wavelength=None):

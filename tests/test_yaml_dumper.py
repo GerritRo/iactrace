@@ -668,7 +668,7 @@ class TestRoundTrip:
                         "conic": -1.0,
                         "aspheric": [],
                     },
-                    "coating": {
+                    "reflectivity_curve": {
                         "type": "table",
                         "angles_deg": [0.0, 30.0, 60.0, 80.0],
                         "values": [0.96, 0.95, 0.90, 0.60],

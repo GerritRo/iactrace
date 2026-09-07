@@ -19,18 +19,14 @@ _VMAP_PAIR_BUDGET = 2_800_000
 
 
 class ObstructionGroup(eqx.Module):
-    """Base class for grouped obstructions.
-
-    Subclasses supply their intersection kernel and stacked parameters via
-    :meth:`_primitive`; the two traversal strategies are shared from here.
-    """
+    """Base class for grouped obstructions."""
 
     @abstractmethod
     def _primitive(self):
-        """Return ``(kernel, params)`` for this group.
+        """Return (kernel, params) for this group.
 
-        ``kernel(ray_origin, ray_direction, *prim)`` intersects one ray with one
-        primitive and returns a scalar ``t`` (``inf`` on a miss). ``params`` is a
+        kernel(ray_origin, ray_direction, *prim) intersects one ray with one
+        primitive and returns a scalar t (inf on a miss). params is a
         tuple of stacked parameter arrays whose leading axis indexes the
         primitives.
         """
@@ -50,9 +46,9 @@ class ObstructionGroup(eqx.Module):
         return jnp.min(ts)
 
     def intersect_batch(self, origins, directions):
-        """Nearest hit distance per ray, for ``(n_rays, 3)`` rays.
+        """Nearest hit distance per ray, for (n_rays, 3) rays.
 
-        Same answer as ``vmap(self.intersect)``, but chooses how to walk the
+        Same answer as vmap(self.intersect), but chooses how to go over the
         primitives based on how many rays there are.
         """
         if origins.shape[0] * len(self) <= _VMAP_PAIR_BUDGET:
@@ -71,11 +67,11 @@ class ObstructionGroup(eqx.Module):
 
 
 class CylinderGroup(ObstructionGroup):
-    """Group of cylinders for efficient batched intersection."""
+    """Group of cylinders for batched intersection."""
 
     p1: jax.Array  # (N, 3)
     p2: jax.Array  # (N, 3)
-    r: jax.Array  # (N,)
+    r: jax.Array   # (N,)
 
     def __init__(self, p1, p2, r):
         self.p1 = jnp.asarray(p1)
@@ -90,16 +86,11 @@ class CylinderGroup(ObstructionGroup):
 
 
 class OpenCylinderGroup(ObstructionGroup):
-    """Group of open cylinders (no end caps) for efficient batched intersection.
+    """Group of open cylinders (no end caps) for batched intersection."""
 
-    An open cylinder is a finite cylindrical surface without circular caps at
-    the ends. Useful for modeling tubes, pipes, or hollow cylindrical structures
-    where rays can pass through the ends.
-    """
-
-    p1: jax.Array  # (N, 3) - first endpoint of axis
-    p2: jax.Array  # (N, 3) - second endpoint of axis
-    r: jax.Array  # (N,) - radius
+    p1: jax.Array  # (N, 3)
+    p2: jax.Array  # (N, 3)
+    r: jax.Array   # (N,)
 
     def __init__(self, p1, p2, r):
         self.p1 = jnp.asarray(p1)
@@ -114,7 +105,7 @@ class OpenCylinderGroup(ObstructionGroup):
 
 
 class BoxGroup(ObstructionGroup):
-    """Group of axis-aligned boxes for efficient batched intersection."""
+    """Group of axis-aligned boxes for batched intersection."""
 
     p1: jax.Array  # (N, 3)
     p2: jax.Array  # (N, 3)
@@ -131,10 +122,10 @@ class BoxGroup(ObstructionGroup):
 
 
 class SphereGroup(ObstructionGroup):
-    """Group of spheres for efficient batched intersection."""
+    """Group of spheres for batched intersection."""
 
     centers: jax.Array  # (N, 3)
-    radii: jax.Array  # (N,)
+    radii: jax.Array    # (N,)
 
     def __init__(self, centers, radii):
         self.centers = jnp.asarray(centers)
@@ -148,11 +139,11 @@ class SphereGroup(ObstructionGroup):
 
 
 class OrientedBoxGroup(ObstructionGroup):
-    """Group of oriented boxes for efficient batched intersection."""
+    """Group of oriented boxes for batched intersection."""
 
-    centers: jax.Array  # (N, 3)
+    centers: jax.Array       # (N, 3)
     half_extents: jax.Array  # (N, 3)
-    rotations: jax.Array  # (N, 3, 3)
+    rotations: jax.Array     # (N, 3, 3)
 
     def __init__(self, centers, half_extents, rotations):
         self.centers = jnp.asarray(centers)
@@ -167,7 +158,7 @@ class OrientedBoxGroup(ObstructionGroup):
 
 
 class TriangleGroup(ObstructionGroup):
-    """Group of triangles for efficient batched intersection."""
+    """Group of triangles for batched intersection."""
 
     v0: jax.Array  # (N, 3)
     v1: jax.Array  # (N, 3)

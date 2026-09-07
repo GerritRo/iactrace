@@ -1,27 +1,13 @@
+from __future__ import annotations
+
 import jax.numpy as jnp
 from jax import random
 
 
 def sample_annulus(key, inner_radius, outer_radius, shape):
-    """
-    Generate uniform random samples within an annulus (ring).
-
-    For uniform sampling in an annulus, r^2 must be uniform between
-    inner_radius^2 and outer_radius^2, so
-    r = sqrt(inner^2 + u*(outer^2 - inner^2)).
-
-    Args:
-        key: JAX random key
-        inner_radius: Inner radius of the annulus
-        outer_radius: Outer radius of the annulus
-        shape: Shape of samples to generate
-
-    Returns:
-        2D points in annulus (..., 2)
-    """
+    """Uniform (*shape, 2) points in the annulus between the two radii."""
     key1, key2 = random.split(key)
 
-    # Uniform in r^2 space, then sqrt to get r
     inner_sq = inner_radius**2
     outer_sq = outer_radius**2
     r = jnp.sqrt(inner_sq + random.uniform(key1, shape) * (outer_sq - inner_sq))
@@ -34,16 +20,7 @@ def sample_annulus(key, inner_radius, outer_radius, shape):
 
 
 def sample_polygon(key, vertices, shape):
-    """Sample uniformly over a convex polygon via fan triangulation.
-
-    Args:
-        key: JAX random key
-        vertices: (n, 2) array of polygon vertices in order (must be convex)
-        shape: batch shape
-
-    Returns:
-        points: (..., 2) array of (x, y) coordinates
-    """
+    """Uniform (*shape, 2) points over the convex polygon vertices (n, 2)."""
     # Fan triangulation from first vertex
     n = len(vertices)
     triangles = jnp.array(

@@ -7,26 +7,16 @@ import jax
 import jax.numpy as jnp
 from jax import Array
 
-from ._tolerances import dir_tol
 from .ray_bundle import DEFAULT_WAVELENGTH
+from .tolerances import dir_tol
 
 
 def fresnel_unpolarized(cos_theta_i, n1, n2):
-    """Unpolarized Fresnel reflection and transmission coefficients.
+    """Unpolarized Fresnel coefficients (R, T) for a bare dielectric interface.
 
-    The standard formula for an ideal bare dielectric interface, used
-    as the implicit default by :class:`RefractInteraction` and
-    :class:`SlabInteraction` when no explicit :class:`ResponseCurve` is
-    supplied. Average of s- and p-polarized intensities.
-
-    Args:
-        cos_theta_i: Cosine of the incidence angle.
-        n1: Refractive index of the incident medium.
-        n2: Refractive index of the transmitted medium.
-
-    Returns:
-        R: Reflectance in ``[0, 1]``.
-        T: Transmittance ``T = 1 - R``.
+    The average of s- and p-polarized intensities, with T = 1 - R. Used as
+    the implicit default by RefractInteraction and
+    SlabInteraction when no explicit ResponseCurve is given.
     """
     eta = n1 / n2
     sin2_t = eta**2 * (1.0 - cos_theta_i**2)
@@ -43,13 +33,27 @@ def fresnel_unpolarized(cos_theta_i, n1, n2):
     return R, 1.0 - R
 
 
+def _broadcast_to_elements(values, n_elements, shared_ndim, label):
+    """Bring values to a leading per-element axis of length n_elements."""
+    v = jnp.asarray(values)
+    if v.ndim == shared_ndim:
+        return jnp.broadcast_to(v, (n_elements, *v.shape))
+    if v.ndim == shared_ndim + 1:
+        if v.shape[0] != n_elements:
+            raise ValueError(
+                f"values first axis ({v.shape[0]}) must match n_elements ({n_elements})"
+            )
+        return v
+    raise ValueError(f"values must be {label}, got shape {v.shape}")
+
+
 class ResponseCurve(eqx.Module):
-    """Abstract base for an optical element's ``R(theta, lambda)`` response.
+    """Abstract base for an optical elements R(theta, lambda) response.
 
-    A response curve maps each ray's incidence-angle cosine
-    and wavelength to a coefficient in ``[0, 1]``.
+    A response curve maps each rays incidence-angle cosine
+    and wavelength to a coefficient in [0, 1].
 
-    All subclasses return an array broadcastable to ``cos_theta_i.shape``.
+    All subclasses return an array broadcastable to cos_theta_i.shape.
     """
 
     @abstractmethod
@@ -64,8 +68,10 @@ class ResponseCurve(eqx.Module):
 class ConstantResponse(ResponseCurve):
     """Angle- and wavelength-independent per-element response.
 
-    Attributes:
-        values: Per-element coefficient in ``[0, 1]``, shape ``(N,)``.
+    Attributes
+    ----------
+    values : array, shape (N,)
+        Per-element coefficient in [0, 1].
     """
 
     values: Array  # (N,)
@@ -75,27 +81,30 @@ class ConstantResponse(ResponseCurve):
 
 
 class TabulatedResponse(ResponseCurve):
-    """Bilinear interpolation over a shared ``(angle, wavelength)`` grid.
+    """Bilinear interpolation over a shared (angle, wavelength) grid.
 
     Each ray's coefficient is read from a per-element
-    ``cos(angle) x wavelength`` table, linearly interpolated in both axes
-    and clamped at the grid edges (matching :func:`jax.numpy.interp`).
+    cos(angle) x wavelength table, linearly interpolated in both axes
+    and clamped at the grid edges (matching jax.numpy.interp).
 
-    Attributes:
-        cos_table: ``cos(angle)`` axis, sorted ascending, shape ``(Kc,)``.
-            ``cos_theta_i = 1`` -> normal incidence, ``0`` -> grazing.
-        wl_table: wavelength axis, sorted ascending, shape ``(Kw,)``. Same
-            units as :attr:`~iactrace.core.ray_bundle.RayBundle.wavelength`.
-            Length 1 for a wavelength-independent curve.
-        values: Per-element coefficient grid, shape ``(N, Kc, Kw)``.
+    Attributes
+    ----------
+    cos_table : array, shape (Kc,)
+        cos(angle) axis, sorted ascending.
+        cos_theta_i = 1 -> normal incidence, 0 -> grazing.
+    wl_table : array, shape (Kw,)
+        Wavelength axis, sorted ascending. Same units as wavelength. Length 1 for a
+        wavelength-independent curve.
+    values : array, shape (N, Kc, Kw)
+        Per-element coefficient grid.
     """
 
     cos_table: Array  # (Kc,)
-    wl_table: Array  # (Kw,)
-    values: Array  # (N, Kc, Kw)
+    wl_table: Array   # (Kw,)
+    values: Array     # (N, Kc, Kw)
 
     def __call__(self, cos_theta_i, element_idx, wavelength=None):
-        rows = self.values[element_idx]  # (n_rays, Kc, Kw)
+        rows = self.values[element_idx]
 
         # Wavelength-independent curve: skip and interpolate in cos only
         if self.wl_table.shape[0] == 1:
@@ -119,86 +128,55 @@ class TabulatedResponse(ResponseCurve):
         *,
         wavelengths=None,
     ) -> TabulatedResponse:
-        """Build a :class:`TabulatedResponse` from human-readable angles.
+        """Build a TabulatedResponse from angles given in degrees.
 
-        Args:
-            angles_deg: Sample angles in degrees, shape ``(Kc,)`` (need not
-                be sorted -- reordered into cos-ascending form internally).
-            values: Coefficient values. Without ``wavelengths`` this is an
-                angle curve: ``(Kc,)`` broadcast to all elements, or
-                ``(N, Kc)`` per element. With ``wavelengths`` it is an
-                ``(angle, wavelength)`` grid: ``(Kc, Kw)`` broadcast, or
-                ``(N, Kc, Kw)`` per element.
-            n_elements: Number of elements ``N`` in the enclosing group.
-            wavelengths: Optional sample wavelengths ``(Kw,)`` (sorted
-                internally). Omit for a wavelength-independent curve.
+        Both axes are sorted internally, so angles_deg (Kc,) and
+        wavelengths (Kw,) may arrive in any order.
 
-        Returns:
-            A ready-to-use curve with cos- and wavelength-ascending
-            lookup tables precomputed.
+        Parameters
+        ----------
+        values : array, shape (Kc,)
+            Without wavelengths, an angle curve --.
+            broadcast to all elements, or (N, Kc) per element. With
+            wavelengths, an (angle, wavelength) grid -- (Kc, Kw)
+            broadcast, or (N, Kc, Kw) per element.
+        wavelengths
+            Omit for a wavelength-independent curve.
         """
         angles_deg = jnp.asarray(angles_deg)
         cos_table = jnp.cos(jnp.deg2rad(angles_deg))
         cos_order = jnp.argsort(cos_table)
         cos_table = cos_table[cos_order]
 
-        v = jnp.asarray(values)
         if wavelengths is None:
             # Angle-only curve -> degenerate single-wavelength grid (Kw = 1).
             wl_table = jnp.asarray([DEFAULT_WAVELENGTH])
-            if v.ndim == 1:
-                v = jnp.broadcast_to(v, (n_elements, v.shape[0]))
-            elif v.ndim == 2:
-                if v.shape[0] != n_elements:
-                    raise ValueError(
-                        f"values first axis ({v.shape[0]}) must match n_elements ({n_elements})"
-                    )
-            else:
-                raise ValueError(f"values must be 1D (Kc,) or 2D (N, Kc), got shape {v.shape}")
-            if v.shape[1] != cos_table.shape[0]:
-                raise ValueError(
-                    f"values angle axis ({v.shape[1]}) must match angles_deg "
-                    f"length ({cos_table.shape[0]})"
-                )
-            v = v[:, cos_order][:, :, None]  # (N, Kc, 1)
-            return cls(cos_table=cos_table, wl_table=wl_table, values=v)
-
-        wl_table = jnp.asarray(wavelengths)
-        wl_order = jnp.argsort(wl_table)
-        wl_table = wl_table[wl_order]
-        if v.ndim == 2:
-            v = jnp.broadcast_to(v, (n_elements, v.shape[0], v.shape[1]))
-        elif v.ndim == 3:
-            if v.shape[0] != n_elements:
-                raise ValueError(
-                    f"values first axis ({v.shape[0]}) must match n_elements ({n_elements})"
-                )
+            wl_order = jnp.zeros(1, dtype=int)
+            v = _broadcast_to_elements(values, n_elements, 1, "1D (Kc,) or 2D (N, Kc)")
+            v = v[:, :, None]
         else:
-            raise ValueError(f"values must be 2D (Kc, Kw) or 3D (N, Kc, Kw), got shape {v.shape}")
-        if v.shape[1] != cos_table.shape[0] or v.shape[2] != wl_table.shape[0]:
+            wl_table = jnp.asarray(wavelengths)
+            wl_order = jnp.argsort(wl_table)
+            wl_table = wl_table[wl_order]
+            v = _broadcast_to_elements(values, n_elements, 2, "2D (Kc, Kw) or 3D (N, Kc, Kw)")
+        if v.shape[1] != cos_table.shape[0]:
             raise ValueError(
-                f"values grid ({v.shape[1]}, {v.shape[2]}) must match "
-                f"(angles_deg, wavelengths) = ({cos_table.shape[0]}, {wl_table.shape[0]})"
+                f"values angle axis ({v.shape[1]}) must match angles_deg "
+                f"length ({cos_table.shape[0]})"
+            )
+        if v.shape[2] != wl_table.shape[0]:
+            raise ValueError(
+                f"values wavelength axis ({v.shape[2]}) must match wavelengths "
+                f"length ({wl_table.shape[0]})"
             )
         v = v[:, cos_order, :][:, :, wl_order]
         return cls(cos_table=cos_table, wl_table=wl_table, values=v)
 
     @classmethod
     def from_wavelengths(cls, wavelengths, values, n_elements: int) -> TabulatedResponse:
-        """Build an **angle-flat** ``R(lambda)`` curve from wavelength samples.
+        """Build an angle-flat R(lambda) curve from wavelength samples.
 
         The convenience wrapper for the wavelength-only case.
-
-        Args:
-            wavelengths: Sample wavelengths ``(Kw,)`` (sorted internally). Same
-                units as :attr:`~iactrace.core.ray_bundle.RayBundle.wavelength`.
-            values: Coefficients in ``[0, 1]``: ``(Kw,)`` broadcast to all
-                elements, or ``(N, Kw)`` per element.
-            n_elements: Number of elements ``N`` in the enclosing group.
-
-        Returns:
-            An angle-independent :class:`TabulatedResponse` whose value depends
-            only on wavelength.
         """
         v = jnp.asarray(values)
         if v.ndim == 1:

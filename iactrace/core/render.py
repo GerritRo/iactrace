@@ -1,34 +1,31 @@
+from __future__ import annotations
+
+from typing import Literal
+
+import equinox as eqx
 import jax
 import jax.numpy as jnp
 from jax import Array
 
-from .intersections import intersect_plane
+from . import _salts
+from .intersections import intersect_plane, is_hit
 from .ray_bundle import DEFAULT_WAVELENGTH, RayBundle
 from .spectrum import Spectrum, as_spectrum
 from .trajectory import TraceResult, Trajectory
 from .transforms import euler_to_matrix
 
-_PRIMARY_ROUGHNESS_SALT = 0xB5DF00
-_ROUGHNESS_SALT = 0xB5DF01
-_WAVELENGTH_SALT = 0xC0FFEE
+# Ray seeding and source generation
 
 
-def _seed_traced_rays(origins, directions, values, wavelength, key):
-    """Attach wavelengths to a caller-supplied bundle for :func:`trace_optics`.
+def _seed_wavelengths(n_rays, wavelength, key):
+    """Per-ray (n_rays,) wavelengths for a caller-supplied bundle.
 
-    A trace is handed its rays, so:
-
-    * scalar (or ``None``) -> every ray at that wavelength;
-    * ``(n_rays,)`` array -> per-ray wavelengths, used as given;
-    * :class:`~iactrace.core.spectrum.Spectrum` -> one wavelength drawn per
-      ray from the distribution.
-
-    Returns ``(origins, directions, values, wavelength)``, all of length
-    ``n_rays``.
+    A trace is handed its rays, so a scalar (or None) means every ray at
+    that wavelength, a (n_rays,) array is used as given, and a
+    Spectrum draws one wavelength per ray.
     """
-    n_rays = values.shape[0]
     if isinstance(wavelength, Spectrum):
-        return origins, directions, values, wavelength.sample(key, (n_rays,))
+        return wavelength.sample(key, (n_rays,))
     wl = jnp.asarray(DEFAULT_WAVELENGTH if wavelength is None else wavelength)
     if wl.ndim > 1 or (wl.ndim == 1 and wl.shape[0] != n_rays):
         raise ValueError(
@@ -36,195 +33,7 @@ def _seed_traced_rays(origins, directions, values, wavelength, key):
             f"shape {wl.shape}. `trace` takes the rays you give it, so an array "
             "is per-ray; pass a Spectrum to draw one wavelength per ray."
         )
-    return origins, directions, values, jnp.broadcast_to(wl, (n_rays,))
-
-
-def _get_stages(optical_groups):
-    """Map optical_groups by optical_stage, return sorted dict (one group per stage)."""
-    by_stage = {}
-    for g in optical_groups:
-        by_stage[g.optical_stage] = g
-    return dict(sorted(by_stage.items()))
-
-
-def _shadow_mask(origins, directions, obstructions, max_t):
-    """Returns 1.0 where unoccluded, 0.0 where blocked."""
-    if not obstructions:
-        return jnp.ones(origins.shape[0])
-    mask = jnp.ones(origins.shape[0])
-    for g in obstructions:
-        t = g.intersect_batch(origins, directions)
-        mask = mask * jnp.where(t < max_t, 0.0, 1.0)
-    return mask
-
-
-def apply_final_leg_shadow(rb, obstruction_groups, camera_position, camera_rotation):
-    """Shadow the converging beam on the final last-optic -> focal-plane leg.
-
-    ``rb`` must be a world-frame bundle as produced by the render, i.e.
-    *before* :meth:`RayBundle.to_frame`: its ``origins`` lie on the last
-    optic and its ``directions`` point toward the focal plane. Only
-    ``values`` and ``alive`` is modified, so the leg's contribution to ``path_length``
-    is still added later by the sensor intersection.
-
-    The leg is capped at the **camera reference plane** (``camera_position``),
-    not at each ray's true sensor / focal-surface landing point. For a thin
-    camera (sensor ~ ``camera_position``) these coincide; if the sensor group
-    or focal surface is offset along the optical axis they differ, and an
-    obstruction between ``camera_position`` and the true landing plane is not
-    accounted for.
-    """
-    if not obstruction_groups:
-        return rb
-    rot = euler_to_matrix(camera_rotation)
-    _, t_cap = jax.vmap(intersect_plane, in_axes=(0, 0, None, None))(
-        rb.origins,
-        rb.directions,
-        camera_position,
-        rot,
-    )
-    shadow = _shadow_mask(rb.origins, rb.directions, obstruction_groups, t_cap)
-    new_alive = rb.alive & (shadow > 0)
-    return RayBundle(
-        origins=rb.origins,
-        directions=rb.directions,
-        values=jnp.where(new_alive, rb.values, 0.0),
-        path_length=rb.path_length,
-        n=rb.n,
-        wavelength=rb.wavelength,
-        alive=new_alive,
-    )
-
-
-def final_leg_points(rb, camera_position, camera_rotation, fallback):
-    """Where the final last-optic -> focal-plane leg lands, for trajectories.
-
-    ``rb`` must be a world-frame bundle (origins on the last optic, directions
-    pointing toward the focal plane), as produced by :func:`trace_optics` and
-    shadowed by :func:`apply_final_leg_shadow`. Returns the ``(n_rays, 3)``
-    intersection with the **camera reference plane** -- the same cap
-    :func:`apply_final_leg_shadow` uses, so the drawn leg matches the shadowed
-    one.
-
-    Rays that are dead, or whose direction does not cross the plane ahead of
-    them, keep ``fallback`` (their last valid position) instead of a
-    meaningless extrapolation.
-    """
-    rot = euler_to_matrix(camera_rotation)
-    _, t = jax.vmap(intersect_plane, in_axes=(0, 0, None, None))(
-        rb.origins,
-        rb.directions,
-        camera_position,
-        rot,
-    )
-    reaches = rb.alive & jnp.isfinite(t) & (t > 0.0)
-    landing = rb.origins + jnp.where(reaches, t, 0.0)[:, None] * rb.directions
-    return jnp.where(reaches[:, None], landing, fallback)
-
-
-def _nearest_hit(group, origins, directions):
-    """Nearest element each ray hits in ``group``: ``(t, element index)``.
-
-    Every ray is tested against every element, and the
-    smallest forward ``t`` wins.
-    """
-    n_rays = origins.shape[0]
-    init_carry = (
-        jnp.full(n_rays, jnp.inf, dtype=origins.dtype),  # best_t
-        jnp.zeros(n_rays, dtype=jnp.int32),  # best_elem
-    )
-
-    def scan_step(carry, eidx):
-        best_t, best_elem = carry
-        ts = group.intersect_t(eidx, origins, directions)
-        closer = ts < best_t
-        return (
-            jnp.where(closer, ts, best_t),
-            jnp.where(closer, eidx.astype(jnp.int32), best_elem),
-        ), None
-
-    (best_t, best_elem), _ = jax.lax.scan(scan_step, init_carry, jnp.arange(len(group)))
-    return best_t, best_elem
-
-
-def _trace_stage(
-    origins,
-    directions,
-    values,
-    alive,
-    current_n,
-    wavelength,
-    group,
-    obstructions,
-    roughness_salt=_ROUGHNESS_SALT,
-):
-    """Process rays through one optical stage: intersect all elements, apply physics,
-    check shadows.
-
-    Args:
-        roughness_salt: Folded into the group's ``sample_key`` to draw this
-            call's surface-roughness perturbation.
-
-    Returns ``(new_origins, new_directions, new_values, new_alive,
-    segment_length, opl_internal, new_n)``:
-
-    * ``new_alive``: per-ray liveness after this stage. A ray dies here if
-      it misses every element (or lands outside an aperture) or is blocked
-      by an obstruction; the physical coefficients only attenuate a ray
-      that is still alive.
-    * ``segment_length``: geometric distance from the previous stage
-      to this surface (in the medium ``current_n``).
-    * ``opl_internal``: per-ray OPL accumulated *inside* the
-      interaction (non-zero only for slabs / windows).
-    * ``new_n``: per-ray refractive index of the medium the ray is in
-      after this stage, ready to weight the next segment.
-
-    Uses lax.scan over elements, keeping only the closest hit per ray.
-    Memory usage is O(n_rays) regardless of element count.
-    """
-    best_t, best_elem = _nearest_hit(group, origins, directions)
-    best_pts, best_norms = group.hit_geometry(best_elem, origins, directions)
-
-    # Rays that hit nothing kept element 0's geometry
-    hit = best_t < 1e10
-    safe_norms = jnp.where(hit[:, None], best_norms, jnp.array([0.0, 0.0, 1.0]))
-
-    new_dirs, new_origins, coeffs, opl_internal, new_n = group.interact(
-        directions,
-        safe_norms,
-        best_pts,
-        best_elem,
-        current_n,
-        roughness_salt=roughness_salt,
-        wavelength=wavelength,
-    )
-
-    shadow = _shadow_mask(origins, directions, obstructions, best_t)
-    new_alive = alive & hit & (shadow > 0)
-    new_values = jnp.where(new_alive, values * coeffs, 0.0)
-    segment = jnp.where(hit, best_t, 0.0)
-    opl_internal = jnp.where(hit, opl_internal, 0.0)
-    # Rays that missed keep their medium; only rays that interacted update it.
-    new_n = jnp.where(hit, new_n, current_n)
-    return (
-        new_origins,
-        new_dirs,
-        new_values,
-        new_alive,
-        segment,
-        opl_internal,
-        new_n,
-    )
-
-
-def _build_primary_geometry(group):
-    """Sample the primary element's aperture and apply surface roughness.
-
-    Returns:
-        Tuple of (points, normals, weights) arrays in world coordinates,
-        each with shape (n_elements, n_samples, ...).
-    """
-    return group.sample_primary_geometry(roughness_salt=_PRIMARY_ROUGHNESS_SALT)
+    return jnp.broadcast_to(wl, (n_rays,))
 
 
 def _build_source_rays(
@@ -240,25 +49,35 @@ def _build_source_rays(
 ):
     """Generate flat ray arrays from sources aimed at one primary element.
 
-    Args:
-        points: (n_samples, 3) sampled surface points for one element.
-        normals: (n_samples, 3) surface normals at those points.
-        weights: (n_samples, 1) importance weights.
-        sources: (n_sources, 3) source positions or unit propagation
-            directions (depending on ``source_type``).
-        source_values: (n_sources,) source intensities.
-        source_type: 'point' or 'parallel'.
-        obstruction_groups: list of ObstructionGroup for shadow testing.
-        spectrum: The source's :class:`~iactrace.core.spectrum.Spectrum`.
-        wl_key: PRNG key for that draw.
+    Parameters
+    ----------
+    points : array, shape (n_samples, 3)
+        Sampled surface points for one element.
+    normals : array, shape (n_samples, 3)
+        Surface normals at those points.
+    weights : array, shape (n_samples, 1)
+        Importance weights.
+    sources : array, shape (n_sources, 3)
+        Source positions or unit propagation directions (depending on source_type).
+    source_values : array, shape (n_sources,)
+        Source intensities.
+    source_type
+        'point' or 'parallel'.
+    obstruction_groups
+        list of ObstructionGroup for shadow testing.
+    spectrum
+        The source's Spectrum.
+    wl_key
+        PRNG key for that draw.
 
-    Returns:
-        ``(origins, directions, normals, values, alive, leg_in,
-        wavelength)`` all shaped (n_rays, ...), source-major.
-        ``alive`` is ``False`` for rays whose source-to-primary segment is
-        blocked by an obstruction. ``leg_in`` is the optical path length each
-        ray already accumulated travelling from the source (or reference
-        wavefront) to its primary sample point.
+    Returns
+    -------
+    (origins, directions, normals, values, alive, leg_in,
+    wavelength) all shaped (n_rays, ...), source-major.
+    alive is False for rays whose source-to-primary segment is
+    blocked by an obstruction. leg_in is the optical path length each
+    ray already accumulated travelling from the source (or reference
+    wavefront) to its primary sample point.
     """
     n_sources = sources.shape[0]
     n_samples = points.shape[0]
@@ -315,8 +134,9 @@ def _apply_primary_interaction(
 ):
     """Apply stage-0 physics: interaction + cos-theta weighting.
 
-    Returns:
-        (new_origins, new_directions, updated_values, opl_internal, new_n).
+    Returns
+    -------
+    (new_origins, new_directions, updated_values, opl_internal, new_n).
     """
     n_rays = origins.shape[0]
     elem_indices = jnp.full((n_rays,), element_idx, dtype=jnp.int32)
@@ -345,14 +165,134 @@ def _empty_bundle() -> RayBundle:
     )
 
 
+# Stage kernel
+
+
+def _shadow_mask(origins, directions, obstructions, max_t):
+    """Returns 1.0 where unoccluded, 0.0 where blocked."""
+    if not obstructions:
+        return jnp.ones(origins.shape[0])
+    mask = jnp.ones(origins.shape[0])
+    for g in obstructions:
+        t = g.intersect_batch(origins, directions)
+        mask = mask * jnp.where(t < max_t, 0.0, 1.0)
+    return mask
+
+
+def _get_stages(optical_groups):
+    """(stages, stage_indices): one group per optical stage, in stage order."""
+    by_stage = {}
+    for g in optical_groups:
+        by_stage[g.optical_stage] = g
+    stages = dict(sorted(by_stage.items()))
+    return stages, list(stages)
+
+
+def _nearest_hit(group, origins, directions):
+    """Nearest element each ray hits in group: (t, element index).
+
+    Every ray is tested against every element, and the
+    smallest forward t wins.
+    """
+    n_rays = origins.shape[0]
+    init_carry = (
+        jnp.full(n_rays, jnp.inf, dtype=origins.dtype),  # best_t
+        jnp.zeros(n_rays, dtype=jnp.int32),  # best_elem
+    )
+
+    def scan_step(carry, eidx):
+        best_t, best_elem = carry
+        ts = group.intersect_t(eidx, origins, directions)
+        closer = ts < best_t
+        return (
+            jnp.where(closer, ts, best_t),
+            jnp.where(closer, eidx.astype(jnp.int32), best_elem),
+        ), None
+
+    (best_t, best_elem), _ = jax.lax.scan(scan_step, init_carry, jnp.arange(len(group)))
+    return best_t, best_elem
+
+
+def _trace_stage(
+    origins,
+    directions,
+    values,
+    alive,
+    current_n,
+    wavelength,
+    group,
+    obstructions,
+    roughness_salt=_salts.ROUGHNESS,
+):
+    """Process rays through one optical stage: intersect all elements, apply physics,
+    check shadows.
+
+    Parameters
+    ----------
+    roughness_salt
+        Folded into the group's sample_key to draw this call's
+        surface-roughness perturbation.
+
+    Returns
+    -------
+    tuple
+        (new_origins, new_directions, new_values, new_alive, segment_length,
+        opl_internal, new_n), where:
+
+        - new_alive is per-ray liveness after this stage. A ray dies here if
+          it misses every element (or lands outside an aperture) or is
+          blocked by an obstruction; the physical coefficients only attenuate
+          a ray that is still alive.
+        - segment_length is the geometric distance from the previous stage to
+          this surface (in the medium current_n).
+        - opl_internal is the per-ray OPL accumulated inside the interaction
+          (non-zero only for slabs / windows).
+        - new_n is the per-ray refractive index of the medium the ray is in
+          after this stage, ready to weight the next segment.
+    """
+    best_t, best_elem = _nearest_hit(group, origins, directions)
+    best_pts, best_norms = group.hit_geometry(best_elem, origins, directions)
+
+    # Rays that hit nothing kept element 0's geometry
+    hit = is_hit(best_t)
+    safe_norms = jnp.where(hit[:, None], best_norms, jnp.array([0.0, 0.0, 1.0]))
+
+    new_dirs, new_origins, coeffs, opl_internal, new_n = group.interact(
+        directions,
+        safe_norms,
+        best_pts,
+        best_elem,
+        current_n,
+        roughness_salt=roughness_salt,
+        wavelength=wavelength,
+    )
+
+    shadow = _shadow_mask(origins, directions, obstructions, best_t)
+    new_alive = alive & hit & (shadow > 0)
+    new_values = jnp.where(new_alive, values * coeffs, 0.0)
+    segment = jnp.where(hit, best_t, 0.0)
+    opl_internal = jnp.where(hit, opl_internal, 0.0)
+    # Rays that missed keep their medium; only rays that interacted update it.
+    new_n = jnp.where(hit, new_n, current_n)
+    return (
+        new_origins,
+        new_dirs,
+        new_values,
+        new_alive,
+        segment,
+        opl_internal,
+        new_n,
+    )
+
+
 def _trace_one_element(
     stages, stage_indices, geom, sources, values, source_type, obstructions, spectrum, eidx
 ):
     """Trace rays from sources through one stage-0 element of the optics.
 
-    Returns a per-element :class:`RayBundle` of length ``n_sources *
-    n_samples`` in world coordinates, source-major. Wavelengths are drawn per
-    ray from ``spectrum``.
+    Returns a per-element RayBundle of length n_sources *
+    n_samples in world coordinates, source-major. Wavelengths are drawn per
+    ray from spectrum.
     """
     s0_points, s0_normals, s0_weights = geom
     origins, dirs, normals, vals, alive, leg_in, wl = _build_source_rays(
@@ -364,7 +304,7 @@ def _trace_one_element(
         source_type,
         obstructions,
         spectrum,
-        jax.random.fold_in(stages[0].sample_key, _WAVELENGTH_SALT + eidx),
+        jax.random.fold_in(stages[0].sample_key, _salts.WAVELENGTH + eidx),
     )
     current_n = jnp.ones(vals.shape[0])
     origins, dirs, vals, opl_internal, current_n = _apply_primary_interaction(
@@ -377,7 +317,7 @@ def _trace_one_element(
         current_n,
         wl,
     )
-    # ``leg_in`` reaches the primary's front face; a stage-0 slab still adds
+    # leg_in reaches the primary's front face; a stage-0 slab still adds
     # its own n * L on top before the ray leaves the element.
     path_length = leg_in + opl_internal
     for sidx in stage_indices[1:]:
@@ -390,7 +330,7 @@ def _trace_one_element(
             wl,
             stages[sidx],
             obstructions,
-            roughness_salt=_ROUGHNESS_SALT + eidx,
+            roughness_salt=_salts.ROUGHNESS + eidx,
         )
         path_length = path_length + current_n * seg + opl_internal
         current_n = new_n
@@ -408,15 +348,17 @@ def _trace_one_element(
 def _per_element_scan(optical_groups, obstructions, sources, values, source_type, spectrum):
     """Common setup for both render variants.
 
-    Returns ``(trace_one, n_elements)`` or ``None`` if the optics has
-    no stage-0 group, where ``trace_one(eidx) -> RayBundle`` traces a
-    single primary element.
+    Returns (trace_one, n_elements) or None if the optics has
+    no stage-0 group, where trace_one(eidx) -> RayBundle traces a
+    single primary element. spectrum may be None for the
+    monochromatic default.
     """
-    stages = _get_stages(optical_groups)
+    if spectrum is None:
+        spectrum = as_spectrum(DEFAULT_WAVELENGTH)
+    stages, stage_indices = _get_stages(optical_groups)
     if 0 not in stages:
         return None
-    stage_indices = sorted(stages.keys())
-    geom = _build_primary_geometry(stages[0])
+    geom = stages[0].sample_primary_geometry(roughness_salt=_salts.PRIMARY_ROUGHNESS)
     n_elements = geom[0].shape[0]
 
     def trace_one(eidx):
@@ -435,6 +377,9 @@ def _per_element_scan(optical_groups, obstructions, sources, values, source_type
     return trace_one, n_elements
 
 
+# Public entrypoints
+
+
 def render_optics(
     optical_groups,
     obstruction_groups,
@@ -444,25 +389,18 @@ def render_optics(
     *,
     spectrum=None,
 ):
-    """Render sources through the optics; return one flat :class:`RayBundle`.
+    """Render sources through the optics; return one flat RayBundle.
 
-    Materialises the full ``(n_elements * n_sources * n_samples,)`` ray
-    buffer. Use :func:`render_optics_accumulate` when only a small
+    Materialises the full (n_elements * n_sources * n_samples,) ray
+    buffer. Use render_optics_accumulate when only a small
     aggregate (image, response matrix, ...) is needed.
 
-    ``spectrum`` is the source's
-    :class:`~iactrace.core.spectrum.Spectrum` (default: monochromatic at
-    :data:`~iactrace.core.ray_bundle.DEFAULT_WAVELENGTH`).
+    spectrum is the source's
+    Spectrum (default: monochromatic at
+    DEFAULT_WAVELENGTH).
     """
-    if spectrum is None:
-        spectrum = as_spectrum(DEFAULT_WAVELENGTH)
     setup = _per_element_scan(
-        optical_groups,
-        obstruction_groups,
-        sources,
-        values,
-        source_type,
-        spectrum,
+        optical_groups, obstruction_groups, sources, values, source_type, spectrum
     )
     if setup is None:
         return _empty_bundle()
@@ -492,25 +430,18 @@ def render_optics_accumulate(
 ):
     """Carry-folding render: walk stage-0 elements with an accumulator.
 
-    Calls ``accumulator(carry, per_element_bundle) -> carry`` for each
+    Calls accumulator(carry, per_element_bundle) -> carry for each
     primary element instead of stacking outputs. Peak memory is bounded
-    by ``init`` plus one element's rays, regardless of element count.
+    by init plus one element's rays, regardless of element count.
 
-    The per-element bundle has length ``n_sources * n_samples`` in world
-    coordinates, source-major (the first ``n_samples`` rays belong to
-    ``sources[0]``). ``spectrum`` is the source's
-    :class:`~iactrace.core.spectrum.Spectrum` (default: monochromatic at
-    :data:`~iactrace.core.ray_bundle.DEFAULT_WAVELENGTH`).
+    The per-element bundle has length n_sources * n_samples in world
+    coordinates, source-major (the first n_samples rays belong to
+    sources[0]). spectrum is the source's
+    Spectrum (default: monochromatic at
+    DEFAULT_WAVELENGTH).
     """
-    if spectrum is None:
-        spectrum = as_spectrum(DEFAULT_WAVELENGTH)
     setup = _per_element_scan(
-        optical_groups,
-        obstruction_groups,
-        sources,
-        values,
-        source_type,
-        spectrum,
+        optical_groups, obstruction_groups, sources, values, source_type, spectrum
     )
     if setup is None:
         return init
@@ -535,57 +466,60 @@ def trace_optics(
 ):
     """Trace rays from arbitrary origins through full optical system.
 
-    Args:
-        optical_groups: List of OpticalElementGroup (combined mirrors + lenses).
-        obstruction_groups: List of ObstructionGroup.
-        ray_origins: (n_rays, 3).
-        ray_directions: (n_rays, 3), normalized.
-        values: (n_rays,).
-        wavelength: a scalar shared by every ray, a **per-ray** ``(n_rays,)``
-            array, or a :class:`~iactrace.core.spectrum.Spectrum`, which draws
-            one wavelength per ray. Default :data:`~iactrace.core.ray_bundle.DEFAULT_WAVELENGTH`.
-        record_trajectory: When True, also collect the per-stage hit points and
-            return them as a :class:`~iactrace.core.trajectory.Trajectory`
-            alongside the RayBundle. Off by default; when off, no trajectory is
-            built and nothing extra is computed (mirrors the
-            :func:`~iactrace.camera.trace_chain` ``record_trajectory`` option).
+    Parameters
+    ----------
+    optical_groups
+        List of OpticalElementGroup (combined mirrors + lenses).
+    obstruction_groups
+        List of ObstructionGroup.
+    ray_origins : array, shape (n_rays, 3)
+        .
+    ray_directions : array, shape (n_rays, 3)
+        Normalized.
+    values : array, shape (n_rays,)
+        .
+    wavelength : array, shape (n_rays,)
+        a scalar shared by every ray, a per-ray.
+        array, or a Spectrum, which draws
+        one wavelength per ray. Default DEFAULT_WAVELENGTH.
+    record_trajectory
+        When True, also collect the per-stage hit points and
+        return them as a Trajectory
+        alongside the RayBundle.
 
-    Returns:
-        A :class:`~iactrace.core.trajectory.TraceResult`. Its ``rays`` are in 3D
-        space after all optical stages; its ``trajectory`` is ``None`` unless
-        ``record_trajectory`` was set, in which case the
-        :class:`~iactrace.core.trajectory.Trajectory` holds the source point
-        followed by each stage's landing point (world frame),
-        ``(n_stages + 1, n_rays, 3)``. It ends on the **last optic** -- this
-        kernel knows no camera.
+    Returns
+    -------
+    A TraceResult. Its rays are in 3D
+    space after all optical stages; its trajectory is None unless
+    record_trajectory was set, in which case the
+    Trajectory holds the source point
+    followed by each stage's landing point (world frame),
+    (n_stages + 1, n_rays, 3). It ends on the last optic.
     """
-    stages = _get_stages(optical_groups)
-    stage_indices = sorted(stages.keys())
+    stages, stage_indices = _get_stages(optical_groups)
 
-    origins, dirs, vals, wl = _seed_traced_rays(
-        ray_origins,
-        ray_directions,
-        values,
+    n_rays = values.shape[0]
+    origins, dirs, vals = ray_origins, ray_directions, values
+    wl = _seed_wavelengths(
+        n_rays,
         wavelength,
-        jax.random.fold_in(stages[stage_indices[0]].sample_key, _WAVELENGTH_SALT),
+        jax.random.fold_in(stages[stage_indices[0]].sample_key, _salts.WAVELENGTH),
     )
-    path_length = jnp.zeros(vals.shape[0])
-    current_n = jnp.ones(vals.shape[0])
-    alive = jnp.ones(vals.shape[0], dtype=bool)
-    ray_origins = origins
+    path_length = jnp.zeros(n_rays)
+    current_n = jnp.ones(n_rays)
+    alive = jnp.ones(n_rays, dtype=bool)
 
     # First trajectory point is the source; each stage appends its landing point.
-    trajectory: list[Array] | None = [ray_origins] if record_trajectory else None
+    trajectory: list[Array] | None = [origins] if record_trajectory else None
 
-    if stage_indices:
-        for stage_idx in stage_indices:
-            origins, dirs, vals, alive, seg, opl_internal, new_n = _trace_stage(
-                origins, dirs, vals, alive, current_n, wl, stages[stage_idx], obstruction_groups
-            )
-            path_length = path_length + current_n * seg + opl_internal
-            current_n = new_n
-            if trajectory is not None:
-                trajectory.append(jnp.where(alive[:, None], origins, trajectory[-1]))
+    for stage_idx in stage_indices:
+        origins, dirs, vals, alive, seg, opl_internal, new_n = _trace_stage(
+            origins, dirs, vals, alive, current_n, wl, stages[stage_idx], obstruction_groups
+        )
+        path_length = path_length + current_n * seg + opl_internal
+        current_n = new_n
+        if trajectory is not None:
+            trajectory.append(jnp.where(alive[:, None], origins, trajectory[-1]))
 
     rays = RayBundle(
         origins=origins,
@@ -599,3 +533,103 @@ def trace_optics(
     if trajectory is None:
         return TraceResult(rays)
     return TraceResult(rays, Trajectory(points=jnp.stack(trajectory, axis=0)))
+
+
+class LazyRayBundle(eqx.Module):
+    """A RayBundle described by a render that has not been evaluated yet.
+
+    Holds the optics, obstructions, camera frame, and source
+    description needed to evaluate itself. Output is delivered in the local
+    frame defined by camera_position and camera_rotation.
+
+    Consume it either with fold -- walk per primary-mirror element with
+    an accumulator, so the full (n_elements * n_sources * n_samples,) ray
+    buffer is never materialised -- or with materialise, when the
+    per-ray output itself is the result (spot diagrams, Camera.collect).
+    """
+
+    optical_groups: list
+    obstruction_groups: list
+    camera_position: Array
+    camera_rotation: Array
+    sources: Array
+    source_values: Array
+    spectrum: Spectrum
+    source_type: Literal["point", "parallel"] = eqx.field(static=True)
+
+    def fold(self, accumulator, init):
+        """Per-element scan: accumulator(carry, rb_local) -> carry.
+
+        rb_local is one element's RayBundle, already handed off
+        into the local frame.
+        """
+        origin, rotation = self.camera_position, self.camera_rotation
+        obstructions = self.obstruction_groups
+
+        def in_local_frame(carry, rb_world):
+            return accumulator(carry, handoff_to_frame(rb_world, obstructions, origin, rotation))
+
+        return render_optics_accumulate(
+            self.optical_groups,
+            self.obstruction_groups,
+            self.sources,
+            self.source_values,
+            self.source_type,
+            in_local_frame,
+            init,
+            spectrum=self.spectrum,
+        )
+
+    def materialise(self) -> RayBundle:
+        """Run the render eagerly; return a flat local-frame RayBundle."""
+        rb_world = render_optics(
+            self.optical_groups,
+            self.obstruction_groups,
+            self.sources,
+            self.source_values,
+            self.source_type,
+            spectrum=self.spectrum,
+        )
+        return handoff_to_frame(
+            rb_world,
+            self.obstruction_groups,
+            self.camera_position,
+            self.camera_rotation,
+        )
+
+
+# Handoff to a local frame
+
+
+def _cap_at_plane(rb, plane_position, plane_rotation):
+    """Ray parameter at which each ray crosses the given plane."""
+    rot = euler_to_matrix(plane_rotation)
+    _, t = jax.vmap(intersect_plane, in_axes=(0, 0, None, None))(
+        rb.origins, rb.directions, plane_position, rot
+    )
+    return t
+
+
+def apply_final_leg_shadow(rb, obstruction_groups, plane_position, plane_rotation):
+    """Shadow the converging beam on the final last-optic -> focal-plane leg."""
+    if not obstruction_groups:
+        return rb
+    t_cap = _cap_at_plane(rb, plane_position, plane_rotation)
+    shadow = _shadow_mask(rb.origins, rb.directions, obstruction_groups, t_cap)
+    new_alive = rb.alive & (shadow > 0)
+    return rb.replace(values=jnp.where(new_alive, rb.values, 0.0), alive=new_alive)
+
+
+def final_leg_points(rb, plane_position, plane_rotation, fallback):
+    """Where the final last-optic -> focal-plane leg lands."""
+    t = _cap_at_plane(rb, plane_position, plane_rotation)
+    reaches = rb.alive & jnp.isfinite(t) & (t > 0.0)
+    landing = rb.origins + jnp.where(reaches, t, 0.0)[:, None] * rb.directions
+    return jnp.where(reaches[:, None], landing, fallback)
+
+
+def handoff_to_frame(rb, obstruction_groups, position, rotation):
+    """Hand a world-frame bundle off to a local frame: shadow, then reframe."""
+    return apply_final_leg_shadow(rb, obstruction_groups, position, rotation).to_frame(
+        position, rotation
+    )

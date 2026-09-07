@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import abc
 
 import equinox as eqx
@@ -5,26 +7,18 @@ import jax.numpy as jnp
 import jax.random as jr
 from jax import Array
 
-# Conversion factor: arcseconds -> radians
 _ARCSEC_TO_RAD = jnp.pi / (180.0 * 3600.0)
 
 
-# Shared perturbation helper
+# Shared Peturbation helper
 
 
 def _apply_perturbation(normals, angles, scale):
-    """Perturb normals by random angles along a tangent basis.
+    """Tilt unit normals by angles (radians, scaled) in their tangent plane.
 
-    Builds an orthonormal tangent frame from the normals, applies
-    scaled random offsets, and re-normalizes.
-
-    Args:
-        normals: Surface normals (..., 3), unit length.
-        angles: Random angle pairs (..., 2).
-        scale: Per-element perturbation scale, broadcastable to (..., 1).
-
-    Returns:
-        Perturbed normals (..., 3), unit length.
+    Builds an orthonormal tangent frame from each normal, adds the scaled
+    offsets, and re-normalises. Shapes broadcast: normals (..., 3), angles
+    (..., 2), scale to (..., 1).
     """
     theta1 = angles[..., 0]
     theta2 = angles[..., 1]
@@ -43,29 +37,22 @@ def _apply_perturbation(normals, angles, scale):
     return perturbed / jnp.linalg.norm(perturbed, axis=-1, keepdims=True)
 
 
-# Base class
+# Base BSDF class
 
 
 class BSDF(eqx.Module):
     """Abstract base for surface scattering models.
 
-    Subclasses implement :meth:`_sample_perturbation` which returns
-    ``(angles, scale)`` for a given shape and element-index resolver.
-    The base class handles tangent-frame construction and applies the
-    perturbation.
+    Subclasses implement _sample_perturbation, returning (angles, scale); the
+    base class builds the tangent frame and applies the perturbation.
     """
 
     @staticmethod
     def _gather(param, element_idx):
-        """Resolve a per-element parameter for the current indexing mode.
+        """Resolve a per-element parameter for whichever indexing mode is in play.
 
-        Per-ray mode (element_idx provided):
-            ``param[element_idx]`` -> ``(n_rays,)``.
-        Batch mode (element_idx is None):
-            ``param[:, None]`` -> ``(N, 1)``, broadcasts over samples.
-
-        Subclasses call this inside ``_sample_perturbation`` instead of
-        writing their own conditional indexing logic.
+        Per-ray (element_idx given) yields (n_rays,); batch mode
+        (element_idx is None) yields (N, 1), broadcasting over samples.
         """
         if element_idx is not None:
             return param[element_idx]
@@ -73,33 +60,18 @@ class BSDF(eqx.Module):
 
     @abc.abstractmethod
     def _sample_perturbation(self, key, shape, element_idx):
-        """Draw perturbation angles and per-ray scale.
+        """Draw (angles, scale): (*shape, 2) angle pairs and a radian scale.
 
-        Args:
-            key: JAX PRNG key.
-            shape: Leading dimensions of normals, i.e. normals.shape[:-1].
-            element_idx: Passed through to :meth:`_gather`.
-
-        Returns:
-            angles: (*shape, 2) random angle pairs.
-            scale: Broadcastable to (*shape, 1), in radians.
+        shape is normals.shape[:-1]; element_idx goes to _gather.
         """
         ...
 
     def perturb_normals(self, normals, key, element_idx=None):
-        """Perturb surface normals.
+        """Perturb (..., 3) surface normals.
 
-        Works for any leading shape: ``(n_rays, 3)`` with per-ray
-        *element_idx*, or ``(N, S, 3)`` with *element_idx=None* when
-        the element dimension is already present.
-
-        Args:
-            normals: (..., 3).
-            key: JAX PRNG key.
-            element_idx: Per-ray element index, or None for batch mode.
-
-        Returns:
-            Perturbed normals (..., 3).
+        Works for any leading shape: (n_rays, 3) with a per-ray element_idx,
+        or (N, S, 3) with element_idx=None when the element dimension is
+        already present.
         """
         angles, scale = self._sample_perturbation(key, normals.shape[:-1], element_idx)
         return _apply_perturbation(normals, angles, scale)
@@ -114,9 +86,11 @@ class GaussianBSDF(BSDF):
     Perturbs surface normals by Gaussian-distributed random angles.
     This is the standard model for surface microroughness.
 
-    Attributes:
-        scale: Per-element roughness sigma in arcseconds (N,).
-               Zero means perfect specular (no perturbation).
+    Attributes
+    ----------
+    scale : array, shape (N,)
+        Per-element roughness sigma in arcseconds.
+        Zero means perfect specular (no perturbation).
     """
 
     scale: Array  # (N,) in arcseconds
@@ -136,14 +110,17 @@ class DoubleGaussianBSDF(BSDF):
     Models surfaces that have both fine-scale microroughness (narrow
     component) and broader scattering from mid-spatial-frequency errors
     (wide component). Each ray's perturbation is drawn from the narrow
-    Gaussian with probability ``(1 - mix_weight)`` or from the wide
-    Gaussian with probability ``mix_weight``.
+    Gaussian with probability (1 - mix_weight) or from the wide
+    Gaussian with probability mix_weight.
 
-    Attributes:
-        scale_narrow: Per-element narrow-component sigma in arcseconds (N,).
-        scale_wide: Per-element wide-component sigma in arcseconds (N,).
-        mix_weight: Per-element probability of the wide component (N,),
-                    values in [0, 1].
+    Attributes
+    ----------
+    scale_narrow : array, shape (N,)
+        Per-element narrow-component sigma in arcseconds.
+    scale_wide : array, shape (N,)
+        Per-element wide-component sigma in arcseconds.
+    mix_weight : array, shape (N,)
+        Per-element probability of the wide component, in [0, 1].
     """
 
     scale_narrow: Array  # (N,) in arcseconds

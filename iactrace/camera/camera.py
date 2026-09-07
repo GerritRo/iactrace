@@ -8,7 +8,8 @@ import jax.numpy as jnp
 from jax import Array
 
 from ..core.intersections import intersect_plane
-from ..core.ray_bundle import LazyRayBundle, RayBundle
+from ..core.ray_bundle import RayBundle
+from ..core.render import LazyRayBundle
 from ..core.trajectory import TraceResult, Trajectory
 from ..core.transforms import euler_to_matrix
 
@@ -30,14 +31,12 @@ def intersect_sensor(
 ) -> tuple[RayBundle, Array]:
     """Intersect 3D rays with sensor planes.
 
-    Accepts either a flat :class:`RayBundle` or a :class:`LazyRayBundle`.
+    Accepts either a flat RayBundle or a LazyRayBundle.
 
-    Returns:
-        Tuple of ``(sensor_rays, s_idx)`` where *sensor_rays* is a
-        :class:`~iactrace.core.ray_bundle.RayBundle` in the sensor-local
-        frame and *s_idx* identifies which sensor each ray hit. A ray
-        missing every sensor plane terminates: ``sensor_rays.alive`` is the
-        incoming liveness AND-ed with "intersected a sensor".
+    Returns
+    -------
+    Tuple of (sensor_rays, s_idx) where sensor_rays is a
+    RayBundle in the sensor-local frame.
     """
     if isinstance(ray_bundle, LazyRayBundle):
         ray_bundle = ray_bundle.materialise()
@@ -68,9 +67,7 @@ def intersect_sensor(
     t_sensor = all_ts[s_idx, idx]
     local_dirs = all_dirs[s_idx, idx]
 
-    # A ray missing every sensor plane terminates (geometry loss); combine
-    # with the liveness the bundle already carries so upstream-dead rays
-    # (shadowed, off-aperture, absorbed geometry) stay dead here too.
+    # A ray missing every sensor plane terminates (geometry loss).
     hit = jnp.isfinite(t_sensor)
     alive = ray_bundle.alive & hit
     safe_t = jnp.where(alive, t_sensor, 0.0)
@@ -89,9 +86,9 @@ def intersect_sensor(
 
 
 def _to_camera_frame(sensor: SensorGroup, points: Array, s_idx: Array) -> Array:
-    """Lift tile-local ``(..., n_rays, 3)`` points into the camera frame.
+    """Lift tile-local (..., n_rays, 3) points into the camera frame.
 
-    Each ray is placed by the tile it actually hit (``s_idx``), so a tiled or
+    Each ray is placed by the tile it actually hit (s_idx), so a tiled or
     curved focal surface comes out right.
     """
     rots = jax.vmap(euler_to_matrix)(sensor.rotations)[s_idx]  # (n_rays, 3, 3)
@@ -99,25 +96,25 @@ def _to_camera_frame(sensor: SensorGroup, points: Array, s_idx: Array) -> Array:
 
 
 class _ChainOutput(NamedTuple):
-    """What :func:`_run_chain` hands back.
+    """Output of a chain run via _run_chain.
 
-    Attributes:
-        pix_id: Per-ray pixel index.
-        valid: Per-ray pixel mask (inside a real pixel, outside the deadband).
-        pe_rays: The bundle after the detection chain.
-        trajectory: Camera-frame path through the chain, or ``None`` when the
-            chain was run without ``record_trajectory``.
+    Attributes
+    ----------
+    pix_id
+        Per-ray pixel index.
+    valid : array, shape (inside a real pixel, outside the deadband)
+        Per-ray pixel mask.
+    pe_rays
+        The bundle after the detection chain.
+    trajectory
+        Camera-frame path through the chain, or None when the
+        chain was run without record_trajectory.
     """
 
     pix_id: Array
     valid: Array
     pe_rays: RayBundle
     trajectory: Trajectory | None = None
-
-
-def _repeat_rays(rays: RayBundle, k: int) -> RayBundle:
-    """Repeat every ray ``k`` times, each ray's copies contiguous (ray-major)."""
-    return jax.tree_util.tree_map(lambda leaf: jnp.repeat(leaf, k, axis=0), rays)
 
 
 def _run_chain(
@@ -128,11 +125,10 @@ def _run_chain(
 ) -> _ChainOutput:
     """Intersect the sensor, assign pixels, translate to pixel-local, run the chain.
 
-
-    Returns a :class:`_ChainOutput`; the image / matrix folds take
-    ``pe_rays.values`` and ``collect`` reads the whole bundle. With
-    ``record_trajectory`` its ``trajectory`` is a camera-frame
-    :class:`~iactrace.core.trajectory.Trajectory` joining the incoming leg from
+    Returns a _ChainOutput; the image / matrix folds take
+    pe_rays.values and collect reads the whole bundle. With
+    record_trajectory its trajectory is a camera-frame
+    Trajectory joining the incoming leg from
     the last optic to the path through the detection chain.
     """
     sensor = camera.sensor_groups[sensor_idx]
@@ -168,10 +164,10 @@ class Camera(eqx.Module):
 
     The Camera works in its local coordinate system.  Sensor positions
     and rotations are relative to the camera origin (typically [0, 0, 0]
-    for a single-sensor camera).  The Telescope transforms the RayBundle
+    for a single-sensor camera). The Telescope transforms the RayBundle
     into the camera frame before passing it here.
 
-    Pipeline::
+    Pipeline:
 
         rb = telescope.render(...)        # LazyRayBundle
         camera.image(rb)                  # pixel image (fused, per-element fold)
@@ -180,12 +176,14 @@ class Camera(eqx.Module):
         camera.trace(rb)                  # TraceResult through the camera (diagnostics)
         rb.materialise()                  # flat camera-frame RayBundle
 
-    Attributes:
-        sensor_groups: List of SensorGroup objects. Each group owns its pixel
-            layout and its detection chain (optional concentrator + ``gap``
-            + photodetector), so different groups can carry different cones or
-            photodetectors. Configure a group's chain when constructing it, or via
-            :meth:`set_concentrator` / :meth:`set_photodetector` / :meth:`set_gap`.
+    Attributes
+    ----------
+    sensor_groups
+        List of SensorGroup objects. Each group owns its pixel
+        layout and its detection chain (optional concentrator + gap
+        + photodetector), so different groups can carry different cones or
+        photodetectors. Configure a group's chain when constructing it, or via
+        set_concentrator / set_photodetector / set_gap.
     """
 
     sensor_groups: list[SensorGroup]
@@ -194,7 +192,7 @@ class Camera(eqx.Module):
         self.sensor_groups = list(sensor_groups)
 
     def _require_sensor_groups(self, sensor_idx: int) -> None:
-        """Validate that ``sensor_idx`` references an existing sensor group."""
+        """Validate that sensor_idx references an existing sensor group."""
         if not self.sensor_groups:
             raise ValueError(
                 "Camera has no sensor groups. Add a SensorGroup before calling collect()/image()."
@@ -212,20 +210,12 @@ class Camera(eqx.Module):
         ray_bundle: RayBundle | LazyRayBundle,
         sensor_idx: int = 0,
     ) -> tuple[Array, Array, Array, Array]:
-        """Per-ray output ``(pe_vals, pe_times, pix_id, detected)``.
+        """Per-ray output (pe_vals, pe_times, pix_id, detected).
 
-        ``detected`` is the final liveness flag: the chain output's ``alive``
-        (stayed alive through the optics, hit a sensor tile, landed on the
-        photodetector surface) AND-ed with the pixel mask (inside a real pixel,
-        outside the edge deadband). It is ``False`` for a ray lost anywhere
-        along the way. Entries of ``pix_id`` / ``pe_times`` for undetected
-        rays are meaningless and must be filtered with this mask before use;
-        ``pe_vals`` is already zeroed there.
-
-        Materialises a :class:`LazyRayBundle`: per-ray output cannot be
+        Materialises a LazyRayBundle: per-ray output cannot be
         produced incrementally.
 
-        For the *path* rays took through the camera, see :meth:`trace`.
+        For the path rays took through the camera, see trace.
         """
         self._require_sensor_groups(sensor_idx)
         if isinstance(ray_bundle, LazyRayBundle):
@@ -243,18 +233,7 @@ class Camera(eqx.Module):
     ) -> TraceResult:
         """The path rays take through the camera, for diagnostics / visualization.
 
-        Returns a :class:`~iactrace.core.trajectory.TraceResult`, like every
-        other tracer. This one always records, so its ``trajectory`` is never
-        ``None``: a camera-frame
-        :class:`~iactrace.core.trajectory.Trajectory` running from the last
-        optic, through each ray's landing on its pixel, to the end of the
-        detection chain -- the final converging leg and the scattering inside
-        the concentrator as one continuous path. ``rays`` is the bundle the
-        detection chain produced, as :meth:`collect` reports it.
-
-        The viz helpers take the result as-is
-        (``show_camera(camera, trajectory=camera.trace(rb))``); reach for
-        ``.trajectory`` when you want the path itself.
+        Returns a TraceResult.
         """
         self._require_sensor_groups(sensor_idx)
         if isinstance(ray_bundle, LazyRayBundle):
@@ -268,15 +247,13 @@ class Camera(eqx.Module):
         ray_bundle: RayBundle | LazyRayBundle,
         sensor_idx: int = 0,
     ) -> Array:
-        """Pixel image of shape ``(n_sensors, *pixel_shape)``.
+        """Pixel image of shape (n_sensors, *pixel_shape).
 
-        Accepts either a flat :class:`RayBundle` (e.g. from
-        :meth:`Telescope.trace`) or the :class:`LazyRayBundle` returned
-        by :meth:`Telescope.render`. The lazy form folds per
-        primary-mirror element so the full ray buffer is never
-        materialised; the eager form scatters the buffer in one call.
+        Accepts either a flat RayBundle (e.g. from
+        Telescope.trace) or the LazyRayBundle returned
+        by Telescope.render.
 
-        For the *path* rays took through the camera, see :meth:`trace`.
+        For the path rays took through the camera, see trace.
         """
         self._require_sensor_groups(sensor_idx)
         sensor = self.sensor_groups[sensor_idx]
@@ -298,13 +275,13 @@ class Camera(eqx.Module):
         lazy_bundle: LazyRayBundle,
         sensor_idx: int = 0,
     ) -> Array:
-        """Per-source pixel response, shape ``(n_sources, n_sensors, *pixel_shape)``.
+        """Per-source pixel response, shape (n_sources, n_sensors, *pixel_shape).
 
         Folds per stage-0 element instead of materialising the full ray
         buffer; peak memory is bounded by the matrix itself.
 
-        Requires a :class:`LazyRayBundle` so the per-source structure
-        is known. Pass ``telescope.render(...)`` directly.
+        Requires a LazyRayBundle so the per-source structure
+        is known. Pass telescope.render(...) directly.
         """
         if not isinstance(lazy_bundle, LazyRayBundle):
             raise TypeError(
@@ -361,12 +338,12 @@ class Camera(eqx.Module):
         return self._with_sensor_group(sensor_idx, new_group)
 
     def set_concentrator(self, sensor_idx: int, concentrator: Concentrator | None) -> Camera:
-        """Set/replace the concentrator on sensor group ``sensor_idx``'s chain."""
+        """Set/replace the concentrator on sensor group sensor_idx's chain."""
         group = self.sensor_groups[sensor_idx]
         return self._with_sensor_group(sensor_idx, group.with_concentrator(concentrator))
 
     def set_photodetector(self, sensor_idx: int, photodetector: PhotoDetector) -> Camera:
-        """Set/replace the photodetector on sensor group ``sensor_idx``'s chain."""
+        """Set/replace the photodetector on sensor group sensor_idx's chain."""
         group = self.sensor_groups[sensor_idx]
         return self._with_sensor_group(sensor_idx, group.with_photodetector(photodetector))
 
@@ -376,11 +353,7 @@ class Camera(eqx.Module):
         return self._with_sensor_group(sensor_idx, group.with_gap(gap))
 
     def get_info(self) -> dict[str, Any]:
-        """Summary of the camera configuration.
-
-        Each sensor group reports its own geometry and detection chain, since the
-        chain (concentrator + gap + photodetector) is owned per group.
-        """
+        """Summary of the camera configuration."""
         info: dict[str, Any] = {"n_sensor_groups": len(self.sensor_groups)}
         for i, sg in enumerate(self.sensor_groups):
             chain = sg.chain
@@ -406,11 +379,14 @@ class Camera(eqx.Module):
 
         Sensor positions are interpreted as camera-local coordinates.
 
-        Args:
-            filename: Path to camera YAML file.
+        Parameters
+        ----------
+        filename
+            Path to camera YAML file.
 
-        Returns:
-            Camera object.
+        Returns
+        -------
+        Camera object.
         """
         from ..io.yaml_io import load_camera_config
 
@@ -426,13 +402,18 @@ class Camera(eqx.Module):
 
         Sensor positions are written in camera-local coordinates.
 
-        Args:
-            filename: Output file path.
-            precision: Number of decimal places for float values.
-            overwrite: If True, overwrite existing file.
+        Parameters
+        ----------
+        filename
+            Output file path.
+        precision
+            Number of decimal places for float values.
+        overwrite
+            If True, overwrite existing file.
 
-        Returns:
-            Path to the saved file.
+        Returns
+        -------
+        Path to the saved file.
         """
         from ..io.yaml_io import save_camera
 

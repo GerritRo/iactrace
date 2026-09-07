@@ -1937,13 +1937,13 @@ sensors:
     entrance_apothem: 0.0205
     exit_apothem: 0.01025
     length: 0.053
-    reflectivity: 0.78
+    reflectivity: 0.83
     max_bounces: 10
     orientation_deg: 0.0
   photodetector:
     type: pmt
-    qe: 1.0            # for now kept ideal
-    n_window: 1.49
+    qe: 0.2
+    window_index: 1.49
     face_radius: 0.01425
     length: 0.098
     vertex_z: 0.0

@@ -15,17 +15,17 @@ from .winston import cpc_full_length, cpc_ideal_wall_tilt
 
 _T_FLOOR = 1e-6  # spurious-hit rejection floor, scaled by a2
 _N_BRACKET = 12  # sub-intervals used to isolate meridian roots on t in [0, 1]
-_N_BISECT = 20  # bisection steps that shrink each bracket
-_N_POLISH = 2  # Newton steps that give the selected root a clean derivative
+_N_BISECT = 20   # bisection steps that shrink each bracket
+_N_POLISH = 2    # Newton steps that give the selected root a clean derivative
 
 
 def _bezier_power_coeffs(control_values: Sequence[float]) -> list[float]:
-    """Power-basis coefficients ``[a0, ..., ad]`` of a 1-D Bezier curve.
+    """Power-basis coefficients [a0, ..., ad] of a 1-D Bezier curve.
 
-    Converts Bernstein control values ``c0..cd`` (the curve passes through
-    ``c0`` at ``t = 0`` and ``cd`` at ``t = 1``) to ``B(t) = sum_k a_k t**k``
+    Converts Bernstein control values c0..cd (the curve passes through
+    c0 at t = 0 and cd at t = 1) to B(t) = sum_k a_k t**k
     via the standard identity
-    ``a_k = C(d, k) * sum_{j<=k} (-1)^{k-j} C(k, j) c_j``.
+    a_k = C(d, k) * sum_{j<=k} (-1)^{k-j} C(k, j) c_j.
     """
     c = [float(v) for v in control_values]
     d = len(c) - 1
@@ -39,7 +39,7 @@ def _bezier_power_coeffs(control_values: Sequence[float]) -> list[float]:
 
 
 def _polyval(coeffs: Array, t: Array) -> Array:
-    """Horner evaluation of a polynomial with ``coeffs`` ordered low -> high."""
+    """Horner evaluation of a polynomial with coeffs ordered low -> high."""
     res = coeffs[-1] * jnp.ones_like(t)
     for k in range(coeffs.shape[0] - 2, -1, -1):
         res = res * t + coeffs[k]
@@ -60,11 +60,7 @@ def _meridian_coeffs(
     exit_apothem: float,
     length: float,
 ) -> tuple[list[float], list[float]]:
-    """Power-basis coefficients of the meridian ``R(t)`` and ``Z(t)``.
-
-    ``control_points`` are the *interior* Bezier points in the paper's
-    normalized box; the exit rim ``(0, 0)`` and mouth ``(1, 1)`` are implied.
-    """
+    """Power-basis coefficients of the meridian R(t) and Z(t)."""
     r_vals = [0.0, *(p[0] for p in control_points), 1.0]
     z_vals = [0.0, *(p[1] for p in control_points), 1.0]
     br = _bezier_power_coeffs(r_vals)
@@ -86,10 +82,10 @@ def _wall_hit(
     gd_z: Array,
     a2: float,
 ) -> tuple[Array, Array]:
-    """Smallest forward ray parameter hitting facet ``n`` and its Bezier ``t``.
+    """Smallest forward ray parameter hitting facet n and its Bezier t.
 
-    Returns ``(tau, t)``; ``tau = inf`` when the facet is not hit in front of
-    the ray. ``gd_r`` / ``gd_z`` are the derivative coefficients of ``R`` / ``Z``.
+    Returns (tau, t); tau = inf when the facet is not hit in front of
+    the ray. gd_r / gd_z are the derivative coefficients of R / Z.
     """
     p = d[0] * n[0] + d[1] * n[1]
     q = d[2]
@@ -154,13 +150,7 @@ def _wall_hit(
 
 
 def _wall_normal(n: Array, t: Array, gd_r: Array, gd_z: Array) -> Array:
-    """Unit wall normal on facet ``n`` at Bezier parameter ``t``.
-
-    The meridian tangent in the ``(u, z)`` half-plane is ``(R'(t), Z'(t))``; the
-    surface normal is perpendicular to it, lifted to 3-D along ``n_hat``. The
-    orientation (inward vs. outward) is irrelevant to
-    :func:`~iactrace.core.interactions.reflect`.
-    """
+    """Unit wall normal on facet n at Bezier parameter t."""
     Rp = _polyval(gd_r, t)
     Zp = _polyval(gd_z, t)
     nrm = jnp.array([Zp * n[0], Zp * n[1], -Rp])
@@ -171,43 +161,51 @@ def _wall_normal(n: Array, t: Array, gd_r: Array, gd_z: Array) -> Array:
 class OkumuraCone(PolygonalCone):
     """Okumura light collector: a polygonal cone with Bezier-curve walls.
 
-    A hollow light guide whose ``n_sides`` walls follow a quadratic or cubic
+    A hollow light guide whose n_sides walls follow a quadratic or cubic
     Bezier meridian (Okumura 2012, arXiv:1205.3968) rather than the Winston
     paraboloid. Construct it either from an explicit list of interior control
-    points or via :meth:`quadratic` / :meth:`cubic`, using the relative
+    points or via quadratic / cubic, using the relative
     coordinates tabulated in the paper. Like the Winston cone, it answers the
-    per-facet Bezier-meridian hit (:meth:`_nearest_hit`); the bounce loop is
-    owned by the shared :func:`~iactrace.camera.optics.polygonal.trace_chain`.
+    per-facet Bezier-meridian hit (_nearest_hit); the bounce loop is
+    owned by the shared trace_chain.
 
     The control points are given in the paper's normalized box: the exit rim is
-    ``(0, 0)`` and the mouth is ``(1, 1)``, so a control point ``(r, z)`` has
-    ``r`` interpolating the inradius from ``exit_apothem`` to ``entrance_apothem``
-    and ``z`` interpolating the axial position from the exit plane to the mouth.
+    (0, 0) and the mouth is (1, 1), so a control point (r, z) has
+    r interpolating the inradius from exit_apothem to entrance_apothem
+    and z interpolating the axial position from the exit plane to the mouth.
 
-    Args:
-        n_sides: Number of facets (6 = hexagonal, 4 = square, ...).
-        entrance_apothem: Mouth inradius ``a1`` (the apothem at ``z = length``).
-        exit_apothem: Exit aperture inradius ``a2``.
-        control_points: Interior Bezier control points in normalized
-            coordinates -- ``[(P1r, P1z)]`` for a quadratic curve,
-            ``[(P1r, P1z), (P2r, P2z)]`` for a cubic one. The endpoints
-            ``(0, 0)`` (exit) and ``(1, 1)`` (mouth) are implied.
-        length: Physical depth. ``None`` defaults to the length of the
-            equivalent full Winston cone, ``L = (a1 + a2) * cos/sin(theta_max)``
-            with ``sin(theta_max) = a2 / a1`` -- the same ``L`` Okumura compares
-            against, so the Okumura cone is a true drop-in for that Winston cone.
-        reflectivity: Per-bounce wall reflectivity (scalar).
-        reflectivity_curve: Optional coating curve
-            (:class:`~iactrace.core.responses.ResponseCurve`) multiplying the scalar,
-            evaluated at each bounce's actual incidence angle and at the ray's
-            wavelength; ``None`` (default) is a flat wall response.
-        max_bounces: Maximum reflections traced before a ray is absorbed.
-        orientation_deg: Rotation of the polygon about the optical axis.
+    Parameters
+    ----------
+    n_sides
+        Number of facets.
+    entrance_apothem
+        Mouth inradius a1.
+    exit_apothem
+        Exit aperture inradius a2.
+    control_points
+        Interior Bezier control points in normalized
+        coordinates -- [(P1r, P1z)] for a quadratic curve,
+        [(P1r, P1z), (P2r, P2z)] for a cubic one. The endpoints
+        (0, 0) (exit) and (1, 1) (mouth) are implied.
+    length
+        Physical depth. None defaults to the length of the
+        equivalent full Winston cone, L = (a1 + a2) * cos/sin(theta_max)
+        with sin(theta_max) = a2 / a1.
+    reflectivity : scalar
+        Per-bounce wall reflectivity.
+    reflectivity_curve
+        Optional coating curve.
+    max_bounces
+        Maximum reflections traced before a ray is absorbed.
+    orientation_deg
+        Rotation of the polygon about the optical axis.
 
-    Raises:
-        ValueError: if ``0 < exit_apothem < entrance_apothem`` is violated, if
-            no interior control point is given, or if the control points give a
-            non-monotonic axial profile ``Z(t)`` (an ill-defined depth).
+    Raises
+    ------
+    ValueError
+        if 0 < exit_apothem < entrance_apothem is violated, if
+        no interior control point is given, or if the control points give a
+        non-monotonic axial profile Z(t) (an ill-defined depth).
     """
 
     n_sides: int = eqx.field(static=True)
@@ -256,8 +254,6 @@ class OkumuraCone(PolygonalCone):
 
         r_coeffs, z_coeffs = _meridian_coeffs(pts, a1, a2, length)
 
-        # A well-defined cone needs a monotonic axial profile so that t in [0, 1]
-        # maps one-to-one onto z in [0, length].
         tt = np.linspace(0.0, 1.0, 257)
         zz = np.polyval(list(reversed(z_coeffs)), tt)
         if np.any(np.diff(zz) < -1e-9 * length):
@@ -288,7 +284,7 @@ class OkumuraCone(PolygonalCone):
         p1: tuple[float, float],
         **kwargs,
     ) -> OkumuraCone:
-        """Build a quadratic Okumura cone from its single Bezier control point ``P1``."""
+        """Build a quadratic Okumura cone from its single Bezier control point P1."""
         return cls(n_sides, entrance_apothem, exit_apothem, [p1], **kwargs)
 
     @classmethod
@@ -301,7 +297,7 @@ class OkumuraCone(PolygonalCone):
         p2: tuple[float, float],
         **kwargs,
     ) -> OkumuraCone:
-        """Build a cubic Okumura cone from its Bezier control points ``P1`` and ``P2``."""
+        """Build a cubic Okumura cone from its Bezier control points P1 and P2."""
         return cls(n_sides, entrance_apothem, exit_apothem, [p1, p2], **kwargs)
 
     @property

@@ -7,8 +7,8 @@ import jax
 import jax.numpy as jnp
 from jax import Array
 
-from ...core._tolerances import dir_tol
 from ...core.responses import ResponseCurve
+from ...core.tolerances import dir_tol
 from .polygonal import PolygonalCone
 
 _T_FLOOR = 1e-6  # spurious-hit rejection floor, scaled by a2
@@ -20,8 +20,10 @@ def cpc_wall_tilt(
     """(sin, cos) of the CPC wall tilt for a cone whose exit-rim apothem is
     a2 and whose +u wall passes through the entrance (a1, length).
 
-    Raises:
-        ValueError: if (a2, a1, length) is not a realizable CPC.
+    Raises
+    ------
+    ValueError
+        if (a2, a1, length) is not a realizable CPC.
     """
     a2, a1, length = float(exit_apothem), float(entrance_apothem), float(length)
     if not 0.0 < a2 < a1:
@@ -33,7 +35,7 @@ def cpc_wall_tilt(
     d = math.hypot(a1 + a2, length) - 2.0 * a2
     disc = r2 - d * d
     if disc < 0.0:
-        raise ValueError(f"(exit={a2}, entrance={a1}, length={length}) is not a realizable ")
+        raise ValueError(f"(exit={a2}, entrance={a1}, length={length}) is not a realizable CPC")
     sq = math.sqrt(disc)
     s = (b * d + length * sq) / r2
     c = (length * d - b * sq) / r2
@@ -48,8 +50,8 @@ def cpc_wall_tilt(
 def cpc_ideal_wall_tilt(exit_apothem: float, entrance_apothem: float) -> tuple[float, float]:
     """(sin, cos) of the wall tilt for the untruncated (ideal) CPC.
 
-    For the full cone, ``entrance_apothem`` *is* the full CPC entry a1, which
-    fixes the wall tilt directly: ``sin(theta) = a2 / a1``.
+    For the full cone, entrance_apothem is the full CPC entry a1, which
+    fixes the wall tilt directly: sin(theta) = a2 / a1.
     """
     s = exit_apothem / entrance_apothem
     c = math.sqrt(1.0 - s * s)
@@ -131,27 +133,33 @@ class WinstonCone(PolygonalCone):
     """Polygonal CPC (Winston cone) light guide.
 
     Defined entirely by its physical dimensions; exit apothem, entrance apothem
-    and length. The parabolic-wall tilt ``(s, c)`` that fixes the cone is
-    computed from them at construction (see :func:`cpc_wall_tilt`). The cone
-    answers the per-facet meridian-parabola hit (:meth:`_nearest_hit`); the
-    bounce loop is owned by the shared :func:`~iactrace.camera.optics.polygonal.trace_chain`.
+    and length.
 
-    Args:
-        n_sides: Number of facets (6 = hexagonal, 4 = square, ...).
-        entrance_apothem: Entrance inradius ``a1``; the apothem **at the entrance
-            plane** ``z = length``. For a truncated cone this is the actual
-            (truncated) entry.
-        exit_apothem: Exit aperture inradius ``a2``.
-        length: Physical depth. ``None`` builds the full (untruncated) CPC and
-            derives the length from ``a1``/``a2``; a value truncates the cone (then
-            ``entrance_apothem`` is the entry at that depth).
-        reflectivity: Per-bounce wall reflectivity (scalar bulk value).
-        reflectivity_curve: Optional coating curve
-            (:class:`~iactrace.core.responses.ResponseCurve`) multiplying the scalar,
-            evaluated at each bounce's actual incidence angle and at the ray's
-            wavelength; ``None`` (default) is a flat wall response.
-        max_bounces: Maximum reflections traced before a ray is absorbed.
-        orientation_deg: Rotation of the polygon about the optical axis.
+    Parameters
+    ----------
+    n_sides
+        Number of facets (6 = hexagonal, 4 = square, ...).
+    entrance_apothem
+        Entrance inradius a1; the apothem at the entrance
+        plane z = length. For a truncated cone this is the actual
+        (truncated) entry.
+    exit_apothem
+        Exit aperture inradius a2.
+    length
+        Physical depth. None builds the full (untruncated) CPC and
+        derives the length from a1/a2; a value truncates the cone (then
+        entrance_apothem is the entry at that depth).
+    reflectivity
+        Per-bounce wall reflectivity (scalar bulk value).
+    reflectivity_curve
+        Optional coating curve
+        (ResponseCurve) multiplying the scalar,
+        evaluated at each bounce's actual incidence angle and at the ray's
+        wavelength; None (default) is a flat wall response.
+    max_bounces
+        Maximum reflections traced before a ray is absorbed.
+    orientation_deg
+        Rotation of the polygon about the optical axis.
     """
 
     n_sides: int = eqx.field(static=True)
@@ -208,7 +216,7 @@ class WinstonCone(PolygonalCone):
 
     @property
     def k(self) -> float:
-        """Meridian offset ``a2 * (2 + s)`` of the wall parabola."""
+        """Meridian offset a2 * (2 + s) of the wall parabola."""
         return self.exit_apothem * (2.0 + self.s)
 
     def _nearest_hit(self, o: Array, d: Array) -> tuple[Array, Array]:

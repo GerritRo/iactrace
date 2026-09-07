@@ -25,10 +25,10 @@ def _apply_color(mesh, rgba):
 
 
 def _color_path(path, rgba):
-    """Colour every entity of a ``Path3D`` so the colour survives to the viewer.
+    """Colour every entity of a Path3D so the colour survives to the viewer.
 
-    ``Path.colors`` is stored *per entity* and reads back ``None`` until it is
-    assigned, in which case the glTF exporter emits no ``COLOR_0`` attribute and
+    Path.colors is stored per entity and reads back None until it is
+    assigned, in which case the glTF exporter emits no COLOR_0 attribute and
     three.js falls back to the default material -- which is why an uncoloured
     path renders white in a notebook however it was constructed.
     """
@@ -54,13 +54,13 @@ def _rigid_transform(rotation, translation):
 
 
 def _spin_z(angle):
-    """3x3 rotation of ``angle`` radians about +Z."""
+    """3x3 rotation of angle radians about +Z."""
     c, s = np.cos(angle), np.sin(angle)
     return np.array([[c, -s, 0.0], [s, c, 0.0], [0.0, 0.0, 1.0]])
 
 
 def _align_z_to(direction_norm):
-    """Rotation mapping local +Z onto the unit ``direction_norm`` (Rodrigues)."""
+    """Rotation mapping local +Z onto the unit direction_norm (Rodrigues)."""
     z_axis = np.array([0.0, 0.0, 1.0])
     if np.allclose(direction_norm, z_axis):
         return np.eye(3)
@@ -74,12 +74,12 @@ def _align_z_to(direction_norm):
 
 
 def _replicate_mesh(mesh, rotation, offsets):
-    """Copy ``mesh`` to every offset under one shared rotation, as a single mesh.
+    """Copy mesh to every offset under one shared rotation, as a single mesh.
 
     Instancing by hand: rotate the template's vertices once, broadcast them over
-    the ``(P, 3)`` ``offsets``, and shift the face indices per copy. A camera has
-    thousands of pixels, so merging with :func:`trimesh.util.concatenate` per
-    pixel is far too slow -- and ``process=False`` keeps trimesh from trying to
+    the (P, 3) offsets, and shift the face indices per copy. A camera has
+    thousands of pixels, so merging with trimesh.util.concatenate per
+    pixel is far too slow -- and process=False keeps trimesh from trying to
     weld the (deliberately) duplicated vertices.
     """
     verts = np.asarray(mesh.vertices) @ np.asarray(rotation).T  # (V, 3)
@@ -98,14 +98,17 @@ def _replicate_mesh(mesh, rotation, offsets):
 def _create_lofted_mesh(z, rings):
     """Loft a stack of polygon cross-sections into a wall mesh.
 
-    Args:
-        z: ``(K,)`` axial heights.
-        rings: ``(K, M, 2)`` polygon vertices per slice (pixel-local frame).
+    Builds quads between consecutive rings rings[k] / rings[k+1] and returns a
+    double-sided trimesh.Trimesh (walls only, no caps). Generalizes
+    _create_open_cylinder_mesh to a varying cross-section, so it covers
+    hexagonal, square and (large M) round cones alike.
 
-    Builds quads between consecutive rings ``rings[k]`` / ``rings[k+1]`` and
-    returns a double-sided :class:`trimesh.Trimesh` (walls only, no caps).
-    Generalizes :func:`_create_open_cylinder_mesh` to a varying cross-section,
-    so it covers hexagonal, square and (large ``M``) round cones alike.
+    Parameters
+    ----------
+    z : array, shape (K,)
+        Axial heights.
+    rings : array, shape (K, M, 2)
+        Polygon vertices per slice (pixel-local frame).
     """
     z = np.asarray(z, dtype=float)
     rings = np.asarray(rings, dtype=float)
@@ -141,10 +144,13 @@ def _create_disk_mesh(
 ):
     """Create disk mesh with surface curvature.
 
-    Args:
-        sag_fn: Callable (x, y) -> z for surface height, or None for flat.
+    For annulus shapes (inner_radius > 0), creates a ring mesh with a centre
+    hole.
 
-    For annulus shapes (inner_radius > 0), creates a ring mesh with a center hole.
+    Parameters
+    ----------
+    sag_fn
+        Callable (x, y) -> z for surface height, or None for flat.
     """
     theta = np.linspace(0, 2 * np.pi, resolution, endpoint=False)
 
@@ -229,8 +235,10 @@ def _create_disk_mesh(
 def _create_polygon_mesh(position, rotation_euler, vertices_2d, sag_fn=None, grid_resolution=8):
     """Create polygon mesh with optional surface curvature.
 
-    Args:
-        sag_fn: Callable (x, y) -> z for surface height, or None for flat.
+    Parameters
+    ----------
+    sag_fn
+        Callable (x, y) -> z for surface height, or None for flat.
     """
     vertices_2d = np.asarray(vertices_2d)
     n_verts = len(vertices_2d)
@@ -318,8 +326,8 @@ def _points_in_polygon(points, vertices):
 def _cylinder_axis_frame(p1, p2):
     """Shared axis-frame setup for the cylinder mesh builders.
 
-    Returns ``(height, rotation, center)`` -- rotation aligning local Z onto
-    the ``p1 -> p2`` axis, and the midpoint to translate to -- or ``None``
+    Returns (height, rotation, center) -- rotation aligning local Z onto
+    the p1 -> p2 axis, and the midpoint to translate to -- or None
     for a degenerate (near-zero-height) axis.
     """
     p1 = np.asarray(p1)

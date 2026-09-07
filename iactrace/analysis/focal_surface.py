@@ -10,41 +10,42 @@ from jax import Array
 from ..core.intersections import (
     intersect_conic,
     intersect_plane,
+    is_hit,
     newton_raphson_intersect,
 )
-from ..core.ray_bundle import LazyRayBundle, RayBundle
+from ..core.ray_bundle import RayBundle
+from ..core.render import LazyRayBundle
 from ..core.surfaces import sag_raw
 from ..core.transforms import euler_to_matrix
 
 
 class FocalSurfaceHits(eqx.Module):
-    """Result of intersecting a :class:`RayBundle` with a :class:`FocalSurface`.
+    """Result of intersecting a RayBundle with a FocalSurface.
 
-    All arrays have leading dimension ``n_rays`` and are aligned with the input
-    bundle. Dead rays appear with ``hit_mask = False`` and meaningless values
-    in the position/direction arrays: always filter with ``hit_mask`` (or
-    :attr:`alive`) before using ``xy_local`` for plotting or statistics.
-
-    Attributes:
-        xy_local: Tangent-plane coordinates at the hit, in the surface-local
-            frame (n_rays, 2).
-        z_local: Sag of the surface at the hit (n_rays,). Always 0 for a flat
-            focal plane.
-        t: Ray parameter at the hit; equals the world-frame distance travelled
-            from ``ray_bundle.origins`` to the surface (n_rays,).
-        hit_mask: Liveness at the surface (n_rays,): ``True`` for a ray that
-            was still alive on arrival **and** crossed this surface. This is
-            the input bundle's ``alive`` flag ANDed with a real intersection,
-            so a ray lost upstream (shadowed, off-aperture) is ``False`` here
-            even if its stale geometry would formally cross the surface.
-        directions_local: Ray directions in the surface-local frame (n_rays, 3).
-            Useful for chief-ray / angle-of-incidence analysis.
-        opl: Per-ray optical path length from the source wavefront to the
-            focal surface, in metres (n_rays,). Equals
-            ``ray_bundle.path_length + t * ray_bundle.n``.
-        values: Throughput-weighted intensity carried to the surface (n_rays,),
-            in the input bundle's units.
-        wavelength: Per-ray wavelength carried from the input bundle (n_rays,).
+    Attributes
+    ----------
+    xy_local
+        Tangent-plane coordinates at the hit, in the surface-local
+        frame (n_rays, 2).
+    z_local
+        Sag of the surface at the hit (n_rays,). Always 0 for a flat
+        focal plane.
+    t
+        Ray parameter at the hit; equals the world-frame distance travelled
+        from ray_bundle.origins to the surface (n_rays,).
+    hit_mask
+        Liveness at the surface (n_rays,).
+    directions_local : array, shape (n_rays, 3)
+        Ray directions in the surface-local frame.
+    opl
+        Per-ray optical path length from the source wavefront to the
+        focal surface, in metres (n_rays,). Equals
+        ray_bundle.path_length + t * ray_bundle.n.
+    values
+        Throughput-weighted intensity carried to the surface (n_rays,),
+        in the input bundle's units.
+    wavelength : array, shape (n_rays,)
+        Per-ray wavelength carried from the input bundle.
     """
 
     xy_local: Array
@@ -58,24 +59,12 @@ class FocalSurfaceHits(eqx.Module):
 
     @property
     def alive(self) -> Array:
-        """Rays that reached the surface carrying light (``hit_mask & values > 0``).
-
-        The one-stop filter for photometry / spot diagrams: it excludes both
-        geometry loss (``hit_mask``) and rays attenuated to zero throughput
-        such as absorbed or totally-internally-reflected rays.
-        """
+        """Rays that reached the surface carrying light (hit_mask & values > 0)."""
         return self.hit_mask & (self.values > 0)
 
 
 class FocalSurface(eqx.Module):
-    """Abstract focal surface attached to the camera frame.
-
-    Subclasses implement :meth:`_intersect_local`, which receives a single ray
-    already transformed into the surface-local frame (vertex at origin, +Z
-    along the surface normal at the vertex). The base :meth:`intersect`
-    handles materialisation of lazy bundles, the world->local transform, and
-    vectorisation across rays.
-    """
+    """Abstract focal surface attached to the camera frame."""
 
     position: Array  # (3,) vertex of the surface in the camera/telescope frame
     rotation: Array  # (3,) Euler XYZ degrees; local +Z is the normal at the vertex
@@ -88,16 +77,20 @@ class FocalSurface(eqx.Module):
     ) -> tuple[Array, Array, Array, Array]:
         """Intersect a single local-frame ray with the surface.
 
-        Args:
-            o_local: Ray origin in the surface-local frame (3,).
-            d_local: Ray direction in the surface-local frame (3,), normalized.
+        Parameters
+        ----------
+        o_local : array, shape (3,)
+            Ray origin in the surface-local frame.
+        d_local
+            Ray direction in the surface-local frame (3,), normalized.
 
-        Returns:
-            Tuple ``(t, xy_local, z_local, valid)`` where:
-                - ``t`` is the ray parameter (scalar),
-                - ``xy_local`` is the in-plane hit coordinate (2,),
-                - ``z_local`` is the surface sag at the hit (scalar),
-                - ``valid`` is a bool flag indicating a real intersection.
+        Returns
+        -------
+        Tuple (t, xy_local, z_local, valid) where:
+            - t is the ray parameter (scalar),
+            - xy_local is the in-plane hit coordinate (2,),
+            - z_local is the surface sag at the hit (scalar),
+            - valid is a bool flag indicating a real intersection.
         """
         raise NotImplementedError
 
@@ -105,7 +98,7 @@ class FocalSurface(eqx.Module):
         self,
         ray_bundle: RayBundle | LazyRayBundle,
     ) -> FocalSurfaceHits:
-        """Intersect every ray in ``ray_bundle`` with this focal surface.
+        """Intersect every ray in ray_bundle with this focal surface.
 
         Lazy bundles are materialised first; per-ray analysis cannot fold.
         """
@@ -141,12 +134,7 @@ class FocalSurface(eqx.Module):
 
 
 class FlatFocalPlane(FocalSurface):
-    """A flat focal plane.
-
-    The plane passes through ``position`` with its normal aligned with the
-    local +Z axis defined by ``rotation``. This is the same model
-    :func:`intersect_sensor` uses for sensors, just without pixel binning.
-    """
+    """A flat focal plane."""
 
     def __init__(
         self,
@@ -160,7 +148,7 @@ class FlatFocalPlane(FocalSurface):
         center = jnp.zeros(3)
         rot = jnp.eye(3)
         xy, t = intersect_plane(o_local, d_local, center, rot)
-        valid = t < 1e10
+        valid = is_hit(t)
         z = jnp.zeros((), dtype=xy.dtype)
         return t, xy, z, valid
 
@@ -168,18 +156,10 @@ class FlatFocalPlane(FocalSurface):
 class AsphericFocalSurface(FocalSurface):
     """A rotationally-symmetric aspheric focal surface.
 
-    Parameterisation matches :class:`AsphericSurfaceGroup`; the surface sag is
+    Parameterisation matches AsphericSurfaceGroup; the surface sag is
 
         z(r) = c r^2 / (1 + sqrt(1 - (1 + k) c^2 r^2))
                + sum_i a_i r^(2i+4)
-
-    with ``r^2 = x^2 + y^2`` in the local frame, i.e. ``aspherics[i]``
-    multiplies ``r^(2i + 4)`` -- the polynomial starts at ``r^4``, since an
-    ``r^2`` term would be degenerate with ``curvature``. The vertex sits at
-    ``position`` and the optical axis points along the local +Z (set by
-    ``rotation``). Pure conics are recovered with ``aspherics=None``;
-    ``curvature = 0`` reduces to a flat plane (Newton converges in one step
-    from the closed-form conic init).
     """
 
     curvature: Array

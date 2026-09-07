@@ -16,64 +16,67 @@ class PMT(PhotoDetector):
     """A photomultiplier: a sensor surface + a cylindrical body.
 
     A self-contained photodetector bundling everything a PMT contributes to
-    detection, applied *after* the chain hands rays over to the sensor surface:
+    detection, applied after the chain hands rays over to the sensor surface:
 
-    * **Geometry.** The **sensor surface** is the sensor surface the chain traces
-      rays onto (:attr:`surface`): bounded by ``face_radius`` and placed with
-      its vertex at ``vertex_z`` (relative to the detector plane; ``0`` = flush
-      with the mount, ``> 0`` peeks toward the light, as for a domed window).
-    * **Efficiency.** The usual ``qe`` / ``qe_curve`` pair, applied to every ray
+    - Geometry. The sensor surface is the sensor surface the chain traces
+      rays onto (surface): bounded by face_radius and placed with
+      its vertex at vertex_z (relative to the detector plane; 0 = flush
+      with the mount, > 0 peeks toward the light, as for a domed window).
+    - Efficiency. The usual qe / qe_curve pair, applied to every ray
       landing on the sensor surface. By default this is the single bulk scalar
-      ``qe`` (real PMT efficiencies are measured with the entrance glass in
-      place, so ``qe`` is the whole measured number). For a wavelength- or
-      angle-dependent photocathode, pass ``qe_curve`` -- the same
-      :class:`~iactrace.core.responses.ResponseCurve` type a mirror or lens
-      takes, so ``QE(lambda)`` is built with
-      :meth:`~iactrace.core.responses.TabulatedResponse.from_wavelengths`.
-    * **Optional entrance window.** Set ``window_index`` to also weight each ray
+      qe (real PMT efficiencies are measured with the entrance glass in
+      place, so qe is the whole measured number). For a wavelength- or
+      angle-dependent photocathode, pass qe_curve.
+    - Optional entrance window. Set window_index to also weight each ray
       by the unpolarized Fresnel transmittance at the air/window interface for
       its incident angle -- the angular response a single measured scalar cannot
-      capture. When you do, ``qe`` should be the intrinsic photocathode QE (the
-      glass loss is then modelled by the Fresnel term, not folded into ``qe``).
+      capture. When you do, qe should be the intrinsic photocathode QE (the
+      glass loss is then modelled by the Fresnel term, not folded into qe).
       A number gives a non-dispersive window; a
-      :class:`~iactrace.core.refractive_index.RefractiveIndex` model gives a
-      dispersive one, ``n(lambda)``.
+      RefractiveIndex model gives a
+      dispersive one, n(lambda).
 
-    A :class:`~iactrace.core.surfaces.FreeformSurfaceGroup` sensor is
-    supported at the Python level (pass it as ``surface``), but -- like a
-    freeform mirror or lens surface -- is not representable in YAML.
+    Parameters
+    ----------
+    qe
+        Bulk detection efficiency in [0, 1] applied at the
+        photocathode. Defaults to 1.0. With qe_curve it acts as a
+        bulk multiplier.
+    qe_curve : array, shape (theta, lambda)
+        Optional QE.
+        ResponseCurve multiplying qe
+        per ray; None (default) is flat.
+    window_index
+        Refractive index of the entrance window. None
+        (default) applies qe alone. A number > 1 (e.g. 1.48 for
+        borosilicate glass) additionally weights each ray by the
+        incident-angle Fresnel transmittance through the window; a
+        RefractiveIndex model does
+        the same with a dispersive n(lambda).
+    face_radius
+        Sensor surface aperture radius (and the body radius).
+    surface
+        The sensor surface figure, a single-element
+        SurfaceGroup (typically an
+        AsphericSurfaceGroup, optionally
+        summed with a ZernikeSurfaceGroup
+        via SumSurfaceGroup). None
+        (default) is a flat window.
+    vertex_z
+        Axial position of the surface's vertex, relative to the
+        detector plane.
+    length
+        Axial length of the cylindrical body behind the sensor surface.
+        None defaults to 2 * face_radius.
+    n_facets
+        Facets of the revolved body (48 ~ round).
 
-    Args:
-        qe: Bulk detection efficiency in ``[0, 1]`` applied at the
-            photocathode. Defaults to ``1.0``. With ``qe_curve`` it acts as a
-            bulk multiplier.
-        qe_curve: Optional ``QE(theta, lambda)``
-            :class:`~iactrace.core.responses.ResponseCurve` multiplying ``qe``
-            per ray; ``None`` (default) is flat.
-        window_index: Refractive index of the entrance window. ``None``
-            (default) applies ``qe`` alone. A number ``> 1`` (e.g. ``1.48`` for
-            borosilicate glass) additionally weights each ray by the
-            incident-angle Fresnel transmittance through the window; a
-            :class:`~iactrace.core.refractive_index.RefractiveIndex` model does
-            the same with a dispersive ``n(lambda)``.
-        face_radius: Sensor surface aperture radius (and the body radius).
-        surface: The sensor surface figure, a single-element
-            :class:`~iactrace.core.surfaces.SurfaceGroup` (typically an
-            :class:`~iactrace.core.surfaces.AsphericSurfaceGroup`, optionally
-            summed with a :class:`~iactrace.core.surfaces.ZernikeSurfaceGroup`
-            via :class:`~iactrace.core.surfaces.SumSurfaceGroup`). ``None``
-            (default) is a flat window.
-        vertex_z: Axial position of the surface's vertex, relative to the
-            detector plane (``0`` = at the plane; same convention as
-            :attr:`~iactrace.camera.detector.surface.DetectionSurface.vertex_z`).
-        length: Axial length of the cylindrical body behind the sensor surface.
-            ``None`` defaults to ``2 * face_radius``.
-        n_facets: Facets of the revolved body (``48`` ~ round).
-
-    Raises:
-        ValueError: on ``qe`` outside ``[0, 1]``, a constant ``window_index``
-            ``<= 1``, non-positive ``face_radius``, negative ``length``, or
-            ``n_facets < 3``.
+    Raises
+    ------
+    ValueError
+        on qe outside [0, 1], a constant window_index
+        <= 1, non-positive face_radius, negative length, or
+        n_facets < 3.
     """
 
     qe: float = eqx.field(static=True)
@@ -127,8 +130,6 @@ class PMT(PhotoDetector):
         self.n_facets = int(n_facets)
 
     def detect(self, local_rays: RayBundle) -> RayBundle:
-        # The photocathode sees the true incidence angle on the sensor surface,
-        # so an angle-dependent qe_curve resolves at the right angle.
         normals = self.surface.normals_at(local_rays.origins)
         cos_theta_i = incidence_cos(local_rays.directions, normals)
         values = apply_qe(local_rays, self.qe, self.qe_curve, cos_theta_i)
@@ -143,11 +144,9 @@ class PMT(PhotoDetector):
     def surface(self) -> DetectionSurface:
         """The sensor surface.
 
-        :attr:`shape` supplies the figure (flat by default; curved / aspheric /
-        Zernike otherwise), placed with its vertex at :attr:`vertex_z` and
-        bounded by :attr:`face_radius` -- the exact same
-        :class:`~iactrace.camera.detector.surface.DetectionSurface` machinery
-        used by every other photodetector's surface.
+        shape supplies the figure (flat by default; curved / aspheric /
+        Zernike otherwise), placed with its vertex at vertex_z and
+        bounded by face_radius.
         """
         return DetectionSurface(self.shape, vertex_z=self.vertex_z, radius=self.face_radius)
 
@@ -156,21 +155,12 @@ class PMT(PhotoDetector):
         return self.face_radius * jnp.stack([jnp.cos(ang), jnp.sin(ang)], axis=-1)
 
     def envelope(self) -> tuple[Array, Array]:
-        """Body-only cylinder for the viz: :attr:`vertex_z` -> ``vertex_z - length``.
-
-        The entry window is the sensor surface, drawn separately; the
-        body is just the tube behind it, sharing the rim circle
-        (``z = vertex_z``, ``r = face_radius``) with a flat / recessed
-        sensor surface so the two fit without intersection. A sensor surface that
-        bulges *past* its rim (a strongly domed :attr:`shape`) is drawn with
-        its body starting at the mount rather than the true apex; this is a
-        diagnostic-viz simplification only, not a tracing concern.
-        """
+        """Body-only cylinder for the viz: vertex_z -> vertex_z - length."""
         m = self.n_facets
         ang = 2.0 * jnp.pi * jnp.arange(m) / m
-        unit = jnp.stack([jnp.cos(ang), jnp.sin(ang)], axis=-1)  # (M, 2)
+        unit = jnp.stack([jnp.cos(ang), jnp.sin(ang)], axis=-1)
         r_prof = jnp.array([self.face_radius, self.face_radius])
         rim_z = self.vertex_z + self.shape.sag_at(0, self.face_radius, 0.0)
         z_prof = jnp.array([rim_z, rim_z - self.length])
-        rings = r_prof[:, None, None] * unit[None, :, :]  # (2, M, 2)
+        rings = r_prof[:, None, None] * unit[None, :, :]
         return z_prof, rings

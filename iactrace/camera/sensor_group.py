@@ -37,9 +37,9 @@ def _build_chain(
     photodetector: PhotoDetector | None,
     gap: float,
 ) -> DetectionChain:
-    """Assemble a :class:`DetectionChain`, defaulting to a perfect flat QE.
+    """Assemble a DetectionChain, defaulting to a perfect flat QE.
 
-    ``photodetector=None`` becomes a :class:`~iactrace.camera.detector.photodetector.ConstantQE`
+    photodetector=None becomes a ConstantQE
     with unit efficiency, so a geometry-only sensor group still detects every
     incident ray. The photocathode geometry (if any) is owned by the photodetector.
     """
@@ -54,10 +54,12 @@ def _build_chain(
 
 
 def _as_nx3(value: Sequence[Sequence[float]] | Array, name: str) -> Array:
-    """Validate ``value`` as an ``(N, 3)`` array, broadcasting a bare ``(3,)``.
+    """Validate value as an (N, 3) array, broadcasting a bare (3,).
 
-    Raises:
-        ValueError: if not 1-D of length 3 nor 2-D with 3 columns.
+    Raises
+    ------
+    ValueError
+        if not 1-D of length 3 nor 2-D with 3 columns.
     """
     arr = jnp.asarray(value)
     if arr.ndim == 1:
@@ -75,16 +77,20 @@ class SensorGroup(eqx.Module):
 
     A sensor group contains N sensors at different positions/orientations
     that share the same pixel geometry and the same detection chain.
-    Each group owns its :class:`~iactrace.camera.detection_chain.DetectionChain`
+    Each group owns its DetectionChain
     (optional concentrator + gap + photodetector), so distinct groups in
-    one :class:`~iactrace.camera.camera.Camera` can carry different cones or
+    one Camera can carry different cones or
     photodetectors.
 
-    Attributes:
-        positions: Sensor positions in 3D space (N, 3)
-        rotations: Sensor rotations as Euler angles in degrees (N, 3)
-        chain: The per-pixel :class:`~iactrace.camera.detection_chain.DetectionChain`
-            applied to every pixel of this group.
+    Attributes
+    ----------
+    positions : array, shape (N, 3)
+        Sensor positions in 3D space.
+    rotations : array, shape (N, 3)
+        Sensor rotations as Euler angles in degrees.
+    chain
+        The per-pixel DetectionChain
+        applied to every pixel of this group.
     """
 
     positions: Array
@@ -106,7 +112,7 @@ class SensorGroup(eqx.Module):
 
     @abstractmethod
     def pixel_index_and_mask(self, sensor_idx: Array, x: Array, y: Array) -> tuple[Array, Array]:
-        """Localize ``(x, y)`` to a flat pixel index plus a validity mask."""
+        """Localize (x, y) to a flat pixel index plus a validity mask."""
         raise NotImplementedError
 
     @property
@@ -114,7 +120,7 @@ class SensorGroup(eqx.Module):
         return 0.0
 
     def scatter(self, pix_id: Array, valid: Array, values: Array) -> Array:
-        """Sum *values* into the pixel accumulator by precomputed assignment."""
+        """Sum values into the pixel accumulator by precomputed assignment."""
         shape = self.get_accumulator_shape()
         flat = jax.ops.segment_sum(
             jnp.where(valid, values, 0.0),
@@ -125,7 +131,17 @@ class SensorGroup(eqx.Module):
 
     @abstractmethod
     def in_bounds(self, x: Array, y: Array) -> Array:
-        """Predicate: True for ``(x, y)`` inside the sensor's active footprint."""
+        """Predicate: True for (x, y) inside the sensor's active footprint."""
+        raise NotImplementedError
+
+    @property
+    @abstractmethod
+    def pixel_centers(self) -> Array:
+        """Pixel centres (n_pixels, 2) in the sensor-local frame.
+
+        Ordered to match the flat pixel index pixel_index_and_mask
+        returns, so pixel_centers[i] is where pixel i sits.
+        """
         raise NotImplementedError
 
     def with_concentrator(self, concentrator: Concentrator | None) -> SensorGroup:
@@ -147,15 +163,7 @@ class SensorGroup(eqx.Module):
 
     @abstractmethod
     def from_pixel_frame(self, points: Array, pix_id: Array) -> Array:
-        """Map pixel-local *points* back to the tile-local frame.
-
-        The inverse of :meth:`to_pixel_frame` for positions, undoing the pixel
-        centre offset (and any grid alignment) for each ray's assigned pixel.
-        ``points`` is ``(..., n_rays, 3)`` and ``pix_id`` ``(n_rays,)``, so a
-        whole recorded trajectory can be lifted out of the pixel frame in one
-        call -- which is what turns a chain trace into something drawable
-        alongside the rest of the camera.
-        """
+        """Map pixel-local points back to the tile-local frame."""
         raise NotImplementedError
 
 
@@ -200,23 +208,35 @@ class SquareSensorGroup(SensorGroup):
     ) -> None:
         """Square-pixel sensor group.
 
-        Args:
-            positions: Sensor positions, shape ``(N, 3)`` (or ``(3,)`` for one).
-            rotations: Euler angles in degrees, same shape as ``positions``.
-            width: Pixel count along x (``> 0``).
-            height: Pixel count along y (``> 0``).
-            bounds: ``(x_min, x_max, y_min, y_max)`` in the sensor-local frame.
-            edge_width: Dead-zone width at pixel edges (``>= 0``).
-            concentrator: Optional per-pixel light concentrator (e.g. a
-                :class:`~iactrace.camera.optics.winston.WinstonCone`).
-            photodetector: Per-pixel detector response. ``None`` defaults to a
-                perfect flat :class:`~iactrace.camera.detector.photodetector.ConstantQE`.
-            gap: Spacing from the concentrator exit (or the entrance plane when
-                there is no concentrator) to the detector (``>= 0``).
+        Parameters
+        ----------
+        positions : array, shape (N, 3)
+            Sensor positions. (or (3,) for one).
+        rotations
+            Euler angles in degrees, same shape as positions.
+        width
+            Pixel count along x (> 0).
+        height
+            Pixel count along y (> 0).
+        bounds : array, shape (x_min, x_max, y_min, y_max)
+            In the sensor-local frame.
+        edge_width
+            Dead-zone width at pixel edges (>= 0).
+        concentrator
+            Optional per-pixel light concentrator (e.g. a
+            WinstonCone).
+        photodetector
+            Per-pixel detector response. None defaults to a
+            perfect flat ConstantQE.
+        gap
+            Spacing from the concentrator exit (or the entrance plane when
+            there is no concentrator) to the detector (>= 0).
 
-        Raises:
-            ValueError: on malformed shapes, non-positive ``width``/``height``,
-                degenerate ``bounds``, or negative ``edge_width``.
+        Raises
+        ------
+        ValueError
+            on malformed shapes, non-positive width/height,
+            degenerate bounds, or negative edge_width.
         """
         self.positions = _as_nx3(positions, "positions")
         self.rotations = _as_nx3(rotations, "rotations")
@@ -272,6 +292,13 @@ class SquareSensorGroup(SensorGroup):
         x_max = self.x0 + self.dx * self.width
         y_max = self.y0 + self.dy * self.height
         return (x >= self.x0) & (x <= x_max) & (y >= self.y0) & (y <= y_max)
+
+    @property
+    def pixel_centers(self) -> Array:
+        xs = self.x0 + (jnp.arange(self.width) + 0.5) * self.dx
+        ys = self.y0 + (jnp.arange(self.height) + 0.5) * self.dy
+        xx, yy = jnp.meshgrid(xs, ys, indexing="xy")  # row-major: yi * width + xi
+        return jnp.stack([xx.ravel(), yy.ravel()], axis=-1)
 
     def to_pixel_frame(self, sensor_rays: RayBundle, pix_id: Array) -> RayBundle:
         x = sensor_rays.origins[:, 0]
@@ -329,23 +356,32 @@ class HexagonalSensorGroup(SensorGroup):
     ) -> None:
         """Hexagonal-pixel sensor group.
 
-        Args:
-            positions: Sensor positions, shape ``(N, 3)`` (or ``(3,)`` for one).
-            rotations: Euler angles in degrees, same shape as ``positions``.
-            hex_centers: Pixel centres, shape ``(M, 2)``. The grid geometry
-                (size, rotation, offset, lookup table) is auto-detected from
-                these on construction.
-            edge_width: Dead-zone width at pixel edges (``>= 0``).
-            concentrator: Optional per-pixel light concentrator (e.g. a
-                :class:`~iactrace.camera.optics.winston.WinstonCone`).
-            photodetector: Per-pixel detector response. ``None`` defaults to a
-                perfect flat :class:`~iactrace.camera.detector.photodetector.ConstantQE`.
-            gap: Spacing from the concentrator exit (or the entrance plane when
-                there is no concentrator) to the detector (``>= 0``).
+        Parameters
+        ----------
+        positions : array, shape (N, 3)
+            Sensor positions. (or (3,) for one).
+        rotations
+            Euler angles in degrees, same shape as positions.
+        hex_centers : array, shape (M, 2)
+            Pixel centres. The grid geometry (size, rotation, offset, lookup table) is
+            auto-detected from these on construction.
+        edge_width
+            Dead-zone width at pixel edges (>= 0).
+        concentrator
+            Optional per-pixel light concentrator (e.g. a
+            WinstonCone).
+        photodetector
+            Per-pixel detector response. None defaults to a
+            perfect flat ConstantQE.
+        gap
+            Spacing from the concentrator exit (or the entrance plane when
+            there is no concentrator) to the detector (>= 0).
 
-        Raises:
-            ValueError: on malformed shapes, empty ``hex_centers``, or negative
-                ``edge_width``.
+        Raises
+        ------
+        ValueError
+            on malformed shapes, empty hex_centers, or negative
+            edge_width.
         """
         self.positions = _as_nx3(positions, "positions")
         self.rotations = _as_nx3(rotations, "rotations")
@@ -391,7 +427,7 @@ class HexagonalSensorGroup(SensorGroup):
 
     @property
     def pixel_frame_rotation(self) -> float:
-        """The detected grid rotation -- see :attr:`SensorGroup.pixel_frame_rotation`."""
+        """The detected grid rotation -- see SensorGroup.pixel_frame_rotation."""
         return self.grid_rotation
 
     def _to_grid_coords(self, x: Array, y: Array) -> tuple[Array, Array]:
@@ -431,6 +467,10 @@ class HexagonalSensorGroup(SensorGroup):
 
         flat_idx = sensor_idx * self.n_pixels + pixel_idx
         return flat_idx, valid
+
+    @property
+    def pixel_centers(self) -> Array:
+        return self.hex_centers
 
     def in_bounds(self, x: Array, y: Array) -> Array:
         x_grid, y_grid = self._to_grid_coords(x, y)

@@ -73,7 +73,7 @@ def _disk_group(radii, inner_radii, curvatures=None, conics=None):
 
 
 class TestAnnularAperture:
-    """check_aperture for mirrors with a center hole (inner_r=0.3, outer_r=1.0)."""
+    """Aperture check for mirrors with a center hole (inner_r=0.3, outer_r=1.0)."""
 
     @pytest.fixture
     def annular_mirror_group(self):
@@ -84,10 +84,10 @@ class TestAnnularAperture:
         inner and outer boundaries themselves are accepted."""
         x = jnp.array([0.0, 0.2, 0.5, 0.9, 1.5])
         y = jnp.zeros(5)
-        result = annular_mirror_group.check_aperture(x, y, 0)
+        result = annular_mirror_group.aperture.check(x, y, 0)
         assert jnp.array_equal(result, jnp.array([False, False, True, True, False]))
-        assert annular_mirror_group.check_aperture(0.3, 0.0, 0)  # inner boundary
-        assert annular_mirror_group.check_aperture(1.0, 0.0, 0)  # outer boundary
+        assert annular_mirror_group.aperture.check(0.3, 0.0, 0)  # inner boundary
+        assert annular_mirror_group.aperture.check(1.0, 0.0, 0)  # outer boundary
 
 
 class TestMirrorGroupWithHole:
@@ -100,10 +100,10 @@ class TestMirrorGroupWithHole:
             jnp.array([0.2, 0.0]),  # first holed, second solid
         )
         # First mirror: origin is inside its hole -> rejected; r=0.5 accepted.
-        assert not group.check_aperture(0.0, 0.0, 0)
-        assert group.check_aperture(0.5, 0.0, 0)
+        assert not group.aperture.check(0.0, 0.0, 0)
+        assert group.aperture.check(0.5, 0.0, 0)
         # Second mirror: solid disk -> origin accepted.
-        assert group.check_aperture(0.0, 0.0, 1)
+        assert group.aperture.check(0.0, 0.0, 1)
 
     def test_area_calculation_annular(self):
         """transform_to_world weights encode area = pi*(outer^2 - inner^2)."""
@@ -175,15 +175,15 @@ def _polygon_group(vertices, n_vertices, curvatures, conics):
 class TestPolygonMirrorGroup:
     """Polygon-aperture mirror groups mask points against their polygon."""
 
-    def test_single_hexagon_check_aperture(self):
+    def test_single_hexagon_aperture_check(self):
         s = 0.5
         angles = jnp.linspace(0, 2 * jnp.pi, 7)[:-1]
         vertices = jnp.stack([jnp.cos(angles) * s, jnp.sin(angles) * s], axis=1)
         group = _polygon_group(vertices[None, :, :], 6, jnp.array([0.1]), jnp.array([-1.0]))
         assert group.aperture.n_vertices == 6
-        assert group.check_aperture(0.0, 0.0, 0)  # centre
-        assert group.check_aperture(0.1, 0.1, 0)  # off-centre, inside
-        assert not group.check_aperture(1.0, 0.0, 0)  # outside
+        assert group.aperture.check(0.0, 0.0, 0)  # centre
+        assert group.aperture.check(0.1, 0.1, 0)  # off-centre, inside
+        assert not group.aperture.check(1.0, 0.0, 0)  # outside
 
     def test_per_mirror_polygon_masking(self):
         """Two square mirrors of different size mask independently."""
@@ -195,5 +195,5 @@ class TestPolygonMirrorGroup:
         )
         group = _polygon_group(vertices, 4, jnp.array([0.05, 0.1]), jnp.array([-1.0, -1.0]))
         assert len(group) == 2
-        assert group.check_aperture(0.4, 0.0, 0)  # inside larger mirror
-        assert not group.check_aperture(0.4, 0.0, 1)  # outside smaller mirror
+        assert group.aperture.check(0.4, 0.0, 0)  # inside larger mirror
+        assert not group.aperture.check(0.4, 0.0, 1)  # outside smaller mirror

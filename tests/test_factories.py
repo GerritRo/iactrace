@@ -17,6 +17,7 @@ from iactrace.core.obstructions import (
     OpenCylinderGroup,
     SphereGroup,
 )
+from iactrace.core.refractive_index import TabulatedIndex
 from iactrace.telescope import Telescope, lenses, mirrors, obstructions
 
 # mirrors.*  -- sugar factories map physical parameters onto surface/aperture.
@@ -131,6 +132,27 @@ class TestLensSugarFactories:
         assert jnp.allclose(slab.interaction_module.index.reference(), jnp.array([1.52]))
         assert jnp.allclose(slab.interaction_module.transmittance, jnp.array([0.9]))
         assert slab.interaction == InteractionType.SLAB
+
+    @pytest.mark.parametrize("factory", ["aspheric_lens", "plano_slab"])
+    def test_single_element_factories_accept_a_dispersive_index(self, factory, random_key):
+        """The sugar factories take a RefractiveIndex model, not just a number.
+
+        They used to coerce with ``float(index)``, so the dispersive model their
+        own docstrings advertise raised TypeError.
+        """
+        model = TabulatedIndex.from_table([300.0, 600.0], [1.6, 1.5], n_elements=1)
+        kwargs = (
+            {"curvature": 7.5, "radius": 0.02}
+            if factory == "aspheric_lens"
+            else {"radius": 0.05, "thickness": 0.003}
+        )
+        group = getattr(lenses, factory)(
+            position=(0, 0, 0.1), index=model, key=random_key, **kwargs
+        )
+        index = group.interaction_module.index
+        assert isinstance(index, TabulatedIndex)
+        assert jnp.allclose(index.reference(300.0), jnp.array([1.6]))
+        assert jnp.allclose(index.reference(600.0), jnp.array([1.5]))
 
 
 # obstructions.*

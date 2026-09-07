@@ -2,6 +2,16 @@ import numpy as np
 import trimesh
 
 from ..core import euler_to_matrix
+from ..core.apertures import DiskAperture, PolygonAperture
+from ..core.interactions import RefractInteraction, SlabInteraction
+from ..core.obstructions import (
+    BoxGroup,
+    CylinderGroup,
+    OpenCylinderGroup,
+    OrientedBoxGroup,
+    SphereGroup,
+    TriangleGroup,
+)
 from ._meshes import (
     _create_box_mesh,
     _create_cylinder_mesh,
@@ -37,12 +47,11 @@ def _curved_face_meshes(group):
 
 
 def _aperture_face_mesh(position, rotation_euler, aperture, i, sag_fn=None):
-    """Build a single face mesh for element ``i`` of ``aperture``.
+    """Build a single face mesh for element i of aperture.
 
     Dispatches on aperture type so callers (mirrors, refractive lenses,
     slab caps) don't need to special-case disks vs. polygons.
     """
-    from ..core.apertures import DiskAperture, PolygonAperture
 
     if isinstance(aperture, DiskAperture):
         return _create_disk_mesh(
@@ -63,15 +72,14 @@ def _aperture_face_mesh(position, rotation_euler, aperture, i, sag_fn=None):
 
 
 def _aperture_slab_mesh(position, rotation_euler, aperture, i, thickness, sections=32):
-    """Extrude element ``i`` of ``aperture`` along the local Z-axis.
+    """Extrude element i of aperture along the local Z-axis.
 
-    Produces a cylinder for ``DiskAperture`` and a prism for
-    ``PolygonAperture``. The front face sits at ``position`` (local
+    Produces a cylinder for DiskAperture and a prism for
+    PolygonAperture. The front face sits at position (local
     z = 0) and the back face at local z = +thickness, matching the
-    physics convention in :func:`iactrace.core.interactions.refract_slab`
-    where ``position`` is the entry point on the front surface.
+    physics convention in iactrace.core.interactions.refract_slab
+    where position is the entry point on the front surface.
     """
-    from ..core.apertures import DiskAperture, PolygonAperture
 
     if thickness < 1e-10:
         return None
@@ -108,7 +116,6 @@ def _get_lens_meshes(group):
     Both honour the element's aperture, so polygonal lenses and windows
     are supported alongside circular ones.
     """
-    from ..core.interactions import RefractInteraction, SlabInteraction
 
     if isinstance(group.interaction_module, RefractInteraction):
         return _curved_face_meshes(group)
@@ -129,15 +136,6 @@ def _get_lens_meshes(group):
 
 def _get_obstruction_meshes(group):
     """Get list of obstruction meshes from group."""
-    from ..core.obstructions import (
-        BoxGroup,
-        CylinderGroup,
-        OpenCylinderGroup,
-        OrientedBoxGroup,
-        SphereGroup,
-        TriangleGroup,
-    )
-
     meshes = []
     if isinstance(group, CylinderGroup):
         p1 = np.asarray(group.p1)

@@ -96,7 +96,7 @@ class TestMirrorCoatingIO:
     def test_angle_only_coating_stays_1d(self, tmp_path):
         # A plain angle curve must serialise as a 1-D `values` list (no
         # `wavelengths_nm`) so existing configs stay byte-identical.
-        from iactrace.io.adapters import _curve_to_schema
+        from iactrace.io.adapters.curves import _curve_to_schema
 
         coat = TabulatedResponse.from_degrees(
             angles_deg=[0.0, 90.0], values=[0.9, 0.6], n_elements=1

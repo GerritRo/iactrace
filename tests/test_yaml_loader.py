@@ -125,6 +125,58 @@ class TestMirrorConfigErrors:
                 build_telescope_config({**base, **extra}, n_samples, random_key)
 
 
+class TestUnknownKeysRejected:
+    """Schemas forbid unknown keys."""
+
+    def test_misspelled_mirror_field_names_the_offending_key(
+        self, valid_template, n_samples, random_key
+    ):
+        config = {
+            "telescope": {"camera_position": [0, 0, 1], "camera_rotation": [0, 0, 0]},
+            "mirror_templates": valid_template,
+            "mirrors": [
+                {
+                    "template": "test_mirror",
+                    "position": [0, 0, 0],
+                    "orientation": [0, 0, 0],
+                    "aperture": {"type": "circular", "radius": 0.5},
+                    "reflectvity": 0.9,
+                }
+            ],
+        }
+        with pytest.raises(YAMLConfigError, match="reflectvity"):
+            build_telescope_config(config, n_samples, random_key)
+
+    def test_stray_key_on_a_nested_schema_is_rejected(self, n_samples, random_key):
+        """A cylinder's `r` copy-pasted onto a box."""
+        config = {
+            "telescope": {"camera_position": [0, 0, 1], "camera_rotation": [0, 0, 0]},
+            "mirrors": [],
+            "obstructions": [
+                {"type": "box", "p1": [-1, -1, 0], "p2": [1, 1, 1], "r": 1.0},
+            ],
+        }
+        with pytest.raises(YAMLConfigError, match="Extra inputs are not permitted"):
+            build_telescope_config(config, n_samples, random_key)
+
+    def test_misspelled_sensor_field_is_rejected(self):
+        config = {
+            "sensors": [
+                {
+                    "type": "square",
+                    "position": [0, 0, 0],
+                    "orientation": [0, 0, 0],
+                    "width": 4,
+                    "height": 4,
+                    "bounds": [-1, 1, -1, 1],
+                    "edge_with": 0.1,  # typo for `edge_width`
+                }
+            ]
+        }
+        with pytest.raises(YAMLConfigError, match="edge_with"):
+            build_camera_config(config)
+
+
 # Camera schema errors
 
 
@@ -266,7 +318,7 @@ class TestValidConfigs:
                         "conic": -1.5,
                         "aspheric": [1e-6, 2e-8],
                     },
-                    "n_inside": 1.5,
+                    "index": 1.5,
                     "stage": 1,
                 },
             ],

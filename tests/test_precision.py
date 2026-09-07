@@ -2,7 +2,7 @@
 
 The package runs in float32 (``conftest.py`` pins ``jax_enable_x64`` off), so
 every tolerance in the traced kernels is derived from the active float dtype
-rather than hard-coded -- see :mod:`iactrace.core._tolerances`. The property
+rather than hard-coded -- see :mod:`iactrace.core.tolerances`. The property
 that buys is checked here directly: trace the same geometry twice, once in
 float32 and once in float64, and require the two to agree. Tolerances that
 track the dtype tighten with it and the runs converge; tolerances fixed at some

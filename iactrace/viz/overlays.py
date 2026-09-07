@@ -8,15 +8,22 @@ def add_rays(scene, origins, directions, length=10.0, color=None):
     """
     Add rays to scene for debugging.
 
-    Args:
-        scene: trimesh.Scene
-        origins: Ray origins (N, 3)
-        directions: Ray directions (N, 3)
-        length: Ray length
-        color: RGBA color for the rays (default: yellow)
+    Parameters
+    ----------
+    scene
+        trimesh.Scene
+    origins : array, shape (N, 3)
+        Ray origins.
+    directions : array, shape (N, 3)
+        Ray directions.
+    length
+        Ray length
+    color
+        RGBA color for the rays (default: yellow)
 
-    Returns:
-        scene
+    Returns
+    -------
+    scene
     """
     if color is None:
         color = [255, 255, 0, 255]
@@ -40,7 +47,7 @@ def add_rays(scene, origins, directions, length=10.0, color=None):
 
 
 def _clip_segment(p0, p1, lo, hi):
-    """Portion of the segment ``p0 -> p1`` inside the box, or ``None``."""
+    """Portion of the segment p0 -> p1 inside the box, or None."""
     d = p1 - p0
     t0, t1 = 0.0, 1.0
     for axis in range(3):
@@ -92,25 +99,31 @@ def add_trajectories(scene, trajectory, color=None, clip=None):
 
     Draws one polyline per ray through its consecutive positions.
 
-    Args:
-        scene: trimesh.Scene
-        trajectory: A :class:`~iactrace.core.trajectory.Trajectory` (as returned
-            by ``Telescope.trace(..., record_trajectory=True)``), a
-            :class:`~iactrace.core.trajectory.TraceResult` or
-            :class:`~iactrace.camera.optics.ChainTrace` (or any object exposing a
-            ``trajectory`` attribute), or a raw ``(steps + 1, N, 3)`` array.
-            ``None`` (recording was off) is a no-op.
-        color: RGBA color for the ray paths (default: amber). Applied per
-            polyline, so it survives the glTF export a notebook renders through.
-        clip: Optional axis-aligned box ``(lo, hi)``, each ``(3,)``, to trim the
-            paths to. A ray's leg in from the optics is metres long while a
-            camera is centimetres deep, so drawing it whole leaves the subject
-            a speck in the corner; clipping keeps the geometry in frame. Paths
-            are cut, not filtered -- a ray that only passes through the box
-            still contributes the part that is inside.
+    Parameters
+    ----------
+    scene
+        trimesh.Scene
+    trajectory
+        A Trajectory (as returned
+        by Telescope.trace(..., record_trajectory=True)), a
+        TraceResult or
+        ChainTrace (or any object exposing a
+        trajectory attribute), or a raw (steps + 1, N, 3) array.
+        None (recording was off) is a no-op.
+    color
+        RGBA color for the ray paths (default: amber). Applied per
+        polyline, so it survives the glTF export a notebook renders through.
+    clip
+        Optional axis-aligned box (lo, hi), each (3,), to trim the
+        paths to. A ray's leg in from the optics is metres long while a
+        camera is centimetres deep, so drawing it whole leaves the subject
+        a speck in the corner; clipping keeps the geometry in frame. Paths
+        are cut, not filtered -- a ray that only passes through the box
+        still contributes the part that is inside.
 
-    Returns:
-        scene
+    Returns
+    -------
+    scene
     """
     if color is None:
         color = [255, 200, 0, 255]
@@ -153,13 +166,18 @@ def add_points(scene, points, color=None):
     """
     Add points to scene.
 
-    Args:
-        scene: trimesh.Scene
-        points: Point coordinates (N, 3)
-        color: RGBA color
+    Parameters
+    ----------
+    scene
+        trimesh.Scene
+    points : array, shape (N, 3)
+        Point coordinates.
+    color
+        RGBA color
 
-    Returns:
-        scene
+    Returns
+    -------
+    scene
     """
     if color is None:
         color = [0, 255, 0, 255]

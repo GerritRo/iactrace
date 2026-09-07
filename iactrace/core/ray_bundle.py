@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Literal
+import dataclasses
 
 import equinox as eqx
 import jax.numpy as jnp
@@ -8,64 +8,37 @@ from jax import Array
 
 from .transforms import euler_to_matrix
 
-if TYPE_CHECKING:
-    from .spectrum import Spectrum
-
 DEFAULT_WAVELENGTH = 400.0
 
 
 class RayBundle(eqx.Module):
     """Bundle of rays through the optical system.
 
-    Carries ray positions, directions, weights, path lengths, and a
-    per-ray liveness flag.
+    The frame of origins / directions is implicit and depends on where
+    the bundle came from: Telescope.render and Telescope.trace return
+    rays in the camera-local frame, ready for Camera.collect /
+    Camera.image.
 
-    The frame of ``origins`` / ``directions`` is implicit and depends on
-    where the bundle came from: ``Telescope.render`` and ``Telescope.trace``
-    return rays in the **camera-local** frame so they can be fed straight
-    into ``Camera.collect`` / ``Camera.image``.
+    By the time the bundle reaches Camera.collect the entries of values
+    are photoelectrons, not raw photons.
 
-    **Liveness vs throughput.** IACTrace keeps the two ways a ray can be
-    "lost" on separate axes:
-
-    * ``alive`` (bool) answers *"is this a valid, still-propagating
-      ray?"*. It is flipped off only by **geometry / occlusion** loss: a
-      ray that misses every element in a stage, lands outside an aperture,
-      is blocked by an obstruction, or misses the sensor. Once ``False``
-      it stays ``False`` (an absorbing state), and the ``origins`` /
-      ``directions`` of a dead ray are meaningless — always mask geometry
-      with ``alive`` before reading positions.
-    * ``values`` (float >= 0) is the **radiometric throughput** of a live
-      ray. Every *physical* coefficient multiplies into it — primary
-      sampling weight, reflectivity / transmittance, quantum efficiency,
-      concentrator throughput. A live ray may legitimately reach ``0``
-      (a perfectly absorbing coating, total internal reflection); that is
-      distinct from a dead ray and is *not* recorded on the ``alive`` axis.
-
-    As an invariant a dead ray always carries ``values == 0``, so the
-    image / response-matrix sums (which add ``values``) need no masking;
-    the ``alive`` flag exists so per-ray consumers can tell *why* a ray is
-    dark. "Carries light" is simply ``alive & (values > 0)``.
-
-    By the time the bundle reaches ``Camera.collect`` the entries of
-    ``values`` are photoelectrons, not raw photons.
-
-    Attributes:
-        origins: Ray positions in 3D (n_rays, 3). Meaningful only where
-            ``alive`` is ``True``.
-        directions: Ray direction vectors (n_rays, 3). Meaningful only
-            where ``alive`` is ``True``.
-        values: Throughput-weighted ray intensities (n_rays,).
-        path_length: Accumulated **optical** path length per ray
-            (n_rays,), in metres.
-        n: Per-ray refractive index of the medium each ray is
-            currently propagating in (n_rays,). Carried so downstream
-            consumers (sensor intersection, focal-surface analysis)
-            can weight the final geometric leg correctly.
-        wavelength: Per-ray wavelength (n_rays,).
-        alive: Per-ray liveness flag (n_rays,), boolean. ``True`` for a
-            valid, still-propagating ray. Defaults to all-``True`` at
-            construction, i.e. a freshly built bundle is fully alive.
+    Attributes
+    ----------
+    origins : array, shape (n_rays, 3)
+        Ray positions. Meaningful only where alive.
+    directions : array, shape (n_rays, 3)
+        Ray directions. Meaningful only where alive.
+    values : array, shape (n_rays,)
+        Throughput-weighted intensities.
+    path_length : array, shape (n_rays,)
+        Accumulated optical path length, in metres.
+    n : array, shape (n_rays,)
+        Refractive index of the medium each ray is in, carried so downstream
+        consumers can weight the final geometric leg.
+    wavelength : array, shape (n_rays,)
+        Per-ray wavelength.
+    alive : array, shape (n_rays,)
+        Per-ray liveness, all-True at construction.
     """
 
     origins: Array
@@ -103,120 +76,17 @@ class RayBundle(eqx.Module):
         )
 
     def replace(self, **changes: Array) -> RayBundle:
-        """Copy with the given fields replaced (functional update).
-
-        ``rays.replace(values=v)`` reads better than re-listing all six
-        fields; unknown field names raise ``TypeError``.
-        """
-        fields = {
-            "origins": self.origins,
-            "directions": self.directions,
-            "values": self.values,
-            "path_length": self.path_length,
-            "n": self.n,
-            "wavelength": self.wavelength,
-            "alive": self.alive,
-        }
+        """Copy with the given fields replaced; unknown names raise TypeError."""
+        fields = {f.name: getattr(self, f.name) for f in dataclasses.fields(self)}
         unknown = set(changes) - set(fields)
         if unknown:
             raise TypeError(f"RayBundle has no field(s) {sorted(unknown)}")
-        fields.update(changes)
-        return RayBundle(**fields)
+        return RayBundle(**{**fields, **changes})
 
     def to_frame(self, origin: Array, rotation: Array) -> RayBundle:
-        """Express these rays in the local frame given by ``origin`` + Euler ``rotation``.
-
-        ``origin`` is the new frame's position in the current frame;
-        ``rotation`` are XYZ Euler angles in degrees.
-
-        This is a **pure coordinate transform**: it moves ``origins`` and
-        ``directions`` and leaves ``values`` / ``path_length`` / ``n`` /
-        ``wavelength`` / ``alive`` untouched.
-        """
+        """Transform rays to the frame given by origin + Euler rotation."""
         rot = euler_to_matrix(rotation)
-        return RayBundle(
+        return self.replace(
             origins=(self.origins - origin) @ rot,
             directions=self.directions @ rot,
-            values=self.values,
-            path_length=self.path_length,
-            n=self.n,
-            wavelength=self.wavelength,
-            alive=self.alive,
         )
-
-
-class LazyRayBundle(eqx.Module):
-    """A :class:`RayBundle` described by a render that hasn't run yet.
-
-    Self-contained: holds the optics, obstructions, camera frame, and
-    source description needed to evaluate itself. Output
-    is delivered in the local frame defined by ``camera_position`` and
-    ``camera_rotation``.
-
-    Two ways to consume a :class:`LazyRayBundle`:
-
-    * :meth:`fold`: walk per primary-mirror element with an accumulator,
-      so the full ``(n_elements * n_sources * n_samples,)`` ray buffer
-      is never materialised. The fused path used by
-      :meth:`Camera.image` and :meth:`Camera.response_matrix`.
-    * :meth:`materialise`: run the render eagerly and return a flat
-      :class:`RayBundle`. Use when the per-ray output itself is the
-      result (spot diagrams, :meth:`Camera.collect`).
-    """
-
-    optical_groups: list
-    obstruction_groups: list
-    camera_position: Array
-    camera_rotation: Array
-    sources: Array
-    source_values: Array
-    spectrum: Spectrum
-    source_type: Literal["point", "parallel"] = eqx.field(static=True)
-
-    def fold(self, accumulator, init):
-        """Per-element scan: ``accumulator(carry, rb_local) -> carry``.
-
-        ``rb_local`` is one element's :class:`RayBundle` already
-        transformed into the local frame.
-        """
-        from .render import apply_final_leg_shadow, render_optics_accumulate
-
-        origin, rotation = self.camera_position, self.camera_rotation
-        obstructions = self.obstruction_groups
-
-        def in_local_frame(carry, rb_world):
-            # Handoff = shadow the final leg (explicit), then a pure reframe.
-            rb_world = apply_final_leg_shadow(rb_world, obstructions, origin, rotation)
-            return accumulator(carry, rb_world.to_frame(origin, rotation))
-
-        return render_optics_accumulate(
-            self.optical_groups,
-            self.obstruction_groups,
-            self.sources,
-            self.source_values,
-            self.source_type,
-            in_local_frame,
-            init,
-            spectrum=self.spectrum,
-        )
-
-    def materialise(self) -> RayBundle:
-        """Run the render eagerly; return a flat local-frame :class:`RayBundle`."""
-        from .render import apply_final_leg_shadow, render_optics
-
-        rb_world = render_optics(
-            self.optical_groups,
-            self.obstruction_groups,
-            self.sources,
-            self.source_values,
-            self.source_type,
-            spectrum=self.spectrum,
-        )
-        # Handoff = shadow the final leg (explicit), then a pure reframe.
-        rb_world = apply_final_leg_shadow(
-            rb_world,
-            self.obstruction_groups,
-            self.camera_position,
-            self.camera_rotation,
-        )
-        return rb_world.to_frame(self.camera_position, self.camera_rotation)

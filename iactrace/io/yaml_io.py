@@ -32,11 +32,11 @@ class YAMLConfigError(Exception):
     pass
 
 
-# YAML helpers
+# Dumping and file helpers
 
 
 def _make_precision_dumper(precision: int) -> type:
-    """Return a ``yaml.SafeDumper`` subclass that formats floats to *precision*."""
+    """Return a yaml.SafeDumper subclass that formats floats to precision."""
 
     class PrecisionDumper(yaml.SafeDumper):
         pass
@@ -51,7 +51,7 @@ def _make_precision_dumper(precision: int) -> type:
 
 
 def _write_yaml(config: dict[str, Any], filepath: Path, precision: int) -> None:
-    """Dump *config* to *filepath* with controlled float precision."""
+    """Dump config to filepath with controlled float precision."""
     dumper_cls = _make_precision_dumper(precision)
     with open(filepath, "w") as f:
         yaml.dump(config, f, Dumper=dumper_cls, default_flow_style=False, sort_keys=False)
@@ -76,14 +76,18 @@ def load_telescope_config(
     """Load a telescope from a standalone telescope YAML file.
 
     The file describes optics (mirrors, lenses, obstructions) and the
-    camera frame (``telescope.camera_position`` and
-    ``telescope.camera_rotation``). A camera is loaded separately via
-    :func:`load_camera_config` / :meth:`Camera.from_yaml`.
+    camera frame (telescope.camera_position and
+    telescope.camera_rotation). A camera is loaded separately via
+    load_camera_config / Camera.from_yaml.
 
-    Args:
-        filename: Path to the telescope YAML file.
-        n_samples: Number of Monte Carlo samples per mirror element.
-        key: JAX random key for sampling and roughness.
+    Parameters
+    ----------
+    filename
+        Path to the telescope YAML file.
+    n_samples
+        Number of Monte Carlo samples per mirror element.
+    key
+        JAX random key for sampling and roughness.
     """
     with open(filename) as f:
         config = yaml.safe_load(f)
@@ -133,11 +137,14 @@ def load_camera_config(filename: str | Path) -> Camera:
     Sensor positions in the file are interpreted as camera-local
     coordinates, so no telescope is needed.
 
-    Args:
-        filename: Path to camera YAML file.
+    Parameters
+    ----------
+    filename
+        Path to camera YAML file.
 
-    Returns:
-        Camera object.
+    Returns
+    -------
+    Camera object.
     """
     with open(filename) as f:
         raw = yaml.safe_load(f)
@@ -160,7 +167,7 @@ def build_camera_config(config: dict[str, Any]) -> Camera:
     return Camera(sensor_groups=sensors)
 
 
-# Serialization helpers
+# Domain object -> dict
 
 
 def telescope_to_dict(telescope: Telescope) -> dict[str, Any]:
@@ -174,17 +181,20 @@ def camera_to_dict(camera: Camera) -> dict[str, Any]:
 
     Sensor positions are written in camera-local coordinates.
 
-    Args:
-        camera: The Camera object to convert.
+    Parameters
+    ----------
+    camera
+        The Camera object to convert.
 
-    Returns:
-        Configuration dictionary suitable for YAML serialization.
+    Returns
+    -------
+    Configuration dictionary suitable for YAML serialization.
     """
     schema = camera_to_file_schema(camera)
     return schema.model_dump(exclude_none=True)
 
 
-# Saving
+# Saving: dict -> file
 
 
 def save_telescope(
@@ -195,14 +205,20 @@ def save_telescope(
 ) -> Path:
     """Save a Telescope object to a standalone telescope YAML file.
 
-    Args:
-        telescope: The Telescope object to save.
-        filename: Output file path.
-        precision: Number of decimal places for float values.
-        overwrite: If True, overwrite existing file.
+    Parameters
+    ----------
+    telescope
+        The Telescope object to save.
+    filename
+        Output file path.
+    precision
+        Number of decimal places for float values.
+    overwrite
+        If True, overwrite existing file.
 
-    Returns:
-        Path to the saved file.
+    Returns
+    -------
+    Path to the saved file.
     """
     filepath = Path(filename)
     _check_overwrite(filepath, overwrite)
@@ -224,14 +240,20 @@ def save_camera(
 
     Sensor positions are written in camera-local coordinates.
 
-    Args:
-        camera: The Camera object to save.
-        filename: Output file path.
-        precision: Number of decimal places for float values.
-        overwrite: If True, overwrite existing file.
+    Parameters
+    ----------
+    camera
+        The Camera object to save.
+    filename
+        Output file path.
+    precision
+        Number of decimal places for float values.
+    overwrite
+        If True, overwrite existing file.
 
-    Returns:
-        Path to the saved file.
+    Returns
+    -------
+    Path to the saved file.
     """
     filepath = Path(filename)
     _check_overwrite(filepath, overwrite)
