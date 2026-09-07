@@ -34,11 +34,31 @@ IACTrace supports multi-stage optical configurations:
 
 - **Single-mirror systems**: Davies-Cotton or parabolic primaries (H.E.S.S.,
   VERITAS, MAGIC)
-- **Two-mirror systems**: Schwarzschild-Couder designs (pSCT, ASTRI)
+- **Two-mirror systems**: Schwarzschild-Couder designs (pSCT, ASTRI, SST)
 - **Additional stages**: Windows (Slabs), Lenses
 
 Mirrors are organized into groups by optical stage, with each facet having
 independent position, orientation, and surface parameters.
+
+Wavelength-Resolved Throughput
+------------------------------
+Every ray carries a wavelength, and every element that attenuates light takes
+the same ``X`` / ``X_curve`` pair: a bulk scalar times an optional
+:class:`~iactrace.core.ResponseCurve` giving ``R(theta, lambda)``. Mirror
+reflectivity, lens and window transmittance, cone wall reflectivity and
+photodetector QE all use this abstraction.
+Refracting elements are dispersive through a separate ``index`` axis: a plain
+number for a non-dispersive element, or a
+:class:`~iactrace.core.TabulatedIndex` / :class:`~iactrace.core.SellmeierIndex`
+model.
+.. code-block:: python
+   import numpy as np
+   from iactrace import Telescope, TabulatedSpectrum
+   cherenkov = TabulatedSpectrum.from_density(
+       np.arange(280.0, 700.0, 10.0), photons_per_nm
+   )
+   rb = telescope.render(dirs, vals, source_type="parallel", wavelength=cherenkov)
+Leave ``wavelength`` unset and everything is monochromatic at 400 nm. 
 
 Aspheric Mirror Surfaces
 ------------------------
@@ -67,17 +87,15 @@ Two camera geometries are supported:
 
 **Square sensors**
    Rectangular pixel grids with configurable resolution and physical bounds.
-   Suitable for SiPM-based cameras or simulating images of lid cameras.
 
 **Hexagonal sensors**
    Hexagonally-packed pixels matching the geometry of PMT-based IACT cameras.
-   Proper handling of hexagon rotations.
 
 Detection Chain
 ---------------
 
-Each sensor group carries its own detection chain — an optional light
-concentrator, a mounting ``gap``, and a photodetector — so different groups
+Each sensor group carries its own detection chain -- an optional light
+concentrator, a mounting ``gap``, and a photodetector -- so different groups
 in one camera can use different cones or detectors:
 
 **Light concentrators**
@@ -134,9 +152,8 @@ See :doc:`/getting_started/telescope_operations` for the full set.
 YAML Configuration
 ------------------
 
-Telescope optics and the camera are defined in two separate human-readable
-YAML files (see :doc:`/getting_started/custom_telescopes` for the full
-schema).
+Telescope optics and the camera are defined in two separate YAML files 
+(see :doc:`/getting_started/custom_telescopes` for the full schema).
 
 The telescope file describes the optics plus the camera frame in world
 coordinates:
