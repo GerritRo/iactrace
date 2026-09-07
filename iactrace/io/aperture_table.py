@@ -72,7 +72,8 @@ def save_aperture_table(
         raise FileExistsError(f"File already exists: {filepath}")
     filepath.parent.mkdir(parents=True, exist_ok=True)
 
-    payload: dict[str, np.ndarray] = {
+
+    payload: dict[str, Any] = {
         name: np.asarray(getattr(table, name), dtype=_DTYPES[name]) for name in _ARRAYS
     }
     payload["on_axis_area"] = np.asarray(float(table.on_axis_area))
