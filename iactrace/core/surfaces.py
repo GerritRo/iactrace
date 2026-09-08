@@ -232,8 +232,8 @@ class AsphericSurfaceGroup(SurfaceGroup):
     """
 
     curvatures: jax.Array  # (N,)
-    conics: jax.Array      # (N,)
-    aspherics: jax.Array   # (N, K)
+    conics: jax.Array  # (N,)
+    aspherics: jax.Array  # (N, K)
 
     def _sag_intrinsic(self, x, y):
         return sag_raw(x, y, self.curvatures, self.conics, self.aspherics)
@@ -468,10 +468,10 @@ class FreeformSurfaceGroup(SurfaceGroup):
     """
 
     grid_z: jax.Array  # (N, H, W)
-    x0: jax.Array      # (N,)
-    y0: jax.Array      # (N,)
-    dx: jax.Array      # (N,)
-    dy: jax.Array      # (N,)
+    x0: jax.Array  # (N,)
+    y0: jax.Array  # (N,)
+    dx: jax.Array  # (N,)
+    dy: jax.Array  # (N,)
 
     def __init__(self, grid_z, x0, y0, dx, dy, offsets=None):
         grid_z = jnp.asarray(grid_z)

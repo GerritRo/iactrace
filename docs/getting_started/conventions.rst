@@ -1,10 +1,6 @@
 Physics and Conventions
 =======================
 
-This page is the contract: the coordinate frame, units, photometry
-model, and which gradients flow through the pipeline. Everything below
-applies uniformly across the library.
-
 Coordinate frame
 ----------------
 
@@ -33,10 +29,11 @@ Small angles      arcseconds (mirror roughness, mirror misalignment)
 Surface error     metres RMS (Zernike figure errors)
 Focal error       metres, or a dimensionless fraction with ``relative=True``
 Time / path       metres of optical path length (``RayBundle.path_length``)
+Wavelength        nanometres by convention
 ================  ===========================================================
 
 There is no built-in unit system; the YAML configs and the runtime API
-agree by convention only. Mixing units silently produces wrong results.
+agree by convention only. **Mixing units silently produces wrong results.**
 
 Rotations
 ---------
@@ -64,7 +61,7 @@ Sensor positions in a camera YAML, ``Camera.collect`` output and
 The camera looks *back* at the optics, so its local +Z points towards the
 last optic and rays arrive travelling along local **-Z** -- which is what the
 per-pixel detection chain assumes (light enters a pixel at ``z = 0`` and runs
-towards -z). Every shipped configuration therefore uses
+towards -z). Every shipped single-mirror configuration therefore uses
 ``camera_rotation: [180, 0, 0]``, a half turn about x, giving
 
 ===============  ==========================
@@ -81,28 +78,30 @@ the image, while light arriving with a +x component lands at +x. Choosing a
 different ``camera_rotation`` changes this mapping.
 
 
-Photometry — monochromatic
---------------------------
+Photometry and wavelength
+-------------------------
 
-**IACTrace is monochromatic.** Rays do not carry a wavelength. Every
-coefficient that would in principle depend on wavelength is treated as a
-single value:
+Every ray carries a wavelength (``RayBundle.wavelength``, nanometres by
+convention, ``400.0`` when unspecified), and every coefficient that
+physically depends on it can be given as a curve:
 
-- Mirror reflectivity (:class:`~iactrace.core.ReflectInteraction`)
-- Lens refractive index and bulk transmittance
+- mirror reflectivity (:class:`~iactrace.core.ReflectInteraction`)
+- lens / window transmittance and refractive index
   (:class:`~iactrace.core.RefractInteraction`,
   :class:`~iactrace.core.SlabInteraction`)
-- Photodetector quantum efficiency (:class:`~iactrace.camera.ConstantQE`,
+- concentrator wall reflectivity (:class:`~iactrace.camera.WinstonCone`,
+  :class:`~iactrace.camera.OkumuraCone`)
+- photodetector quantum efficiency (:class:`~iactrace.camera.TabulatedQE`,
   :class:`~iactrace.camera.PMT`)
 
-This means PSF, throughput, and effective aperture results are
-correctly differentiable and physically sensible *for a single
-wavelength* — typically the photon-detection-weighted mean of whatever
-spectrum you have in mind. Anything that requires a real spectrum
-(wavelength-dependent QE for PMTs/SiPMs, dispersion through refractive
-optics, reflectivity rolloff in the UV) is not modelled.
+A source emits a :class:`~iactrace.core.Spectrum`, which draws one wavelength per
+ray, so a broadband render costs no more rays than a monochromatic one. Set
+none of the above and every ray runs at ``DEFAULT_WAVELENGTH`` with flat
+coefficients. See :doc:`wavelength` for the full picture.
 
-Wavelength tracking is planned for a future release.
+Wavelengths are nanometres only by convention -- the library never converts.
+Whatever unit you use for the source must also be the unit of every curve's
+wavelength axis and of the Sellmeier ``c`` coefficients (wavelength squared).
 
 The throughput-weighted values pipeline
 ---------------------------------------
@@ -111,12 +110,12 @@ The throughput-weighted values pipeline
 every multiplicative factor along the optical path::
 
     source irradiance at the sample point
-        × primary sampling weight
-        × reflectivity / refractivity
-        × aperture mask
-        × obstruction shadow
-        × concentrator throughput
-        × quantum efficiency
+        x primary sampling weight
+        x reflectivity / refractivity
+        x aperture mask
+        x obstruction shadow
+        x concentrator throughput
+        x quantum efficiency
 
 The first factor is where the two source types differ. A **parallel**
 source is at infinity, so the ``values`` you pass to
@@ -141,21 +140,14 @@ closed-form ray sampler.
 
 :meth:`Telescope.render` *is the fast path for point and parallel
 sources.* It samples rays *backwards* from the primary aperture toward
-each source — the only two cases where this is closed-form — and fuses
+each source -- the only two cases where this is closed-form -- and fuses
 the per-mirror-element scan, so :meth:`Camera.image` and
 :meth:`Camera.response_matrix` can fold over the full ray buffer
 without ever materialising it.
 
 :meth:`Telescope.trace` *is the general path.* You hand it raw
 ``(origins, directions, values)`` arrays and it propagates them
-through. Use it for anything that ``render`` doesn't cover:
-
-- extended sources (Gaussian, disk, image-as-source)
-- arbitrary calibration ray patterns (collimated test beams,
-  flashers with measured emission profiles)
-
-There is no special source-type enum for these — sample whatever
-distribution you want yourself, and call ``trace``.
+through. Use it for anything that ``render`` doesn't cover.
 
 Differentiability
 -----------------
@@ -166,10 +158,17 @@ Specifically, ``jax.grad`` flows through:
 - mirror surface parameters: ``curvatures``, ``conics``, ``aspherics``,
   positions, rotations
 - mirror reflectivity, lens refractive index and transmittance
-- photodetector QE
+- the tabulated values of any response curve -- a mirror coating, a cone
+  wall, a detector's QE / PDE
+- a source spectrum's own parameters (the wavelength draw is
+  reparameterised)
 - source positions / directions and source values
 
 What does **not** currently flow:
+
+- a photodetector's **bulk** ``qe`` scalar. ``ConstantQE.qe``, ``TabulatedQE.qe``
+  and ``PMT.qe`` are static fields, so gradients reach a detector's QE *curve*
+  values but not the scalar in front of them. Optimise the curve instead.
 
 - gradients through pixel bin assignment.
   :meth:`SensorGroup.pixel_index_and_mask` uses integer ``floor`` to
@@ -177,9 +176,8 @@ What does **not** currently flow:
   values with ``segment_sum``. Gradients flow w.r.t. the ray *values*
   (so ``d(image)/d(reflectivity)`` etc. are fine), but not through the
   bin *index* itself. Optimisations that need a continuous response to
-  pixel boundaries (e.g. sensor-position fitting via image gradients)
-  would need a straight-through estimator, which IACTrace does not
-  currently ship.
+  pixel boundaries would need soft binning, which IACTrace
+  does not currently ship.
 
 For gradient-based work, prefer objectives built from the ray *values*
 or from :doc:`focal-surface </api/analysis>` spot statistics, both of

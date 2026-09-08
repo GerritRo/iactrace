@@ -48,6 +48,7 @@ optimization and differentiable simulations.
    getting_started/conventions
    getting_started/concept
    getting_started/quickstart
+   getting_started/wavelength
    getting_started/custom_telescopes
    getting_started/telescope_operations
 

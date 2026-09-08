@@ -68,7 +68,7 @@ class TabulatedIndex(RefractiveIndex):
     """
 
     wavelengths: Array  # (K,)
-    n_values: Array     # (N, K)
+    n_values: Array  # (N, K)
 
     def n_at(self, element_idx, wavelength):
         rows = self.n_values[element_idx]

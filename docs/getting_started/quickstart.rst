@@ -168,6 +168,28 @@ Both stages can report the path rays actually took, through
    scene = show_camera(camera, trajectory=traj)
    scene.show()
 
+Choosing a Wavelength
+---------------------
+
+Rays run at 400 nm unless told otherwise. Pass a scalar for a monochromatic
+render, or a :class:`~iactrace.core.Spectrum` to draw one wavelength per ray:
+
+.. code-block:: python
+
+   from iactrace import TabulatedSpectrum
+
+   image = camera.image(
+       telescope.render(directions, values, 'parallel', wavelength=450.0)
+   )
+
+   # Cherenkov-like photon density, 1 / lambda^2 over 300-600 nm.
+   wl = jnp.linspace(300.0, 600.0, 31)
+   spectrum = TabulatedSpectrum.from_density(wl, 1.0 / wl**2)
+
+   image = camera.image(
+       telescope.render(directions, values, 'parallel', wavelength=spectrum)
+   )
+
 Applying Optical Imperfections
 ------------------------------
 

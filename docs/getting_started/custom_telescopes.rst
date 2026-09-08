@@ -67,6 +67,7 @@ A simple single-mirror telescope:
    mirror_templates:
      primary:
        surface:
+         type: aspheric
          curvature: 0.0333    # 1/(2*focal_length) for parabola
          conic: -1.0          # Parabolic
          aspheric: []
@@ -111,11 +112,13 @@ Each mirror entry specifies:
         type: polygon
         vertices: [[x1,y1],[x2,y2],[x3,y3],...,[xN,yN]]
 
-**curvature, conic, aspheric, zernike, bsdf, reflectivity, coating** (all optional)
+**curvature, conic, aspheric, zernike, bsdf, reflectivity, reflectivity_curve** (all optional)
    A mirror is self-contained: it can set any of these directly, with no
    ``template`` at all. A field left unset defaults to flat / unmodified
    surface, perfect specular reflection, and reflectivity ``1.0`` -- see
    `Mirror Templates`_ for how ``template`` fills these in instead.
+   ``reflectivity_curve`` adds the angle- and wavelength-dependent part on
+   top of the bulk ``reflectivity``; see :doc:`wavelength`.
 
 **template** (optional)
    Reference to a ``mirror_templates`` entry supplying defaults for
@@ -133,8 +136,8 @@ Mirror Templates
 ----------------
 
 A template supplies *defaults*, not requirements: every field it can set
-(``surface``, ``bsdf``, ``reflectivity``, ``coating``) can also be set
-directly on a mirror, and the mirror's own value always wins when both are
+(``surface``, ``bsdf``, ``reflectivity``, ``reflectivity_curve``) can also be
+set directly on a mirror, and the mirror's own value always wins when both are
 defined. A mirror is the **joint** of itself and its (optional) template,
 resolved field by field -- not a fixed split between "shared" and
 "per-mirror" data.
@@ -148,6 +151,7 @@ override just the varying one on each facet.
    mirror_templates:
      primary_facet:
        surface:
+         type: aspheric
          curvature: 0.0333
          conic: -1.0
          aspheric: []
@@ -208,9 +212,11 @@ rectangular, hexagonal, etc.
        aperture:
          type: circular
          radius: 0.5
-       curvature: 0.05
-       conic: 0.0
-       n_inside: 1.5
+       surface:
+         type: aspheric
+         curvature: 0.05
+         conic: 0.0
+       index: 1.5           # a number, or a dispersive n(lambda) model
        transmittance: 0.95  # default 1.0
        stage: 1
 
@@ -226,9 +232,14 @@ rectangular, hexagonal, etc.
          type: polygon
          vertices: [[-0.20, -0.15], [0.20, -0.15], [0.20, 0.15], [-0.20, 0.15]]
        thickness: 0.005
-       n_inside: 1.5
+       index: 1.5
        transmittance: 0.98
        stage: 2
+
+Both lens types take ``index`` (a number, or a ``sellmeier`` /
+``index_table`` block for dispersion) and an optional
+``transmittance_curve``. Without a curve, the face loss is plain Fresnel from
+the index. See :doc:`wavelength`.
 
 Obstruction Definitions
 -----------------------
@@ -284,7 +295,7 @@ camera origin sits at the telescope's ``camera_position``):
        bounds: [-0.5, 0.5, -0.5, 0.5]   # [xmin, xmax, ymin, ymax]
        id: main_sensor
        photodetector:          # optional; defaults to perfect QE = 1
-         type: constant
+         type: constant        # or: tabulated (qe_curve), pmt
          qe: 0.4
        concentrator:           # optional
          type: winston         # or: okumura
@@ -295,6 +306,10 @@ camera origin sits at the telescope's ``camera_position``):
 
 Sensor types are ``square`` (``width`` / ``height`` / ``bounds``) and
 ``hexagonal`` (``centers_x`` / ``centers_y`` lists of pixel centers).
+
+Detectors and concentrators take the same curve blocks as the optics: a
+``qe_curve`` or ``reflectivity_curve``, plus a ``window_index`` for a PMT's
+entrance window. See :doc:`wavelength`.
 
 Loading Custom Configurations
 -----------------------------

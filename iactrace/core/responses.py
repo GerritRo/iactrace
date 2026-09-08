@@ -100,8 +100,8 @@ class TabulatedResponse(ResponseCurve):
     """
 
     cos_table: Array  # (Kc,)
-    wl_table: Array   # (Kw,)
-    values: Array     # (N, Kc, Kw)
+    wl_table: Array  # (Kw,)
+    values: Array  # (N, Kc, Kw)
 
     def __call__(self, cos_theta_i, element_idx, wavelength=None):
         rows = self.values[element_idx]

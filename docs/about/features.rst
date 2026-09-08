@@ -40,26 +40,6 @@ IACTrace supports multi-stage optical configurations:
 Mirrors are organized into groups by optical stage, with each facet having
 independent position, orientation, and surface parameters.
 
-Wavelength-Resolved Throughput
-------------------------------
-Every ray carries a wavelength, and every element that attenuates light takes
-the same ``X`` / ``X_curve`` pair: a bulk scalar times an optional
-:class:`~iactrace.core.ResponseCurve` giving ``R(theta, lambda)``. Mirror
-reflectivity, lens and window transmittance, cone wall reflectivity and
-photodetector QE all use this abstraction.
-Refracting elements are dispersive through a separate ``index`` axis: a plain
-number for a non-dispersive element, or a
-:class:`~iactrace.core.TabulatedIndex` / :class:`~iactrace.core.SellmeierIndex`
-model.
-.. code-block:: python
-   import numpy as np
-   from iactrace import Telescope, TabulatedSpectrum
-   cherenkov = TabulatedSpectrum.from_density(
-       np.arange(280.0, 700.0, 10.0), photons_per_nm
-   )
-   rb = telescope.render(dirs, vals, source_type="parallel", wavelength=cherenkov)
-Leave ``wavelength`` unset and everything is monochromatic at 400 nm. 
-
 Aspheric Mirror Surfaces
 ------------------------
 
@@ -90,6 +70,25 @@ Two camera geometries are supported:
 
 **Hexagonal sensors**
    Hexagonally-packed pixels matching the geometry of PMT-based IACT cameras.
+
+Wavelength and Response Curves
+------------------------------
+
+Rays carry a wavelength, and every coefficient along the path can depend on
+both incidence angle and wavelength:
+
+**Source spectra**
+    Either monochromatic (:class:`~iactrace.core.ConstantSpectrum`) or a tabulated 
+    photon density (:class:`~iactrace.core.TabulatedSpectrum`).
+
+**Response curves**
+   Mirror reflectivity, lens and window transmittance, concentrator wall reflectivity,
+   and detector quantum efficiency all use a `(\theta, \lambda)` table via 
+   (:class:`~iactrace.core.TabulatedResponse`). Each takes the same bulk scalar x curve pair.
+
+**Dispersion**
+   Refractive index as a table (:class:`~iactrace.core.TabulatedIndex`) or 
+   Sellmeier coefficients (:class:`~iactrace.core.SellmeierIndex`).
 
 Detection Chain
 ---------------
@@ -169,6 +168,7 @@ coordinates:
    mirror_templates:
      primary:
        surface:
+         type: aspheric
          curvature: 0.0667   # 1/15m focal length
          conic: -1.0         # Parabolic
          aspheric: []

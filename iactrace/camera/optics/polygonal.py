@@ -40,7 +40,7 @@ class PolygonalCone(Concentrator):
 
     _N_SLICES = 24  # meridian samples for cross_sections (plain class constant)
 
-    n_sides: eqx.AbstractVar[int] # how many sides for the cone
+    n_sides: eqx.AbstractVar[int]  # how many sides for the cone
     orientation: eqx.AbstractVar[float]  # rotation about the optical axis, radians
     entrance_apothem: eqx.AbstractVar[float]  # mouth inradius a1 (at z = length)
     exit_apothem: eqx.AbstractVar[float]  # exit inradius a2 (at z = 0)

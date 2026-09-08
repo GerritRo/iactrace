@@ -44,12 +44,27 @@ Photodetectors / Concentrators
 
    * - :class:`~iactrace.camera.ConstantQE`
      - Flat scalar quantum efficiency (the default detector)
+   * - :class:`~iactrace.camera.TabulatedQE`
+     - Detector carrying a measured QE curve (bulk ``qe`` x ``qe_curve``)
    * - :class:`~iactrace.camera.PMT`
-     - Photomultiplier: sensor surface, QE, optional Fresnel window
+     - Photomultiplier: sensor surface, QE, optional dispersive window
    * - :class:`~iactrace.camera.WinstonCone`
      - Winston light concentrator (per pixel)
    * - :class:`~iactrace.camera.OkumuraCone`
      - Okumura-style light concentrator (per pixel)
+
+Wavelength Dependence
+^^^^^^^^^^^^^^^^^^^^^
+
+.. list-table::
+   :widths: 30 70
+
+   * - :class:`~iactrace.core.Spectrum`
+     - What a source emits, as a distribution over wavelength
+   * - :class:`~iactrace.core.ResponseCurve`
+     - :math:`R(\theta, \lambda)` behind reflectivity, transmittance and QE
+   * - :class:`~iactrace.core.RefractiveIndex`
+     - :math:`n(\lambda)` for lenses, windows and PMT entrance windows
 
 I/O Functions
 ^^^^^^^^^^^^^

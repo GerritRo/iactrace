@@ -69,7 +69,7 @@ class TabulatedSpectrum(Spectrum):
     """
 
     wavelengths: Array  # (K,) ascending
-    density: Array      # (K,) >= 0
+    density: Array  # (K,) >= 0
 
     def _cdf(self):
         dwl = jnp.diff(self.wavelengths)
