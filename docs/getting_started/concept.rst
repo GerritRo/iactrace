@@ -1,8 +1,7 @@
 Concepts
 ========
 
-This page introduces the moving parts. For the precise contract —
-coordinates, units, photometry, differentiability — see
+This page introduces the moving parts. For the precise contract see
 :doc:`conventions`.
 
 Light Sources
@@ -43,9 +42,12 @@ so moving a source further away dims it as it physically should. For a
 parallel source there is no distance and ``values`` are the irradiance on
 the aperture directly. See :doc:`conventions` for the full chain.
 
-For anything else — extended sources, Cherenkov shower input, custom
-calibration ray patterns — sample the rays yourself and use
+For anything else sample the rays yourself and use
 :meth:`Telescope.trace` (see :doc:`conventions`).
+
+Either type also carries a **spectrum**: ``wavelength=`` on ``render`` takes
+a scalar or a :class:`~iactrace.core.Spectrum`, which gives each ray its own
+wavelength (see :doc:`wavelength`).
 
 Monte Carlo Integration
 -----------------------

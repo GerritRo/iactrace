@@ -8,15 +8,82 @@ classes instead of these functions directly.
 Render Engine
 -------------
 
+``render_optics`` generates rays from sources and materialises the full ray
+buffer; ``render_optics_accumulate`` folds an accumulator over primary
+elements instead, so peak memory does not grow with element count.
+``trace_optics`` takes caller-supplied rays.
+
 .. autofunction:: iactrace.core.render_optics
 
+.. autofunction:: iactrace.core.render_optics_accumulate
+
 .. autofunction:: iactrace.core.trace_optics
+
+Handoff to a local frame
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autofunction:: iactrace.core.handoff_to_frame
+
+.. autofunction:: iactrace.core.apply_final_leg_shadow
+
+.. autofunction:: iactrace.core.final_leg_points
 
 Ray Bundle
 ----------
 
+.. autodata:: iactrace.core.DEFAULT_WAVELENGTH
+
 .. autoclass:: iactrace.core.RayBundle
    :members:
+
+.. autoclass:: iactrace.core.LazyRayBundle
+   :members:
+
+Trajectories
+~~~~~~~~~~~~
+
+.. autoclass:: iactrace.core.TraceResult
+   :members:
+
+.. autoclass:: iactrace.core.Trajectory
+   :members:
+
+Source Spectra
+--------------
+
+What a source emits, as a distribution over wavelength.
+
+.. autoclass:: iactrace.core.Spectrum
+   :members:
+
+.. autoclass:: iactrace.core.ConstantSpectrum
+   :show-inheritance:
+
+.. autoclass:: iactrace.core.TabulatedSpectrum
+   :members:
+   :show-inheritance:
+
+.. autofunction:: iactrace.core.as_spectrum
+
+Refractive Index
+----------------
+
+A refracting element's index as a function of wavelength.
+
+.. autoclass:: iactrace.core.RefractiveIndex
+   :members:
+
+.. autoclass:: iactrace.core.ConstantIndex
+   :show-inheritance:
+
+.. autoclass:: iactrace.core.TabulatedIndex
+   :members:
+   :show-inheritance:
+
+.. autoclass:: iactrace.core.SellmeierIndex
+   :show-inheritance:
+
+.. autofunction:: iactrace.core.as_refractive_index
 
 Optical Element Composition
 ---------------------------
@@ -56,18 +123,20 @@ Interactions
 .. autoclass:: iactrace.core.InteractionType
    :members:
 
-Coatings
-~~~~~~~~
+Response Curves
+~~~~~~~~~~~~~~~
 
-Angle-dependent reflectivity / transmittance applied at an interaction.
+Angle- and wavelength-dependent reflectivity / transmittance applied at an
+interaction.
 
-.. autoclass:: iactrace.core.Coating
+.. autoclass:: iactrace.core.ResponseCurve
    :members:
 
-.. autoclass:: iactrace.core.ConstantCoating
+.. autoclass:: iactrace.core.ConstantResponse
    :show-inheritance:
 
-.. autoclass:: iactrace.core.TabulatedCoating
+.. autoclass:: iactrace.core.TabulatedResponse
+   :members:
    :show-inheritance:
 
 BSDF (surface scattering)
@@ -87,13 +156,13 @@ Optical Physics
 
 Functions for ray-surface interactions:
 
-.. autofunction:: iactrace.core.interactions.reflect
+.. autofunction:: iactrace.core.reflect
 
-.. autofunction:: iactrace.core.interactions.refract
+.. autofunction:: iactrace.core.refract
 
-.. autofunction:: iactrace.core.interactions.refract_slab
+.. autofunction:: iactrace.core.refract_slab
 
-.. autofunction:: iactrace.core.coatings.fresnel_unpolarized
+.. autofunction:: iactrace.core.fresnel_unpolarized
 
 Surfaces
 --------
@@ -121,13 +190,17 @@ aspheric base plus a per-facet Zernike figure error).
    :members:
    :show-inheritance:
 
-.. autofunction:: iactrace.core.surfaces.sag
+.. autofunction:: iactrace.core.sag
 
-.. autofunction:: iactrace.core.surfaces.compute_sag_and_normal
+.. autofunction:: iactrace.core.compute_sag_and_normal
 
 .. autofunction:: iactrace.core.zernike_terms
 
 .. autofunction:: iactrace.core.bicubic_interp
+
+.. autofunction:: iactrace.core.sag_raw
+
+.. autodata:: iactrace.core.N_ZERNIKE
 
 Intersection Functions
 ----------------------
@@ -135,21 +208,27 @@ Intersection Functions
 Geometric ray-primitive intersection tests (in
 :mod:`iactrace.core.intersections`):
 
-.. autofunction:: iactrace.core.intersections.intersect_plane
+.. autofunction:: iactrace.core.intersect_plane
 
-.. autofunction:: iactrace.core.intersections.intersect_sphere
+.. autofunction:: iactrace.core.intersect_sphere
 
-.. autofunction:: iactrace.core.intersections.intersect_cylinder
+.. autofunction:: iactrace.core.intersect_cylinder
 
-.. autofunction:: iactrace.core.intersections.intersect_open_cylinder
+.. autofunction:: iactrace.core.intersect_open_cylinder
 
-.. autofunction:: iactrace.core.intersections.intersect_box
+.. autofunction:: iactrace.core.intersect_box
 
-.. autofunction:: iactrace.core.intersections.intersect_oriented_box
+.. autofunction:: iactrace.core.intersect_oriented_box
 
-.. autofunction:: iactrace.core.intersections.intersect_triangle
+.. autofunction:: iactrace.core.intersect_triangle
 
-.. autofunction:: iactrace.core.intersections.intersect_conic
+.. autofunction:: iactrace.core.intersect_conic
+
+For a surface with no closed-form root, the generic Newton solver:
+
+.. autofunction:: iactrace.core.newton_raphson_intersect
+
+.. autofunction:: iactrace.core.is_hit
 
 Obstruction Groups
 ------------------
@@ -183,3 +262,22 @@ Transforms
 Coordinate transformation utilities:
 
 .. autofunction:: iactrace.core.euler_to_matrix
+
+Aperture Sampling
+-----------------
+
+Uniform sampling over an element's aperture, used when a render generates its
+primary-surface rays.
+
+.. autofunction:: iactrace.core.sample_annulus
+
+.. autofunction:: iactrace.core.sample_polygon
+
+Numerical Tolerances
+--------------------
+
+Resolution-relative floors, derived from the working dtype.
+
+.. autofunction:: iactrace.core.dir_tol
+
+.. autofunction:: iactrace.core.len_rel

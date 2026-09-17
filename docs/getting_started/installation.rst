@@ -106,6 +106,9 @@ IACTrace depends on:
    * - `PyYAML <https://pyyaml.org/>`_
      - >= 6.0
      - YAML configuration parsing
+   * - `Pydantic <https://docs.pydantic.dev/>`_
+     - >= 2.0
+     - Config-file schema validation
 
 Troubleshooting
 ---------------

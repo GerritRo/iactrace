@@ -446,7 +446,7 @@ class TestDetectionSurface:
         cone = WinstonCone(6, 0.02, 0.01, reflectivity=0.95, max_bounces=12)
         pmt = PMT(
             qe=0.8,
-            n_window=1.48,
+            window_index=1.48,
             face_radius=0.011,
             surface=spherical_cap_surface(0.011, 0.003),
             vertex_z=0.003,

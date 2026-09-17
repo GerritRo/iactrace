@@ -8,9 +8,9 @@ from jax.typing import ArrayLike
 
 from ..core.apertures import Aperture, DiskAperture
 from ..core.bsdf import BSDF, GaussianBSDF
-from ..core.coatings import Coating
 from ..core.interactions import ReflectInteraction
 from ..core.optics import OpticalElementGroup
+from ..core.responses import ResponseCurve
 from ..core.surfaces import AsphericSurfaceGroup
 from ._common import as_aspheric_row as _as_aspheric_row
 from ._common import as_vec3 as _as_vec3
@@ -38,38 +38,55 @@ def mirror_group(
     aperture: Aperture,
     reflectivity: Array | float = 1.0,
     sample_key: Array,
-    coating: Coating | None = None,
+    reflectivity_curve: ResponseCurve | None = None,
     bsdf: BSDF | None = None,
     optical_stage: int = 0,
     n_samples: int = 100,
 ) -> OpticalElementGroup:
-    """Canonical reflective :class:`OpticalElementGroup` builder.
+    """Canonical reflective OpticalElementGroup builder.
 
     Takes pre-shaped per-element arrays plus a pre-built aperture and an
-    optional :class:`BSDF` instance, and assembles the surface + interaction
+    optional BSDF instance, and assembles the surface + interaction
     + group wiring.
 
-    Args:
-        positions: Per-element vertex positions, shape ``(N, 3)``.
-        rotations: Per-element Euler angles in degrees, shape ``(N, 3)``.
-        curvatures: Per-element curvatures ``1/R``, shape ``(N,)``.
-        conics: Per-element Schwarzschild conic constants, shape ``(N,)``.
-        aspherics: Per-element even aspheric coefficients ``[A4, A6, ...]``,
-            shape ``(N, K)``; column ``i`` multiplies ``r^(2i + 4)``.
-        offsets: Per-element surface decentering, shape ``(N, 2)``. Use
-            ``jnp.zeros((N, 2))`` for a centred disk.
-        aperture: Pre-built aperture.
-        reflectivity: Per-element reflectivity in ``[0, 1]``, shape ``(N,)``.
-        sample_key: JAX PRNG key used for aperture sampling and BSDF.
-        bsdf: Optional :class:`BSDF` instance. ``None`` leaves the element
-            perfectly specular (the :class:`OpticalElementGroup` constructor
-            fills in a zero-scale :class:`GaussianBSDF`).
-        optical_stage: Stage index within the Telescope; each group in a
-            telescope must have a unique stage.
-        n_samples: Monte Carlo samples per element per render.
+    Parameters
+    ----------
+    positions : array, shape (N, 3)
+        Per-element vertex positions.
+    rotations : array, shape (N, 3)
+        Per-element Euler angles in degrees.
+    curvatures : array, shape (N,)
+        Per-element curvatures 1/R.
+    conics : array, shape (N,)
+        Per-element Schwarzschild conic constants.
+    aspherics : array, shape (N, K)
+        Per-element even aspheric coefficients [A4, A6, ...]. ; column i multiplies
+        r^(2i + 4).
+    offsets : array, shape (N, 2)
+        Per-element surface decentering. Use jnp.zeros((N, 2)) for a centred disk.
+    aperture
+        Pre-built aperture.
+    reflectivity : array, shape (N,)
+        Per-element bulk reflectivity in [0, 1].
+    reflectivity_curve : array, shape (theta, lambda)
+        Optional R.
+        ResponseCurve multiplying
+        reflectivity per ray; None (default) is a flat response.
+    sample_key
+        JAX PRNG key used for aperture sampling and BSDF.
+    bsdf
+        Optional BSDF instance. None leaves the element
+        perfectly specular (the OpticalElementGroup constructor
+        fills in a zero-scale GaussianBSDF).
+    optical_stage
+        Stage index within the Telescope; each group in a
+        telescope must have a unique stage.
+    n_samples
+        Monte Carlo samples per element per render.
 
-    Returns:
-        A ready-to-use :class:`OpticalElementGroup`.
+    Returns
+    -------
+    A ready-to-use OpticalElementGroup.
     """
     positions = jnp.asarray(positions)
     rotations = jnp.asarray(rotations)
@@ -79,9 +96,9 @@ def mirror_group(
     offsets = jnp.asarray(offsets)
     n = int(positions.shape[0])
 
-    refl_scalar = jnp.asarray(reflectivity)
-    if refl_scalar.ndim == 0:
-        refl_scalar = jnp.full((n,), refl_scalar)
+    refl = jnp.asarray(reflectivity)
+    if refl.ndim == 0:
+        refl = jnp.full((n,), refl)
 
     surface = AsphericSurfaceGroup(
         curvatures=curvatures,
@@ -90,8 +107,8 @@ def mirror_group(
         offsets=offsets,
     )
     interaction = ReflectInteraction(
-        reflectivity=coating,
-        reflectivity_scalar=refl_scalar,
+        reflectivity=refl,
+        reflectivity_curve=reflectivity_curve,
     )
 
     return OpticalElementGroup(
@@ -120,40 +137,53 @@ def disk_array(
     aspheric_coeffs: ArrayLike | None = None,
     inner_radii: ArrayLike | None = None,
     reflectivities: ArrayLike | None = None,
-    coating: Coating | None = None,
+    reflectivity_curve: ResponseCurve | None = None,
     bsdf_scales: ArrayLike | None = None,
     offsets: ArrayLike | None = None,
     optical_stage: int = 0,
     n_samples: int = 100,
     key: Array,
 ) -> OpticalElementGroup:
-    """Build a batched ``N``-element disk-aperture mirror group.
+    """Build a batched N-element disk-aperture mirror group.
 
-    Use this for segmented primary mirrors. Per-element arrays must all
-    match length ``N``. Scalar defaults fill in where an argument is
-    omitted. For anything beyond disk apertures / Gaussian BSDF, drop
-    down to :func:`mirror_group`.
+    Use this for segmented primary mirrors.
 
-    Args:
-        positions: Per-element vertex positions, shape ``(N, 3)``.
-        rotations: Per-element Euler angles in degrees, shape ``(N, 3)``.
-        curvatures: Per-element curvatures ``1/R``, shape ``(N,)``.
-        radii: Outer disk radii, shape ``(N,)``.
-        conics: Per-element conic constants, shape ``(N,)``. Defaults to
-            zeros (spherical).
-        aspheric_coeffs: Per-element aspheric coefficients, shape ``(N, K)``.
-            ``None`` disables aspherics.
-        inner_radii: Per-element central hole radii, shape ``(N,)``.
-            Defaults to zeros.
-        reflectivities: Per-element reflectivities, shape ``(N,)``. Defaults
-            to ones.
-        bsdf_scales: Per-element Gaussian BSDF roughness in arcseconds,
-            shape ``(N,)``. Zero (the default) disables the BSDF.
-        offsets: Per-element surface decentering, shape ``(N, 2)``. Defaults
-            to zeros.
-        optical_stage: Stage index shared by all elements in this group.
-        n_samples: Monte Carlo samples per element per render.
-        key: JAX PRNG key for aperture sampling and BSDF.
+    Parameters
+    ----------
+    positions : array, shape (N, 3)
+        Per-element vertex positions.
+    rotations : array, shape (N, 3)
+        Per-element Euler angles in degrees.
+    curvatures : array, shape (N,)
+        Per-element curvatures 1/R.
+    radii : array, shape (N,)
+        Outer disk radii.
+    conics : array, shape (N,)
+        Per-element conic constants. Defaults to zeros (spherical).
+    aspheric_coeffs : array, shape (N, K)
+        Per-element aspheric coefficients.
+        None disables aspherics.
+    inner_radii : array, shape (N,)
+        Per-element central hole radii.
+        Defaults to zeros.
+    reflectivities : array, shape (N,)
+        Per-element bulk reflectivities.
+        Defaults to ones.
+    reflectivity_curve : array, shape (theta, lambda)
+        Optional R.
+        ResponseCurve shared by every
+        element, multiplying reflectivities per ray.
+    bsdf_scales : array, shape (N,)
+        Per-element Gaussian BSDF roughness in arcseconds. Zero (the default) disables
+        the BSDF.
+    offsets : array, shape (N, 2)
+        Per-element surface decentering. Defaults to zeros.
+    optical_stage
+        Stage index shared by all elements in this group.
+    n_samples
+        Monte Carlo samples per element per render.
+    key
+        JAX PRNG key for aperture sampling and BSDF.
     """
     positions_arr = jnp.asarray(positions)
     if positions_arr.ndim != 2 or positions_arr.shape[1] != 3:
@@ -207,7 +237,7 @@ def disk_array(
         offsets=offsets_arr,
         aperture=aperture,
         reflectivity=refl_arr,
-        coating=coating,
+        reflectivity_curve=reflectivity_curve,
         bsdf=bsdf,
         sample_key=key,
         optical_stage=optical_stage,
@@ -228,13 +258,13 @@ def _single_disk_mirror(
     radius,
     inner_radius,
     reflectivity,
-    coating,
+    reflectivity_curve,
     bsdf_scale,
     optical_stage,
     n_samples,
     key,
 ) -> OpticalElementGroup:
-    """Common backing for :func:`spherical`, :func:`parabolic`, :func:`aspheric`."""
+    """Common backing for spherical, parabolic, aspheric."""
     pos = _as_vec3(position, "position")
     rot = _as_vec3(rotation, "rotation")
     aspheric_row = _as_aspheric_row(aspheric_coeffs)
@@ -248,7 +278,7 @@ def _single_disk_mirror(
         radii=jnp.asarray([float(radius)]),
         inner_radii=jnp.asarray([float(inner_radius)]),
         reflectivities=jnp.asarray([float(reflectivity)]),
-        coating=coating,
+        reflectivity_curve=reflectivity_curve,
         bsdf_scales=jnp.asarray([float(bsdf_scale)]),
         optical_stage=optical_stage,
         n_samples=n_samples,
@@ -265,16 +295,16 @@ def _focal_length_disk_mirror(
     rotation: Sequence[float] = (0.0, 0.0, 0.0),
     inner_radius: float = 0.0,
     reflectivity: float = 1.0,
-    coating: Coating | None = None,
+    reflectivity_curve: ResponseCurve | None = None,
     bsdf_scale: float = 0.0,
     optical_stage: int = 0,
     n_samples: int = 100,
     key: Array,
 ) -> OpticalElementGroup:
-    """Common backing for :func:`spherical` and :func:`parabolic`.
+    """Common backing for spherical and parabolic.
 
-    Both derive ``curvature = 1 / (2 * focal_length)`` and differ only in
-    ``conic`` (``0`` vs ``-1``).
+    Both derive curvature = 1 / (2 * focal_length) and differ only in
+    conic (0 vs -1).
     """
     return _single_disk_mirror(
         position=position,
@@ -285,7 +315,7 @@ def _focal_length_disk_mirror(
         radius=radius,
         inner_radius=inner_radius,
         reflectivity=reflectivity,
-        coating=coating,
+        reflectivity_curve=reflectivity_curve,
         bsdf_scale=bsdf_scale,
         optical_stage=optical_stage,
         n_samples=n_samples,
@@ -301,7 +331,7 @@ def spherical(
     rotation: Sequence[float] = (0.0, 0.0, 0.0),
     inner_radius: float = 0.0,
     reflectivity: float = 1.0,
-    coating: Coating | None = None,
+    reflectivity_curve: ResponseCurve | None = None,
     bsdf_scale: float = 0.0,
     optical_stage: int = 0,
     n_samples: int = 100,
@@ -309,20 +339,34 @@ def spherical(
 ) -> OpticalElementGroup:
     """Build a spherical mirror as a single-element group.
 
-    Uses ``c = 1 / (2 * focal_length)`` with ``conic = 0``. Set
-    ``inner_radius > 0`` for an annular mirror.
+    Uses c = 1 / (2 * focal_length) with conic = 0. Set
+    inner_radius > 0 for an annular mirror.
 
-    Args:
-        position: Mirror vertex in world coordinates, shape (3,).
-        focal_length: Paraxial focal length in metres (positive = concave).
-        radius: Outer disk radius in metres.
-        rotation: Euler angles in degrees. Defaults to no rotation.
-        inner_radius: Inner hole radius in metres. Zero for a solid disk.
-        reflectivity: Per-element reflectivity in ``[0, 1]``.
-        bsdf_scale: Gaussian roughness sigma in arcseconds (0 disables).
-        optical_stage: Stage index within the Telescope.
-        n_samples: Monte Carlo samples per render call.
-        key: JAX PRNG key.
+    Parameters
+    ----------
+    position : array, shape (3,)
+        Mirror vertex in world coordinates.
+    focal_length
+        Paraxial focal length in metres (positive = concave).
+    radius
+        Outer disk radius in metres.
+    rotation
+        Euler angles in degrees. Defaults to no rotation.
+    inner_radius
+        Inner hole radius in metres. Zero for a solid disk.
+    reflectivity
+        Bulk reflectivity in [0, 1].
+    reflectivity_curve : array, shape (theta, lambda)
+        Optional R.
+        ResponseCurve multiplying it.
+    bsdf_scale : array, shape (0 disables)
+        Gaussian roughness sigma in arcseconds.
+    optical_stage
+        Stage index within the Telescope.
+    n_samples
+        Monte Carlo samples per render call.
+    key
+        JAX PRNG key.
     """
     return _focal_length_disk_mirror(
         conic=0.0,
@@ -332,7 +376,7 @@ def spherical(
         rotation=rotation,
         inner_radius=inner_radius,
         reflectivity=reflectivity,
-        coating=coating,
+        reflectivity_curve=reflectivity_curve,
         bsdf_scale=bsdf_scale,
         optical_stage=optical_stage,
         n_samples=n_samples,
@@ -348,7 +392,7 @@ def parabolic(
     rotation: Sequence[float] = (0.0, 0.0, 0.0),
     inner_radius: float = 0.0,
     reflectivity: float = 1.0,
-    coating: Coating | None = None,
+    reflectivity_curve: ResponseCurve | None = None,
     bsdf_scale: float = 0.0,
     optical_stage: int = 0,
     n_samples: int = 100,
@@ -356,11 +400,11 @@ def parabolic(
 ) -> OpticalElementGroup:
     """Build a parabolic mirror as a single-element group.
 
-    Uses ``c = 1 / (2 * focal_length)`` and ``conic = -1``, matching the
-    reference ``configs/BASIC/Cassegrain_telescope.yaml`` primary
-    (``focal_length=0.4`` -> ``curvature=1.25``).
+    Uses c = 1 / (2 * focal_length) and conic = -1, matching the
+    reference configs/BASIC/Cassegrain_telescope.yaml primary
+    (focal_length=0.4 -> curvature=1.25).
 
-    Args: see :func:`spherical`.
+    Takes the same parameters as spherical.
     """
     return _focal_length_disk_mirror(
         conic=-1.0,
@@ -370,7 +414,7 @@ def parabolic(
         rotation=rotation,
         inner_radius=inner_radius,
         reflectivity=reflectivity,
-        coating=coating,
+        reflectivity_curve=reflectivity_curve,
         bsdf_scale=bsdf_scale,
         optical_stage=optical_stage,
         n_samples=n_samples,
@@ -388,7 +432,7 @@ def aspheric(
     aspheric_coeffs: Sequence[float] | None = None,
     inner_radius: float = 0.0,
     reflectivity: float = 1.0,
-    coating: Coating | None = None,
+    reflectivity_curve: ResponseCurve | None = None,
     bsdf_scale: float = 0.0,
     optical_stage: int = 0,
     n_samples: int = 100,
@@ -396,24 +440,40 @@ def aspheric(
 ) -> OpticalElementGroup:
     """Build a general aspheric mirror as a single-element group.
 
-    Fully explicit version of :func:`spherical` / :func:`parabolic`: you
-    supply the curvature, conic constant, and optional even aspheric
-    coefficients. Use this for hyperbolic / elliptic / higher-order
-    aspheric mirrors.
+    Fully explicit version of spherical / parabolic.
 
-    Args:
-        position: Mirror vertex in world coordinates, shape (3,).
-        curvature: Paraxial curvature ``1/R`` in m^-1.
-        radius: Outer disk radius in metres.
-        rotation: Euler angles in degrees. Defaults to no rotation.
-        conic: Schwarzschild conic constant. ``0`` spherical, ``-1``
-            parabolic, ``-1 < k < 0`` prolate ellipsoid, ``k < -1``
-            hyperboloid.
-        aspheric_coeffs: Even aspheric coefficients ``[A4, A6, ...]``,
-            i.e. ``aspheric_coeffs[i]`` multiplies ``r^(2i + 4)``. The
-            polynomial starts at ``r^4``.
-        inner_radius, reflectivity, bsdf_scale, optical_stage, n_samples, key:
-            see :func:`spherical`.
+    Parameters
+    ----------
+    position : array, shape (3,)
+        Mirror vertex in world coordinates.
+    curvature
+        Paraxial curvature 1/R in m^-1.
+    radius
+        Outer disk radius in metres.
+    rotation
+        Euler angles in degrees. Defaults to no rotation.
+    conic
+        Schwarzschild conic constant. 0 spherical, -1
+        parabolic, -1 < k < 0 prolate ellipsoid, k < -1
+        hyperboloid.
+    aspheric_coeffs
+        Even aspheric coefficients [A4, A6, ...],
+        i.e. aspheric_coeffs[i] multiplies r^(2i + 4). The
+        polynomial starts at r^4.
+    inner_radius
+        see spherical.
+    reflectivity
+        see spherical.
+    reflectivity_curve
+        see spherical.
+    bsdf_scale
+        see spherical.
+    optical_stage
+        see spherical.
+    n_samples
+        see spherical.
+    key
+        see spherical.
     """
     return _single_disk_mirror(
         position=position,
@@ -424,7 +484,7 @@ def aspheric(
         radius=radius,
         inner_radius=inner_radius,
         reflectivity=reflectivity,
-        coating=coating,
+        reflectivity_curve=reflectivity_curve,
         bsdf_scale=bsdf_scale,
         optical_stage=optical_stage,
         n_samples=n_samples,

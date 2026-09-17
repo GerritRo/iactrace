@@ -2,7 +2,7 @@
 
 The package runs in float32 (``conftest.py`` pins ``jax_enable_x64`` off), so
 every tolerance in the traced kernels is derived from the active float dtype
-rather than hard-coded -- see :mod:`iactrace.core._tolerances`. The property
+rather than hard-coded -- see :mod:`iactrace.core.tolerances`. The property
 that buys is checked here directly: trace the same geometry twice, once in
 float32 and once in float64, and require the two to agree. Tolerances that
 track the dtype tighten with it and the runs converge; tolerances fixed at some
@@ -201,7 +201,7 @@ class TestKernelPrecision:
         denominator turns that 0/0 into 0 and transmits a ray that should have
         been reflected outright.
         """
-        from iactrace.core.coatings import fresnel_unpolarized
+        from iactrace.core.responses import fresnel_unpolarized
 
         def grazing():
             cos_i = jnp.asarray(np.array([0.0, 1e-9, 1e-7, 1e-5, 1e-3]))

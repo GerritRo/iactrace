@@ -208,7 +208,6 @@ class TestMultipleObstructions:
         ray_origins = jnp.repeat(jnp.array([[5.0, 0.0, 5.0]]), _VMAP_PAIR_BUDGET, axis=0)
         ray_directions = jnp.repeat(jnp.array([[-1.0, 0.0, 0.0]]), _VMAP_PAIR_BUDGET, axis=0)
 
-
         t_vmap = jax.vmap(cylinders.intersect)(ray_origins, ray_directions)
         t_batch = cylinders.intersect_batch(ray_origins, ray_directions)
 

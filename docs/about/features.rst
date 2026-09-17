@@ -34,7 +34,7 @@ IACTrace supports multi-stage optical configurations:
 
 - **Single-mirror systems**: Davies-Cotton or parabolic primaries (H.E.S.S.,
   VERITAS, MAGIC)
-- **Two-mirror systems**: Schwarzschild-Couder designs (pSCT, ASTRI)
+- **Two-mirror systems**: Schwarzschild-Couder designs (pSCT, ASTRI, SST)
 - **Additional stages**: Windows (Slabs), Lenses
 
 Mirrors are organized into groups by optical stage, with each facet having
@@ -67,17 +67,34 @@ Two camera geometries are supported:
 
 **Square sensors**
    Rectangular pixel grids with configurable resolution and physical bounds.
-   Suitable for SiPM-based cameras or simulating images of lid cameras.
 
 **Hexagonal sensors**
    Hexagonally-packed pixels matching the geometry of PMT-based IACT cameras.
-   Proper handling of hexagon rotations.
+
+Wavelength and Response Curves
+------------------------------
+
+Rays carry a wavelength, and every coefficient along the path can depend on
+both incidence angle and wavelength:
+
+**Source spectra**
+    Either monochromatic (:class:`~iactrace.core.ConstantSpectrum`) or a tabulated 
+    photon density (:class:`~iactrace.core.TabulatedSpectrum`).
+
+**Response curves**
+   Mirror reflectivity, lens and window transmittance, concentrator wall reflectivity,
+   and detector quantum efficiency all use a `(\theta, \lambda)` table via 
+   (:class:`~iactrace.core.TabulatedResponse`). Each takes the same bulk scalar x curve pair.
+
+**Dispersion**
+   Refractive index as a table (:class:`~iactrace.core.TabulatedIndex`) or 
+   Sellmeier coefficients (:class:`~iactrace.core.SellmeierIndex`).
 
 Detection Chain
 ---------------
 
-Each sensor group carries its own detection chain — an optional light
-concentrator, a mounting ``gap``, and a photodetector — so different groups
+Each sensor group carries its own detection chain -- an optional light
+concentrator, a mounting ``gap``, and a photodetector -- so different groups
 in one camera can use different cones or detectors:
 
 **Light concentrators**
@@ -134,9 +151,8 @@ See :doc:`/getting_started/telescope_operations` for the full set.
 YAML Configuration
 ------------------
 
-Telescope optics and the camera are defined in two separate human-readable
-YAML files (see :doc:`/getting_started/custom_telescopes` for the full
-schema).
+Telescope optics and the camera are defined in two separate YAML files 
+(see :doc:`/getting_started/custom_telescopes` for the full schema).
 
 The telescope file describes the optics plus the camera frame in world
 coordinates:
@@ -152,6 +168,7 @@ coordinates:
    mirror_templates:
      primary:
        surface:
+         type: aspheric
          curvature: 0.0667   # 1/15m focal length
          conic: -1.0         # Parabolic
          aspheric: []

@@ -7,8 +7,15 @@ import jax.numpy as jnp
 from jax import Array
 from jax.typing import ArrayLike
 
-from ..core.ray_bundle import LazyRayBundle
-from ..core.render import apply_final_leg_shadow, final_leg_points, trace_optics
+from ..core.ray_bundle import DEFAULT_WAVELENGTH
+from ..core.render import (
+    LazyRayBundle,
+    apply_final_leg_shadow,
+    final_leg_points,
+    handoff_to_frame,
+    trace_optics,
+)
+from ..core.spectrum import Spectrum, as_spectrum
 from ..core.trajectory import TraceResult, Trajectory
 from ..core.transforms import euler_to_matrix
 from . import operations as _ops
@@ -18,6 +25,7 @@ if TYPE_CHECKING:
 
     from ..core.obstructions import ObstructionGroup
     from ..core.optics import OpticalElementGroup
+    from ..core.refractive_index import RefractiveIndex
 
 
 class Telescope(eqx.Module):
@@ -29,7 +37,7 @@ class Telescope(eqx.Module):
     operates purely in its local coordinate system.
 
     Optical elements (mirrors and lenses) are stored separately for clarity,
-    but can be accessed together via the ``optical_groups`` property for
+    but can be accessed together via the optical_groups property for
     unified ray tracing through mixed reflective/refractive systems.
     """
 
@@ -51,15 +59,22 @@ class Telescope(eqx.Module):
     ) -> None:
         """Initialize Telescope.
 
-        Args:
-            mirror_groups: List of Mirror groups (reflective elements)
-            obstruction_groups: List of Obstruction groups
-            name: Telescope name
-            lens_groups: List of Lens groups (refractive elements)
-            camera_position: Camera origin in world coordinates (3,).
-                Defaults to [0, 0, 0].
-            camera_rotation: Camera orientation as Euler angles in degrees (3,).
-                Defaults to [0, 0, 0].
+        Parameters
+        ----------
+        mirror_groups
+            List of Mirror groups (reflective elements)
+        obstruction_groups
+            List of Obstruction groups
+        name
+            Telescope name
+        lens_groups
+            List of Lens groups (refractive elements)
+        camera_position : array, shape (3,)
+            Camera origin in world coordinates.
+            Defaults to [0, 0, 0].
+        camera_rotation : array, shape (3,)
+            Camera orientation as Euler angles in degrees.
+            Defaults to [0, 0, 0].
         """
         # Validate one group per optical stage
         all_groups = list(mirror_groups)
@@ -99,26 +114,55 @@ class Telescope(eqx.Module):
         sources: Array,
         values: Array,
         source_type: Literal["point", "parallel"] = "point",
+        *,
+        wavelength: ArrayLike | Spectrum | None = None,
     ) -> LazyRayBundle:
         """Describe a render through the optics; do not execute yet.
 
-        Returns a :class:`LazyRayBundle` packaging this telescope's
+        Returns a LazyRayBundle packaging this telescope's
         optics and camera frame with the given sources. Downstream
-        camera methods (:meth:`Camera.image`,
-        :meth:`Camera.response_matrix`, :meth:`Camera.collect`) consume
+        camera methods (Camera.image,
+        Camera.response_matrix, Camera.collect) consume
         it directly: image and response_matrix fold per primary element
         so the full ray buffer is never materialised; collect
         materialises (per-ray output cannot be folded).
 
-        Args:
-            sources: Source positions ``(N, 3)`` or directions ``(N, 3)``.
-            values: Source strengths ``(N,)``. For ``'parallel'`` these are
-                irradiances on the aperture; for ``'point'`` they are
-                radiant intensities, and the irradiance each primary sample
-                sees is ``value / d^2`` for that sample's distance ``d`` to
-                the source.
-            source_type: ``'point'`` or ``'parallel'``.
+        Parameters
+        ----------
+        sources : array, shape (N, 3)
+            Source positions, or directions for a parallel source.
+        values : array, shape (N,)
+            Source strengths. For 'parallel' these are
+            irradiances on the aperture; for 'point' they are
+            radiant intensities, and the irradiance each primary sample
+            sees is value / d^2 for that sample's distance d to
+            the source.
+        source_type
+            'point' or 'parallel'.
+        wavelength
+            A scalar (None ->
+            DEFAULT_WAVELENGTH), a
+            per-ray (N,) array, or a
+            Spectrum, which draws one
+            wavelength per ray.
+
+        Raises
+        ------
+        ValueError
+            if wavelength is an array. A render generates its
+            own rays, so an array has nothing to line up with.
         """
+        if (
+            not isinstance(wavelength, Spectrum)
+            and jnp.asarray(DEFAULT_WAVELENGTH if wavelength is None else wavelength).ndim
+        ):
+            raise ValueError(
+                "render takes a scalar wavelength or a Spectrum, not an array: it "
+                "generates its own rays, so an array has nothing to line up with. "
+                "For several wavelengths, render each one separately (see "
+                "Spectrum.bins), or pass a Spectrum to draw one per ray."
+            )
+        spectrum = as_spectrum(DEFAULT_WAVELENGTH if wavelength is None else wavelength)
         return LazyRayBundle(
             optical_groups=self.optical_groups,
             obstruction_groups=self.obstruction_groups,
@@ -126,6 +170,7 @@ class Telescope(eqx.Module):
             camera_rotation=self.camera_rotation,
             sources=sources,
             source_values=values,
+            spectrum=spectrum,
             source_type=source_type,
         )
 
@@ -135,40 +180,51 @@ class Telescope(eqx.Module):
         ray_directions: Array,
         values: Array,
         record_trajectory: bool = False,
+        *,
+        wavelength: ArrayLike | Spectrum | None = None,
     ) -> TraceResult:
         """Trace rays from arbitrary origins through the full optical system.
 
-        Args:
-            ray_origins: Ray starting positions (N, 3)
-            ray_directions: Ray directions (N, 3), should be normalized
-            values: Ray intensities (N,)
-            record_trajectory: When True, also record the per-stage ray path for
-                diagnostics / 3D visualization (see
-                :func:`iactrace.viz.show_telescope`). Off by default and free when
-                off -- nothing extra is computed. Mirrors the
-                :func:`~iactrace.camera.trace_chain` option on the chain side.
+        Parameters
+        ----------
+        ray_origins : array, shape (N, 3)
+            Ray starting positions.
+        ray_directions : array, shape (N, 3)
+            Ray directions, should be normalized.
+        values : array, shape (N,)
+            Ray intensities.
+        record_trajectory
+            When True, also record the per-stage ray path for
+            diagnostics / 3D visualization (see
+            iactrace.viz.show_telescope).
+        wavelength
+            A scalar (None ->
+            DEFAULT_WAVELENGTH), a
+            per-ray (N,) array, or a
+            Spectrum, which draws one
+            wavelength per ray.
 
-        Returns:
-            A :class:`~iactrace.core.trajectory.TraceResult`, as every tracer
-            returns. Its ``rays`` are in the camera's local coordinate system;
-            pass them to ``camera.collect()`` or ``camera.image()`` for
-            detection::
+        Returns
+        -------
+        A TraceResult, as every tracer
+        returns. Its rays are in the camera's local coordinate system;
+        pass them to camera.collect() or camera.image() for
+        detection
 
-                rays = telescope.trace(origins, directions, values).rays
-                rays, trajectory = telescope.trace(..., record_trajectory=True)
+            rays = telescope.trace(origins, directions, values).rays
+            rays, trajectory = telescope.trace(..., record_trajectory=True)
 
-            ``trajectory`` is ``None`` unless ``record_trajectory`` was set, in
-            which case the :class:`~iactrace.core.trajectory.Trajectory` holds
-            the source point, each optical stage's landing point, and finally
-            the converging leg's landing on the camera reference plane --
-            ``(n_stages + 2, N, 3)``, so the beam is seen coming to a focus.
-            ``rays`` stops on the last optic (the sensor intersection happens
-            downstream in ``Camera``); the trajectory adds that last leg for
-            display.
+        trajectory is None unless record_trajectory was set, in
+        which case the Trajectory holds
+        the source point, each optical stage's landing point, and finally
+        the converging leg's landing on the camera reference plane.
+        rays stops on the last optic (the sensor intersection happens
+        downstream in Camera); the trajectory adds that last leg for
+        display.
 
-            The trajectory is in the **world frame** (the frame
-            :func:`iactrace.viz.show_telescope` draws the optics in), *not* the
-            camera frame ``rays`` is reframed into.
+        The trajectory is in the world frame (the frame
+        iactrace.viz.show_telescope draws the optics in), not the
+        camera frame rays is reframed into.
         """
         result = trace_optics(
             self.optical_groups,
@@ -177,24 +233,18 @@ class Telescope(eqx.Module):
             ray_directions,
             values,
             record_trajectory=record_trajectory,
+            wavelength=wavelength,
         )
-        # Handoff = shadow the final leg (explicit), then a pure reframe.
-        rb = apply_final_leg_shadow(
-            result.rays,
-            self.obstruction_groups,
-            self.camera_position,
-            self.camera_rotation,
-        )
+        origin, rotation = self.camera_position, self.camera_rotation
         if result.trajectory is None:
-            return TraceResult(rb.to_frame(self.camera_position, self.camera_rotation))
-        # Close the path on the focal plane: the bundle itself stops on the
-        # last optic, so without this the beam is never seen converging.
+            return TraceResult(
+                handoff_to_frame(result.rays, self.obstruction_groups, origin, rotation)
+            )
+        rb = apply_final_leg_shadow(result.rays, self.obstruction_groups, origin, rotation)
         points = result.trajectory.points
-        landing = final_leg_points(
-            rb, self.camera_position, self.camera_rotation, fallback=points[-1]
-        )
+        landing = final_leg_points(rb, origin, rotation, fallback=points[-1])
         trajectory = Trajectory(points=jnp.concatenate([points, landing[None]], axis=0))
-        return TraceResult(rb.to_frame(self.camera_position, self.camera_rotation), trajectory)
+        return TraceResult(rb.to_frame(origin, rotation), trajectory)
 
     @classmethod
     def from_yaml(
@@ -208,12 +258,16 @@ class Telescope(eqx.Module):
 
         The telescope file describes only the optical system and the
         camera frame. Load the camera separately via
-        :meth:`Camera.from_yaml`.
+        Camera.from_yaml.
 
-        Args:
-            filename: Path to telescope YAML file.
-            n_samples: Number of Monte Carlo samples per mirror element.
-            key: JAX random key for sampling and roughness.
+        Parameters
+        ----------
+        filename
+            Path to telescope YAML file.
+        n_samples
+            Number of Monte Carlo samples per mirror element.
+        key
+            JAX random key for sampling and roughness.
         """
         from ..io.yaml_io import load_telescope_config
 
@@ -227,13 +281,18 @@ class Telescope(eqx.Module):
     ) -> Path:
         """Save the telescope configuration to a standalone YAML file.
 
-        Args:
-            filename: Output file path.
-            precision: Number of decimal places for float values.
-            overwrite: If True, overwrite existing file.
+        Parameters
+        ----------
+        filename
+            Output file path.
+        precision
+            Number of decimal places for float values.
+        overwrite
+            If True, overwrite existing file.
 
-        Returns:
-            Path to the saved file.
+        Returns
+        -------
+        Path to the saved file.
         """
         from ..io.yaml_io import save_telescope
 
@@ -265,7 +324,7 @@ class Telescope(eqx.Module):
     # Stage access
 
     def stage(self, idx: int) -> OpticalElementGroup:
-        """Return the :class:`OpticalElementGroup` at ``optical_stage == idx``."""
+        """Return the OpticalElementGroup at optical_stage == idx."""
         for g in self.optical_groups:
             if g.optical_stage == idx:
                 return g
@@ -361,16 +420,20 @@ class Telescope(eqx.Module):
     def scale_transmittance(self, stage: int, factor: Array | float) -> Telescope:
         return _ops.scale_transmittance(self, stage, factor)
 
-    def set_refractive_index(self, stage: int, n_inside: Array | float) -> Telescope:
-        return _ops.set_refractive_index(self, stage, n_inside)
+    def set_refractive_index(self, stage: int, index: Array | float | RefractiveIndex) -> Telescope:
+        return _ops.set_refractive_index(self, stage, index)
 
     def set_thickness(self, stage: int, thickness: Array | float) -> Telescope:
         return _ops.set_thickness(self, stage, thickness)
 
     def set_focal_lengths(
-        self, stage: int, focal_lengths: Array, n_outside: float = 1.0
+        self,
+        stage: int,
+        focal_lengths: Array,
+        n_outside: float = 1.0,
+        wavelength: float | Array = DEFAULT_WAVELENGTH,
     ) -> Telescope:
-        return _ops.set_focal_lengths(self, stage, focal_lengths, n_outside)
+        return _ops.set_focal_lengths(self, stage, focal_lengths, n_outside, wavelength)
 
     def apply_focal_error(
         self,
@@ -379,8 +442,9 @@ class Telescope(eqx.Module):
         key: Array,
         relative: bool = False,
         n_outside: float = 1.0,
+        wavelength: float | Array = DEFAULT_WAVELENGTH,
     ) -> Telescope:
-        return _ops.apply_focal_error(self, stage, sigma, key, relative, n_outside)
+        return _ops.apply_focal_error(self, stage, sigma, key, relative, n_outside, wavelength)
 
     # Obstruction methods
 

@@ -1,8 +1,8 @@
 import jax.numpy as jnp
 import pytest
 
-from iactrace.core.coatings import fresnel_unpolarized
 from iactrace.core.interactions import refract, refract_slab
+from iactrace.core.responses import fresnel_unpolarized
 
 
 def _cos_t_from_direction(refracted, normal):

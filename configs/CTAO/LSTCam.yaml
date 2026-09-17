@@ -15,7 +15,7 @@ sensors:
   photodetector:
     type: pmt
     qe: 1.0            # for now kept perfect
-    n_window: 1.52     
+    window_index: 1.52     
     face_radius: 0.01925
     surface:
       type: aspheric

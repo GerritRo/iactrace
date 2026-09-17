@@ -610,7 +610,6 @@ obstructions:
   - -0.26
   - -0.26
   - 2.0888
-  r: 1
 - id: Camera_Mast
   type: cylinder
   p1:
@@ -744,7 +743,6 @@ lenses:
     - - -0.25
       - 0.25
   thickness: 0.0035
-  n_inside: 1.54
-  n_outside: 1.0
+  index: 1.54
   transmittance: 1.0
   stage: 2

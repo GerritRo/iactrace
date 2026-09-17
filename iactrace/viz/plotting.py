@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.collections import PolyCollection
 
+from ..camera.sensor_group import HexagonalSensorGroup, SquareSensorGroup
 from ..core.transforms import euler_to_matrix
 
 
@@ -23,34 +24,45 @@ def show_image(
 ):
     """Render a camera image at actual focal-plane positions.
 
-    Builds a single :class:`~matplotlib.collections.PolyCollection` holding
+    Builds a single PolyCollection holding
     every pixel in the camera. Pixel polygons are projected onto the camera
-    ``(x, y)`` plane after applying each tile's position and Euler rotation,
+    (x, y) plane after applying each tile's position and Euler rotation,
     so curvature and tile tilt are reflected faithfully.
 
-    This draws the *image* -- pixel values on the focal plane. For the camera's
+    This draws the image -- pixel values on the focal plane. For the camera's
     physical 3D geometry (every pixel's concentrator and photosensor) see
-    :func:`iactrace.viz.show_camera`.
+    iactrace.viz.show_camera.
 
-    Args:
-        image: Pixel image array. Shape ``(n_sensors, height, width)`` for
-            :class:`~iactrace.SquareSensorGroup`, ``(n_sensors, n_pixels)``
-            for :class:`~iactrace.HexagonalSensorGroup`.
-        sensor: The sensor group that produced ``image``.
-        ax: Matplotlib axes. Created with a square aspect figure if ``None``.
-        cmap: Colormap name or instance.
-        vmin, vmax: Explicit colour limits. Default: data min/max.
-        norm: Optional :class:`matplotlib.colors.Normalize`. Overrides
-            ``vmin``/``vmax`` when given.
-        edgecolor: Pixel-boundary colour. Default ``"none"`` (no outlines).
-        linewidth: Pixel-boundary line width.
-        colorbar: Attach a vertical colorbar to ``ax``.
-        cbar_label: Colorbar label text.
+    Parameters
+    ----------
+    image
+        Pixel image array. Shape (n_sensors, height, width) for
+        SquareSensorGroup, (n_sensors, n_pixels)
+        for HexagonalSensorGroup.
+    sensor
+        The sensor group that produced image.
+    ax
+        Matplotlib axes. Created with a square aspect figure if None.
+    cmap
+        Colormap name or instance.
+    vmin, vmax
+        Explicit colour limits. Default: data min/max.
+    norm
+        Optional matplotlib.colors.Normalize. Overrides
+        vmin/vmax when given.
+    edgecolor
+        Pixel-boundary colour. Default "none" (no outlines).
+    linewidth
+        Pixel-boundary line width.
+    colorbar
+        Attach a vertical colorbar to ax.
+    cbar_label
+        Colorbar label text.
 
-    Returns:
-        ``ax`` (the axes that received the collection).
+    Returns
+    -------
+    ax (the axes that received the collection).
     """
-    from ..camera.sensor_group import HexagonalSensorGroup, SquareSensorGroup
 
     image = np.asarray(image)
     if isinstance(sensor, SquareSensorGroup):
@@ -93,14 +105,14 @@ def show_image(
 def _stack_rotations(rotations):
     """Per-sensor rotation matrices, shape (n_sensors, 3, 3).
 
-    Uses the canonical :func:`iactrace.core.transforms.euler_to_matrix` so the
+    Uses the canonical iactrace.core.transforms.euler_to_matrix so the
     2D camera view shares the exact Euler convention of the 3D geometry.
     """
     return np.stack([np.asarray(euler_to_matrix(r)) for r in np.asarray(rotations)])
 
 
 def _square_polygons(image, sensor):
-    """Return ``(polys, values)`` for a SquareSensorGroup image."""
+    """Return (polys, values) for a SquareSensorGroup image."""
     expected_shape = (sensor.n_sensors, sensor.height, sensor.width)
     if image.shape != expected_shape:
         raise ValueError(f"image shape {image.shape} does not match sensor shape {expected_shape}")
@@ -132,7 +144,7 @@ def _square_polygons(image, sensor):
 
 
 def _hex_polygons(image, sensor):
-    """Return ``(polys, values)`` for a HexagonalSensorGroup image."""
+    """Return (polys, values) for a HexagonalSensorGroup image."""
     expected_shape = (sensor.n_sensors, sensor.n_pixels)
     if image.shape != expected_shape:
         raise ValueError(f"image shape {image.shape} does not match sensor shape {expected_shape}")
