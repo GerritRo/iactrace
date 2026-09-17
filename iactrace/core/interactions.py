@@ -33,9 +33,9 @@ def refract(direction, normal, n1, n2):
 
     Parameters
     ----------
-    direction : array, shape (3,)
+    direction : ndarray (3,)
         Ray direction, normalized.
-    normal : array, shape (3,)
+    normal : ndarray (3,)
         Surface normal, normalized, pointing outward.
     n1, n2
         Refractive index of the incident and transmitted media.
@@ -68,11 +68,11 @@ def refract_slab(direction, normal, position, n_out, n_in, thickness):
 
     Parameters
     ----------
-    direction : array, shape (3,)
+    direction : ndarray (3,)
         Ray direction, normalized.
-    normal : array, shape (3,)
+    normal : ndarray (3,)
         Front-surface normal, pointing outward.
-    position : array, shape (3,)
+    position : ndarray (3,)
         Entry point in world coordinates.
     n_out, n_in
         Refractive index of the ambient medium and of the slab material.
@@ -179,7 +179,7 @@ class ReflectInteraction(Interaction):
     reflectivity_curve
         R(theta, lambda) response curve, or None
         for a flat angular and spectral response.
-    reflectivity : array, shape (N,)
+    reflectivity : ndarray (N,)
         Per-element bulk multiplier in [0, 1]. Operations such as set_reflectivity write
         here, leaving the curve untouched.
     """
@@ -248,7 +248,7 @@ class RefractInteraction(Interaction):
     transmittance_curve
         T(theta, lambda) response curve, or None
         for the bare-interface Fresnel transmittance.
-    transmittance : array, shape (N,)
+    transmittance : ndarray (N,)
         Per-element bulk multiplier in [0, 1].
     """
 
@@ -333,12 +333,12 @@ class SlabInteraction(Interaction):
         model evaluated per ray at that ray's wavelength. A constant
         window is
         ConstantIndex.
-    thickness : array, shape (N,)
+    thickness : ndarray (N,)
         Per-element slab thickness.
     transmittance_curve
         T(theta, lambda) response curve for the whole
         slab, or None for the bare-window Fresnel product.
-    transmittance : array, shape (N,)
+    transmittance : ndarray (N,)
         Per-element bulk multiplier in [0, 1].
     """
 

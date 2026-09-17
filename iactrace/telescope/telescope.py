@@ -69,10 +69,10 @@ class Telescope(eqx.Module):
             Telescope name
         lens_groups
             List of Lens groups (refractive elements)
-        camera_position : array, shape (3,)
+        camera_position : ndarray (3,)
             Camera origin in world coordinates.
             Defaults to [0, 0, 0].
-        camera_rotation : array, shape (3,)
+        camera_rotation : ndarray (3,)
             Camera orientation as Euler angles in degrees.
             Defaults to [0, 0, 0].
         """
@@ -129,9 +129,9 @@ class Telescope(eqx.Module):
 
         Parameters
         ----------
-        sources : array, shape (N, 3)
+        sources : ndarray (N, 3)
             Source positions, or directions for a parallel source.
-        values : array, shape (N,)
+        values : ndarray (N,)
             Source strengths. For 'parallel' these are
             irradiances on the aperture; for 'point' they are
             radiant intensities, and the irradiance each primary sample
@@ -141,8 +141,7 @@ class Telescope(eqx.Module):
             'point' or 'parallel'.
         wavelength
             A scalar (None ->
-            DEFAULT_WAVELENGTH), a
-            per-ray (N,) array, or a
+            DEFAULT_WAVELENGTH) or a
             Spectrum, which draws one
             wavelength per ray.
 
@@ -187,11 +186,11 @@ class Telescope(eqx.Module):
 
         Parameters
         ----------
-        ray_origins : array, shape (N, 3)
+        ray_origins : ndarray (N, 3)
             Ray starting positions.
-        ray_directions : array, shape (N, 3)
+        ray_directions : ndarray (N, 3)
             Ray directions, should be normalized.
-        values : array, shape (N,)
+        values : ndarray (N,)
             Ray intensities.
         record_trajectory
             When True, also record the per-stage ray path for

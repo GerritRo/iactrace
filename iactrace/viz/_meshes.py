@@ -105,9 +105,9 @@ def _create_lofted_mesh(z, rings):
 
     Parameters
     ----------
-    z : array, shape (K,)
+    z : ndarray (K,)
         Axial heights.
-    rings : array, shape (K, M, 2)
+    rings : ndarray (K, M, 2)
         Polygon vertices per slice (pixel-local frame).
     """
     z = np.asarray(z, dtype=float)

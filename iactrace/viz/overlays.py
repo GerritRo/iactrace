@@ -12,9 +12,9 @@ def add_rays(scene, origins, directions, length=10.0, color=None):
     ----------
     scene
         trimesh.Scene
-    origins : array, shape (N, 3)
+    origins : ndarray (N, 3)
         Ray origins.
-    directions : array, shape (N, 3)
+    directions : ndarray (N, 3)
         Ray directions.
     length
         Ray length
@@ -170,7 +170,7 @@ def add_points(scene, points, color=None):
     ----------
     scene
         trimesh.Scene
-    points : array, shape (N, 3)
+    points : ndarray (N, 3)
         Point coordinates.
     color
         RGBA color

@@ -51,15 +51,15 @@ def _build_source_rays(
 
     Parameters
     ----------
-    points : array, shape (n_samples, 3)
+    points : ndarray (n_samples, 3)
         Sampled surface points for one element.
-    normals : array, shape (n_samples, 3)
+    normals : ndarray (n_samples, 3)
         Surface normals at those points.
-    weights : array, shape (n_samples, 1)
+    weights : ndarray (n_samples, 1)
         Importance weights.
-    sources : array, shape (n_sources, 3)
+    sources : ndarray (n_sources, 3)
         Source positions or unit propagation directions (depending on source_type).
-    source_values : array, shape (n_sources,)
+    source_values : ndarray (n_sources,)
         Source intensities.
     source_type
         'point' or 'parallel'.
@@ -472,13 +472,13 @@ def trace_optics(
         List of OpticalElementGroup (combined mirrors + lenses).
     obstruction_groups
         List of ObstructionGroup.
-    ray_origins : array, shape (n_rays, 3)
+    ray_origins : ndarray (n_rays, 3)
         .
-    ray_directions : array, shape (n_rays, 3)
+    ray_directions : ndarray (n_rays, 3)
         Normalized.
-    values : array, shape (n_rays,)
+    values : ndarray (n_rays,)
         .
-    wavelength : array, shape (n_rays,)
+    wavelength : ndarray (n_rays,)
         a scalar shared by every ray, a per-ray.
         array, or a Spectrum, which draws
         one wavelength per ray. Default DEFAULT_WAVELENGTH.

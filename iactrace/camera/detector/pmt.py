@@ -32,8 +32,7 @@ class PMT(PhotoDetector):
       its incident angle -- the angular response a single measured scalar cannot
       capture. When you do, qe should be the intrinsic photocathode QE (the
       glass loss is then modelled by the Fresnel term, not folded into qe).
-      A number gives a non-dispersive window; a
-      RefractiveIndex model gives a
+      A number gives a non-dispersive window; a RefractiveIndex model gives a
       dispersive one, n(lambda).
 
     Parameters
@@ -42,8 +41,8 @@ class PMT(PhotoDetector):
         Bulk detection efficiency in [0, 1] applied at the
         photocathode. Defaults to 1.0. With qe_curve it acts as a
         bulk multiplier.
-    qe_curve : array, shape (theta, lambda)
-        Optional QE.
+    qe_curve : ndarray
+        Optional QE(theta, lambda)
         ResponseCurve multiplying qe
         per ray; None (default) is flat.
     window_index

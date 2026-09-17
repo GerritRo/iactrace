@@ -147,7 +147,7 @@ class OpticalElementGroup(eqx.Module):
         ----------
         element_idx
             Index of the element within this group.
-        origins, directions : array, shape (n_rays, 3)
+        origins, directions : ndarray (n_rays, 3)
             Rays in world coordinates.
 
         Returns
@@ -185,9 +185,9 @@ class OpticalElementGroup(eqx.Module):
 
         Parameters
         ----------
-        element_idx : array, shape (n_rays,)
+        element_idx : ndarray (n_rays,)
             Per-ray element index.
-        origins, directions : array, shape (n_rays, 3)
+        origins, directions : ndarray (n_rays, 3)
             Rays in world coordinates.
 
         Returns

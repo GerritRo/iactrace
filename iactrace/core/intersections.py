@@ -42,11 +42,11 @@ def _localize(ray_origin, ray_direction, reference, scale=0.0):
 
     Parameters
     ----------
-    ray_origin : array, shape (3,)
+    ray_origin : ndarray (3,)
         Ray origin.
-    ray_direction : array, shape (3,)
+    ray_direction : ndarray (3,)
         Ray direction, assumed normalized.
-    reference : array, shape (3,)
+    reference : ndarray (3,)
         Point to move towards, usually the primitive's centre.
     scale
         Size of the primitive.
@@ -102,7 +102,7 @@ def _slab_hit(origin, direction, lo, hi, t_lo):
     ----------
     origin, direction
         Ray expressed in the box's own frame.
-    lo, hi : array, shape (3,)
+    lo, hi : ndarray (3,)
         Opposite corners, with lo <= hi componentwise.
     t_lo
         Smallest acceptable ray parameter.
@@ -185,9 +185,9 @@ def intersect_cylinder(ray_origin, ray_direction, p1, p2, radius):
 
     Parameters
     ----------
-    p1 : array, shape (3,)
+    p1 : ndarray (3,)
         First endpoint of cylinder axis.
-    p2 : array, shape (3,)
+    p2 : ndarray (3,)
         Second endpoint of cylinder axis.
     radius : scalar
         Cylinder radius.
@@ -223,9 +223,9 @@ def intersect_open_cylinder(ray_origin, ray_direction, p1, p2, radius):
 
     Parameters
     ----------
-    p1 : array, shape (3,)
+    p1 : ndarray (3,)
         First endpoint of cylinder axis.
-    p2 : array, shape (3,)
+    p2 : ndarray (3,)
         Second endpoint of cylinder axis.
     radius : scalar
         Cylinder radius.
@@ -245,9 +245,9 @@ def intersect_box(ray_origin, ray_direction, p1, p2):
 
     Parameters
     ----------
-    p1 : array, shape (3,)
+    p1 : ndarray (3,)
         lower edge of the bounding box.
-    p2 : array, shape (3,)
+    p2 : ndarray (3,)
         upper diagonal edge of the bounding box.
     """
     box_min = jnp.minimum(p1, p2)
@@ -262,11 +262,11 @@ def intersect_oriented_box(ray_origin, ray_direction, center, half_extents, rota
 
     Parameters
     ----------
-    center : array, shape (3,)
+    center : ndarray (3,)
         Box center.
-    half_extents : array, shape (3,)
+    half_extents : ndarray (3,)
         Half-sizes along local axes.
-    rotation : array, shape (3, 3)
+    rotation : ndarray (3, 3)
         Rotation matrix transforming local to world coordinates.
     """
     origin, t_offset, t_lo = _localize(ray_origin, ray_direction, center, jnp.max(half_extents))
@@ -282,7 +282,7 @@ def intersect_triangle(ray_origin, ray_direction, v0, v1, v2):
 
     Parameters
     ----------
-    v0, v1, v2 : array, shape (3,)
+    v0, v1, v2 : ndarray (3,)
         Triangle vertices.
     """
     edge1 = v1 - v0
@@ -310,7 +310,7 @@ def intersect_sphere(ray_origin, ray_direction, center, radius):
 
     Parameters
     ----------
-    center : array, shape (3,)
+    center : ndarray (3,)
         Sphere center.
     radius : scalar
         Sphere radius.

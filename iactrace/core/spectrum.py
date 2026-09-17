@@ -62,18 +62,51 @@ class TabulatedSpectrum(Spectrum):
 
     Attributes
     ----------
-    wavelengths : array, shape (K,)
-        Sample wavelengths, sorted ascending.
-    density : array, shape (K,)
-        Relative photon density aligned with wavelengths.
+    wavelengths : ndarray (K,)
+        Sample wavelengths, strictly ascending. At least two are required.
+    density : ndarray (K,)
+        Relative photon density aligned with wavelengths, non-negative and not
+        zero everywhere.
+
+    Raises
+    ------
+    ValueError
+        if the two arrays disagree in shape, if fewer than two wavelengths are
+        given, or if the wavelengths are not strictly ascending or the density
+        carries no mass.
     """
 
-    wavelengths: Array  # (K,) ascending
-    density: Array  # (K,) >= 0
+    wavelengths: Array
+    density: Array
+
+    def __check_init__(self):
+        if self.wavelengths.ndim != 1 or self.density.ndim != 1:
+            raise ValueError(
+                "`wavelengths` and `density` must both be 1-D, got shapes "
+                f"{self.wavelengths.shape} and {self.density.shape}"
+            )
+        if self.wavelengths.shape != self.density.shape:
+            raise ValueError(
+                f"`density` ({self.density.shape[0]}) must give one value per wavelength "
+                f"({self.wavelengths.shape[0]})"
+            )
+        if self.wavelengths.shape[0] < 2:
+            raise ValueError("`wavelengths` must give at least two values.")
+        # Value checks only where the arrays are concrete
+        if isinstance(self.wavelengths, jax.core.Tracer) or isinstance(
+            self.density, jax.core.Tracer
+        ):
+            return
+        if not bool(jnp.all(jnp.diff(self.wavelengths) > 0.0)):
+            raise ValueError("`wavelengths` must be strictly ascending with no repeats")
+        if not bool(jnp.all(self.density >= 0.0)):
+            raise ValueError("`density` must be non-negative")
+        if not bool(jnp.sum(self.density) > 0.0):
+            raise ValueError("`density` is zero everywhere.")
 
     def _cdf(self):
         dwl = jnp.diff(self.wavelengths)
-        seg = 0.5 * (self.density[1:] + self.density[:-1]) * dwl  # trapezoid mass / segment
+        seg = 0.5 * (self.density[1:] + self.density[:-1]) * dwl
         cdf = jnp.concatenate([jnp.zeros(1), jnp.cumsum(seg)])
         return cdf / cdf[-1]
 

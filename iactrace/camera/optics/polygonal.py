@@ -58,10 +58,10 @@ class PolygonalCone(Concentrator):
 
         Parameters
         ----------
-        cos_theta_i : array, shape (n_rays,)
+        cos_theta_i : ndarray (n_rays,)
             Cosine of the angle between the ray and the wall normal at the hit point. 1
             is normal incidence, 0 grazing.
-        wavelength : array, shape (n_rays,)
+        wavelength : ndarray (n_rays,)
             Per-ray wavelength.
         """
         if self.reflectivity_curve is None:
@@ -159,7 +159,7 @@ class ChainTrace(NamedTuple):
         there (0 for lost / absorbed rays), origins the landing point,
         directions the true incident direction, path_length the
         accumulated OPL.
-    bounces : array, shape (N,)
+    bounces : ndarray (N,)
         Int -- wall reflections before termination.
     trajectory
         A Trajectory of per-step

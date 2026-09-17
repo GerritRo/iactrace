@@ -148,7 +148,7 @@ class SumSurfaceGroup(SurfaceGroup):
     components
         Tuple of component SurfaceGroup instances, each
         sized to the same N.
-    offsets : array, shape (N, 2)
+    offsets : ndarray (N, 2)
         Per-element in-surface decenter for the composite.
         (inherited).
     """
@@ -220,14 +220,14 @@ class AsphericSurfaceGroup(SurfaceGroup):
 
     Attributes
     ----------
-    curvatures : array, shape (N,)
+    curvatures : ndarray (N,)
         Per-element curvatures.
-    conics : array, shape (N,)
+    conics : ndarray (N,)
         Per-element conic constants.
-    aspherics : array, shape (N, K)
+    aspherics : ndarray (N, K)
         Per-element even aspheric coefficients [A4, A6, ...]; column i
         multiplies r^(2i + 4). See sag_raw.
-    offsets : array, shape (N, 2)
+    offsets : ndarray (N, 2)
         Per-element in-surface decenter (inherited).
     """
 
@@ -348,13 +348,13 @@ class ZernikeSurfaceGroup(SurfaceGroup):
 
     Attributes
     ----------
-    coeffs : array, shape (N, J)
+    coeffs : ndarray (N, J)
         Per-element Noll coefficients in metres. With J <= 11. Column m is Noll index m
         + 1 (Z1 = piston).
-    r_norm : array, shape (N,)
+    r_norm : ndarray (N,)
         Per-element normalization radius in metres.
         rho = 1 at this radius.
-    offsets : array, shape (N, 2)
+    offsets : ndarray (N, 2)
         Per-element in-surface decenter (inherited).
     """
 
@@ -455,15 +455,15 @@ class FreeformSurfaceGroup(SurfaceGroup):
 
     Attributes
     ----------
-    grid_z : array, shape (N, H, W)
+    grid_z : ndarray (N, H, W)
         Per-element height samples in metres. grid_z[n, j, i] is the height
         of element n at column i (x), row j (y).
-    x0, y0 : array, shape (N,)
+    x0, y0 : ndarray (N,)
         Per-element grid origin — the coordinate of column /
         row 0.
-    dx, dy : array, shape (N,)
+    dx, dy : ndarray (N,)
         Per-element grid spacing along x / y.
-    offsets : array, shape (N, 2)
+    offsets : ndarray (N, 2)
         Per-element in-surface decenter (inherited).
     """
 

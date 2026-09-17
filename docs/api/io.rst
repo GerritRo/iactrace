@@ -5,7 +5,8 @@ Everything iactrace reads from or writes to a file: telescope and camera
 configuration as YAML, and the result of a scan as ``.npz``.
 
 For how the package is layered, and what to touch when adding a new schema
-variant or a new file format, see ``iactrace/io/README.md``.
+variant or a new file format, see the module docstring of
+:mod:`iactrace.io`.
 
 Configuration
 -------------

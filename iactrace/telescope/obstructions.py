@@ -49,9 +49,9 @@ def cylinder(
 
     Parameters
     ----------
-    p1 : array, shape (3,)
+    p1 : ndarray (3,)
         One endpoint of the cylinder axis.
-    p2 : array, shape (3,)
+    p2 : ndarray (3,)
         The other endpoint.
     r
         Cylinder radius in metres.
@@ -73,9 +73,9 @@ def open_cylinder(
 
     Parameters
     ----------
-    p1 : array, shape (3,)
+    p1 : ndarray (3,)
         One endpoint of the cylinder axis.
-    p2 : array, shape (3,)
+    p2 : ndarray (3,)
         The other endpoint.
     r
         Cylinder radius in metres.
@@ -96,9 +96,9 @@ def box(
 
     Parameters
     ----------
-    p1 : array, shape (3,)
+    p1 : ndarray (3,)
         One corner of the box.
-    p2 : array, shape (3,)
+    p2 : ndarray (3,)
         The diagonally opposite corner.
     """
     return BoxGroup(
@@ -116,7 +116,7 @@ def sphere(
 
     Parameters
     ----------
-    center : array, shape (3,)
+    center : ndarray (3,)
         Sphere centre.
     r
         Sphere radius in metres.

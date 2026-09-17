@@ -458,6 +458,52 @@ class TestSpectrum:
         wl, w = ts.bins()
         assert jnp.allclose(w.sum(), 1.0)
 
+    def test_a_single_node_is_rejected(self):
+        """One node has no segment to integrate or invert.
+
+        Left unchecked it hands back NaN weights from ``bins()`` and dies inside
+        a gather in ``sample()`` -- both a long way from the actual mistake.
+        """
+        with pytest.raises(ValueError, match="at least two values"):
+            TabulatedSpectrum.from_density([400.0], [1.0])
+
+    def test_a_density_with_no_mass_is_rejected(self):
+        # Normalising by the total would divide by zero and NaN the whole render.
+        with pytest.raises(ValueError, match="zero everywhere"):
+            TabulatedSpectrum.from_density([300.0, 600.0], [0.0, 0.0])
+
+    def test_a_negative_density_is_rejected(self):
+        with pytest.raises(ValueError, match="non-negative"):
+            TabulatedSpectrum(jnp.array([300.0, 600.0]), jnp.array([-1.0, 1.0]))
+
+    def test_repeated_wavelengths_are_rejected(self):
+        # A zero-width segment leaves the inverse CDF undefined on it.
+        with pytest.raises(ValueError, match="strictly ascending"):
+            TabulatedSpectrum(jnp.array([300.0, 300.0]), jnp.array([1.0, 1.0]))
+
+    def test_mismatched_lengths_are_rejected(self):
+        with pytest.raises(ValueError, match="one value per wavelength"):
+            TabulatedSpectrum(jnp.array([300.0, 600.0]), jnp.array([1.0, 1.0, 1.0]))
+
+    def test_validation_does_not_fire_on_a_traced_density(self):
+        """The checks must not break the reparameterised gradient.
+
+        ``density`` is a tracer under ``jax.grad``, so the value checks are
+        skipped there; the structural ones stay, since shapes are static.
+        """
+        wl = jnp.array([300.0, 450.0, 600.0])
+        grad = jax.grad(
+            lambda d: TabulatedSpectrum(wl, d).sample(jax.random.key(7), (256,)).mean()
+        )(jnp.array([1.0, 2.0, 1.0]))
+        assert bool(jnp.all(jnp.isfinite(grad)))
+
+    def test_a_valid_spectrum_survives_a_jit_round_trip(self):
+        # Unflattening rebuilds the module without __init__, so the checks must
+        # not run again on a tracer-valued copy.
+        ts = TabulatedSpectrum.from_density([300.0, 450.0, 600.0], [1.0, 2.0, 1.0])
+        draws = jax.jit(lambda s: s.sample(jax.random.key(8), (16,)))(ts)
+        assert bool(jnp.all(jnp.isfinite(draws)))
+
 
 class TestWavelengthSampling:
     """A render draws one wavelength per ray; it never replicates rays."""

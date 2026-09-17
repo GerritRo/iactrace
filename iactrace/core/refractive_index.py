@@ -39,7 +39,7 @@ class ConstantIndex(RefractiveIndex):
 
     Attributes
     ----------
-    values : array, shape (N,)
+    values : ndarray (N,)
         Per-element refractive index.
     """
 
@@ -61,9 +61,9 @@ class TabulatedIndex(RefractiveIndex):
 
     Attributes
     ----------
-    wavelengths : array, shape (K,)
+    wavelengths : ndarray (K,)
         Lookup axis, sorted ascending. Same units as wavelength.
-    n_values : array, shape (N, K)
+    n_values : ndarray (N, K)
         Per-element index samples aligned with wavelengths.
     """
 
@@ -122,9 +122,9 @@ class SellmeierIndex(RefractiveIndex):
 
     Attributes
     ----------
-    b : array, shape (N, M)
+    b : ndarray (N, M)
         Per-element Sellmeier B coefficients.
-    c : array, shape (N, M)
+    c : ndarray (N, M)
         Per-element Sellmeier C coefficients.
     """
 

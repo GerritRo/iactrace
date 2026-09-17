@@ -88,7 +88,7 @@ class GaussianBSDF(BSDF):
 
     Attributes
     ----------
-    scale : array, shape (N,)
+    scale : ndarray (N,)
         Per-element roughness sigma in arcseconds.
         Zero means perfect specular (no perturbation).
     """
@@ -115,11 +115,11 @@ class DoubleGaussianBSDF(BSDF):
 
     Attributes
     ----------
-    scale_narrow : array, shape (N,)
+    scale_narrow : ndarray (N,)
         Per-element narrow-component sigma in arcseconds.
-    scale_wide : array, shape (N,)
+    scale_wide : ndarray (N,)
         Per-element wide-component sigma in arcseconds.
-    mix_weight : array, shape (N,)
+    mix_weight : ndarray (N,)
         Per-element probability of the wide component, in [0, 1].
     """
 

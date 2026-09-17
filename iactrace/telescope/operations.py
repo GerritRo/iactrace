@@ -355,7 +355,7 @@ def apply_zernike_error(
     ----------
     stage
         Optical stage to perturb.
-    sigmas : array, shape (J,)
+    sigmas : ndarray (J,)
         Per-Noll-mode RMS sigmas in metres. With J <= 11.
     key
         JAX PRNG key for the coefficient draw.
