@@ -24,20 +24,20 @@ class RayBundle(eqx.Module):
 
     Attributes
     ----------
-    origins : array, shape (n_rays, 3)
+    origins : ndarray (n_rays, 3)
         Ray positions. Meaningful only where alive.
-    directions : array, shape (n_rays, 3)
+    directions : ndarray (n_rays, 3)
         Ray directions. Meaningful only where alive.
-    values : array, shape (n_rays,)
+    values : ndarray (n_rays,)
         Throughput-weighted intensities.
-    path_length : array, shape (n_rays,)
+    path_length : ndarray (n_rays,)
         Accumulated optical path length, in metres.
-    n : array, shape (n_rays,)
+    n : ndarray (n_rays,)
         Refractive index of the medium each ray is in, carried so downstream
         consumers can weight the final geometric leg.
-    wavelength : array, shape (n_rays,)
+    wavelength : ndarray (n_rays,)
         Per-ray wavelength.
-    alive : array, shape (n_rays,)
+    alive : ndarray (n_rays,)
         Per-ray liveness, all-True at construction.
     """
 

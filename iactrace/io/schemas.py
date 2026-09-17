@@ -444,9 +444,9 @@ class TabulatedQESchema(ConfigModel):
 
     The detector-side qe / qe_curve pair: qe is the bulk scalar and
     qe_curve the response curve multiplying it, in the same
-    {type: table, ...} form a mirror's reflectivity_curve takes. The
-    legacy inline form (wavelengths_nm plus a list of qe values) is
-    still accepted and folded into an angle-flat curve.
+    {type: table, ...} form a mirror's reflectivity_curve takes. For the usual
+    wavelength-only QE, give the curve a wavelengths_nm axis and a single
+    angles_deg entry.
     """
 
     type: Literal["tabulated"] = "tabulated"

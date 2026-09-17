@@ -37,9 +37,9 @@ class FieldFrame(eqx.Module):
     axis
         Unit propagation direction of an on-axis ray -- the direction
         light travels, pointing into the telescope (3,).
-    e_lon : array, shape (3,)
+    e_lon : ndarray (3,)
         Unit sky axis of increasing lon.
-    e_lat : array, shape (3,)
+    e_lat : ndarray (3,)
         Unit sky axis of increasing lat.
     """
 
@@ -147,11 +147,11 @@ class EffectiveApertureTable:
 
     Attributes
     ----------
-    origin : array, shape (2,)
+    origin : ndarray (2,)
         Field offset of node (0, 0), [lon, lat] in radians.
-    step : array, shape (2,)
+    step : ndarray (2,)
         Node spacing along [lon, lat], in radians.
-    offset : array, shape (n_pixels, 2)
+    offset : ndarray (n_pixels, 2)
         Node index of each pixel's window corner.
     values
         Effective area in m^2 (n_pixels, W, W); axis -2 runs along
@@ -159,9 +159,9 @@ class EffectiveApertureTable:
     on_axis_area
         On-axis effective area over all pixels, band-averaged over
         spectral_area. Normalises values dimensionless.
-    wavelengths : array, shape (K,)
+    wavelengths : ndarray (K,)
         Wavelength grid of spectral_area, in nm.
-    spectral_area : array, shape (K,)
+    spectral_area : ndarray (K,)
         On-axis total effective area per wavelength.
     meta
         Provenance, including the table's own on-axis sum for comparison

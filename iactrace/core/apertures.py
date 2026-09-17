@@ -58,9 +58,9 @@ class DiskAperture(Aperture):
 
     Attributes
     ----------
-    radii : array, shape (N,)
+    radii : ndarray (N,)
         Outer radius per element.
-    inner_radii : array, shape (N,)
+    inner_radii : ndarray (N,)
         Inner radius per element, 0 for a solid disk.
     """
 
@@ -94,10 +94,10 @@ class PolygonAperture(Aperture):
 
     Attributes
     ----------
-    vertices : array, shape (N, K, 2)
+    vertices : ndarray (N, K, 2)
         Polygon vertices per element, CCW order.
-    n_vertices : array, shape (static, same for all)
-        Number of vertices per polygon.
+    n_vertices
+        Number of vertices per polygon; static, and the same for every element.
     """
 
     vertices: Array  # (N, K, 2)

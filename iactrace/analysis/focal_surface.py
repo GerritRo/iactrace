@@ -35,7 +35,7 @@ class FocalSurfaceHits(eqx.Module):
         from ray_bundle.origins to the surface (n_rays,).
     hit_mask
         Liveness at the surface (n_rays,).
-    directions_local : array, shape (n_rays, 3)
+    directions_local : ndarray (n_rays, 3)
         Ray directions in the surface-local frame.
     opl
         Per-ray optical path length from the source wavefront to the
@@ -44,7 +44,7 @@ class FocalSurfaceHits(eqx.Module):
     values
         Throughput-weighted intensity carried to the surface (n_rays,),
         in the input bundle's units.
-    wavelength : array, shape (n_rays,)
+    wavelength : ndarray (n_rays,)
         Per-ray wavelength carried from the input bundle.
     """
 
@@ -79,7 +79,7 @@ class FocalSurface(eqx.Module):
 
         Parameters
         ----------
-        o_local : array, shape (3,)
+        o_local : ndarray (3,)
             Ray origin in the surface-local frame.
         d_local
             Ray direction in the surface-local frame (3,), normalized.

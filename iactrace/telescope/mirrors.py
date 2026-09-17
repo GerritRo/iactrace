@@ -51,25 +51,25 @@ def mirror_group(
 
     Parameters
     ----------
-    positions : array, shape (N, 3)
+    positions : ndarray (N, 3)
         Per-element vertex positions.
-    rotations : array, shape (N, 3)
+    rotations : ndarray (N, 3)
         Per-element Euler angles in degrees.
-    curvatures : array, shape (N,)
+    curvatures : ndarray (N,)
         Per-element curvatures 1/R.
-    conics : array, shape (N,)
+    conics : ndarray (N,)
         Per-element Schwarzschild conic constants.
-    aspherics : array, shape (N, K)
+    aspherics : ndarray (N, K)
         Per-element even aspheric coefficients [A4, A6, ...]. ; column i multiplies
         r^(2i + 4).
-    offsets : array, shape (N, 2)
+    offsets : ndarray (N, 2)
         Per-element surface decentering. Use jnp.zeros((N, 2)) for a centred disk.
     aperture
         Pre-built aperture.
-    reflectivity : array, shape (N,)
+    reflectivity : ndarray (N,)
         Per-element bulk reflectivity in [0, 1].
-    reflectivity_curve : array, shape (theta, lambda)
-        Optional R.
+    reflectivity_curve
+        Optional R(theta, lambda)
         ResponseCurve multiplying
         reflectivity per ray; None (default) is a flat response.
     sample_key
@@ -150,33 +150,33 @@ def disk_array(
 
     Parameters
     ----------
-    positions : array, shape (N, 3)
+    positions : ndarray (N, 3)
         Per-element vertex positions.
-    rotations : array, shape (N, 3)
+    rotations : ndarray (N, 3)
         Per-element Euler angles in degrees.
-    curvatures : array, shape (N,)
+    curvatures : ndarray (N,)
         Per-element curvatures 1/R.
-    radii : array, shape (N,)
+    radii : ndarray (N,)
         Outer disk radii.
-    conics : array, shape (N,)
+    conics : ndarray (N,)
         Per-element conic constants. Defaults to zeros (spherical).
-    aspheric_coeffs : array, shape (N, K)
+    aspheric_coeffs : ndarray (N, K)
         Per-element aspheric coefficients.
         None disables aspherics.
-    inner_radii : array, shape (N,)
+    inner_radii : ndarray (N,)
         Per-element central hole radii.
         Defaults to zeros.
-    reflectivities : array, shape (N,)
+    reflectivities : ndarray (N,)
         Per-element bulk reflectivities.
         Defaults to ones.
-    reflectivity_curve : array, shape (theta, lambda)
-        Optional R.
+    reflectivity_curve
+        Optional R(theta, lambda)
         ResponseCurve shared by every
         element, multiplying reflectivities per ray.
-    bsdf_scales : array, shape (N,)
+    bsdf_scales : ndarray (N,)
         Per-element Gaussian BSDF roughness in arcseconds. Zero (the default) disables
         the BSDF.
-    offsets : array, shape (N, 2)
+    offsets : ndarray (N, 2)
         Per-element surface decentering. Defaults to zeros.
     optical_stage
         Stage index shared by all elements in this group.
@@ -344,7 +344,7 @@ def spherical(
 
     Parameters
     ----------
-    position : array, shape (3,)
+    position : ndarray (3,)
         Mirror vertex in world coordinates.
     focal_length
         Paraxial focal length in metres (positive = concave).
@@ -356,10 +356,10 @@ def spherical(
         Inner hole radius in metres. Zero for a solid disk.
     reflectivity
         Bulk reflectivity in [0, 1].
-    reflectivity_curve : array, shape (theta, lambda)
-        Optional R.
+    reflectivity_curve
+        Optional R(theta, lambda)
         ResponseCurve multiplying it.
-    bsdf_scale : array, shape (0 disables)
+    bsdf_scale : ndarray (0 disables)
         Gaussian roughness sigma in arcseconds.
     optical_stage
         Stage index within the Telescope.
@@ -444,7 +444,7 @@ def aspheric(
 
     Parameters
     ----------
-    position : array, shape (3,)
+    position : ndarray (3,)
         Mirror vertex in world coordinates.
     curvature
         Paraxial curvature 1/R in m^-1.

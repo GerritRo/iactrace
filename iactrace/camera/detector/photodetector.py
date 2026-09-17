@@ -111,7 +111,7 @@ def apply_qe(
         Bulk quantum efficiency in [0, 1].
     qe_curve
         Optional response curve, or None for a flat response.
-    cos_theta_i : array, shape (n_rays,)
+    cos_theta_i : ndarray (n_rays,)
         Incidence cosines at the surface.
         None (the default) evaluates the curve at normal incidence,
         which is exact for the usual wavelength-only QE(lambda).
@@ -178,9 +178,9 @@ class TabulatedQE(PhotoDetector):
 
         Parameters
         ----------
-        wavelengths : array, shape (K,)
+        wavelengths : ndarray (K,)
             Sample wavelengths (sorted internally).
-        qe : array, shape (K,)
+        qe : ndarray (K,)
             Detection efficiency in [0, 1] aligned with wavelengths.
         bulk_qe
             Optional bulk multiplier applied on top of the curve.

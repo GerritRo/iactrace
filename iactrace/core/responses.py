@@ -70,7 +70,7 @@ class ConstantResponse(ResponseCurve):
 
     Attributes
     ----------
-    values : array, shape (N,)
+    values : ndarray (N,)
         Per-element coefficient in [0, 1].
     """
 
@@ -89,13 +89,13 @@ class TabulatedResponse(ResponseCurve):
 
     Attributes
     ----------
-    cos_table : array, shape (Kc,)
+    cos_table : ndarray (Kc,)
         cos(angle) axis, sorted ascending.
         cos_theta_i = 1 -> normal incidence, 0 -> grazing.
-    wl_table : array, shape (Kw,)
+    wl_table : ndarray (Kw,)
         Wavelength axis, sorted ascending. Same units as wavelength. Length 1 for a
         wavelength-independent curve.
-    values : array, shape (N, Kc, Kw)
+    values : ndarray (N, Kc, Kw)
         Per-element coefficient grid.
     """
 
@@ -135,7 +135,7 @@ class TabulatedResponse(ResponseCurve):
 
         Parameters
         ----------
-        values : array, shape (Kc,)
+        values : ndarray (Kc,)
             Without wavelengths, an angle curve --.
             broadcast to all elements, or (N, Kc) per element. With
             wavelengths, an (angle, wavelength) grid -- (Kc, Kw)

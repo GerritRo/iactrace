@@ -49,18 +49,18 @@ def refractive_group(
 
     Parameters
     ----------
-    positions : array, shape (N, 3)
+    positions : ndarray (N, 3)
         Per-element vertex positions.
-    rotations : array, shape (N, 3)
+    rotations : ndarray (N, 3)
         Per-element Euler angles in degrees.
-    curvatures : array, shape (N,)
+    curvatures : ndarray (N,)
         Per-element curvatures 1/R.
-    conics : array, shape (N,)
+    conics : ndarray (N,)
         Per-element conic constants.
-    aspherics : array, shape (N, K)
+    aspherics : ndarray (N, K)
         Per-element even aspheric coefficients [A4, A6, ...]. ; column i multiplies
         r^(2i + 4).
-    offsets : array, shape (N, 2)
+    offsets : ndarray (N, 2)
         Per-element surface decentering.
     aperture
         Pre-built aperture sized to N.
@@ -72,10 +72,10 @@ def refractive_group(
         the incident side is not stored: the render loop reads it
         dynamically from each ray's current medium (see
         RefractInteraction).
-    transmittance : array, shape (N,)
+    transmittance : ndarray (N,)
         Per-element bulk transmittance in [0, 1].
-    transmittance_curve : array, shape (theta, lambda)
-        Optional T.
+    transmittance_curve
+        Optional T(theta, lambda)
         ResponseCurve multiplying
         transmittance per ray; None (default) uses bare-interface
         Fresnel.
@@ -139,9 +139,9 @@ def slab_group(
 
     Parameters
     ----------
-    positions : array, shape (N, 3)
+    positions : ndarray (N, 3)
         Per-element front-surface positions.
-    rotations : array, shape (N, 3)
+    rotations : ndarray (N, 3)
         Per-element Euler angles in degrees.
     aperture
         Pre-built aperture sized to N.
@@ -152,12 +152,12 @@ def slab_group(
         a dispersive one. The ambient index is not stored: the render loop
         reads it dynamically from each ray's current medium (see
         SlabInteraction).
-    thickness : array, shape (N,)
+    thickness : ndarray (N,)
         Per-element slab thickness in metres.
-    transmittance : array, shape (N,)
+    transmittance : ndarray (N,)
         Per-element bulk transmittance in [0, 1].
-    transmittance_curve : array, shape (theta, lambda)
-        Optional T.
+    transmittance_curve
+        Optional T(theta, lambda)
         ResponseCurve for the whole
         slab, multiplying transmittance per ray; None (default)
         uses the bare-window Fresnel product.
@@ -272,7 +272,7 @@ def aspheric_lens(
 
     Parameters
     ----------
-    position : array, shape (3,)
+    position : ndarray (3,)
         Vertex position in world coordinates.
     curvature
         Surface curvature 1/R in m^-1.
@@ -291,8 +291,8 @@ def aspheric_lens(
         a dispersive lens.
     transmittance
         Bulk transmittance in [0, 1]. Defaults to 1.0.
-    transmittance_curve : array, shape (theta, lambda)
-        Optional T.
+    transmittance_curve
+        Optional T(theta, lambda)
         ResponseCurve multiplying
         transmittance; None (default) uses bare-interface Fresnel.
     optical_stage
@@ -339,7 +339,7 @@ def plano_slab(
 
     Parameters
     ----------
-    position : array, shape (3,)
+    position : ndarray (3,)
         Vertex position of the front surface.
     radius
         Outer disk radius in metres.
@@ -354,8 +354,8 @@ def plano_slab(
         a dispersive window.
     transmittance
         Bulk transmittance in [0, 1]. Defaults to 1.0.
-    transmittance_curve : array, shape (theta, lambda)
-        Optional T.
+    transmittance_curve
+        Optional T(theta, lambda)
         ResponseCurve for the window.
     optical_stage
         Stage index within the Telescope.

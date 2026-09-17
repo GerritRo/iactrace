@@ -102,7 +102,7 @@ class _ChainOutput(NamedTuple):
     ----------
     pix_id
         Per-ray pixel index.
-    valid : array, shape (inside a real pixel, outside the deadband)
+    valid : ndarray
         Per-ray pixel mask.
     pe_rays
         The bundle after the detection chain.

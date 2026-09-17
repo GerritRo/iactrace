@@ -84,9 +84,9 @@ class SensorGroup(eqx.Module):
 
     Attributes
     ----------
-    positions : array, shape (N, 3)
+    positions : ndarray (N, 3)
         Sensor positions in 3D space.
-    rotations : array, shape (N, 3)
+    rotations : ndarray (N, 3)
         Sensor rotations as Euler angles in degrees.
     chain
         The per-pixel DetectionChain
@@ -210,7 +210,7 @@ class SquareSensorGroup(SensorGroup):
 
         Parameters
         ----------
-        positions : array, shape (N, 3)
+        positions : ndarray (N, 3)
             Sensor positions. (or (3,) for one).
         rotations
             Euler angles in degrees, same shape as positions.
@@ -218,8 +218,8 @@ class SquareSensorGroup(SensorGroup):
             Pixel count along x (> 0).
         height
             Pixel count along y (> 0).
-        bounds : array, shape (x_min, x_max, y_min, y_max)
-            In the sensor-local frame.
+        bounds : ndarray
+            (x_min, x_max, y_min, y_max) in the sensor-local frame.
         edge_width
             Dead-zone width at pixel edges (>= 0).
         concentrator
@@ -358,11 +358,11 @@ class HexagonalSensorGroup(SensorGroup):
 
         Parameters
         ----------
-        positions : array, shape (N, 3)
+        positions : ndarray (N, 3)
             Sensor positions. (or (3,) for one).
         rotations
             Euler angles in degrees, same shape as positions.
-        hex_centers : array, shape (M, 2)
+        hex_centers : ndarray (M, 2)
             Pixel centres. The grid geometry (size, rotation, offset, lookup table) is
             auto-detected from these on construction.
         edge_width
