@@ -13,7 +13,7 @@ sensors:
   gap: 0.001000
   photodetector:
     type: pmt
-    qe: 0.8            # bulk multiplier; the absolute QE is in the curve
+    qe: 1.0
     qe_curve:
       type: table
       angles_deg: [0.0]
