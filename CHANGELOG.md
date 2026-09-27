@@ -1,5 +1,24 @@
 # Changelog
 
+## v0.11.0 (2026-09-27)
+
+### BREAKING CHANGE
+
+- Python attribute and keyword names change and coatings are renamed to response
+
+### Feat
+
+- **all**: Added wavelength support, unified treament of response curves across the board
+
+### Fix
+
+- **configs**: adjusted hess parameters to public data, reverted FlashCam changes
+- **io**: fixed ruff issue, fixed mypy issue in aperture_table io
+
+### Refactor
+
+- **all**: major refactor, enabling nyx integration, switching to numpy docstrings
+
 ## v0.10.3 (2026-08-19)
 
 ### Perf
