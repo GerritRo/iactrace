@@ -1,10 +1,3 @@
-"""Shared builders for the test suite.
-
-Plain functions (not fixtures) so any test module can import exactly what it
-needs. Fixtures live in ``conftest.py``; these are the parametrisable builders
-that several modules would otherwise construct by copy-paste.
-"""
-
 import jax
 import jax.numpy as jnp
 
@@ -46,7 +39,7 @@ def make_disk_mirror_group(
         offsets=jnp.zeros((n, 2)),
     )
     aperture = DiskAperture(radii=radii, inner_radii=jnp.zeros(n))
-    interaction = ReflectInteraction(reflectivity=None, reflectivity_scalar=jnp.ones(n))
+    interaction = ReflectInteraction(reflectivity_curve=None, reflectivity=jnp.ones(n))
     return OpticalElementGroup(
         positions=positions,
         rotations=rotations,
@@ -67,7 +60,7 @@ def mirror_group_with_surface(surface, radius=0.5, stage=0, n_samples=64):
     n = surface.offsets.shape[0]
     radii = jnp.full(n, radius) if jnp.ndim(radius) == 0 else jnp.asarray(radius)
     aperture = DiskAperture(radii=radii, inner_radii=jnp.zeros(n))
-    interaction = ReflectInteraction(reflectivity=None, reflectivity_scalar=jnp.ones(n))
+    interaction = ReflectInteraction(reflectivity_curve=None, reflectivity=jnp.ones(n))
     return OpticalElementGroup(
         positions=jnp.zeros((n, 3)),
         rotations=jnp.zeros((n, 3)),
@@ -231,8 +224,14 @@ def bin_positions(sensor, sensor_idx, x, y, values):
 # --- finite-difference slope --------------------------------------------------
 
 
+def central_diff(f, x, h):
+    """Central difference of a scalar function of a scalar."""
+    return (f(x + h) - f(x - h)) / (2.0 * h)
+
+
 def fd_slope(sag_fn, x, y, h=1e-5):
     """Central-difference (dz/dx, dz/dy) of a scalar sag function."""
-    dzdx = (sag_fn(x + h, y) - sag_fn(x - h, y)) / (2 * h)
-    dzdy = (sag_fn(x, y + h) - sag_fn(x, y - h)) / (2 * h)
-    return float(dzdx), float(dzdy)
+    return (
+        float(central_diff(lambda t: sag_fn(t, y), x, h)),
+        float(central_diff(lambda t: sag_fn(x, t), y, h)),
+    )

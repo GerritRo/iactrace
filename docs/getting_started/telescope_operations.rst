@@ -6,7 +6,7 @@ operations return **new telescope instances** rather than mutating in
 place, enabling reproducible simulations and compatibility with JAX
 transformations.
 
-Operations are addressed by **stage** — the integer ``optical_stage``
+Operations are addressed by **stage** -- the integer ``optical_stage``
 of the target group. The split between mirrors and lenses inside the
 telescope YAML is purely a storage detail; in code, you only ever talk
 in stages. Stage 0 is the primary; the renderer walks stages in
@@ -153,6 +153,10 @@ These validate the kind at the requested stage and raise
    telescope = telescope.set_reflectivity(stage=0, reflectivity=0.95)
    telescope = telescope.scale_reflectivity(stage=0, factor=0.9)
 
+These write the **bulk** scalar and leave any response curve on the element
+untouched, so an angle- or wavelength-dependent coating survives a
+reflectivity rescale (see :doc:`wavelength`).
+
 **Transmittance (lens or slab only)**
 
 .. code-block:: python
@@ -164,7 +168,10 @@ These validate the kind at the requested stage and raise
 
 .. code-block:: python
 
-   telescope = telescope.set_refractive_index(stage=2, n_inside=1.52)
+   telescope = telescope.set_refractive_index(stage=2, index=1.52)
+
+``index`` also takes a :class:`~iactrace.core.RefractiveIndex` model
+(tabulated or Sellmeier) to make the stage dispersive; see :doc:`wavelength`.
 
 **Slab thickness (slab only)**
 
@@ -175,10 +182,12 @@ These validate the kind at the requested stage and raise
 **Focal length (mirror or lens, kind-dispatched formula)**
 
 For mirrors, ``c = 1 / (2 f)``. For single-surface refractive lenses,
-``c = 1 / ((n_inside - n_outside) f)``, where ``n_outside`` is a design-time
+``c = 1 / ((n - n_outside) f)``, where ``n_outside`` is a design-time
 ambient-index assumption passed to the operation (default ``1.0``; the lens
 itself stores no ambient index -- the render loop reads it dynamically from
-each ray's current medium). Slabs raise.
+each ray's current medium) and ``n`` is the lens index at the design
+``wavelength`` (default 400 nm; it matters only for a dispersive lens).
+Slabs raise.
 
 .. code-block:: python
 
@@ -265,5 +274,5 @@ Chaining operations
 Next Steps
 ----------
 
-- :doc:`/examples/index` — detailed examples for specific use cases
-- :doc:`/api/telescope` — full API reference
+- :doc:`/examples/index` -- detailed examples for specific use cases
+- :doc:`/api/telescope` -- full API reference

@@ -1,0 +1,7466 @@
+telescope:
+  name: GammaDC12
+  units: m
+  camera_position:
+  - 0.0
+  - 0.0
+  - 15.028
+  camera_rotation:
+  - 180.0
+  - 0.0
+  - 0.0
+mirror_templates:
+  dc_facet:
+    surface:
+      type: aspheric
+      curvature: 0.03333333
+      conic: 0.0
+      aspheric: []
+mirrors:
+- id: M_00_00
+  position:
+  - -5.7
+  - 5.7
+  - 2.350099
+  orientation:
+  - 11.41476
+  - 11.648291
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_00_01
+  position:
+  - -5.1
+  - 5.7
+  - 2.096512
+  orientation:
+  - 11.362079
+  - 10.357786
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_00_02
+  position:
+  - -4.5
+  - 5.7
+  - 1.875214
+  orientation:
+  - 11.316697
+  - 9.090345
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_00_03
+  position:
+  - -3.9
+  - 5.7
+  - 1.684595
+  orientation:
+  - 11.278039
+  - 7.842247
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_00_04
+  position:
+  - -3.3
+  - 5.7
+  - 1.523354
+  orientation:
+  - 11.245647
+  - 6.610204
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_00_05
+  position:
+  - -2.7
+  - 5.7
+  - 1.390445
+  orientation:
+  - 11.219155
+  - 5.391268
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_00_06
+  position:
+  - -2.1
+  - 5.7
+  - 1.285045
+  orientation:
+  - 11.198279
+  - 4.182744
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_00_07
+  position:
+  - -1.5
+  - 5.7
+  - 1.206523
+  orientation:
+  - 11.182802
+  - 2.982135
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_00_08
+  position:
+  - -0.9
+  - 5.7
+  - 1.154423
+  orientation:
+  - 11.172569
+  - 1.787084
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_00_09
+  position:
+  - -0.3
+  - 5.7
+  - 1.128446
+  orientation:
+  - 11.167477
+  - 0.59533
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_00_10
+  position:
+  - 0.3
+  - 5.7
+  - 1.128446
+  orientation:
+  - 11.167477
+  - -0.59533
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_00_11
+  position:
+  - 0.9
+  - 5.7
+  - 1.154423
+  orientation:
+  - 11.172569
+  - -1.787084
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_00_12
+  position:
+  - 1.5
+  - 5.7
+  - 1.206523
+  orientation:
+  - 11.182802
+  - -2.982135
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_00_13
+  position:
+  - 2.1
+  - 5.7
+  - 1.285045
+  orientation:
+  - 11.198279
+  - -4.182744
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_00_14
+  position:
+  - 2.7
+  - 5.7
+  - 1.390445
+  orientation:
+  - 11.219155
+  - -5.391268
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_00_15
+  position:
+  - 3.3
+  - 5.7
+  - 1.523354
+  orientation:
+  - 11.245647
+  - -6.610204
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_00_16
+  position:
+  - 3.9
+  - 5.7
+  - 1.684595
+  orientation:
+  - 11.278039
+  - -7.842247
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_00_17
+  position:
+  - 4.5
+  - 5.7
+  - 1.875214
+  orientation:
+  - 11.316697
+  - -9.090345
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_00_18
+  position:
+  - 5.1
+  - 5.7
+  - 2.096512
+  orientation:
+  - 11.362079
+  - -10.357786
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_00_19
+  position:
+  - 5.7
+  - 5.7
+  - 2.350099
+  orientation:
+  - 11.41476
+  - -11.648291
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_01_00
+  position:
+  - -5.7
+  - 5.1
+  - 2.096512
+  orientation:
+  - 10.152618
+  - 11.545286
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_01_01
+  position:
+  - -5.1
+  - 5.1
+  - 1.847814
+  orientation:
+  - 10.1072
+  - 10.268239
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_01_02
+  position:
+  - -4.5
+  - 5.1
+  - 1.630632
+  orientation:
+  - 10.068034
+  - 9.013266
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_01_03
+  position:
+  - -3.9
+  - 5.1
+  - 1.443452
+  orientation:
+  - 10.03464
+  - 7.776837
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_01_04
+  position:
+  - -3.3
+  - 5.1
+  - 1.285045
+  orientation:
+  - 10.006638
+  - 6.555825
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_01_05
+  position:
+  - -2.7
+  - 5.1
+  - 1.154423
+  orientation:
+  - 9.983723
+  - 5.347412
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_01_06
+  position:
+  - -2.1
+  - 5.1
+  - 1.050806
+  orientation:
+  - 9.965657
+  - 4.149019
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_01_07
+  position:
+  - -1.5
+  - 5.1
+  - 0.973596
+  orientation:
+  - 9.952259
+  - 2.958248
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_01_08
+  position:
+  - -0.9
+  - 5.1
+  - 0.922358
+  orientation:
+  - 9.943397
+  - 1.772831
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_01_09
+  position:
+  - -0.3
+  - 5.1
+  - 0.896809
+  orientation:
+  - 9.938987
+  - 0.590592
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_01_10
+  position:
+  - 0.3
+  - 5.1
+  - 0.896809
+  orientation:
+  - 9.938987
+  - -0.590592
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_01_11
+  position:
+  - 0.9
+  - 5.1
+  - 0.922358
+  orientation:
+  - 9.943397
+  - -1.772831
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_01_12
+  position:
+  - 1.5
+  - 5.1
+  - 0.973596
+  orientation:
+  - 9.952259
+  - -2.958248
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_01_13
+  position:
+  - 2.1
+  - 5.1
+  - 1.050806
+  orientation:
+  - 9.965657
+  - -4.149019
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_01_14
+  position:
+  - 2.7
+  - 5.1
+  - 1.154423
+  orientation:
+  - 9.983723
+  - -5.347412
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_01_15
+  position:
+  - 3.3
+  - 5.1
+  - 1.285045
+  orientation:
+  - 10.006638
+  - -6.555825
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_01_16
+  position:
+  - 3.9
+  - 5.1
+  - 1.443452
+  orientation:
+  - 10.03464
+  - -7.776837
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_01_17
+  position:
+  - 4.5
+  - 5.1
+  - 1.630632
+  orientation:
+  - 10.068034
+  - -9.013266
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_01_18
+  position:
+  - 5.1
+  - 5.1
+  - 1.847814
+  orientation:
+  - 10.1072
+  - -10.268239
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_01_19
+  position:
+  - 5.7
+  - 5.1
+  - 2.096512
+  orientation:
+  - 10.152618
+  - -11.545286
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_02_00
+  position:
+  - -5.7
+  - 4.5
+  - 1.875214
+  orientation:
+  - 8.912152
+  - 11.456854
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_02_01
+  position:
+  - -5.1
+  - 4.5
+  - 1.630632
+  orientation:
+  - 8.87334
+  - 10.191285
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_02_02
+  position:
+  - -4.5
+  - 4.5
+  - 1.416922
+  orientation:
+  - 8.839839
+  - 8.94697
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_02_03
+  position:
+  - -3.9
+  - 4.5
+  - 1.232647
+  orientation:
+  - 8.811255
+  - 7.720539
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_02_04
+  position:
+  - -3.3
+  - 4.5
+  - 1.076638
+  orientation:
+  - 8.787271
+  - 6.508994
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_02_05
+  position:
+  - -2.7
+  - 4.5
+  - 0.947954
+  orientation:
+  - 8.767634
+  - 5.309626
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_02_09
+  position:
+  - -0.3
+  - 4.5
+  - 0.694057
+  orientation:
+  - 8.729274
+  - 0.586507
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_02_10
+  position:
+  - 0.3
+  - 4.5
+  - 0.694057
+  orientation:
+  - 8.729274
+  - -0.586507
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_02_11
+  position:
+  - 0.9
+  - 4.5
+  - 0.719244
+  orientation:
+  - 8.733056
+  - -1.760541
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_02_12
+  position:
+  - 1.5
+  - 4.5
+  - 0.769751
+  orientation:
+  - 8.740657
+  - -2.937654
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_02_17
+  position:
+  - 4.5
+  - 4.5
+  - 1.416922
+  orientation:
+  - 8.839839
+  - -8.94697
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_02_18
+  position:
+  - 5.1
+  - 4.5
+  - 1.630632
+  orientation:
+  - 8.87334
+  - -10.191285
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_02_19
+  position:
+  - 5.7
+  - 4.5
+  - 1.875214
+  orientation:
+  - 8.912152
+  - -11.456854
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_03_00
+  position:
+  - -5.7
+  - 3.9
+  - 1.684595
+  orientation:
+  - 7.689885
+  - 11.381746
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_03_01
+  position:
+  - -5.1
+  - 3.9
+  - 1.443452
+  orientation:
+  - 7.657153
+  - 10.12587
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_03_02
+  position:
+  - -4.5
+  - 3.9
+  - 1.232647
+  orientation:
+  - 7.628878
+  - 8.890577
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_03_03
+  position:
+  - -3.9
+  - 3.9
+  - 1.050806
+  orientation:
+  - 7.604738
+  - 7.672623
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_03_04
+  position:
+  - -3.3
+  - 3.9
+  - 0.896809
+  orientation:
+  - 7.584473
+  - 6.469117
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_03_10
+  position:
+  - 0.3
+  - 3.9
+  - 0.518978
+  orientation:
+  - 7.53543
+  - -0.583024
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_03_11
+  position:
+  - 0.9
+  - 3.9
+  - 0.543859
+  orientation:
+  - 7.538631
+  - -1.750065
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_03_15
+  position:
+  - 3.3
+  - 3.9
+  - 0.896809
+  orientation:
+  - 7.584473
+  - -6.469117
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_03_16
+  position:
+  - 3.9
+  - 3.9
+  - 1.050806
+  orientation:
+  - 7.604738
+  - -7.672623
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_03_17
+  position:
+  - 4.5
+  - 3.9
+  - 1.232647
+  orientation:
+  - 7.628878
+  - -8.890577
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_03_18
+  position:
+  - 5.1
+  - 3.9
+  - 1.443452
+  orientation:
+  - 7.657153
+  - -10.12587
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_03_19
+  position:
+  - 5.7
+  - 3.9
+  - 1.684595
+  orientation:
+  - 7.689885
+  - -11.381746
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_04_00
+  position:
+  - -5.7
+  - 3.3
+  - 1.523354
+  orientation:
+  - 6.482739
+  - 11.318968
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_04_01
+  position:
+  - -5.1
+  - 3.3
+  - 1.285045
+  orientation:
+  - 6.455668
+  - 10.071157
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_04_02
+  position:
+  - -4.5
+  - 3.3
+  - 1.076638
+  orientation:
+  - 6.432269
+  - 8.843382
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_04_03
+  position:
+  - -3.9
+  - 3.3
+  - 0.896809
+  orientation:
+  - 6.412282
+  - 7.632503
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_04_06
+  position:
+  - -2.1
+  - 3.3
+  - 0.518978
+  orientation:
+  - 6.370888
+  - 4.074426
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_04_07
+  position:
+  - -1.5
+  - 3.3
+  - 0.444589
+  orientation:
+  - 6.362832
+  - 2.90539
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_04_08
+  position:
+  - -0.9
+  - 3.3
+  - 0.395206
+  orientation:
+  - 6.357501
+  - 1.741283
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_04_11
+  position:
+  - 0.9
+  - 3.3
+  - 0.395206
+  orientation:
+  - 6.357501
+  - -1.741283
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_04_13
+  position:
+  - 2.1
+  - 3.3
+  - 0.518978
+  orientation:
+  - 6.370888
+  - -4.074426
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_04_14
+  position:
+  - 2.7
+  - 3.3
+  - 0.618762
+  orientation:
+  - 6.381742
+  - -5.250471
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_04_15
+  position:
+  - 3.3
+  - 3.3
+  - 0.744475
+  orientation:
+  - 6.395496
+  - -6.435715
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_04_16
+  position:
+  - 3.9
+  - 3.3
+  - 0.896809
+  orientation:
+  - 6.412282
+  - -7.632503
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_04_17
+  position:
+  - 4.5
+  - 3.3
+  - 1.076638
+  orientation:
+  - 6.432269
+  - -8.843382
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_04_18
+  position:
+  - 5.1
+  - 3.3
+  - 1.285045
+  orientation:
+  - 6.455668
+  - -10.071157
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_04_19
+  position:
+  - 5.7
+  - 3.3
+  - 1.523354
+  orientation:
+  - 6.482739
+  - -11.318968
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_05_00
+  position:
+  - -5.7
+  - 2.7
+  - 1.390445
+  orientation:
+  - 5.287945
+  - 11.267733
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_05_01
+  position:
+  - -5.1
+  - 2.7
+  - 1.154423
+  orientation:
+  - 5.266206
+  - 10.026479
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_05_02
+  position:
+  - -4.5
+  - 2.7
+  - 0.947954
+  orientation:
+  - 5.247406
+  - 8.804826
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_05_03
+  position:
+  - -3.9
+  - 2.7
+  - 0.769751
+  orientation:
+  - 5.231342
+  - 7.599715
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_05_05
+  position:
+  - -2.7
+  - 2.7
+  - 0.494139
+  orientation:
+  - 5.206784
+  - 5.228418
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_05_06
+  position:
+  - -2.1
+  - 2.7
+  - 0.395206
+  orientation:
+  - 5.198053
+  - 4.057449
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_05_07
+  position:
+  - -1.5
+  - 2.7
+  - 0.321444
+  orientation:
+  - 5.191571
+  - 2.893355
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_05_08
+  position:
+  - -0.9
+  - 2.7
+  - 0.272475
+  orientation:
+  - 5.187282
+  - 1.734098
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_05_09
+  position:
+  - -0.3
+  - 2.7
+  - 0.248051
+  orientation:
+  - 5.185146
+  - 0.577715
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_05_11
+  position:
+  - 0.9
+  - 2.7
+  - 0.272475
+  orientation:
+  - 5.187282
+  - -1.734098
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_05_13
+  position:
+  - 2.1
+  - 2.7
+  - 0.395206
+  orientation:
+  - 5.198053
+  - -4.057449
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_05_14
+  position:
+  - 2.7
+  - 2.7
+  - 0.494139
+  orientation:
+  - 5.206784
+  - -5.228418
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_05_15
+  position:
+  - 3.3
+  - 2.7
+  - 0.618762
+  orientation:
+  - 5.217845
+  - -6.408408
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_05_16
+  position:
+  - 3.9
+  - 2.7
+  - 0.769751
+  orientation:
+  - 5.231342
+  - -7.599715
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_05_17
+  position:
+  - 4.5
+  - 2.7
+  - 0.947954
+  orientation:
+  - 5.247406
+  - -8.804826
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_05_18
+  position:
+  - 5.1
+  - 2.7
+  - 1.154423
+  orientation:
+  - 5.266206
+  - -10.026479
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_05_19
+  position:
+  - 5.7
+  - 2.7
+  - 1.390445
+  orientation:
+  - 5.287945
+  - -11.267733
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_06_00
+  position:
+  - -5.7
+  - 2.1
+  - 1.285045
+  orientation:
+  - 4.102971
+  - 11.227427
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_06_01
+  position:
+  - -5.1
+  - 2.1
+  - 1.050806
+  orientation:
+  - 4.08631
+  - 9.991316
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_06_02
+  position:
+  - -4.5
+  - 2.1
+  - 0.845849
+  orientation:
+  - 4.071897
+  - 8.77447
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_06_03
+  position:
+  - -3.9
+  - 2.1
+  - 0.668915
+  orientation:
+  - 4.059576
+  - 7.573892
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_06_04
+  position:
+  - -3.3
+  - 2.1
+  - 0.518978
+  orientation:
+  - 4.049222
+  - 6.386897
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_06_05
+  position:
+  - -2.7
+  - 2.1
+  - 0.395206
+  orientation:
+  - 4.040735
+  - 5.211042
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_06_06
+  position:
+  - -2.1
+  - 2.1
+  - 0.296939
+  orientation:
+  - 4.034034
+  - 4.04407
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_06_07
+  position:
+  - -1.5
+  - 2.1
+  - 0.223668
+  orientation:
+  - 4.02906
+  - 2.88387
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_06_08
+  position:
+  - -0.9
+  - 2.1
+  - 0.175021
+  orientation:
+  - 4.025767
+  - 1.728436
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_06_09
+  position:
+  - -0.3
+  - 2.1
+  - 0.150758
+  orientation:
+  - 4.024128
+  - 0.575832
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_06_13
+  position:
+  - 2.1
+  - 2.1
+  - 0.296939
+  orientation:
+  - 4.034034
+  - -4.04407
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_06_14
+  position:
+  - 2.7
+  - 2.1
+  - 0.395206
+  orientation:
+  - 4.040735
+  - -5.211042
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_06_15
+  position:
+  - 3.3
+  - 2.1
+  - 0.518978
+  orientation:
+  - 4.049222
+  - -6.386897
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_06_16
+  position:
+  - 3.9
+  - 2.1
+  - 0.668915
+  orientation:
+  - 4.059576
+  - -7.573892
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_06_17
+  position:
+  - 4.5
+  - 2.1
+  - 0.845849
+  orientation:
+  - 4.071897
+  - -8.77447
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_06_18
+  position:
+  - 5.1
+  - 2.1
+  - 1.050806
+  orientation:
+  - 4.08631
+  - -9.991316
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_06_19
+  position:
+  - 5.7
+  - 2.1
+  - 1.285045
+  orientation:
+  - 4.102971
+  - -11.227427
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_07_00
+  position:
+  - -5.7
+  - 1.5
+  - 1.206523
+  orientation:
+  - 2.925465
+  - 11.197584
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_07_01
+  position:
+  - -5.1
+  - 1.5
+  - 0.973596
+  orientation:
+  - 2.913693
+  - 9.965273
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_07_02
+  position:
+  - -4.5
+  - 1.5
+  - 0.769751
+  orientation:
+  - 2.903507
+  - 8.75198
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_07_03
+  position:
+  - -3.9
+  - 1.5
+  - 0.593751
+  orientation:
+  - 2.894798
+  - 7.554757
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_07_04
+  position:
+  - -3.3
+  - 1.5
+  - 0.444589
+  orientation:
+  - 2.887478
+  - 6.370954
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_07_05
+  position:
+  - -2.7
+  - 1.5
+  - 0.321444
+  orientation:
+  - 2.881476
+  - 5.198162
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_07_06
+  position:
+  - -2.1
+  - 1.5
+  - 0.223668
+  orientation:
+  - 2.876737
+  - 4.034152
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_07_07
+  position:
+  - -1.5
+  - 1.5
+  - 0.150758
+  orientation:
+  - 2.873218
+  - 2.876838
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_07_08
+  position:
+  - -0.9
+  - 1.5
+  - 0.102349
+  orientation:
+  - 2.870889
+  - 1.724237
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_07_09
+  position:
+  - -0.3
+  - 1.5
+  - 0.078204
+  orientation:
+  - 2.86973
+  - 0.574436
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_07_12
+  position:
+  - 1.5
+  - 1.5
+  - 0.150758
+  orientation:
+  - 2.873218
+  - -2.876838
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_07_13
+  position:
+  - 2.1
+  - 1.5
+  - 0.223668
+  orientation:
+  - 2.876737
+  - -4.034152
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_07_14
+  position:
+  - 2.7
+  - 1.5
+  - 0.321444
+  orientation:
+  - 2.881476
+  - -5.198162
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_07_15
+  position:
+  - 3.3
+  - 1.5
+  - 0.444589
+  orientation:
+  - 2.887478
+  - -6.370954
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_07_16
+  position:
+  - 3.9
+  - 1.5
+  - 0.593751
+  orientation:
+  - 2.894798
+  - -7.554757
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_07_17
+  position:
+  - 4.5
+  - 1.5
+  - 0.769751
+  orientation:
+  - 2.903507
+  - -8.75198
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_07_18
+  position:
+  - 5.1
+  - 1.5
+  - 0.973596
+  orientation:
+  - 2.913693
+  - -9.965273
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_07_19
+  position:
+  - 5.7
+  - 1.5
+  - 1.206523
+  orientation:
+  - 2.925465
+  - -11.197584
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_08_00
+  position:
+  - -5.7
+  - 0.9
+  - 1.154423
+  orientation:
+  - 1.753205
+  - 11.177869
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_08_01
+  position:
+  - -5.1
+  - 0.9
+  - 0.922358
+  orientation:
+  - 1.746193
+  - 9.948064
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_08_02
+  position:
+  - -4.5
+  - 0.9
+  - 0.719244
+  orientation:
+  - 1.740124
+  - 8.737117
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_08_03
+  position:
+  - -3.9
+  - 0.9
+  - 0.543859
+  orientation:
+  - 1.734934
+  - 7.542108
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_08_04
+  position:
+  - -3.3
+  - 0.9
+  - 0.395206
+  orientation:
+  - 1.730571
+  - 6.360414
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_08_05
+  position:
+  - -2.7
+  - 0.9
+  - 0.272475
+  orientation:
+  - 1.726994
+  - 5.189646
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_08_06
+  position:
+  - -2.1
+  - 0.9
+  - 0.175021
+  orientation:
+  - 1.72417
+  - 4.027593
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_08_07
+  position:
+  - -1.5
+  - 0.9
+  - 0.102349
+  orientation:
+  - 1.722072
+  - 2.872188
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_08_08
+  position:
+  - -0.9
+  - 0.9
+  - 0.054098
+  orientation:
+  - 1.720684
+  - 1.72146
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_08_09
+  position:
+  - -0.3
+  - 0.9
+  - 0.03003
+  orientation:
+  - 1.719993
+  - 0.573513
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_08_12
+  position:
+  - 1.5
+  - 0.9
+  - 0.102349
+  orientation:
+  - 1.722072
+  - -2.872188
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_08_13
+  position:
+  - 2.1
+  - 0.9
+  - 0.175021
+  orientation:
+  - 1.72417
+  - -4.027593
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_08_14
+  position:
+  - 2.7
+  - 0.9
+  - 0.272475
+  orientation:
+  - 1.726994
+  - -5.189646
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_08_15
+  position:
+  - 3.3
+  - 0.9
+  - 0.395206
+  orientation:
+  - 1.730571
+  - -6.360414
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_08_16
+  position:
+  - 3.9
+  - 0.9
+  - 0.543859
+  orientation:
+  - 1.734934
+  - -7.542108
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_08_17
+  position:
+  - 4.5
+  - 0.9
+  - 0.719244
+  orientation:
+  - 1.740124
+  - -8.737117
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_08_18
+  position:
+  - 5.1
+  - 0.9
+  - 0.922358
+  orientation:
+  - 1.746193
+  - -9.948064
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_08_19
+  position:
+  - 5.7
+  - 0.9
+  - 1.154423
+  orientation:
+  - 1.753205
+  - -11.177869
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_09_00
+  position:
+  - -5.7
+  - 0.3
+  - 1.128446
+  orientation:
+  - 0.584058
+  - 11.168064
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_09_01
+  position:
+  - -5.1
+  - 0.3
+  - 0.896809
+  orientation:
+  - 0.581729
+  - 9.939505
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_09_02
+  position:
+  - -4.5
+  - 0.3
+  - 0.694057
+  orientation:
+  - 0.579713
+  - 8.729724
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_09_03
+  position:
+  - -3.9
+  - 0.3
+  - 0.518978
+  orientation:
+  - 0.577989
+  - 7.535816
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_09_04
+  position:
+  - -3.3
+  - 0.3
+  - 0.370578
+  orientation:
+  - 0.576539
+  - 6.355171
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_09_05
+  position:
+  - -2.7
+  - 0.3
+  - 0.248051
+  orientation:
+  - 0.575351
+  - 5.185409
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_09_06
+  position:
+  - -2.1
+  - 0.3
+  - 0.150758
+  orientation:
+  - 0.574412
+  - 4.02433
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_09_07
+  position:
+  - -1.5
+  - 0.3
+  - 0.078204
+  orientation:
+  - 0.573716
+  - 2.869874
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_09_08
+  position:
+  - -0.9
+  - 0.3
+  - 0.03003
+  orientation:
+  - 0.573254
+  - 1.720079
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_09_09
+  position:
+  - -0.3
+  - 0.3
+  - 0.006001
+  orientation:
+  - 0.573025
+  - 0.573053
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_09_12
+  position:
+  - 1.5
+  - 0.3
+  - 0.078204
+  orientation:
+  - 0.573716
+  - -2.869874
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_09_13
+  position:
+  - 2.1
+  - 0.3
+  - 0.150758
+  orientation:
+  - 0.574412
+  - -4.02433
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_09_14
+  position:
+  - 2.7
+  - 0.3
+  - 0.248051
+  orientation:
+  - 0.575351
+  - -5.185409
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_09_15
+  position:
+  - 3.3
+  - 0.3
+  - 0.370578
+  orientation:
+  - 0.576539
+  - -6.355171
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_09_16
+  position:
+  - 3.9
+  - 0.3
+  - 0.518978
+  orientation:
+  - 0.577989
+  - -7.535816
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_09_17
+  position:
+  - 4.5
+  - 0.3
+  - 0.694057
+  orientation:
+  - 0.579713
+  - -8.729724
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_09_18
+  position:
+  - 5.1
+  - 0.3
+  - 0.896809
+  orientation:
+  - 0.581729
+  - -9.939505
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_09_19
+  position:
+  - 5.7
+  - 0.3
+  - 1.128446
+  orientation:
+  - 0.584058
+  - -11.168064
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_10_00
+  position:
+  - -5.7
+  - -0.3
+  - 1.128446
+  orientation:
+  - -0.584058
+  - 11.168064
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_10_01
+  position:
+  - -5.1
+  - -0.3
+  - 0.896809
+  orientation:
+  - -0.581729
+  - 9.939505
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_10_02
+  position:
+  - -4.5
+  - -0.3
+  - 0.694057
+  orientation:
+  - -0.579713
+  - 8.729724
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_10_03
+  position:
+  - -3.9
+  - -0.3
+  - 0.518978
+  orientation:
+  - -0.577989
+  - 7.535816
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_10_04
+  position:
+  - -3.3
+  - -0.3
+  - 0.370578
+  orientation:
+  - -0.576539
+  - 6.355171
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_10_05
+  position:
+  - -2.7
+  - -0.3
+  - 0.248051
+  orientation:
+  - -0.575351
+  - 5.185409
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_10_06
+  position:
+  - -2.1
+  - -0.3
+  - 0.150758
+  orientation:
+  - -0.574412
+  - 4.02433
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_10_07
+  position:
+  - -1.5
+  - -0.3
+  - 0.078204
+  orientation:
+  - -0.573716
+  - 2.869874
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_10_08
+  position:
+  - -0.9
+  - -0.3
+  - 0.03003
+  orientation:
+  - -0.573254
+  - 1.720079
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_10_11
+  position:
+  - 0.9
+  - -0.3
+  - 0.03003
+  orientation:
+  - -0.573254
+  - -1.720079
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_10_12
+  position:
+  - 1.5
+  - -0.3
+  - 0.078204
+  orientation:
+  - -0.573716
+  - -2.869874
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_10_13
+  position:
+  - 2.1
+  - -0.3
+  - 0.150758
+  orientation:
+  - -0.574412
+  - -4.02433
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_10_14
+  position:
+  - 2.7
+  - -0.3
+  - 0.248051
+  orientation:
+  - -0.575351
+  - -5.185409
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_10_15
+  position:
+  - 3.3
+  - -0.3
+  - 0.370578
+  orientation:
+  - -0.576539
+  - -6.355171
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_10_16
+  position:
+  - 3.9
+  - -0.3
+  - 0.518978
+  orientation:
+  - -0.577989
+  - -7.535816
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_10_17
+  position:
+  - 4.5
+  - -0.3
+  - 0.694057
+  orientation:
+  - -0.579713
+  - -8.729724
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_10_18
+  position:
+  - 5.1
+  - -0.3
+  - 0.896809
+  orientation:
+  - -0.581729
+  - -9.939505
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_10_19
+  position:
+  - 5.7
+  - -0.3
+  - 1.128446
+  orientation:
+  - -0.584058
+  - -11.168064
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_11_00
+  position:
+  - -5.7
+  - -0.9
+  - 1.154423
+  orientation:
+  - -1.753205
+  - 11.177869
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_11_01
+  position:
+  - -5.1
+  - -0.9
+  - 0.922358
+  orientation:
+  - -1.746193
+  - 9.948064
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_11_02
+  position:
+  - -4.5
+  - -0.9
+  - 0.719244
+  orientation:
+  - -1.740124
+  - 8.737117
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_11_03
+  position:
+  - -3.9
+  - -0.9
+  - 0.543859
+  orientation:
+  - -1.734934
+  - 7.542108
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_11_04
+  position:
+  - -3.3
+  - -0.9
+  - 0.395206
+  orientation:
+  - -1.730571
+  - 6.360414
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_11_05
+  position:
+  - -2.7
+  - -0.9
+  - 0.272475
+  orientation:
+  - -1.726994
+  - 5.189646
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_11_06
+  position:
+  - -2.1
+  - -0.9
+  - 0.175021
+  orientation:
+  - -1.72417
+  - 4.027593
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_11_07
+  position:
+  - -1.5
+  - -0.9
+  - 0.102349
+  orientation:
+  - -1.722072
+  - 2.872188
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_11_08
+  position:
+  - -0.9
+  - -0.9
+  - 0.054098
+  orientation:
+  - -1.720684
+  - 1.72146
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_11_11
+  position:
+  - 0.9
+  - -0.9
+  - 0.054098
+  orientation:
+  - -1.720684
+  - -1.72146
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_11_12
+  position:
+  - 1.5
+  - -0.9
+  - 0.102349
+  orientation:
+  - -1.722072
+  - -2.872188
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_11_13
+  position:
+  - 2.1
+  - -0.9
+  - 0.175021
+  orientation:
+  - -1.72417
+  - -4.027593
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_11_14
+  position:
+  - 2.7
+  - -0.9
+  - 0.272475
+  orientation:
+  - -1.726994
+  - -5.189646
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_11_15
+  position:
+  - 3.3
+  - -0.9
+  - 0.395206
+  orientation:
+  - -1.730571
+  - -6.360414
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_11_16
+  position:
+  - 3.9
+  - -0.9
+  - 0.543859
+  orientation:
+  - -1.734934
+  - -7.542108
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_11_17
+  position:
+  - 4.5
+  - -0.9
+  - 0.719244
+  orientation:
+  - -1.740124
+  - -8.737117
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_11_18
+  position:
+  - 5.1
+  - -0.9
+  - 0.922358
+  orientation:
+  - -1.746193
+  - -9.948064
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_11_19
+  position:
+  - 5.7
+  - -0.9
+  - 1.154423
+  orientation:
+  - -1.753205
+  - -11.177869
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_12_00
+  position:
+  - -5.7
+  - -1.5
+  - 1.206523
+  orientation:
+  - -2.925465
+  - 11.197584
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_12_01
+  position:
+  - -5.1
+  - -1.5
+  - 0.973596
+  orientation:
+  - -2.913693
+  - 9.965273
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_12_02
+  position:
+  - -4.5
+  - -1.5
+  - 0.769751
+  orientation:
+  - -2.903507
+  - 8.75198
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_12_03
+  position:
+  - -3.9
+  - -1.5
+  - 0.593751
+  orientation:
+  - -2.894798
+  - 7.554757
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_12_04
+  position:
+  - -3.3
+  - -1.5
+  - 0.444589
+  orientation:
+  - -2.887478
+  - 6.370954
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_12_05
+  position:
+  - -2.7
+  - -1.5
+  - 0.321444
+  orientation:
+  - -2.881476
+  - 5.198162
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_12_06
+  position:
+  - -2.1
+  - -1.5
+  - 0.223668
+  orientation:
+  - -2.876737
+  - 4.034152
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_12_07
+  position:
+  - -1.5
+  - -1.5
+  - 0.150758
+  orientation:
+  - -2.873218
+  - 2.876838
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_12_08
+  position:
+  - -0.9
+  - -1.5
+  - 0.102349
+  orientation:
+  - -2.870889
+  - 1.724237
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_12_11
+  position:
+  - 0.9
+  - -1.5
+  - 0.102349
+  orientation:
+  - -2.870889
+  - -1.724237
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_12_12
+  position:
+  - 1.5
+  - -1.5
+  - 0.150758
+  orientation:
+  - -2.873218
+  - -2.876838
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_12_13
+  position:
+  - 2.1
+  - -1.5
+  - 0.223668
+  orientation:
+  - -2.876737
+  - -4.034152
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_12_14
+  position:
+  - 2.7
+  - -1.5
+  - 0.321444
+  orientation:
+  - -2.881476
+  - -5.198162
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_12_15
+  position:
+  - 3.3
+  - -1.5
+  - 0.444589
+  orientation:
+  - -2.887478
+  - -6.370954
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_12_16
+  position:
+  - 3.9
+  - -1.5
+  - 0.593751
+  orientation:
+  - -2.894798
+  - -7.554757
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_12_17
+  position:
+  - 4.5
+  - -1.5
+  - 0.769751
+  orientation:
+  - -2.903507
+  - -8.75198
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_12_18
+  position:
+  - 5.1
+  - -1.5
+  - 0.973596
+  orientation:
+  - -2.913693
+  - -9.965273
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_12_19
+  position:
+  - 5.7
+  - -1.5
+  - 1.206523
+  orientation:
+  - -2.925465
+  - -11.197584
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_13_00
+  position:
+  - -5.7
+  - -2.1
+  - 1.285045
+  orientation:
+  - -4.102971
+  - 11.227427
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_13_01
+  position:
+  - -5.1
+  - -2.1
+  - 1.050806
+  orientation:
+  - -4.08631
+  - 9.991316
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_13_02
+  position:
+  - -4.5
+  - -2.1
+  - 0.845849
+  orientation:
+  - -4.071897
+  - 8.77447
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_13_03
+  position:
+  - -3.9
+  - -2.1
+  - 0.668915
+  orientation:
+  - -4.059576
+  - 7.573892
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_13_04
+  position:
+  - -3.3
+  - -2.1
+  - 0.518978
+  orientation:
+  - -4.049222
+  - 6.386897
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_13_05
+  position:
+  - -2.7
+  - -2.1
+  - 0.395206
+  orientation:
+  - -4.040735
+  - 5.211042
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_13_06
+  position:
+  - -2.1
+  - -2.1
+  - 0.296939
+  orientation:
+  - -4.034034
+  - 4.04407
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_13_07
+  position:
+  - -1.5
+  - -2.1
+  - 0.223668
+  orientation:
+  - -4.02906
+  - 2.88387
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_13_08
+  position:
+  - -0.9
+  - -2.1
+  - 0.175021
+  orientation:
+  - -4.025767
+  - 1.728436
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_13_11
+  position:
+  - 0.9
+  - -2.1
+  - 0.175021
+  orientation:
+  - -4.025767
+  - -1.728436
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_13_12
+  position:
+  - 1.5
+  - -2.1
+  - 0.223668
+  orientation:
+  - -4.02906
+  - -2.88387
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_13_13
+  position:
+  - 2.1
+  - -2.1
+  - 0.296939
+  orientation:
+  - -4.034034
+  - -4.04407
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_13_14
+  position:
+  - 2.7
+  - -2.1
+  - 0.395206
+  orientation:
+  - -4.040735
+  - -5.211042
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_13_15
+  position:
+  - 3.3
+  - -2.1
+  - 0.518978
+  orientation:
+  - -4.049222
+  - -6.386897
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_13_16
+  position:
+  - 3.9
+  - -2.1
+  - 0.668915
+  orientation:
+  - -4.059576
+  - -7.573892
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_13_17
+  position:
+  - 4.5
+  - -2.1
+  - 0.845849
+  orientation:
+  - -4.071897
+  - -8.77447
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_13_18
+  position:
+  - 5.1
+  - -2.1
+  - 1.050806
+  orientation:
+  - -4.08631
+  - -9.991316
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_13_19
+  position:
+  - 5.7
+  - -2.1
+  - 1.285045
+  orientation:
+  - -4.102971
+  - -11.227427
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_14_00
+  position:
+  - -5.7
+  - -2.7
+  - 1.390445
+  orientation:
+  - -5.287945
+  - 11.267733
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_14_01
+  position:
+  - -5.1
+  - -2.7
+  - 1.154423
+  orientation:
+  - -5.266206
+  - 10.026479
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_14_02
+  position:
+  - -4.5
+  - -2.7
+  - 0.947954
+  orientation:
+  - -5.247406
+  - 8.804826
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_14_03
+  position:
+  - -3.9
+  - -2.7
+  - 0.769751
+  orientation:
+  - -5.231342
+  - 7.599715
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_14_04
+  position:
+  - -3.3
+  - -2.7
+  - 0.618762
+  orientation:
+  - -5.217845
+  - 6.408408
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_14_05
+  position:
+  - -2.7
+  - -2.7
+  - 0.494139
+  orientation:
+  - -5.206784
+  - 5.228418
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_14_06
+  position:
+  - -2.1
+  - -2.7
+  - 0.395206
+  orientation:
+  - -5.198053
+  - 4.057449
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_14_07
+  position:
+  - -1.5
+  - -2.7
+  - 0.321444
+  orientation:
+  - -5.191571
+  - 2.893355
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_14_11
+  position:
+  - 0.9
+  - -2.7
+  - 0.272475
+  orientation:
+  - -5.187282
+  - -1.734098
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_14_12
+  position:
+  - 1.5
+  - -2.7
+  - 0.321444
+  orientation:
+  - -5.191571
+  - -2.893355
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_14_13
+  position:
+  - 2.1
+  - -2.7
+  - 0.395206
+  orientation:
+  - -5.198053
+  - -4.057449
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_14_14
+  position:
+  - 2.7
+  - -2.7
+  - 0.494139
+  orientation:
+  - -5.206784
+  - -5.228418
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_14_15
+  position:
+  - 3.3
+  - -2.7
+  - 0.618762
+  orientation:
+  - -5.217845
+  - -6.408408
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_14_16
+  position:
+  - 3.9
+  - -2.7
+  - 0.769751
+  orientation:
+  - -5.231342
+  - -7.599715
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_14_17
+  position:
+  - 4.5
+  - -2.7
+  - 0.947954
+  orientation:
+  - -5.247406
+  - -8.804826
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_14_18
+  position:
+  - 5.1
+  - -2.7
+  - 1.154423
+  orientation:
+  - -5.266206
+  - -10.026479
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_14_19
+  position:
+  - 5.7
+  - -2.7
+  - 1.390445
+  orientation:
+  - -5.287945
+  - -11.267733
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_15_00
+  position:
+  - -5.7
+  - -3.3
+  - 1.523354
+  orientation:
+  - -6.482739
+  - 11.318968
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_15_01
+  position:
+  - -5.1
+  - -3.3
+  - 1.285045
+  orientation:
+  - -6.455668
+  - 10.071157
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_15_02
+  position:
+  - -4.5
+  - -3.3
+  - 1.076638
+  orientation:
+  - -6.432269
+  - 8.843382
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_15_03
+  position:
+  - -3.9
+  - -3.3
+  - 0.896809
+  orientation:
+  - -6.412282
+  - 7.632503
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_15_04
+  position:
+  - -3.3
+  - -3.3
+  - 0.744475
+  orientation:
+  - -6.395496
+  - 6.435715
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_15_05
+  position:
+  - -2.7
+  - -3.3
+  - 0.618762
+  orientation:
+  - -6.381742
+  - 5.250471
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_15_06
+  position:
+  - -2.1
+  - -3.3
+  - 0.518978
+  orientation:
+  - -6.370888
+  - 4.074426
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_15_07
+  position:
+  - -1.5
+  - -3.3
+  - 0.444589
+  orientation:
+  - -6.362832
+  - 2.90539
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_15_10
+  position:
+  - 0.3
+  - -3.3
+  - 0.370578
+  orientation:
+  - -6.354848
+  - -0.580104
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_15_11
+  position:
+  - 0.9
+  - -3.3
+  - 0.395206
+  orientation:
+  - -6.357501
+  - -1.741283
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_15_12
+  position:
+  - 1.5
+  - -3.3
+  - 0.444589
+  orientation:
+  - -6.362832
+  - -2.90539
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_15_13
+  position:
+  - 2.1
+  - -3.3
+  - 0.518978
+  orientation:
+  - -6.370888
+  - -4.074426
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_15_14
+  position:
+  - 2.7
+  - -3.3
+  - 0.618762
+  orientation:
+  - -6.381742
+  - -5.250471
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_15_15
+  position:
+  - 3.3
+  - -3.3
+  - 0.744475
+  orientation:
+  - -6.395496
+  - -6.435715
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_15_16
+  position:
+  - 3.9
+  - -3.3
+  - 0.896809
+  orientation:
+  - -6.412282
+  - -7.632503
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_15_17
+  position:
+  - 4.5
+  - -3.3
+  - 1.076638
+  orientation:
+  - -6.432269
+  - -8.843382
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_15_18
+  position:
+  - 5.1
+  - -3.3
+  - 1.285045
+  orientation:
+  - -6.455668
+  - -10.071157
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_15_19
+  position:
+  - 5.7
+  - -3.3
+  - 1.523354
+  orientation:
+  - -6.482739
+  - -11.318968
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_16_00
+  position:
+  - -5.7
+  - -3.9
+  - 1.684595
+  orientation:
+  - -7.689885
+  - 11.381746
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_16_01
+  position:
+  - -5.1
+  - -3.9
+  - 1.443452
+  orientation:
+  - -7.657153
+  - 10.12587
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_16_02
+  position:
+  - -4.5
+  - -3.9
+  - 1.232647
+  orientation:
+  - -7.628878
+  - 8.890577
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_16_03
+  position:
+  - -3.9
+  - -3.9
+  - 1.050806
+  orientation:
+  - -7.604738
+  - 7.672623
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_16_04
+  position:
+  - -3.3
+  - -3.9
+  - 0.896809
+  orientation:
+  - -7.584473
+  - 6.469117
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_16_05
+  position:
+  - -2.7
+  - -3.9
+  - 0.769751
+  orientation:
+  - -7.567874
+  - 5.277439
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_16_06
+  position:
+  - -2.1
+  - -3.9
+  - 0.668915
+  orientation:
+  - -7.554778
+  - 4.095184
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_16_07
+  position:
+  - -1.5
+  - -3.9
+  - 0.593751
+  orientation:
+  - -7.545061
+  - 2.920102
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_16_10
+  position:
+  - 0.3
+  - -3.9
+  - 0.518978
+  orientation:
+  - -7.53543
+  - -0.583024
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_16_11
+  position:
+  - 0.9
+  - -3.9
+  - 0.543859
+  orientation:
+  - -7.538631
+  - -1.750065
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_16_12
+  position:
+  - 1.5
+  - -3.9
+  - 0.593751
+  orientation:
+  - -7.545061
+  - -2.920102
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_16_13
+  position:
+  - 2.1
+  - -3.9
+  - 0.668915
+  orientation:
+  - -7.554778
+  - -4.095184
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_16_14
+  position:
+  - 2.7
+  - -3.9
+  - 0.769751
+  orientation:
+  - -7.567874
+  - -5.277439
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_16_15
+  position:
+  - 3.3
+  - -3.9
+  - 0.896809
+  orientation:
+  - -7.584473
+  - -6.469117
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_16_16
+  position:
+  - 3.9
+  - -3.9
+  - 1.050806
+  orientation:
+  - -7.604738
+  - -7.672623
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_16_17
+  position:
+  - 4.5
+  - -3.9
+  - 1.232647
+  orientation:
+  - -7.628878
+  - -8.890577
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_16_18
+  position:
+  - 5.1
+  - -3.9
+  - 1.443452
+  orientation:
+  - -7.657153
+  - -10.12587
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_16_19
+  position:
+  - 5.7
+  - -3.9
+  - 1.684595
+  orientation:
+  - -7.689885
+  - -11.381746
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_17_00
+  position:
+  - -5.7
+  - -4.5
+  - 1.875214
+  orientation:
+  - -8.912152
+  - 11.456854
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_17_01
+  position:
+  - -5.1
+  - -4.5
+  - 1.630632
+  orientation:
+  - -8.87334
+  - 10.191285
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_17_02
+  position:
+  - -4.5
+  - -4.5
+  - 1.416922
+  orientation:
+  - -8.839839
+  - 8.94697
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_17_03
+  position:
+  - -3.9
+  - -4.5
+  - 1.232647
+  orientation:
+  - -8.811255
+  - 7.720539
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_17_04
+  position:
+  - -3.3
+  - -4.5
+  - 1.076638
+  orientation:
+  - -8.787271
+  - 6.508994
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_17_05
+  position:
+  - -2.7
+  - -4.5
+  - 0.947954
+  orientation:
+  - -8.767634
+  - 5.309626
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_17_06
+  position:
+  - -2.1
+  - -4.5
+  - 0.845849
+  orientation:
+  - -8.752147
+  - 4.119951
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_17_07
+  position:
+  - -1.5
+  - -4.5
+  - 0.769751
+  orientation:
+  - -8.740657
+  - 2.937654
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_17_08
+  position:
+  - -0.9
+  - -4.5
+  - 0.719244
+  orientation:
+  - -8.733056
+  - 1.760541
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_17_10
+  position:
+  - 0.3
+  - -4.5
+  - 0.694057
+  orientation:
+  - -8.729274
+  - -0.586507
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_17_11
+  position:
+  - 0.9
+  - -4.5
+  - 0.719244
+  orientation:
+  - -8.733056
+  - -1.760541
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_17_12
+  position:
+  - 1.5
+  - -4.5
+  - 0.769751
+  orientation:
+  - -8.740657
+  - -2.937654
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_17_13
+  position:
+  - 2.1
+  - -4.5
+  - 0.845849
+  orientation:
+  - -8.752147
+  - -4.119951
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_17_14
+  position:
+  - 2.7
+  - -4.5
+  - 0.947954
+  orientation:
+  - -8.767634
+  - -5.309626
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_17_15
+  position:
+  - 3.3
+  - -4.5
+  - 1.076638
+  orientation:
+  - -8.787271
+  - -6.508994
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_17_16
+  position:
+  - 3.9
+  - -4.5
+  - 1.232647
+  orientation:
+  - -8.811255
+  - -7.720539
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_17_17
+  position:
+  - 4.5
+  - -4.5
+  - 1.416922
+  orientation:
+  - -8.839839
+  - -8.94697
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_17_18
+  position:
+  - 5.1
+  - -4.5
+  - 1.630632
+  orientation:
+  - -8.87334
+  - -10.191285
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_17_19
+  position:
+  - 5.7
+  - -4.5
+  - 1.875214
+  orientation:
+  - -8.912152
+  - -11.456854
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_18_00
+  position:
+  - -5.7
+  - -5.1
+  - 2.096512
+  orientation:
+  - -10.152618
+  - 11.545286
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_18_01
+  position:
+  - -5.1
+  - -5.1
+  - 1.847814
+  orientation:
+  - -10.1072
+  - 10.268239
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_18_02
+  position:
+  - -4.5
+  - -5.1
+  - 1.630632
+  orientation:
+  - -10.068034
+  - 9.013266
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_18_03
+  position:
+  - -3.9
+  - -5.1
+  - 1.443452
+  orientation:
+  - -10.03464
+  - 7.776837
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_18_04
+  position:
+  - -3.3
+  - -5.1
+  - 1.285045
+  orientation:
+  - -10.006638
+  - 6.555825
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_18_05
+  position:
+  - -2.7
+  - -5.1
+  - 1.154423
+  orientation:
+  - -9.983723
+  - 5.347412
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_18_06
+  position:
+  - -2.1
+  - -5.1
+  - 1.050806
+  orientation:
+  - -9.965657
+  - 4.149019
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_18_07
+  position:
+  - -1.5
+  - -5.1
+  - 0.973596
+  orientation:
+  - -9.952259
+  - 2.958248
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_18_08
+  position:
+  - -0.9
+  - -5.1
+  - 0.922358
+  orientation:
+  - -9.943397
+  - 1.772831
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_18_09
+  position:
+  - -0.3
+  - -5.1
+  - 0.896809
+  orientation:
+  - -9.938987
+  - 0.590592
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_18_10
+  position:
+  - 0.3
+  - -5.1
+  - 0.896809
+  orientation:
+  - -9.938987
+  - -0.590592
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_18_11
+  position:
+  - 0.9
+  - -5.1
+  - 0.922358
+  orientation:
+  - -9.943397
+  - -1.772831
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_18_12
+  position:
+  - 1.5
+  - -5.1
+  - 0.973596
+  orientation:
+  - -9.952259
+  - -2.958248
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_18_13
+  position:
+  - 2.1
+  - -5.1
+  - 1.050806
+  orientation:
+  - -9.965657
+  - -4.149019
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_18_14
+  position:
+  - 2.7
+  - -5.1
+  - 1.154423
+  orientation:
+  - -9.983723
+  - -5.347412
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_18_15
+  position:
+  - 3.3
+  - -5.1
+  - 1.285045
+  orientation:
+  - -10.006638
+  - -6.555825
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_18_16
+  position:
+  - 3.9
+  - -5.1
+  - 1.443452
+  orientation:
+  - -10.03464
+  - -7.776837
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_18_17
+  position:
+  - 4.5
+  - -5.1
+  - 1.630632
+  orientation:
+  - -10.068034
+  - -9.013266
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_18_18
+  position:
+  - 5.1
+  - -5.1
+  - 1.847814
+  orientation:
+  - -10.1072
+  - -10.268239
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_18_19
+  position:
+  - 5.7
+  - -5.1
+  - 2.096512
+  orientation:
+  - -10.152618
+  - -11.545286
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_19_00
+  position:
+  - -5.7
+  - -5.7
+  - 2.350099
+  orientation:
+  - -11.41476
+  - 11.648291
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_19_01
+  position:
+  - -5.1
+  - -5.7
+  - 2.096512
+  orientation:
+  - -11.362079
+  - 10.357786
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_19_02
+  position:
+  - -4.5
+  - -5.7
+  - 1.875214
+  orientation:
+  - -11.316697
+  - 9.090345
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_19_03
+  position:
+  - -3.9
+  - -5.7
+  - 1.684595
+  orientation:
+  - -11.278039
+  - 7.842247
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_19_04
+  position:
+  - -3.3
+  - -5.7
+  - 1.523354
+  orientation:
+  - -11.245647
+  - 6.610204
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_19_05
+  position:
+  - -2.7
+  - -5.7
+  - 1.390445
+  orientation:
+  - -11.219155
+  - 5.391268
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_19_06
+  position:
+  - -2.1
+  - -5.7
+  - 1.285045
+  orientation:
+  - -11.198279
+  - 4.182744
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_19_07
+  position:
+  - -1.5
+  - -5.7
+  - 1.206523
+  orientation:
+  - -11.182802
+  - 2.982135
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_19_08
+  position:
+  - -0.9
+  - -5.7
+  - 1.154423
+  orientation:
+  - -11.172569
+  - 1.787084
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_19_09
+  position:
+  - -0.3
+  - -5.7
+  - 1.128446
+  orientation:
+  - -11.167477
+  - 0.59533
+  - 0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_19_10
+  position:
+  - 0.3
+  - -5.7
+  - 1.128446
+  orientation:
+  - -11.167477
+  - -0.59533
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_19_11
+  position:
+  - 0.9
+  - -5.7
+  - 1.154423
+  orientation:
+  - -11.172569
+  - -1.787084
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_19_12
+  position:
+  - 1.5
+  - -5.7
+  - 1.206523
+  orientation:
+  - -11.182802
+  - -2.982135
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_19_13
+  position:
+  - 2.1
+  - -5.7
+  - 1.285045
+  orientation:
+  - -11.198279
+  - -4.182744
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_19_14
+  position:
+  - 2.7
+  - -5.7
+  - 1.390445
+  orientation:
+  - -11.219155
+  - -5.391268
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_19_15
+  position:
+  - 3.3
+  - -5.7
+  - 1.523354
+  orientation:
+  - -11.245647
+  - -6.610204
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_19_16
+  position:
+  - 3.9
+  - -5.7
+  - 1.684595
+  orientation:
+  - -11.278039
+  - -7.842247
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_19_17
+  position:
+  - 4.5
+  - -5.7
+  - 1.875214
+  orientation:
+  - -11.316697
+  - -9.090345
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_19_18
+  position:
+  - 5.1
+  - -5.7
+  - 2.096512
+  orientation:
+  - -11.362079
+  - -10.357786
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+- id: M_19_19
+  position:
+  - 5.7
+  - -5.7
+  - 2.350099
+  orientation:
+  - -11.41476
+  - -11.648291
+  - -0.0
+  aperture:
+    type: polygon
+    vertices:
+    - - -0.28
+      - -0.28
+    - - 0.28
+      - -0.28
+    - - 0.28
+      - 0.28
+    - - -0.28
+      - 0.28
+  template: dc_facet
+obstructions:
+- id: Mast_0
+  type: cylinder
+  p1:
+  - 6.0
+  - 6.0
+  - 2.630683
+  p2:
+  - 0.65
+  - 0.65
+  - 15.038
+  r: 0.08
+- id: Mast_1
+  type: cylinder
+  p1:
+  - -6.0
+  - 6.0
+  - 2.630683
+  p2:
+  - -0.65
+  - 0.65
+  - 15.038
+  r: 0.08
+- id: Mast_2
+  type: cylinder
+  p1:
+  - 6.0
+  - -6.0
+  - 2.630683
+  p2:
+  - 0.65
+  - -0.65
+  - 15.038
+  r: 0.08
+- id: Mast_3
+  type: cylinder
+  p1:
+  - -6.0
+  - -6.0
+  - 2.630683
+  p2:
+  - -0.65
+  - -0.65
+  - 15.038
+  r: 0.08
+- id: Camera_Enclosure
+  type: box
+  p1:
+  - -0.65
+  - -0.65
+  - 15.038
+  p2:
+  - 0.65
+  - 0.65
+  - 15.388

@@ -36,6 +36,8 @@ Obstruction builders
 
 .. automodule:: iactrace.telescope.obstructions
    :members:
+   :exclude-members: ObstructionGroup, CylinderGroup, OpenCylinderGroup, BoxGroup,
+                     SphereGroup, OrientedBoxGroup, TriangleGroup
 
 Operations
 ----------

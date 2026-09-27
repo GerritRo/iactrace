@@ -13,19 +13,23 @@ class DetectionChain(eqx.Module):
     """A pixel's detection train: (optional concentrator) -> surface -> photodetector.
 
     Every chain traces rays up to the photodetector's own sensor surface (its
-    photocathode geometry, :attr:`~iactrace.camera.detector.photodetector.PhotoDetector.surface`)
+    photocathode geometry, surface)
     and hands the resulting bundle back to the photodetector, which applies its
     detection efficiencies (QE, window response, ...). Geometry is owned by the
-    photodetector; the chain only *places* it, at the detector plane
-    :attr:`detector_z` set by the concentrator + ``gap``. The chain is identical
+    photodetector; the chain only places it, at the detector plane
+    detector_z set by the concentrator + gap. The chain is identical
     for every pixel in a SensorGroup, so it runs once over all rays at once.
 
-    Attributes:
-        concentrator: Optional light concentrator (cone / lightguide).
-        photodetector: Photodetector -- both the response and (via its
-            ``surface``) the photocathode geometry rays are traced to.
-        gap: Spacing from the concentrator exit (or the entrance with no cone) to
-            the detector plane where the photocathode is mounted. Defaults ``0.0``.
+    Attributes
+    ----------
+    concentrator
+        Optional light concentrator (cone / lightguide).
+    photodetector
+        Photodetector -- both the response and (via its
+        surface) the photocathode geometry rays are traced to.
+    gap
+        Spacing from the concentrator exit (or the entrance with no cone) to
+        the detector plane where the photocathode is mounted. Defaults 0.0.
     """
 
     concentrator: Concentrator | None
@@ -50,42 +54,34 @@ class DetectionChain(eqx.Module):
 
     @property
     def detector_z(self) -> float:
-        """Detector-plane position in the pixel-local frame: ``-(length + gap)``."""
+        """Detector-plane position in the pixel-local frame: -(length + gap)."""
         length = self.concentrator.length if self.concentrator is not None else 0.0
         return -float(length) - self.gap
 
     @property
     def surface(self) -> DetectionSurface:
-        """The photodetector's sensor surface, placed at :attr:`detector_z`.
-
-        The photodetector owns the surface with ``vertex_z`` relative to the
-        detector plane; this property shifts it into absolute pixel-local
-        coordinates -- the surface rays are actually traced onto. Public so
-        diagnostics (e.g. :func:`iactrace.viz.show_sensor_chain`) can read
-        the placed geometry.
-        """
+        """The photodetector's sensor surface, placed at detector_z."""
         return self.photodetector.surface.shifted(self.detector_z)
 
     def propagate(self, local_rays: RayBundle, record_trajectory: bool = False) -> TraceResult:
-        """Trace *local_rays* to the sensor surface, then hand off to the photodetector.
+        """Trace local_rays to the sensor surface, then hand off to the photodetector.
 
-        ``local_rays`` are in the pixel-local frame (entrance at ``z = 0``). With
-        a concentrator, they are delivered to :attr:`surface` by the
-        concentrator's own
-        :meth:`~iactrace.camera.optics.concentrator.Concentrator.to_surface`.
+        local_rays are in the pixel-local frame (entrance at z = 0). With
+        a concentrator, they are delivered to surface by the
+        concentrator's own to_surface.
         With no concentrator the rays advance straight onto
         the surface. The handover to the photodetector is just the resulting bundle
         -- rays at the surface, pixel-local frame -- which it weights by its own
         detection efficiency (reading any geometry it needs from the surface it
         owns). Optical path length is accumulated up to the surface (concentrator
-        fill index on its internal leg, ray medium ``n`` on the free legs).
+        fill index on its internal leg, ray medium n on the free legs).
 
-        Returns a :class:`~iactrace.core.trajectory.TraceResult`; take its
-        ``rays`` for the detected bundle. Pass ``record_trajectory=True`` to
-        also populate its ``trajectory`` with the path through the chain
+        Returns a TraceResult; take its
+        rays for the detected bundle. Pass record_trajectory=True to
+        also populate its trajectory with the path through the chain
         (pixel-local frame): the wall-by-wall bounce path where the
         concentrator can report one, otherwise the straight entrance-to-landing
-        segment. Off by default, and ``trajectory`` is then ``None``.
+        segment. Off by default, and trajectory is then None.
         """
         surface = self.surface
         if self.concentrator is None:

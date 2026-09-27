@@ -7,6 +7,7 @@ from iactrace import Telescope
 from iactrace.core.apertures import DiskAperture
 from iactrace.core.interactions import RefractInteraction
 from iactrace.core.optics import OpticalElementGroup
+from iactrace.core.refractive_index import ConstantIndex
 from iactrace.core.surfaces import (
     AsphericSurfaceGroup,
     SumSurfaceGroup,
@@ -225,9 +226,9 @@ def _make_lens_telescope():
         surface=surface,
         aperture=DiskAperture(radii=jnp.full(n, 0.3), inner_radii=jnp.zeros(n)),
         interaction_module=RefractInteraction(
-            n_inside=jnp.full(n, 1.5),
-            transmittance=None,
-            transmittance_scalar=jnp.full(n, 0.9),
+            index=ConstantIndex(jnp.full(n, 1.5)),
+            transmittance_curve=None,
+            transmittance=jnp.full(n, 0.9),
         ),
         sample_key=jax.random.key(1),
         optical_stage=1,
@@ -262,19 +263,32 @@ class TestLensOperations:
     def test_scale_transmittance_clipped(self):
         tel = _make_lens_telescope()
         tel = tel.scale_transmittance(stage=1, factor=0.5)
-        assert jnp.allclose(tel.stage(1).interaction_module.transmittance_scalar, 0.45)
+        assert jnp.allclose(tel.stage(1).interaction_module.transmittance, 0.45)
         tel2 = _make_lens_telescope().scale_transmittance(stage=1, factor=10.0)
-        assert jnp.allclose(tel2.stage(1).interaction_module.transmittance_scalar, 1.0)
+        assert jnp.allclose(tel2.stage(1).interaction_module.transmittance, 1.0)
 
     def test_set_refractive_index_and_element_counts(self):
         tel = _make_lens_telescope()
         assert tel.n_lens_elements == 2
         assert tel.n_mirror_elements == 2
-        tel = tel.set_refractive_index(stage=1, n_inside=1.6)
-        assert jnp.allclose(tel.stage(1).interaction_module.n_inside, 1.6)
+        tel = tel.set_refractive_index(stage=1, index=1.6)
+        assert jnp.allclose(tel.stage(1).interaction_module.index.reference(), 1.6)
+
+    def test_set_refractive_index_accepts_dispersion_model(self):
+        from iactrace.core.refractive_index import TabulatedIndex
+
+        tel = _make_lens_telescope()  # 2-element lens at stage 1
+        disp = TabulatedIndex.from_table([300.0, 600.0], [1.4, 1.6], n_elements=2)
+        tel = tel.set_refractive_index(stage=1, index=disp)
+        assert isinstance(tel.stage(1).interaction_module.index, TabulatedIndex)
+
+    def test_set_refractive_index_rejects_wrong_element_count(self):
+        tel = _make_lens_telescope()  # 2-element lens at stage 1
+        with pytest.raises(ValueError, match="elements"):
+            tel.set_refractive_index(stage=1, index=ConstantIndex(jnp.array([1.5])))  # N=1 != 2
 
     def test_set_focal_length_on_lens_uses_refractive_formula(self):
-        # n_inside=1.5, n_outside=1 -> c = 1/((n-1)*f); f=4 -> c = 1/(0.5*4) = 0.5
+        # index=1.5, n_outside=1 -> c = 1/((n-1)*f); f=4 -> c = 1/(0.5*4) = 0.5
         tel = _make_lens_telescope().set_focal_lengths(stage=1, focal_lengths=jnp.full(2, 4.0))
         assert jnp.allclose(tel.stage(1).surface.curvatures, 0.5)
 

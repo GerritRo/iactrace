@@ -76,6 +76,16 @@ Summary Table
      - sim_telarray
      - Commercial
      - ROBAST
+   * - IACT/ATMO Support
+     - No
+     - Yes
+     - No
+     - Yes
+   * - IACT Electronics Simulation
+     - No
+     - Yes
+     - No
+     - No
    * - Non-sequential ray tracing
      - No
      - No

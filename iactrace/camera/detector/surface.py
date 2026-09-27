@@ -8,30 +8,38 @@ import jax
 import jax.numpy as jnp
 from jax import Array
 
-from ...core._tolerances import dir_tol
 from ...core.ray_bundle import RayBundle
 from ...core.surfaces import AsphericSurfaceGroup, SurfaceGroup
+from ...core.tolerances import dir_tol
 
 
 class DetectionSurface(eqx.Module):
     """
     The sensor surface a detection chain delivers rays onto.
 
-    Args:
-        shape: Optional single-element core surface group giving the sag
-            ``z(x, y)`` in the vertex frame (element ``0`` is used). Mutually
-            exclusive with ``curvature`` / ``conic``.
-        vertex_z: Axial position of the surface vertex, relative to the
-            detector plane (``0`` = at the plane).
-        curvature: ``c = 1 / R``. ``0`` -> flat. ``> 0`` concave toward the
-            incoming light (bowl); ``< 0`` convex (a dome bulging toward +z).
-        conic: Conic constant ``k`` (``0`` -> sphere).
-        radius: Aperture radius; rays landing beyond it are dropped. ``None``
-            -> unbounded.
+    Parameters
+    ----------
+    shape
+        Optional single-element core surface group giving the sag
+        z(x, y) in the vertex frame (element 0 is used). Mutually
+        exclusive with curvature / conic.
+    vertex_z
+        Axial position of the surface vertex, relative to the
+        detector plane (0 = at the plane).
+    curvature
+        c = 1 / R. 0 -> flat. > 0 concave toward the
+        incoming light (bowl); < 0 convex (a dome bulging toward +z).
+    conic
+        Conic constant k (0 -> sphere).
+    radius
+        Aperture radius; rays landing beyond it are dropped. None
+        -> unbounded.
 
-    Raises:
-        ValueError: on non-positive ``radius``, or when both ``shape`` and
-            ``curvature`` / ``conic`` are given.
+    Raises
+    ------
+    ValueError
+        on non-positive radius, or when both shape and
+        curvature / conic are given.
     """
 
     shape: SurfaceGroup
@@ -56,8 +64,6 @@ class DetectionSurface(eqx.Module):
         self.radius = float("inf") if radius is None else float(radius)
         self.is_flat = shape is None and curvature == 0.0
         if shape is None:
-            # A pure-conic core surface: no aspheric terms, so the shared
-            # intersection machinery takes the closed-form root (no Newton).
             self.shape = AsphericSurfaceGroup(
                 offsets=jnp.zeros((1, 2)),
                 curvatures=jnp.asarray([float(curvature)]),
@@ -68,15 +74,13 @@ class DetectionSurface(eqx.Module):
             self.shape = shape
 
     def shifted(self, dz: float) -> DetectionSurface:
-        """Copy with ``vertex_z`` shifted by ``dz`` (relative -> absolute placement)."""
+        """Copy with vertex_z shifted by dz (relative -> absolute placement)."""
         if self.is_flat:
             return DetectionSurface(vertex_z=self.vertex_z + dz, radius=self.radius)
         return DetectionSurface(self.shape, vertex_z=self.vertex_z + dz, radius=self.radius)
 
     def _hit(self, o: Array, d: Array, vertex: float) -> tuple[Array, Array, Array]:
-        """
-        Nearest forward hit for one ray, with the surface vertex at ``vertex``.
-        """
+        """Nearest forward hit for one ray, with the surface vertex at vertex."""
         shift = jnp.array([0.0, 0.0, vertex])
         t = self.shape._index(0)._intersect_t(o - shift, d)
         point = o + jnp.where(jnp.isfinite(t), t, 0.0) * d
@@ -84,20 +88,11 @@ class DetectionSurface(eqx.Module):
         return t, point, within
 
     def sag_fn(self) -> Callable[[Array, Array], Array]:
-        """Return this surface's ``z(x, y)`` sag function.
-
-        For callers (e.g. 3D visualisation) that need a plain sag callable
-        rather than the full intersection machinery.
-        """
+        """Return this surface's z(x, y) sag function."""
         return lambda x, y: self.shape.sag_at(0, x, y)
 
     def normals_at(self, points: Array) -> Array:
-        """Outward unit surface normals at the transverse positions of *points*.
-
-        The surface is ``z = vertex_z + sag(x, y)``, so only ``(x, y)`` matter
-        and the result is placement-independent -- angle-dependent photodetectors
-        call this on the landing ``origins`` handed over by the chain.
-        """
+        """Outward unit surface normals at the transverse positions of points."""
         x, y = points[..., 0], points[..., 1]
         if math.isfinite(self.radius):
             r2 = x**2 + y**2
@@ -110,7 +105,7 @@ class DetectionSurface(eqx.Module):
 
     def stop(self, rays: RayBundle) -> RayBundle:
         """
-        Advance *rays* onto the surface (no concentrator).
+        Advance rays onto the surface (no concentrator).
         """
         o, d = rays.origins, rays.directions
         if self.is_flat:

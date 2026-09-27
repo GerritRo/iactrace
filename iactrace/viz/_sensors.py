@@ -1,6 +1,7 @@
 import numpy as np
 import trimesh
 
+from ..camera import HexagonalSensorGroup, SquareSensorGroup
 from ..core import euler_to_matrix
 from ._meshes import (
     _create_disk_mesh,
@@ -12,13 +13,12 @@ from ._utils import convex_hull_2d as _convex_hull_2d
 
 
 def _pixel_outline_2d(sensor_group):
-    """Single-pixel boundary polygon ``(M, 2)``, centred at the origin.
+    """Single-pixel boundary polygon (M, 2), centred at the origin.
 
     Grid-aligned (the pixel-local frame), so it lines up with a concentrator's
-    ``cross_sections`` and the detector outline drawn by
-    :func:`show_sensor_chain`.
+    cross_sections and the detector outline drawn by
+    show_sensor_chain.
     """
-    from ..camera import HexagonalSensorGroup, SquareSensorGroup
 
     if isinstance(sensor_group, SquareSensorGroup):
         hx, hy = sensor_group.dx / 2.0, sensor_group.dy / 2.0
@@ -31,38 +31,25 @@ def _pixel_outline_2d(sensor_group):
 
 
 def _pixel_centers_2d(sensor_group):
-    """Pixel centres ``(n_pixels, 2)`` in the sensor-local frame.
+    """Pixel centres (n_pixels, 2) in the sensor-local frame.
 
-    The counterpart of :func:`_sensor_grid_segments_2d`: where each pixel's
+    The counterpart of _sensor_grid_segments_2d: where each pixel's
     detection chain is mounted. Conventions match the filled pixel polygons in
-    :func:`iactrace.viz.show_image`.
+    iactrace.viz.show_image.
     """
-    from ..camera import HexagonalSensorGroup, SquareSensorGroup
-
-    if isinstance(sensor_group, SquareSensorGroup):
-        w, h = sensor_group.width, sensor_group.height
-        xs = sensor_group.x0 + (np.arange(w) + 0.5) * sensor_group.dx
-        ys = sensor_group.y0 + (np.arange(h) + 0.5) * sensor_group.dy
-        xx, yy = np.meshgrid(xs, ys, indexing="xy")
-        return np.column_stack([xx.ravel(), yy.ravel()])
-
-    if isinstance(sensor_group, HexagonalSensorGroup):
-        return np.asarray(sensor_group.hex_centers)
-
-    raise TypeError(f"Unsupported sensor group type: {type(sensor_group).__name__}")
+    return np.asarray(sensor_group.pixel_centers)
 
 
 def _sensor_grid_segments_2d(sensor_group):
     """Pixel-boundary line segments for one sensor, in the sensor-local frame.
 
-    Returns an ``(S, 2, 2)`` array of ``S`` segments (each a start/end 2D
-    point) tracing the pixel grid, or ``None`` for an unsupported group.
+    Returns an (S, 2, 2) array of S segments (each a start/end 2D
+    point) tracing the pixel grid, or None for an unsupported group.
     Square groups yield the full set of grid lines; hexagonal groups yield
     each pixel's six-edge outline (interior edges are drawn twice, which is
     fine for a wireframe overlay). The conventions match the filled pixel
-    polygons in :func:`iactrace.viz.show_image`.
+    polygons in iactrace.viz.show_image.
     """
-    from ..camera import HexagonalSensorGroup, SquareSensorGroup
 
     if isinstance(sensor_group, SquareSensorGroup):
         w, h = sensor_group.width, sensor_group.height
@@ -100,7 +87,7 @@ def _sensor_grid_segments_2d(sensor_group):
 def _get_sensor_grid_paths(sensor_group, color):
     """Build pixel-grid wireframe paths for a sensor group (camera frame).
 
-    Returns one :class:`trimesh.path.Path3D` per sensor, drawing the pixel
+    Returns one trimesh.path.Path3D per sensor, drawing the pixel
     boundaries as coloured line segments so the physical pixel layout can be
     inspected alongside the filled sensor faces. The lines are nudged a hair
     off the sensor plane so they never z-fight with the sensor mesh.
@@ -140,7 +127,6 @@ def _get_sensor_meshes(sensor_group):
 
     Each sensor in the group gets its own mesh, rendered at its position/rotation.
     """
-    from ..camera import HexagonalSensorGroup, SquareSensorGroup
 
     positions = np.asarray(sensor_group.positions)
     rotations = np.asarray(sensor_group.rotations)
@@ -189,15 +175,15 @@ def _thin_slices(z, rings, detail):
 def _chain_part_meshes(sensor, *, include_entrance=True, detail=1.0, **kwargs):
     """One pixel's detection-chain geometry, in the pixel-local frame.
 
-    Returns a list of ``(mesh, rgba)`` for the entrance aperture, concentrator
+    Returns a list of (mesh, rgba) for the entrance aperture, concentrator
     walls, photocathode surface and photodetector body -- whichever the chain
-    actually has. Built once and shared by :func:`show_sensor_chain` (a single
-    pixel) and :func:`show_camera` (replicated across every pixel), so both show
+    actually has. Built once and shared by show_sensor_chain (a single
+    pixel) and show_camera (replicated across every pixel), so both show
     exactly the same geometry.
 
-    ``detail`` scales the tessellation (1.0 = full). One pixel is cheap at full
+    detail scales the tessellation (1.0 = full). One pixel is cheap at full
     detail; a whole camera multiplies it by a few thousand, so
-    :func:`show_camera` turns it down.
+    show_camera turns it down.
     """
     entrance_color = kwargs.get("entrance_color", [255, 0, 0, 128])
     cone_color = kwargs.get("cone_color", [135, 206, 235, 255])

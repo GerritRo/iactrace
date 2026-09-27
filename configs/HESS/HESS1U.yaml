@@ -1,5 +1,55 @@
+# H.E.S.S. HESS1U Camera Configuration
+# =====================================
+#
+# SPDX-License-Identifier: CC-BY-SA-4.0
+#
+# This file is licensed under Creative Commons Attribution-ShareAlike 4.0
+# International (CC-BY-SA-4.0). See DATA_LICENSE.rst for full terms.
+#
+# Derived from sim_telarray configuration files by Konrad Bernlöhr (MPI Heidelberg).
+# Citation: Bernlöhr, Astroparticle Physics 30 (2008) 149-158, arXiv:0808.2253
 sensors:
-- centers_x:
+- id: HESS1U
+  orientation:
+  - 0.0
+  - 0.0
+  - 0.0
+  position:
+  - 0.0
+  - 0.0
+  - 0.0
+  type: hexagonal
+  concentrator:
+    type: winston
+    n_sides: 6
+    entrance_apothem: 0.0205
+    exit_apothem: 0.01025
+    length: 0.053
+    reflectivity: 1.00
+    reflectivity_curve:
+      type: table
+      angles_deg: [0.0]
+      wavelengths_nm: [300.0, 350.0, 400.0, 450.0, 500.0]
+      values:
+      - [0.738, 0.701, 0.835, 0.847, 0.814]
+    max_bounces: 10
+    orientation_deg: 0.0
+  photodetector:
+    type: pmt
+    qe: 1.0
+    qe_curve:
+      type: table
+      angles_deg: [0.0]
+      wavelengths_nm: [250., 272., 294., 316., 338., 360., 382., 404., 426., 448., 470., 492., 514., 536., 558., 580., 602., 624., 646., 668.]
+      values:
+      - [0., 0.04258, 0.15516, 0.22206, 0.23728, 0.2466, 0.24986, 0.25664, 0.25024, 0.23002, 0.2048 , 0.17964, 0.14792, 0.09452, 0.06474, 0.0461, 0.02972, 0.0126, 0.0008, 0.]
+    window_index: 1.49
+    face_radius: 0.01425
+    length: 0.098
+    vertex_z: 0.0
+  gap: 0.001000
+  edge_width: 0.0005
+  centers_x:
   - 0.6615
   - 0.6195
   - 0.5775
@@ -1921,31 +1971,3 @@ sensors:
   - 0.3455
   - 0.3455
   - 0.3455
-  id: HESS1U
-  orientation:
-  - 0.0
-  - 0.0
-  - 0.0
-  position:
-  - 0.0
-  - 0.0
-  - 0.0
-  type: hexagonal
-  concentrator:
-    type: winston
-    n_sides: 6
-    entrance_apothem: 0.0205
-    exit_apothem: 0.01025
-    length: 0.053
-    reflectivity: 0.78
-    max_bounces: 10
-    orientation_deg: 0.0
-  photodetector:
-    type: pmt
-    qe: 1.0            # for now kept ideal
-    n_window: 1.49
-    face_radius: 0.01425
-    length: 0.098
-    vertex_z: 0.0
-  gap: 0.001000
-  edge_width: 0.0005

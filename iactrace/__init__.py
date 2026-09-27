@@ -11,9 +11,25 @@ from .camera import (
     PhotoDetector,
     SensorGroup,
     SquareSensorGroup,
+    TabulatedQE,
     WinstonCone,
 )
-from .core import LazyRayBundle, RayBundle, TraceResult, Trajectory
+from .core import (
+    ConstantIndex,
+    ConstantResponse,
+    ConstantSpectrum,
+    LazyRayBundle,
+    RayBundle,
+    RefractiveIndex,
+    ResponseCurve,
+    SellmeierIndex,
+    Spectrum,
+    TabulatedIndex,
+    TabulatedResponse,
+    TabulatedSpectrum,
+    TraceResult,
+    Trajectory,
+)
 from .io import save_camera, save_telescope
 from .telescope import Telescope
 from .viz import (
@@ -24,7 +40,7 @@ from .viz import (
     show_telescope,
 )
 
-__version__ = "0.10.3"
+__version__ = "0.11.0"
 
 jax.config.update("jax_default_matmul_precision", "highest")
 
@@ -46,7 +62,19 @@ __all__ = [
     # PhotoDetector
     "PhotoDetector",
     "ConstantQE",
+    "TabulatedQE",
     "PMT",
+    # Wavelength / angle dependency
+    "ResponseCurve",
+    "ConstantResponse",
+    "TabulatedResponse",
+    "RefractiveIndex",
+    "ConstantIndex",
+    "TabulatedIndex",
+    "SellmeierIndex",
+    "Spectrum",
+    "ConstantSpectrum",
+    "TabulatedSpectrum",
     # Visualization
     "show_image",
     "show_telescope",
