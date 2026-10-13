@@ -5,13 +5,11 @@ import math
 import sys
 
 import equinox as eqx
-import jax
 import jax.numpy as jnp
 import numpy as np
 from jax import Array
 
 from ..core.spectrum import TabulatedSpectrum
-from ..core.transforms import euler_to_matrix
 
 __all__ = [
     "EffectiveApertureTable",
@@ -58,12 +56,9 @@ class FieldFrame(eqx.Module):
         rotation_deg
             Roll about the optical axis.
         """
-        rotations = jax.vmap(euler_to_matrix)(jnp.asarray(telescope.stage(0).rotations))
-        axis = np.asarray(rotations)[:, :, 2].mean(axis=0)
-        axis = -axis / np.linalg.norm(axis)
-
-        e_lon = _orthogonalise(np.array([0.0, 1.0, 0.0]), axis)  # +Y
-        e_lat = np.cross(axis, e_lon)  # +X
+        axis = np.array([0.0, 0.0, -1.0])
+        e_lon = np.array([0.0, 1.0, 0.0])  # +Y
+        e_lat = np.array([1.0, 0.0, 0.0])  # +X, axis x e_lon
         if rotation_deg:
             c, s = math.cos(math.radians(rotation_deg)), math.sin(math.radians(rotation_deg))
             e_lon, e_lat = c * e_lon + s * e_lat, -s * e_lon + c * e_lat
@@ -78,15 +73,6 @@ class FieldFrame(eqx.Module):
             + (jnp.cos(lat) * jnp.sin(lon))[..., None] * self.e_lon
             + jnp.sin(lat)[..., None] * self.e_lat
         )
-
-
-def _orthogonalise(v: np.ndarray, axis: np.ndarray) -> np.ndarray:
-    """Component of v perpendicular to axis, normalised."""
-    residual = np.asarray(v, dtype=float) - np.dot(v, axis) * axis
-    if np.linalg.norm(residual) < 1e-8:
-        fallback = np.array([1.0, 0.0, 0.0]) if abs(axis[0]) < 0.9 else np.array([0.0, 1.0, 0.0])
-        residual = fallback - np.dot(fallback, axis) * axis
-    return residual / np.linalg.norm(residual)
 
 
 @eqx.filter_jit

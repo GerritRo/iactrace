@@ -110,7 +110,7 @@ def table(spectral_rig):
 
 class TestFieldFrame:
     def test_axis_is_exact_and_noise_free(self, flat_rig):
-        """The axis comes from element orientations, so it does not wobble."""
+        """The axis comes from the telescope frame, should be no wobble."""
         telescope, _ = flat_rig
         frame = FieldFrame.from_telescope(telescope)
         assert np.allclose(np.asarray(frame.axis), [0.0, 0.0, -1.0], atol=1e-12)
