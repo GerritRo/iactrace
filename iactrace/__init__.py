@@ -40,7 +40,7 @@ from .viz import (
     show_telescope,
 )
 
-__version__ = "0.11.0"
+__version__ = "0.11.1"
 
 jax.config.update("jax_default_matmul_precision", "highest")
 

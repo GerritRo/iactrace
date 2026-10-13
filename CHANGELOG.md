@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.11.1 (2026-10-13)
+
+### Fix
+
+- **effective_aperture**: axis was wrongly aligned with mirrors, not with camera axis
+
 ## v0.11.0 (2026-09-27)
 
 ### BREAKING CHANGE
