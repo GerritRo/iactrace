@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.11.2 (2026-11-06)
+
+### Fix
+
+- **operations**: changed z displacement of optical elements to be along local element z axis again
+
 ## v0.11.1 (2026-10-13)
 
 ### Fix
