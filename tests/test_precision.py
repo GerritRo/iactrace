@@ -93,9 +93,6 @@ class TestTelescopePrecision:
         xy32, hit32 = _traced_in(False, lambda: _trace_config(*args))
         xy64, hit64 = _traced_in(True, lambda: _trace_config(*args))
 
-        # Same rays detected. This is the half that a too-tight residual bound
-        # breaks: the float32 run reports converged hits as misses and silently
-        # drops them, while float64 keeps them.
         assert np.array_equal(hit32, hit64), (
             f"{int((hit32 != hit64).sum())} rays detected in one dtype but not the other"
         )
@@ -103,8 +100,7 @@ class TestTelescopePrecision:
         detected = hit32.astype(bool)
         assert detected.sum() > 0.5 * len(detected), "geometry does not illuminate the camera"
 
-        # Landing positions agree to a few float32 ulps at this telescope's own
-        # scale -- far below a pixel, and far below the PSF.
+        # Landing positions agree to a few float32 ulps
         deviation = np.linalg.norm(xy32[detected] - xy64[detected], axis=-1)
         assert deviation.max() <= 8.0 * EPS32 * height, (
             f"max deviation {deviation.max():.3e} m exceeds "

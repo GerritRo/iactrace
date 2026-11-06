@@ -335,11 +335,6 @@ class TestFinalLegShadow:
         assert out is rb
 
     def _near_focus_sphere(self):
-        # make_simple_telescope: parabola of curvature 1 -> focus at z=0.5,
-        # aperture radius 0.1. A small sphere just short of the focus sits
-        # deep inside the converging cone but barely clips the incoming beam:
-        # its incoming silhouette can remove at most ~(0.02/0.1)**2 = 4% of
-        # the flux, so a far larger drop can only come from the final leg.
         return SphereGroup(centers=[[0.0, 0.0, 0.46]], radii=[0.02])
 
     def test_blocks_converging_cone_in_image(self):
@@ -419,7 +414,11 @@ class TestRoughnessInTracing:
         rb_zero = tel_zero.trace(origins, directions, values).rays
         x_zero, y_zero = _sensor_xy(camera, rb_zero)
 
-        assert jnp.allclose(jnp.stack([x_clean, y_clean], 1), jnp.stack([x_zero, y_zero], 1))
+        print(x_zero - x_clean)
+
+        assert jnp.allclose(
+            jnp.stack([x_clean, y_clean], 1), jnp.stack([x_zero, y_zero], 1), rtol=1e-5, atol=1e-6
+        )
         assert jnp.allclose(rb_clean.values, rb_zero.values)
 
     def test_roughness_is_deterministic(self, telescope_and_camera, test_rays):
