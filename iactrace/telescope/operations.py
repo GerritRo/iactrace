@@ -18,6 +18,7 @@ from ..core.surfaces import (
     SumSurfaceGroup,
     ZernikeSurfaceGroup,
 )
+from ..core.transforms import euler_to_matrix
 
 if TYPE_CHECKING:
     from ..core import ObstructionGroup
@@ -240,10 +241,11 @@ def set_rotations(telescope: Telescope, stage: int, rotations: Array) -> Telesco
 
 
 def apply_displacement(telescope: Telescope, stage: int, sigma_z: float, key: Array) -> Telescope:
-    """Apply random Gaussian z-displacement to elements in the group at stage."""
+    """Apply random Gaussian z-displacement along the local axis to elements in the group at stage."""
     group = telescope.stage(stage)
     delta_z = jax.random.normal(key, shape=(len(group),)) * sigma_z
-    new_positions = group.positions.at[:, 2].add(delta_z)
+    rot = jax.vmap(euler_to_matrix)(group.rotations)
+    new_positions = group.positions + delta_z[:, None] * rot[:, :, 2]
     return _update_at_stage(telescope, stage, lambda g: g.positions, new_positions)
 
 

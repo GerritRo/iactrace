@@ -13,6 +13,7 @@ from iactrace.core.surfaces import (
     SumSurfaceGroup,
     ZernikeSurfaceGroup,
 )
+from iactrace.core.transforms import euler_to_matrix
 from iactrace.telescope import operations as ops
 
 from ._helpers import make_disk_mirror_group, mirror_group_with_surface
@@ -118,17 +119,21 @@ class TestRandomPerturbations:
         assert jnp.isclose(jnp.std(delta_h), expected_sigma_h_deg, rtol=0.1)
         assert jnp.isclose(jnp.std(delta_v), expected_sigma_v_deg, rtol=0.1)
 
-    def test_displacement_affects_only_z(self, simple_telescope, random_key):
-        """Z-axis displacement should only affect z coordinates."""
-        original_xy = simple_telescope.mirror_groups[0].positions[:, :2].copy()
+    def test_displacement_affects_only_local_z(self, simple_telescope, random_key):
+        """Displacement along local z should only affect local z coordinates."""
+        group = simple_telescope.stage(0)
+        original_positions = group.positions.copy()
+
+        rot = jax.vmap(euler_to_matrix)(group.rotations)
 
         modified_tel = ops.apply_displacement(simple_telescope, 0, sigma_z=1.0, key=random_key)
 
-        assert jnp.allclose(modified_tel.mirror_groups[0].positions[:, :2], original_xy)
-        assert not jnp.allclose(
-            modified_tel.mirror_groups[0].positions[:, 2],
-            simple_telescope.mirror_groups[0].positions[:, 2],
-        )
+        displacement = modified_tel.stage(0).positions - original_positions
+
+        local_displacement = jnp.einsum("nij,nj->ni", jnp.swapaxes(rot, 1, 2), displacement)
+
+        assert jnp.allclose(local_displacement[:, :2], 0.0)
+        assert not jnp.allclose(local_displacement[:, 2], 0.0)
 
     def test_conic_error_preserves_mean(self, simple_telescope, random_key):
         """Conic error with zero sigma should preserve original values."""
