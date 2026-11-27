@@ -5,6 +5,8 @@ import jax.numpy as jnp
 from jax import Array
 from jax.scipy.ndimage import map_coordinates
 
+from ...core.interpolation import bracket
+
 
 def _safe_norm(v: Array) -> Array:
     """Vector length with a finite gradient at zero."""
@@ -53,9 +55,8 @@ def landing_coordinates(
 
 def _fractional_index(x: Array, grid: Array) -> Array:
     """Position of x in grid as a fractional index (clamped at the ends)."""
-    if grid.shape[0] == 1:
-        return jnp.zeros_like(x)
-    return jnp.interp(x, grid, jnp.arange(grid.shape[0], dtype=x.dtype))
+    lo, _, weight = bracket(grid, x)
+    return lo + weight
 
 
 class AngularResponse(eqx.Module):

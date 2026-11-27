@@ -7,6 +7,8 @@ import jax
 import jax.numpy as jnp
 from jax import Array
 
+from .interpolation import bracket
+
 
 class Spectrum(eqx.Module):
     """A source's distribution over wavelength.
@@ -117,7 +119,7 @@ class TabulatedSpectrum(Spectrum):
         """
         u = jax.random.uniform(key, shape)
         cdf = self._cdf()
-        i = jnp.clip(jnp.searchsorted(cdf, u, side="right") - 1, 0, self.wavelengths.shape[0] - 2)
+        i = bracket(cdf, u)[0]
         p0, p1 = self.density[i], self.density[i + 1]
         lo, hi = cdf[i], cdf[i + 1]
         wide = hi > lo

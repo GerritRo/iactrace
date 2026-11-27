@@ -3,10 +3,10 @@ from __future__ import annotations
 from abc import abstractmethod
 
 import equinox as eqx
-import jax
 import jax.numpy as jnp
 from jax import Array
 
+from .interpolation import bracket
 from .ray_bundle import DEFAULT_WAVELENGTH
 from .tolerances import dir_tol
 
@@ -104,20 +104,18 @@ class TabulatedResponse(ResponseCurve):
     values: Array  # (N, Kc, Kw)
 
     def __call__(self, cos_theta_i, element_idx, wavelength=None):
-        rows = self.values[element_idx]
-
-        # Wavelength-independent curve: skip and interpolate in cos only
-        if self.wl_table.shape[0] == 1:
-            return jax.vmap(lambda c, r: jnp.interp(c, self.cos_table, r[:, 0]))(cos_theta_i, rows)
-
         if wavelength is None:
             wavelength = jnp.full_like(cos_theta_i, self.wl_table[0])
+        c_lo, c_hi, c_w = bracket(self.cos_table, cos_theta_i)
+        w_lo, w_hi, w_w = bracket(self.wl_table, wavelength)
 
-        def per_ray(cos, wl, grid):
-            col = jax.vmap(lambda r: jnp.interp(wl, self.wl_table, r))(grid)  # (Kc,)
-            return jnp.interp(cos, self.cos_table, col)
+        # Only the four table nodes around each ray are read.
+        def along_wavelength(c):
+            lo = self.values[element_idx, c, w_lo]
+            return lo + w_w * (self.values[element_idx, c, w_hi] - lo)
 
-        return jax.vmap(per_ray)(cos_theta_i, wavelength, rows)
+        lo = along_wavelength(c_lo)
+        return lo + c_w * (along_wavelength(c_hi) - lo)
 
     @classmethod
     def from_degrees(
