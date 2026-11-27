@@ -9,6 +9,7 @@ import jax.numpy as jnp
 import numpy as np
 from jax import Array
 
+from ...core.intersections import _quadratic_roots
 from ...core.responses import ResponseCurve
 from .polygonal import PolygonalCone
 from .winston import cpc_full_length, cpc_ideal_wall_tilt
@@ -72,32 +73,17 @@ def _meridian_coeffs(
     return r_coeffs, z_coeffs
 
 
-def _wall_hit(
-    o: Array,
-    d: Array,
-    n: Array,
-    r_coeffs: Array,
-    z_coeffs: Array,
-    gd_r: Array,
-    gd_z: Array,
-    a2: float,
-) -> tuple[Array, Array]:
-    """Smallest forward ray parameter hitting facet n and its Bezier t.
+def _roots_quadratic(g: Array) -> tuple[Array, Array]:
+    """Both roots of a quadratic G in closed form: (t, found), each (2,)."""
+    t1, t2, real = _quadratic_roots(g[2], 0.5 * g[1], g[0])
+    t = jnp.stack([t1, t2])
+    found = real & jnp.isfinite(t)
+    return jnp.where(found, t, 0.0), found
 
-    Returns (tau, t); tau = inf when the facet is not hit in front of
-    the ray. gd_r / gd_z are the derivative coefficients of R / Z.
-    """
-    p = d[0] * n[0] + d[1] * n[1]
-    q = d[2]
-    u0 = o[0] * n[0] + o[1] * n[1]
-    z0 = o[2]
 
-    # G(t) = q R(t) - p Z(t) + (p z0 - q u0), and its derivative coefficients.
-    g = q * r_coeffs - p * z_coeffs
-    g = g.at[0].add(p * z0 - q * u0)
-    gd = q * gd_r - p * gd_z
-
-    # Isolate roots on [0, 1] by sign changes over a fixed set of sub-intervals.
+def _roots_bracketed(g: Array, gd: Array) -> tuple[Array, Array]:
+    """Roots of G on [0, 1] by bracketing and bisection: (t, found)."""
+    # Isolate roots by sign changes over a fixed set of sub-intervals.
     ts = jnp.linspace(0.0, 1.0, _N_BRACKET + 1)
     gs = _polyval(g, ts)
     lo, hi = ts[:-1], ts[1:]
@@ -127,6 +113,35 @@ def _wall_hit(
         return jnp.clip(t - step, lo, hi), None
 
     t, _ = jax.lax.scan(_polish, t, None, length=_N_POLISH)
+    return t, bracketed
+
+
+def _wall_hit(
+    o: Array,
+    d: Array,
+    n: Array,
+    r_coeffs: Array,
+    z_coeffs: Array,
+    gd_r: Array,
+    gd_z: Array,
+    a2: float,
+) -> tuple[Array, Array]:
+    """Smallest forward ray parameter hitting facet n and its Bezier t.
+
+    Returns (tau, t); tau = inf when the facet is not hit in front of
+    the ray. gd_r / gd_z are the derivative coefficients of R / Z.
+    """
+    p = d[0] * n[0] + d[1] * n[1]
+    q = d[2]
+    u0 = o[0] * n[0] + o[1] * n[1]
+    z0 = o[2]
+
+    # G(t) = q R(t) - p Z(t) + (p z0 - q u0), and its derivative coefficients.
+    g = q * r_coeffs - p * z_coeffs
+    g = g.at[0].add(p * z0 - q * u0)
+    gd = q * gd_r - p * gd_z
+
+    t, found = _roots_quadratic(g) if g.shape[0] == 3 else _roots_bracketed(g, gd)
 
     # Recover the ray parameter from whichever coordinate the ray moves along
     R = _polyval(r_coeffs, t)
@@ -137,7 +152,7 @@ def _wall_hit(
     tau = jnp.where(use_p, R - u0, Z - z0) / safe
 
     ok = (
-        bracketed
+        found
         & (t >= 0.0)
         & (t <= 1.0)
         & jnp.isfinite(tau)

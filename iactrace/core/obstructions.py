@@ -15,7 +15,8 @@ from .intersections import (
     intersect_triangle,
 )
 
-_VMAP_PAIR_BUDGET = 2_800_000
+# Ray-primitive pairs tested in one batch before falling back to a loop.
+_VMAP_PAIR_BUDGET = 40_000_000
 
 
 class ObstructionGroup(eqx.Module):

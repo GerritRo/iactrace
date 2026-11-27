@@ -7,6 +7,7 @@ import jax
 import jax.numpy as jnp
 from jax import Array
 
+from .interpolation import bracket
 from .ray_bundle import DEFAULT_WAVELENGTH
 
 
@@ -71,8 +72,9 @@ class TabulatedIndex(RefractiveIndex):
     n_values: Array  # (N, K)
 
     def n_at(self, element_idx, wavelength):
-        rows = self.n_values[element_idx]
-        return jax.vmap(lambda w, r: jnp.interp(w, self.wavelengths, r))(wavelength, rows)
+        lo, hi, weight = bracket(self.wavelengths, wavelength)
+        n_lo = self.n_values[element_idx, lo]
+        return n_lo + weight * (self.n_values[element_idx, hi] - n_lo)
 
     def reference(self, wavelength=DEFAULT_WAVELENGTH):
         return jax.vmap(lambda r: jnp.interp(wavelength, self.wavelengths, r))(self.n_values)

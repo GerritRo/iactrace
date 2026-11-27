@@ -5,23 +5,55 @@ import trimesh
 from ..core import euler_to_matrix
 
 
-def _apply_color(mesh, rgba):
+def _apply_color(mesh, rgba, emissive=None):
     """Apply RGBA color to a mesh with correct transparency for three.js/glTF rendering.
 
     glTF materials default to alphaMode='OPAQUE', which causes three.js to ignore
     the alpha channel even when face colors have alpha < 255. Using PBRMaterial with
     alphaMode='BLEND' fixes this for semi-transparent colors.
+
+    emissive (optional RGB, 0-255) is light the surface gives off by itself,
+    independent of the scene lights, so it stays visible on the unlit side.
     """
     rgba = list(rgba)
-    if rgba[3] < 255:
-        factor = [c / 255.0 for c in rgba]
+    if rgba[3] < 255 or emissive is not None:
         mat = trimesh.visual.material.PBRMaterial(
-            baseColorFactor=factor,
-            alphaMode="BLEND",
+            baseColorFactor=[c / 255.0 for c in rgba],
+            emissiveFactor=None if emissive is None else [c / 255.0 for c in emissive[:3]],
+            alphaMode="BLEND" if rgba[3] < 255 else "OPAQUE",
         )
         mesh.visual = trimesh.visual.TextureVisuals(material=mat)
     else:
         mesh.visual.face_colors = rgba
+
+
+def _edge_path(mesh, rgba, angle_deg=20.0):
+    """Unlit outline of a mesh: its open boundary plus its sharp creases.
+
+    Returns a Path3D through every edge that bounds only one face (the rim
+    of an open surface) or joins two faces bent by more than angle_deg (the
+    rim of a closed slab), so smooth tessellation seams are skipped. Faces
+    duplicated by _make_double_sided are dropped first, else every edge
+    would look shared.
+    """
+    faces = np.asarray(mesh.faces)
+    _, first = np.unique(np.sort(faces, axis=1), axis=0, return_index=True)
+    single = trimesh.Trimesh(mesh.vertices, faces[np.sort(first)], process=False)
+    single.merge_vertices()
+
+    edges = single.edges_sorted
+    _, inverse, counts = np.unique(edges, axis=0, return_inverse=True, return_counts=True)
+    boundary = edges[counts[inverse.ravel()] == 1]
+    sharp = single.face_adjacency_edges[single.face_adjacency_angles > np.deg2rad(angle_deg)]
+    keep = np.vstack([boundary, sharp])
+    if len(keep) == 0:
+        return None
+
+    path = trimesh.path.Path3D(
+        entities=[trimesh.path.entities.Line([2 * k, 2 * k + 1]) for k in range(len(keep))],
+        vertices=single.vertices[keep].reshape(-1, 3),
+    )
+    return _color_path(path, rgba)
 
 
 def _color_path(path, rgba):

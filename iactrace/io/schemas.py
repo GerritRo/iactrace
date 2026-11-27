@@ -1,7 +1,9 @@
 from __future__ import annotations
 
-from typing import Annotated, Any, Literal
+import math
+from typing import Annotated, Any, ClassVar, Literal
 
+import numpy as np
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -128,10 +130,17 @@ class TabulatedCurveSchema(ConfigModel):
     See TabulatedResponse.
     """
 
+    max_value: ClassVar[float] = 1.0
+
     type: Literal["table"] = "table"
     angles_deg: list[float] = Field(min_length=1)
     values: list[float] | list[list[float]] = Field(min_length=1)
     wavelengths_nm: list[float] | None = None
+
+    def _check_value(self, x: float) -> None:
+        if not 0.0 <= x <= self.max_value:
+            allowed = "lie in [0, 1]" if self.max_value == 1.0 else "be >= 0"
+            raise ValueError(f"values must {allowed}; got {x}")
 
     @field_validator("angles_deg")
     @classmethod
@@ -167,8 +176,7 @@ class TabulatedCurveSchema(ConfigModel):
                         "values must be a 1-D list when wavelengths_nm is omitted; "
                         "give wavelengths_nm for an (angle, wavelength) grid"
                     )
-                if not 0.0 <= x <= 1.0:
-                    raise ValueError(f"values must lie in [0, 1]; got {x}")
+                self._check_value(x)
         else:
             # Grid: one row per angle, one column per wavelength.
             nwl = len(self.wavelengths_nm)
@@ -183,8 +191,7 @@ class TabulatedCurveSchema(ConfigModel):
                         f"each values row must be a list of length len(wavelengths_nm)={nwl}"
                     )
                 for x in row:
-                    if not 0.0 <= x <= 1.0:
-                        raise ValueError(f"values must lie in [0, 1]; got {x}")
+                    self._check_value(x)
         return self
 
 
@@ -454,11 +461,64 @@ class TabulatedQESchema(ConfigModel):
     qe_curve: ResponseCurveSchema
 
 
+class AngularResponseSchema(ConfigModel):
+    """Serialized AngularResponse: a relative response against the incidence angle.
+
+    angles_deg (angle to the local normal of the face) is always given; the
+    table can have up to three further axes: radius (distance of the landing
+    point from the PMT axis), azimuth_deg (direction around the local normal;
+    0 = heading radially outward, 180 = toward the axis) and wavelengths_nm.
+    values is nested with one level per given axis, in the order angle,
+    radius, azimuth, wavelength: a plain list for angles alone,
+    values[i][j][k][l] with all four. Values are relative (>= 0, not bounded
+    by 1).
+    """
+
+    type: Literal["table"] = "table"
+    angles_deg: list[float] = Field(min_length=1)
+    radius: list[float] | None = Field(default=None, min_length=1)
+    azimuth_deg: list[float] | None = Field(default=None, min_length=1)
+    wavelengths_nm: list[float] | None = Field(default=None, min_length=1)
+    values: list[Any] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def _check(self) -> AngularResponseSchema:
+        limits = {"angles_deg": 90.0, "azimuth_deg": 180.0}
+        names = ("angles_deg", "radius", "azimuth_deg", "wavelengths_nm")
+        given = [name for name in names if getattr(self, name) is not None]
+        for name in given:
+            axis = getattr(self, name)
+            if any(b <= a for a, b in zip(axis, axis[1:], strict=False)):
+                raise ValueError(f"{name} must be strictly increasing")
+            if axis[0] < 0.0 or axis[-1] > limits.get(name, math.inf):
+                raise ValueError(f"{name} must lie in [0, {limits.get(name, 'inf')}]")
+        if self.wavelengths_nm is not None and self.wavelengths_nm[0] <= 0.0:
+            raise ValueError("wavelengths_nm must be > 0")
+        shape = tuple(len(getattr(self, name)) for name in given)
+        try:
+            values = np.asarray(self.values, dtype=float)
+        except ValueError as e:
+            raise ValueError(f"values must be a regular nested list of shape {shape}") from e
+        if values.shape != shape:
+            raise ValueError(
+                f"values must have shape {shape} for the axes {given}, got {values.shape}"
+            )
+        if not np.all(np.isfinite(values)) or values.min() < 0.0:
+            raise ValueError("values must be finite and >= 0")
+        return self
+
+
 class PMTSchema(ConfigModel):
     """Serialized PMT.
 
-    A photomultiplier response: the qe / qe_curve photocathode pair
-    plus an optional entrance index window (Fresnel angular response) --
+    The efficiency is the product of the bulk qe and two response functions;
+    one that is not given is 1:
+
+    - qe_curve: QE against wavelength (the datasheet curve);
+    - angular_response: relative response against the incidence angle and,
+      optionally, where and from which side a ray lands on the face.
+
+    An optional entrance window_index adds the Fresnel loss at the window --
     a plain number for a non-dispersive window, or a model for a dispersive
     one, the same field either way.
     """
@@ -466,6 +526,7 @@ class PMTSchema(ConfigModel):
     type: Literal["pmt"] = "pmt"
     qe: float = Field(ge=0, le=1, default=1.0)
     qe_curve: ResponseCurveSchema | None = None
+    angular_response: AngularResponseSchema | None = None
     window_index: IndexSchema | None = None
     face_radius: float = Field(gt=0)
     surface: SurfaceSpec = Field(

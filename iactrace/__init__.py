@@ -2,6 +2,7 @@ import jax
 
 from .camera import (
     PMT,
+    AngularResponse,
     Camera,
     Concentrator,
     ConstantQE,
@@ -64,6 +65,7 @@ __all__ = [
     "ConstantQE",
     "TabulatedQE",
     "PMT",
+    "AngularResponse",
     # Wavelength / angle dependency
     "ResponseCurve",
     "ConstantResponse",
