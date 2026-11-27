@@ -2,12 +2,11 @@ import numpy as np
 import trimesh
 
 from ..core import euler_to_matrix
-from ._meshes import _apply_color, _replicate_mesh, _rigid_transform, _spin_z
+from ._meshes import _apply_color, _edge_path, _replicate_mesh, _rigid_transform, _spin_z
 from ._optics import _get_lens_meshes, _get_mirror_meshes, _get_obstruction_meshes
 from ._sensors import (
     _chain_part_meshes,
     _get_sensor_grid_paths,
-    _get_sensor_meshes,
     _pixel_centers_2d,
 )
 from .overlays import add_trajectories
@@ -20,9 +19,10 @@ def show_telescope(telescope, camera=None, *, trajectory=None, **kwargs):
     In Jupyter notebooks, displays interactive 3D view via three.js (client-side).
     No server-side OpenGL required.
 
-    When a camera is supplied, each sensor is drawn as a filled face plus a
-    black wireframe of its pixel grid (square cells or hexagons), so the
-    physical pixel layout can be checked against the rest of the optics.
+    When a camera is supplied, each sensor is drawn as a wireframe of its
+    pixel grid (square cells or hexagons), so the physical pixel layout can be
+    checked against the rest of the optics. The lines are unlit and drawn in a
+    bright colour, so they stay visible against the camera body.
 
     Parameters
     ----------
@@ -41,11 +41,15 @@ def show_telescope(telescope, camera=None, *, trajectory=None, **kwargs):
 
         - mirror_color: RGBA color for mirrors (default: light blue)
         - obstruction_color: RGBA color for obstructions (default: gray)
-        - sensor_color: RGBA color for sensors (default: red)
         - lens_color: RGBA color for lenses (default: light green, semi-transparent)
+        - lens_glow: RGB the lens glass emits on its own, so it does not
+        go dark on its unlit side (default: a dim version of lens_color;
+        None for no glow)
+        - lens_outline_color: RGBA of the unlit line drawn round each lens's
+        rim and edges (default: bright green; None for no outline)
         - show_sensor_grid: Draw per-pixel grid lines for each sensor
         (default: True; only has an effect when camera is given)
-        - sensor_grid_color: RGBA color for the pixel grid (default: black)
+        - sensor_grid_color: RGBA color for the pixel grid (default: amber)
 
     Returns
     -------
@@ -53,44 +57,45 @@ def show_telescope(telescope, camera=None, *, trajectory=None, **kwargs):
     """
     mirror_color = kwargs.get("mirror_color", [135, 206, 235, 200])
     obstruction_color = kwargs.get("obstruction_color", [128, 128, 128, 255])
-    sensor_color = kwargs.get("sensor_color", [255, 0, 0, 128])
     lens_color = kwargs.get("lens_color", [144, 238, 144, 150])  # Light green, semi-transparent
+    lens_glow = kwargs.get("lens_glow", [int(0.35 * c) for c in lens_color[:3]])
+    lens_outline_color = kwargs.get("lens_outline_color", [160, 255, 170, 255])
     show_sensor_grid = kwargs.get("show_sensor_grid", True)
-    sensor_grid_color = kwargs.get("sensor_grid_color", [0, 0, 0, 255])  # Black pixel grid
+    # Lines are unlit in the viewer, so a bright colour reads as self-lit
+    # against the shaded camera body; black disappears into it.
+    sensor_grid_color = kwargs.get("sensor_grid_color", [255, 190, 0, 255])
 
     scene = trimesh.Scene()
 
     # Each optical family renders the same way: build per-element meshes,
     # merge them, colour the merge, and add it to the scene.
-    for groups, get_meshes, color in (
-        (telescope.mirror_groups, _get_mirror_meshes, mirror_color),
-        (telescope.lens_groups, _get_lens_meshes, lens_color),
-        (telescope.obstruction_groups, _get_obstruction_meshes, obstruction_color),
+    for groups, get_meshes, color, glow, outline in (
+        (telescope.mirror_groups, _get_mirror_meshes, mirror_color, None, None),
+        (telescope.lens_groups, _get_lens_meshes, lens_color, lens_glow, lens_outline_color),
+        (telescope.obstruction_groups, _get_obstruction_meshes, obstruction_color, None, None),
     ):
         for group in groups:
             meshes = get_meshes(group)
             if meshes:
                 combined = trimesh.util.concatenate(meshes)
-                _apply_color(combined, color)
+                _apply_color(combined, color, emissive=glow)
                 scene.add_geometry(combined)
+                if outline is not None:
+                    for mesh in meshes:
+                        path = _edge_path(mesh, outline)
+                        if path is not None:
+                            scene.add_geometry(path)
 
-    # Add sensors from camera
-    if camera is not None:
+    # Pixel grid of each sensor, placed in the telescope frame
+    if camera is not None and show_sensor_grid:
         cam_transform = _rigid_transform(
             np.asarray(euler_to_matrix(telescope.camera_rotation)),
             np.asarray(telescope.camera_position),
         )
         for sensor_group in camera.sensor_groups:
-            meshes = _get_sensor_meshes(sensor_group)
-            for mesh in meshes:
-                mesh.apply_transform(cam_transform)
-                _apply_color(mesh, sensor_color)
-                scene.add_geometry(mesh)
-
-            if show_sensor_grid:
-                for path in _get_sensor_grid_paths(sensor_group, sensor_grid_color):
-                    path.apply_transform(cam_transform)
-                    scene.add_geometry(path)
+            for path in _get_sensor_grid_paths(sensor_group, sensor_grid_color):
+                path.apply_transform(cam_transform)
+                scene.add_geometry(path)
 
     # Optional recorded ray paths (traced by the caller), drawn as-is.
     if trajectory is not None:

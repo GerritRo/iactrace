@@ -9,7 +9,6 @@ from ._meshes import (
     _create_polygon_mesh,
     _make_double_sided,
 )
-from ._utils import convex_hull_2d as _convex_hull_2d
 
 
 def _pixel_outline_2d(sensor_group):
@@ -89,15 +88,15 @@ def _get_sensor_grid_paths(sensor_group, color):
 
     Returns one trimesh.path.Path3D per sensor, drawing the pixel
     boundaries as coloured line segments so the physical pixel layout can be
-    inspected alongside the filled sensor faces. The lines are nudged a hair
-    off the sensor plane so they never z-fight with the sensor mesh.
+    inspected alongside the rest of the optics. The lines are nudged a hair
+    off the sensor plane along local +Z.
     """
     segments_2d = _sensor_grid_segments_2d(sensor_group)
     if segments_2d is None or len(segments_2d) == 0:
         return []
 
-    # Offset the wireframe by 0.1% of the sensor extent along the local +Z so
-    # it sits just in front of the filled face (negligible, avoids z-fighting).
+    # Offset the wireframe by 0.1% of the sensor extent along the local +Z
+    # (negligible; keeps it off any surface lying in the sensor plane).
     lift = 1e-3 * float(np.ptp(segments_2d.reshape(-1, 2), axis=0).max())
 
     n_seg = len(segments_2d)
@@ -120,46 +119,6 @@ def _get_sensor_grid_paths(sensor_group, color):
         path.colors = colors
         paths.append(path)
     return paths
-
-
-def _get_sensor_meshes(sensor_group):
-    """Get list of sensor meshes from a sensor group.
-
-    Each sensor in the group gets its own mesh, rendered at its position/rotation.
-    """
-
-    positions = np.asarray(sensor_group.positions)
-    rotations = np.asarray(sensor_group.rotations)
-
-    meshes = []
-    n_sensors = len(sensor_group)
-
-    if isinstance(sensor_group, SquareSensorGroup):
-        # Compute 2D boundary vertices from pixel geometry
-        x0, y0 = sensor_group.x0, sensor_group.y0
-        x1 = x0 + sensor_group.width * sensor_group.dx
-        y1 = y0 + sensor_group.height * sensor_group.dy
-        vertices = np.array([[x0, y0], [x1, y0], [x1, y1], [x0, y1]])
-
-        for i in range(n_sensors):
-            mesh = _create_polygon_mesh(positions[i], rotations[i], vertices, sag_fn=None)
-            mesh = _make_double_sided(mesh)
-            if mesh is not None:
-                meshes.append(mesh)
-
-    elif isinstance(sensor_group, HexagonalSensorGroup):
-        # Use convex hull of hex centers as boundary
-        centers = np.asarray(sensor_group.hex_centers)
-        boundary = _convex_hull_2d(centers)
-
-        if boundary is not None:
-            for i in range(n_sensors):
-                mesh = _create_polygon_mesh(positions[i], rotations[i], boundary, sag_fn=None)
-                mesh = _make_double_sided(mesh)
-                if mesh is not None:
-                    meshes.append(mesh)
-
-    return meshes
 
 
 def _thin_slices(z, rings, detail):
