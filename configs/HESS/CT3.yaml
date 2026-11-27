@@ -34,7 +34,7 @@ mirror_templates:
       values:
       - [0.755056, 0.790921, 0.792809, 0.797528, 0.806966, 0.814517, 0.81546 , 0.821123, 0.830562, 0.84, 0.84, 0.84, 0.84, 0.84, 0.84, 0.84, 0.84, 0.84, 0.84, 0.849438, 0.849438]
 mirrors:
-- aperture:
+- aperture: &ct3_facet
     radius: 0.300000
     type: circular
   id: M_0
@@ -47,9 +47,7 @@ mirrors:
   - 1.178000
   - 0.049608
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_1
   orientation:
   - 2.255268
@@ -60,9 +58,7 @@ mirrors:
   - 1.178000
   - 0.049608
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_2
   orientation:
   - 3.287701
@@ -73,9 +69,7 @@ mirrors:
   - 1.715000
   - 0.111417
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_3
   orientation:
   - 3.286989
@@ -86,9 +80,7 @@ mirrors:
   - 1.715000
   - 0.098496
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_4
   orientation:
   - 3.287701
@@ -99,9 +91,7 @@ mirrors:
   - 1.715000
   - 0.111417
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_5
   orientation:
   - 4.325261
@@ -112,9 +102,7 @@ mirrors:
   - 2.252000
   - 0.199472
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_6
   orientation:
   - 4.323371
@@ -125,9 +113,7 @@ mirrors:
   - 2.252000
   - 0.173488
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_7
   orientation:
   - 4.323371
@@ -138,9 +124,7 @@ mirrors:
   - 2.252000
   - 0.173488
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_8
   orientation:
   - 4.325261
@@ -151,9 +135,7 @@ mirrors:
   - 2.252000
   - 0.199472
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_9
   orientation:
   - 5.369761
@@ -164,9 +146,7 @@ mirrors:
   - 2.789000
   - 0.314248
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_10
   orientation:
   - 5.366198
@@ -177,9 +157,7 @@ mirrors:
   - 2.789000
   - 0.274985
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_12
   orientation:
   - 5.366198
@@ -190,9 +168,7 @@ mirrors:
   - 2.789000
   - 0.274985
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_13
   orientation:
   - 5.369761
@@ -203,9 +179,7 @@ mirrors:
   - 2.789000
   - 0.314248
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_14
   orientation:
   - 6.423125
@@ -216,9 +190,7 @@ mirrors:
   - 3.326000
   - 0.456377
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_15
   orientation:
   - 6.417356
@@ -229,9 +201,7 @@ mirrors:
   - 3.326000
   - 0.403539
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_16
   orientation:
   - 6.414486
@@ -242,9 +212,7 @@ mirrors:
   - 3.326000
   - 0.377191
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_18
   orientation:
   - 6.417356
@@ -255,9 +223,7 @@ mirrors:
   - 3.326000
   - 0.403539
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_19
   orientation:
   - 6.423125
@@ -268,9 +234,7 @@ mirrors:
   - 3.326000
   - 0.456377
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_20
   orientation:
   - 7.487426
@@ -281,9 +245,7 @@ mirrors:
   - 3.863000
   - 0.626672
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_21
   orientation:
   - 7.478867
@@ -294,9 +256,7 @@ mirrors:
   - 3.863000
   - 0.559874
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_22
   orientation:
   - 7.473764
@@ -307,9 +267,7 @@ mirrors:
   - 3.863000
   - 0.519944
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_23
   orientation:
   - 7.472069
@@ -320,9 +278,7 @@ mirrors:
   - 3.863000
   - 0.506658
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_24
   orientation:
   - 7.473764
@@ -333,9 +289,7 @@ mirrors:
   - 3.863000
   - 0.519944
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_25
   orientation:
   - 7.478867
@@ -346,9 +300,7 @@ mirrors:
   - 3.863000
   - 0.559874
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_26
   orientation:
   - 7.487426
@@ -359,9 +311,7 @@ mirrors:
   - 3.863000
   - 0.626672
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_27
   orientation:
   - 8.564936
@@ -372,9 +322,7 @@ mirrors:
   - 4.400000
   - 0.826149
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_28
   orientation:
   - 8.552930
@@ -385,9 +333,7 @@ mirrors:
   - 4.400000
   - 0.744906
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_29
   orientation:
   - 8.544991
@@ -398,9 +344,7 @@ mirrors:
   - 4.400000
   - 0.691001
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_30
   orientation:
   - 8.541041
@@ -411,9 +355,7 @@ mirrors:
   - 4.400000
   - 0.664124
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_31
   orientation:
   - 8.541041
@@ -424,9 +366,7 @@ mirrors:
   - 4.400000
   - 0.664124
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_32
   orientation:
   - 8.544991
@@ -437,9 +377,7 @@ mirrors:
   - 4.400000
   - 0.691001
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_33
   orientation:
   - 8.552930
@@ -450,9 +388,7 @@ mirrors:
   - 4.400000
   - 0.744906
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_34
   orientation:
   - 8.564936
@@ -463,9 +399,7 @@ mirrors:
   - 4.400000
   - 0.826149
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_35
   orientation:
   - 9.658174
@@ -476,9 +410,7 @@ mirrors:
   - 4.937000
   - 1.056063
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_36
   orientation:
   - 9.641973
@@ -489,9 +421,7 @@ mirrors:
   - 4.937000
   - 0.959771
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_37
   orientation:
   - 9.630518
@@ -502,9 +432,7 @@ mirrors:
   - 4.937000
   - 0.891394
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_38
   orientation:
   - 9.623691
@@ -515,9 +443,7 @@ mirrors:
   - 4.937000
   - 0.850526
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_39
   orientation:
   - 9.621423
@@ -528,9 +454,7 @@ mirrors:
   - 4.937000
   - 0.836930
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_40
   orientation:
   - 9.623691
@@ -541,9 +465,7 @@ mirrors:
   - 4.937000
   - 0.850526
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_41
   orientation:
   - 9.630518
@@ -554,9 +476,7 @@ mirrors:
   - 4.937000
   - 0.891394
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_42
   orientation:
   - 9.641973
@@ -567,9 +487,7 @@ mirrors:
   - 4.937000
   - 0.959771
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_43
   orientation:
   - 9.658174
@@ -580,9 +498,7 @@ mirrors:
   - 4.937000
   - 1.056063
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_44
   orientation:
   - 10.767915
@@ -593,9 +509,7 @@ mirrors:
   - 5.473000
   - 1.317549
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_45
   orientation:
   - 10.746659
@@ -606,9 +520,7 @@ mirrors:
   - 5.473000
   - 1.205467
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_46
   orientation:
   - 10.730910
@@ -619,9 +531,7 @@ mirrors:
   - 5.473000
   - 1.122000
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_47
   orientation:
   - 10.720502
@@ -632,9 +542,7 @@ mirrors:
   - 5.473000
   - 1.066633
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_48
   orientation:
   - 10.715325
@@ -645,9 +553,7 @@ mirrors:
   - 5.473000
   - 1.039033
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_49
   orientation:
   - 10.715325
@@ -658,9 +564,7 @@ mirrors:
   - 5.473000
   - 1.039033
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_50
   orientation:
   - 10.720502
@@ -671,9 +575,7 @@ mirrors:
   - 5.473000
   - 1.066633
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_51
   orientation:
   - 10.730910
@@ -684,9 +586,7 @@ mirrors:
   - 5.473000
   - 1.122000
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_52
   orientation:
   - 10.746659
@@ -697,9 +597,7 @@ mirrors:
   - 5.473000
   - 1.205467
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_53
   orientation:
   - 10.767915
@@ -710,9 +608,7 @@ mirrors:
   - 5.473000
   - 1.317549
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_54
   orientation:
   - 11.874174
@@ -723,9 +619,7 @@ mirrors:
   - 6.010000
   - 1.484449
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_55
   orientation:
   - 11.853219
@@ -736,9 +630,7 @@ mirrors:
   - 6.010000
   - 1.385122
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_56
   orientation:
   - 11.838411
@@ -749,9 +641,7 @@ mirrors:
   - 6.010000
   - 1.314617
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_57
   orientation:
   - 11.829589
@@ -762,9 +652,7 @@ mirrors:
   - 6.010000
   - 1.272487
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_58
   orientation:
   - 11.826659
@@ -775,9 +663,7 @@ mirrors:
   - 6.010000
   - 1.258473
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_59
   orientation:
   - 11.829589
@@ -788,9 +674,7 @@ mirrors:
   - 6.010000
   - 1.272487
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_60
   orientation:
   - 11.838411
@@ -801,9 +685,7 @@ mirrors:
   - 6.010000
   - 1.314617
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_61
   orientation:
   - 11.853219
@@ -814,9 +696,7 @@ mirrors:
   - 6.010000
   - 1.385122
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_62
   orientation:
   - 11.874174
@@ -827,9 +707,7 @@ mirrors:
   - 6.010000
   - 1.484449
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_63
   orientation:
   - 1.640516
@@ -840,9 +718,7 @@ mirrors:
   - 0.857000
   - 0.049570
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_64
   orientation:
   - 0.614404
@@ -853,9 +729,7 @@ mirrors:
   - 0.321000
   - 0.049604
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_65
   orientation:
   - 2.671835
@@ -866,9 +740,7 @@ mirrors:
   - 1.394000
   - 0.111357
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_66
   orientation:
   - 1.641859
@@ -879,9 +751,7 @@ mirrors:
   - 0.857000
   - 0.098443
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_67
   orientation:
   - 0.615040
@@ -892,9 +762,7 @@ mirrors:
   - 0.321000
   - 0.111398
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_68
   orientation:
   - 3.707800
@@ -905,9 +773,7 @@ mirrors:
   - 1.931000
   - 0.199391
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_69
   orientation:
   - 2.674618
@@ -918,9 +784,7 @@ mirrors:
   - 1.394000
   - 0.173409
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_70
   orientation:
   - 1.643924
@@ -931,9 +795,7 @@ mirrors:
   - 0.857000
   - 0.173416
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_71
   orientation:
   - 0.615949
@@ -944,9 +806,7 @@ mirrors:
   - 0.321000
   - 0.199434
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_72
   orientation:
   - 4.750207
@@ -957,9 +817,7 @@ mirrors:
   - 2.468000
   - 0.314143
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_73
   orientation:
   - 3.712518
@@ -970,9 +828,7 @@ mirrors:
   - 1.931000
   - 0.274878
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_74
   orientation:
   - 2.678599
@@ -983,9 +839,7 @@ mirrors:
   - 1.394000
   - 0.261816
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_75
   orientation:
   - 1.646732
@@ -996,9 +850,7 @@ mirrors:
   - 0.857000
   - 0.274888
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_76
   orientation:
   - 0.617140
@@ -1009,9 +861,7 @@ mirrors:
   - 0.321000
   - 0.314185
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_77
   orientation:
   - 5.800959
@@ -1022,9 +872,7 @@ mirrors:
   - 3.005000
   - 0.456249
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_78
   orientation:
   - 4.757391
@@ -1035,9 +883,7 @@ mirrors:
   - 2.468000
   - 0.403404
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_79
   orientation:
   - 3.718932
@@ -1048,9 +894,7 @@ mirrors:
   - 1.931000
   - 0.377055
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_80
   orientation:
   - 2.683815
@@ -1061,9 +905,7 @@ mirrors:
   - 1.394000
   - 0.377057
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_81
   orientation:
   - 1.650310
@@ -1074,9 +916,7 @@ mirrors:
   - 0.857000
   - 0.403412
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_82
   orientation:
   - 0.618624
@@ -1087,9 +927,7 @@ mirrors:
   - 0.321000
   - 0.456284
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_83
   orientation:
   - 6.862103
@@ -1100,9 +938,7 @@ mirrors:
   - 3.542000
   - 0.626519
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_84
   orientation:
   - 5.811192
@@ -1113,9 +949,7 @@ mirrors:
   - 3.005000
   - 0.559710
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_85
   orientation:
   - 4.766805
@@ -1126,9 +960,7 @@ mirrors:
   - 2.468000
   - 0.519773
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_86
   orientation:
   - 3.727106
@@ -1139,9 +971,7 @@ mirrors:
   - 1.931000
   - 0.506486
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_87
   orientation:
   - 2.690317
@@ -1152,9 +982,7 @@ mirrors:
   - 1.394000
   - 0.519774
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_88
   orientation:
   - 1.654692
@@ -1165,9 +993,7 @@ mirrors:
   - 0.857000
   - 0.559711
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_89
   orientation:
   - 0.620417
@@ -1178,9 +1004,7 @@ mirrors:
   - 0.321000
   - 0.626543
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_90
   orientation:
   - 7.935872
@@ -1191,9 +1015,7 @@ mirrors:
   - 4.079000
   - 0.825971
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_91
   orientation:
   - 6.876037
@@ -1204,9 +1026,7 @@ mirrors:
   - 3.542000
   - 0.744712
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_92
   orientation:
   - 5.824236
@@ -1217,9 +1037,7 @@ mirrors:
   - 3.005000
   - 0.690796
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_93
   orientation:
   - 4.778545
@@ -1230,9 +1048,7 @@ mirrors:
   - 2.468000
   - 0.663913
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_94
   orientation:
   - 3.737121
@@ -1243,9 +1059,7 @@ mirrors:
   - 1.931000
   - 0.663911
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_95
   orientation:
   - 2.698171
@@ -1256,9 +1070,7 @@ mirrors:
   - 1.394000
   - 0.690789
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_96
   orientation:
   - 1.659924
@@ -1269,9 +1081,7 @@ mirrors:
   - 0.857000
   - 0.744701
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_97
   orientation:
   - 0.622537
@@ -1282,9 +1092,7 @@ mirrors:
   - 0.321000
   - 0.825978
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_98
   orientation:
   - 9.024742
@@ -1295,9 +1103,7 @@ mirrors:
   - 4.616000
   - 1.055858
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_99
   orientation:
   - 7.954245
@@ -1308,9 +1114,7 @@ mirrors:
   - 4.079000
   - 0.959546
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_100
   orientation:
   - 6.893418
@@ -1321,9 +1125,7 @@ mirrors:
   - 3.542000
   - 0.891153
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_101
   orientation:
   - 5.840223
@@ -1334,9 +1136,7 @@ mirrors:
   - 3.005000
   - 0.850274
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_102
   orientation:
   - 4.792730
@@ -1347,9 +1147,7 @@ mirrors:
   - 2.468000
   - 0.836671
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_103
   orientation:
   - 3.749081
@@ -1360,9 +1158,7 @@ mirrors:
   - 1.931000
   - 0.850265
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_104
   orientation:
   - 2.707460
@@ -1373,9 +1169,7 @@ mirrors:
   - 1.394000
   - 0.891134
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_105
   orientation:
   - 1.666062
@@ -1386,9 +1180,7 @@ mirrors:
   - 0.857000
   - 0.959518
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_106
   orientation:
   - 0.625007
@@ -1399,9 +1191,7 @@ mirrors:
   - 0.321000
   - 1.055844
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_107
   orientation:
   - 10.131499
@@ -1412,9 +1202,7 @@ mirrors:
   - 5.153000
   - 1.317717
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_108
   orientation:
   - 9.048408
@@ -1425,9 +1213,7 @@ mirrors:
   - 4.616000
   - 1.205606
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_109
   orientation:
   - 7.976780
@@ -1438,9 +1224,7 @@ mirrors:
   - 4.079000
   - 1.122117
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_110
   orientation:
   - 6.914434
@@ -1451,9 +1235,7 @@ mirrors:
   - 3.542000
   - 1.066733
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_111
   orientation:
   - 5.859326
@@ -1464,9 +1246,7 @@ mirrors:
   - 3.005000
   - 1.039119
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_112
   orientation:
   - 4.809514
@@ -1477,9 +1257,7 @@ mirrors:
   - 2.468000
   - 1.039112
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_113
   orientation:
   - 3.763118
@@ -1490,9 +1268,7 @@ mirrors:
   - 1.931000
   - 1.066711
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_114
   orientation:
   - 2.718288
@@ -1503,9 +1279,7 @@ mirrors:
   - 1.394000
   - 1.122080
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_115
   orientation:
   - 1.673177
@@ -1516,9 +1290,7 @@ mirrors:
   - 0.857000
   - 1.205555
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_116
   orientation:
   - 0.627858
@@ -1529,9 +1301,7 @@ mirrors:
   - 0.321000
   - 1.317675
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_117
   orientation:
   - 10.161458
@@ -1542,9 +1312,7 @@ mirrors:
   - 5.153000
   - 1.484602
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_118
   orientation:
   - 9.077045
@@ -1555,9 +1323,7 @@ mirrors:
   - 4.616000
   - 1.385247
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_119
   orientation:
   - 8.003727
@@ -1568,9 +1334,7 @@ mirrors:
   - 4.079000
   - 1.314718
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_120
   orientation:
   - 6.939317
@@ -1581,9 +1345,7 @@ mirrors:
   - 3.542000
   - 1.272571
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_121
   orientation:
   - 5.881760
@@ -1594,9 +1356,7 @@ mirrors:
   - 3.005000
   - 1.258544
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_122
   orientation:
   - 4.829089
@@ -1607,9 +1367,7 @@ mirrors:
   - 2.468000
   - 1.272551
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_123
   orientation:
   - 3.779394
@@ -1620,9 +1378,7 @@ mirrors:
   - 1.931000
   - 1.314678
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_124
   orientation:
   - 2.730783
@@ -1633,9 +1389,7 @@ mirrors:
   - 1.394000
   - 1.385187
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_125
   orientation:
   - 1.681355
@@ -1646,9 +1400,7 @@ mirrors:
   - 0.857000
   - 1.484522
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_126
   orientation:
   - 0.631124
@@ -1659,9 +1411,7 @@ mirrors:
   - 0.321000
   - 1.613350
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_127
   orientation:
   - -0.614404
@@ -1672,9 +1422,7 @@ mirrors:
   - -0.321000
   - 0.049604
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_128
   orientation:
   - -1.640516
@@ -1685,9 +1433,7 @@ mirrors:
   - -0.857000
   - 0.049570
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_129
   orientation:
   - -0.615040
@@ -1698,9 +1444,7 @@ mirrors:
   - -0.321000
   - 0.111398
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_130
   orientation:
   - -1.641859
@@ -1711,9 +1455,7 @@ mirrors:
   - -0.857000
   - 0.098443
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_131
   orientation:
   - -2.671835
@@ -1724,9 +1466,7 @@ mirrors:
   - -1.394000
   - 0.111357
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_132
   orientation:
   - -0.615949
@@ -1737,9 +1477,7 @@ mirrors:
   - -0.321000
   - 0.199434
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_133
   orientation:
   - -1.643924
@@ -1750,9 +1488,7 @@ mirrors:
   - -0.857000
   - 0.173416
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_134
   orientation:
   - -2.674618
@@ -1763,9 +1499,7 @@ mirrors:
   - -1.394000
   - 0.173409
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_135
   orientation:
   - -3.707800
@@ -1776,9 +1510,7 @@ mirrors:
   - -1.931000
   - 0.199391
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_136
   orientation:
   - -0.617140
@@ -1789,9 +1521,7 @@ mirrors:
   - -0.321000
   - 0.314185
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_137
   orientation:
   - -1.646732
@@ -1802,9 +1532,7 @@ mirrors:
   - -0.857000
   - 0.274888
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_138
   orientation:
   - -2.678599
@@ -1815,9 +1543,7 @@ mirrors:
   - -1.394000
   - 0.261816
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_139
   orientation:
   - -3.712518
@@ -1828,9 +1554,7 @@ mirrors:
   - -1.931000
   - 0.274878
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_140
   orientation:
   - -4.750207
@@ -1841,9 +1565,7 @@ mirrors:
   - -2.468000
   - 0.314143
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_141
   orientation:
   - -0.618624
@@ -1854,9 +1576,7 @@ mirrors:
   - -0.321000
   - 0.456284
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_142
   orientation:
   - -1.650310
@@ -1867,9 +1587,7 @@ mirrors:
   - -0.857000
   - 0.403412
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_143
   orientation:
   - -2.683815
@@ -1880,9 +1598,7 @@ mirrors:
   - -1.394000
   - 0.377057
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_144
   orientation:
   - -3.718932
@@ -1893,9 +1609,7 @@ mirrors:
   - -1.931000
   - 0.377055
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_145
   orientation:
   - -4.757391
@@ -1906,9 +1620,7 @@ mirrors:
   - -2.468000
   - 0.403404
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_146
   orientation:
   - -5.800959
@@ -1919,9 +1631,7 @@ mirrors:
   - -3.005000
   - 0.456249
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_147
   orientation:
   - -0.620417
@@ -1932,9 +1642,7 @@ mirrors:
   - -0.321000
   - 0.626543
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_148
   orientation:
   - -1.654692
@@ -1945,9 +1653,7 @@ mirrors:
   - -0.857000
   - 0.559711
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_149
   orientation:
   - -2.690317
@@ -1958,9 +1664,7 @@ mirrors:
   - -1.394000
   - 0.519774
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_150
   orientation:
   - -3.727106
@@ -1971,9 +1675,7 @@ mirrors:
   - -1.931000
   - 0.506486
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_151
   orientation:
   - -4.766805
@@ -1984,9 +1686,7 @@ mirrors:
   - -2.468000
   - 0.519773
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_152
   orientation:
   - -5.811192
@@ -1997,9 +1697,7 @@ mirrors:
   - -3.005000
   - 0.559710
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_153
   orientation:
   - -6.862103
@@ -2010,9 +1708,7 @@ mirrors:
   - -3.542000
   - 0.626519
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_154
   orientation:
   - -0.622537
@@ -2023,9 +1719,7 @@ mirrors:
   - -0.321000
   - 0.825978
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_155
   orientation:
   - -1.659924
@@ -2036,9 +1730,7 @@ mirrors:
   - -0.857000
   - 0.744701
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_156
   orientation:
   - -2.698171
@@ -2049,9 +1741,7 @@ mirrors:
   - -1.394000
   - 0.690789
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_157
   orientation:
   - -3.737121
@@ -2062,9 +1752,7 @@ mirrors:
   - -1.931000
   - 0.663911
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_158
   orientation:
   - -4.778545
@@ -2075,9 +1763,7 @@ mirrors:
   - -2.468000
   - 0.663913
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_159
   orientation:
   - -5.824236
@@ -2088,9 +1774,7 @@ mirrors:
   - -3.005000
   - 0.690796
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_160
   orientation:
   - -6.876037
@@ -2101,9 +1785,7 @@ mirrors:
   - -3.542000
   - 0.744712
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_161
   orientation:
   - -7.935872
@@ -2114,9 +1796,7 @@ mirrors:
   - -4.079000
   - 0.825971
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_162
   orientation:
   - -0.625007
@@ -2127,9 +1807,7 @@ mirrors:
   - -0.321000
   - 1.055844
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_163
   orientation:
   - -1.666062
@@ -2140,9 +1818,7 @@ mirrors:
   - -0.857000
   - 0.959518
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_164
   orientation:
   - -2.707460
@@ -2153,9 +1829,7 @@ mirrors:
   - -1.394000
   - 0.891134
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_165
   orientation:
   - -3.749081
@@ -2166,9 +1840,7 @@ mirrors:
   - -1.931000
   - 0.850265
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_166
   orientation:
   - -4.792730
@@ -2179,9 +1851,7 @@ mirrors:
   - -2.468000
   - 0.836671
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_167
   orientation:
   - -5.840223
@@ -2192,9 +1862,7 @@ mirrors:
   - -3.005000
   - 0.850274
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_168
   orientation:
   - -6.893418
@@ -2205,9 +1873,7 @@ mirrors:
   - -3.542000
   - 0.891153
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_169
   orientation:
   - -7.954245
@@ -2218,9 +1884,7 @@ mirrors:
   - -4.079000
   - 0.959546
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_170
   orientation:
   - -9.024742
@@ -2231,9 +1895,7 @@ mirrors:
   - -4.616000
   - 1.055858
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_171
   orientation:
   - -0.627858
@@ -2244,9 +1906,7 @@ mirrors:
   - -0.321000
   - 1.317675
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_172
   orientation:
   - -1.673177
@@ -2257,9 +1917,7 @@ mirrors:
   - -0.857000
   - 1.205555
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_173
   orientation:
   - -2.718288
@@ -2270,9 +1928,7 @@ mirrors:
   - -1.394000
   - 1.122080
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_174
   orientation:
   - -3.763118
@@ -2283,9 +1939,7 @@ mirrors:
   - -1.931000
   - 1.066711
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_175
   orientation:
   - -4.809514
@@ -2296,9 +1950,7 @@ mirrors:
   - -2.468000
   - 1.039112
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_176
   orientation:
   - -5.859326
@@ -2309,9 +1961,7 @@ mirrors:
   - -3.005000
   - 1.039119
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_177
   orientation:
   - -6.914434
@@ -2322,9 +1972,7 @@ mirrors:
   - -3.542000
   - 1.066733
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_178
   orientation:
   - -7.976780
@@ -2335,9 +1983,7 @@ mirrors:
   - -4.079000
   - 1.122117
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_179
   orientation:
   - -9.048408
@@ -2348,9 +1994,7 @@ mirrors:
   - -4.616000
   - 1.205606
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_180
   orientation:
   - -10.131499
@@ -2361,9 +2005,7 @@ mirrors:
   - -5.153000
   - 1.317717
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_181
   orientation:
   - -0.631124
@@ -2374,9 +2016,7 @@ mirrors:
   - -0.321000
   - 1.613350
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_182
   orientation:
   - -1.681355
@@ -2387,9 +2027,7 @@ mirrors:
   - -0.857000
   - 1.484522
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_183
   orientation:
   - -2.730783
@@ -2400,9 +2038,7 @@ mirrors:
   - -1.394000
   - 1.385187
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_184
   orientation:
   - -3.779394
@@ -2413,9 +2049,7 @@ mirrors:
   - -1.931000
   - 1.314678
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_185
   orientation:
   - -4.829089
@@ -2426,9 +2060,7 @@ mirrors:
   - -2.468000
   - 1.272551
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_186
   orientation:
   - -5.881760
@@ -2439,9 +2071,7 @@ mirrors:
   - -3.005000
   - 1.258544
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_187
   orientation:
   - -6.939317
@@ -2452,9 +2082,7 @@ mirrors:
   - -3.542000
   - 1.272571
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_188
   orientation:
   - -8.003727
@@ -2465,9 +2093,7 @@ mirrors:
   - -4.079000
   - 1.314718
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_189
   orientation:
   - -9.077045
@@ -2478,9 +2104,7 @@ mirrors:
   - -4.616000
   - 1.385247
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_190
   orientation:
   - -10.161458
@@ -2491,9 +2115,7 @@ mirrors:
   - -5.153000
   - 1.484602
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_191
   orientation:
   - -2.255268
@@ -2504,9 +2126,7 @@ mirrors:
   - -1.178000
   - 0.049608
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_192
   orientation:
   - -2.255268
@@ -2517,9 +2137,7 @@ mirrors:
   - -1.178000
   - 0.049608
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_193
   orientation:
   - -3.287701
@@ -2530,9 +2148,7 @@ mirrors:
   - -1.715000
   - 0.111417
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_194
   orientation:
   - -3.286989
@@ -2543,9 +2159,7 @@ mirrors:
   - -1.715000
   - 0.098496
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_195
   orientation:
   - -3.287701
@@ -2556,9 +2170,7 @@ mirrors:
   - -1.715000
   - 0.111417
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_196
   orientation:
   - -4.325261
@@ -2569,9 +2181,7 @@ mirrors:
   - -2.252000
   - 0.199472
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_197
   orientation:
   - -4.323371
@@ -2582,9 +2192,7 @@ mirrors:
   - -2.252000
   - 0.173488
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_198
   orientation:
   - -4.323371
@@ -2595,9 +2203,7 @@ mirrors:
   - -2.252000
   - 0.173488
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_199
   orientation:
   - -4.325261
@@ -2608,9 +2214,7 @@ mirrors:
   - -2.252000
   - 0.199472
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_200
   orientation:
   - -5.369761
@@ -2621,9 +2225,7 @@ mirrors:
   - -2.789000
   - 0.314248
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_201
   orientation:
   - -5.366198
@@ -2634,9 +2236,7 @@ mirrors:
   - -2.789000
   - 0.274985
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_202
   orientation:
   - -5.365014
@@ -2647,9 +2247,7 @@ mirrors:
   - -2.789000
   - 0.261920
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_203
   orientation:
   - -5.366198
@@ -2660,9 +2258,7 @@ mirrors:
   - -2.789000
   - 0.274985
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_204
   orientation:
   - -5.369761
@@ -2673,9 +2269,7 @@ mirrors:
   - -2.789000
   - 0.314248
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_205
   orientation:
   - -6.423125
@@ -2686,9 +2280,7 @@ mirrors:
   - -3.326000
   - 0.456377
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_206
   orientation:
   - -6.417356
@@ -2699,9 +2291,7 @@ mirrors:
   - -3.326000
   - 0.403539
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_207
   orientation:
   - -6.414486
@@ -2712,9 +2302,7 @@ mirrors:
   - -3.326000
   - 0.377191
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_208
   orientation:
   - -6.414486
@@ -2725,9 +2313,7 @@ mirrors:
   - -3.326000
   - 0.377191
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_209
   orientation:
   - -6.417356
@@ -2738,9 +2324,7 @@ mirrors:
   - -3.326000
   - 0.403539
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_210
   orientation:
   - -6.423125
@@ -2751,9 +2335,7 @@ mirrors:
   - -3.326000
   - 0.456377
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_211
   orientation:
   - -7.487426
@@ -2764,9 +2346,7 @@ mirrors:
   - -3.863000
   - 0.626672
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_212
   orientation:
   - -7.478867
@@ -2777,9 +2357,7 @@ mirrors:
   - -3.863000
   - 0.559874
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_213
   orientation:
   - -7.473764
@@ -2790,9 +2368,7 @@ mirrors:
   - -3.863000
   - 0.519944
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_214
   orientation:
   - -7.472069
@@ -2803,9 +2379,7 @@ mirrors:
   - -3.863000
   - 0.506658
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_215
   orientation:
   - -7.473764
@@ -2816,9 +2390,7 @@ mirrors:
   - -3.863000
   - 0.519944
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_216
   orientation:
   - -7.478867
@@ -2829,9 +2401,7 @@ mirrors:
   - -3.863000
   - 0.559874
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_217
   orientation:
   - -7.487426
@@ -2842,9 +2412,7 @@ mirrors:
   - -3.863000
   - 0.626672
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_218
   orientation:
   - -8.564936
@@ -2855,9 +2423,7 @@ mirrors:
   - -4.400000
   - 0.826149
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_219
   orientation:
   - -8.552930
@@ -2868,9 +2434,7 @@ mirrors:
   - -4.400000
   - 0.744906
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_220
   orientation:
   - -8.544991
@@ -2881,9 +2445,7 @@ mirrors:
   - -4.400000
   - 0.691001
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_221
   orientation:
   - -8.541041
@@ -2894,9 +2456,7 @@ mirrors:
   - -4.400000
   - 0.664124
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_222
   orientation:
   - -8.541041
@@ -2907,9 +2467,7 @@ mirrors:
   - -4.400000
   - 0.664124
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_223
   orientation:
   - -8.544991
@@ -2920,9 +2478,7 @@ mirrors:
   - -4.400000
   - 0.691001
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_224
   orientation:
   - -8.552930
@@ -2933,9 +2489,7 @@ mirrors:
   - -4.400000
   - 0.744906
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_225
   orientation:
   - -8.564936
@@ -2946,9 +2500,7 @@ mirrors:
   - -4.400000
   - 0.826149
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_226
   orientation:
   - -9.658174
@@ -2959,9 +2511,7 @@ mirrors:
   - -4.937000
   - 1.056063
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_227
   orientation:
   - -9.641973
@@ -2972,9 +2522,7 @@ mirrors:
   - -4.937000
   - 0.959771
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_228
   orientation:
   - -9.630518
@@ -2985,9 +2533,7 @@ mirrors:
   - -4.937000
   - 0.891394
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_229
   orientation:
   - -9.623691
@@ -2998,9 +2544,7 @@ mirrors:
   - -4.937000
   - 0.850526
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_230
   orientation:
   - -9.621423
@@ -3011,9 +2555,7 @@ mirrors:
   - -4.937000
   - 0.836930
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_231
   orientation:
   - -9.623691
@@ -3024,9 +2566,7 @@ mirrors:
   - -4.937000
   - 0.850526
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_232
   orientation:
   - -9.630518
@@ -3037,9 +2577,7 @@ mirrors:
   - -4.937000
   - 0.891394
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_233
   orientation:
   - -9.641973
@@ -3050,9 +2588,7 @@ mirrors:
   - -4.937000
   - 0.959771
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_234
   orientation:
   - -9.658174
@@ -3063,9 +2599,7 @@ mirrors:
   - -4.937000
   - 1.056063
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_235
   orientation:
   - -10.767915
@@ -3076,9 +2610,7 @@ mirrors:
   - -5.473000
   - 1.317549
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_236
   orientation:
   - -10.746659
@@ -3089,9 +2621,7 @@ mirrors:
   - -5.473000
   - 1.205467
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_237
   orientation:
   - -10.730910
@@ -3102,9 +2632,7 @@ mirrors:
   - -5.473000
   - 1.122000
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_238
   orientation:
   - -10.720502
@@ -3115,9 +2643,7 @@ mirrors:
   - -5.473000
   - 1.066633
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_239
   orientation:
   - -10.715325
@@ -3128,9 +2654,7 @@ mirrors:
   - -5.473000
   - 1.039033
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_240
   orientation:
   - -10.715325
@@ -3141,9 +2665,7 @@ mirrors:
   - -5.473000
   - 1.039033
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_241
   orientation:
   - -10.720502
@@ -3154,9 +2676,7 @@ mirrors:
   - -5.473000
   - 1.066633
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_242
   orientation:
   - -10.730910
@@ -3167,9 +2687,7 @@ mirrors:
   - -5.473000
   - 1.122000
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_243
   orientation:
   - -10.746659
@@ -3180,9 +2698,7 @@ mirrors:
   - -5.473000
   - 1.205467
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_244
   orientation:
   - -10.767915
@@ -3193,9 +2709,7 @@ mirrors:
   - -5.473000
   - 1.317549
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_245
   orientation:
   - -11.874174
@@ -3206,9 +2720,7 @@ mirrors:
   - -6.010000
   - 1.484449
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_246
   orientation:
   - -11.853219
@@ -3219,9 +2731,7 @@ mirrors:
   - -6.010000
   - 1.385122
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_247
   orientation:
   - -11.838411
@@ -3232,9 +2742,7 @@ mirrors:
   - -6.010000
   - 1.314617
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_248
   orientation:
   - -11.829589
@@ -3245,9 +2753,7 @@ mirrors:
   - -6.010000
   - 1.272487
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_249
   orientation:
   - -11.826659
@@ -3258,9 +2764,7 @@ mirrors:
   - -6.010000
   - 1.258473
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_250
   orientation:
   - -11.829589
@@ -3271,9 +2775,7 @@ mirrors:
   - -6.010000
   - 1.272487
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_251
   orientation:
   - -11.838411
@@ -3284,9 +2786,7 @@ mirrors:
   - -6.010000
   - 1.314617
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_252
   orientation:
   - -11.853219
@@ -3297,9 +2797,7 @@ mirrors:
   - -6.010000
   - 1.385122
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_253
   orientation:
   - -11.874174
@@ -3310,9 +2808,7 @@ mirrors:
   - -6.010000
   - 1.484449
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_254
   orientation:
   - -1.640516
@@ -3323,9 +2819,7 @@ mirrors:
   - -0.857000
   - 0.049570
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_255
   orientation:
   - -0.614404
@@ -3336,9 +2830,7 @@ mirrors:
   - -0.321000
   - 0.049604
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_256
   orientation:
   - -2.671835
@@ -3349,9 +2841,7 @@ mirrors:
   - -1.394000
   - 0.111357
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_257
   orientation:
   - -1.641859
@@ -3362,9 +2852,7 @@ mirrors:
   - -0.857000
   - 0.098443
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_258
   orientation:
   - -0.615040
@@ -3375,9 +2863,7 @@ mirrors:
   - -0.321000
   - 0.111398
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_259
   orientation:
   - -3.707800
@@ -3388,9 +2874,7 @@ mirrors:
   - -1.931000
   - 0.199391
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_260
   orientation:
   - -2.674618
@@ -3401,9 +2885,7 @@ mirrors:
   - -1.394000
   - 0.173409
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_261
   orientation:
   - -1.643924
@@ -3414,9 +2896,7 @@ mirrors:
   - -0.857000
   - 0.173416
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_262
   orientation:
   - -0.615949
@@ -3427,9 +2907,7 @@ mirrors:
   - -0.321000
   - 0.199434
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_263
   orientation:
   - -4.750207
@@ -3440,9 +2918,7 @@ mirrors:
   - -2.468000
   - 0.314143
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_264
   orientation:
   - -3.712518
@@ -3453,9 +2929,7 @@ mirrors:
   - -1.931000
   - 0.274878
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_265
   orientation:
   - -2.678599
@@ -3466,9 +2940,7 @@ mirrors:
   - -1.394000
   - 0.261816
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_266
   orientation:
   - -1.646732
@@ -3479,9 +2951,7 @@ mirrors:
   - -0.857000
   - 0.274888
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_267
   orientation:
   - -0.617140
@@ -3492,9 +2962,7 @@ mirrors:
   - -0.321000
   - 0.314185
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_268
   orientation:
   - -5.800959
@@ -3505,9 +2973,7 @@ mirrors:
   - -3.005000
   - 0.456249
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_269
   orientation:
   - -4.757391
@@ -3518,9 +2984,7 @@ mirrors:
   - -2.468000
   - 0.403404
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_270
   orientation:
   - -3.718932
@@ -3531,9 +2995,7 @@ mirrors:
   - -1.931000
   - 0.377055
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_271
   orientation:
   - -2.683815
@@ -3544,9 +3006,7 @@ mirrors:
   - -1.394000
   - 0.377057
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_272
   orientation:
   - -1.650310
@@ -3557,9 +3017,7 @@ mirrors:
   - -0.857000
   - 0.403412
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_273
   orientation:
   - -0.618624
@@ -3570,9 +3028,7 @@ mirrors:
   - -0.321000
   - 0.456284
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_274
   orientation:
   - -6.862103
@@ -3583,9 +3039,7 @@ mirrors:
   - -3.542000
   - 0.626519
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_275
   orientation:
   - -5.811192
@@ -3596,9 +3050,7 @@ mirrors:
   - -3.005000
   - 0.559710
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_276
   orientation:
   - -4.766805
@@ -3609,9 +3061,7 @@ mirrors:
   - -2.468000
   - 0.519773
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_277
   orientation:
   - -3.727106
@@ -3622,9 +3072,7 @@ mirrors:
   - -1.931000
   - 0.506486
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_278
   orientation:
   - -2.690317
@@ -3635,9 +3083,7 @@ mirrors:
   - -1.394000
   - 0.519774
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_279
   orientation:
   - -1.654692
@@ -3648,9 +3094,7 @@ mirrors:
   - -0.857000
   - 0.559711
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_280
   orientation:
   - -0.620417
@@ -3661,9 +3105,7 @@ mirrors:
   - -0.321000
   - 0.626543
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_281
   orientation:
   - -7.935872
@@ -3674,9 +3116,7 @@ mirrors:
   - -4.079000
   - 0.825971
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_282
   orientation:
   - -6.876037
@@ -3687,9 +3127,7 @@ mirrors:
   - -3.542000
   - 0.744712
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_283
   orientation:
   - -5.824236
@@ -3700,9 +3138,7 @@ mirrors:
   - -3.005000
   - 0.690796
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_284
   orientation:
   - -4.778545
@@ -3713,9 +3149,7 @@ mirrors:
   - -2.468000
   - 0.663913
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_285
   orientation:
   - -3.737121
@@ -3726,9 +3160,7 @@ mirrors:
   - -1.931000
   - 0.663911
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_286
   orientation:
   - -2.698171
@@ -3739,9 +3171,7 @@ mirrors:
   - -1.394000
   - 0.690789
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_287
   orientation:
   - -1.659924
@@ -3752,9 +3182,7 @@ mirrors:
   - -0.857000
   - 0.744701
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_288
   orientation:
   - -0.622537
@@ -3765,9 +3193,7 @@ mirrors:
   - -0.321000
   - 0.825978
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_289
   orientation:
   - -9.024742
@@ -3778,9 +3204,7 @@ mirrors:
   - -4.616000
   - 1.055858
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_290
   orientation:
   - -7.954245
@@ -3791,9 +3215,7 @@ mirrors:
   - -4.079000
   - 0.959546
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_291
   orientation:
   - -6.893418
@@ -3804,9 +3226,7 @@ mirrors:
   - -3.542000
   - 0.891153
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_292
   orientation:
   - -5.840223
@@ -3817,9 +3237,7 @@ mirrors:
   - -3.005000
   - 0.850274
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_293
   orientation:
   - -4.792730
@@ -3830,9 +3248,7 @@ mirrors:
   - -2.468000
   - 0.836671
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_294
   orientation:
   - -3.749081
@@ -3843,9 +3259,7 @@ mirrors:
   - -1.931000
   - 0.850265
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_295
   orientation:
   - -2.707460
@@ -3856,9 +3270,7 @@ mirrors:
   - -1.394000
   - 0.891134
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_296
   orientation:
   - -1.666062
@@ -3869,9 +3281,7 @@ mirrors:
   - -0.857000
   - 0.959518
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_297
   orientation:
   - -0.625007
@@ -3882,9 +3292,7 @@ mirrors:
   - -0.321000
   - 1.055844
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_298
   orientation:
   - -10.131499
@@ -3895,9 +3303,7 @@ mirrors:
   - -5.153000
   - 1.317717
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_299
   orientation:
   - -9.048408
@@ -3908,9 +3314,7 @@ mirrors:
   - -4.616000
   - 1.205606
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_300
   orientation:
   - -7.976780
@@ -3921,9 +3325,7 @@ mirrors:
   - -4.079000
   - 1.122117
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_301
   orientation:
   - -6.914434
@@ -3934,9 +3336,7 @@ mirrors:
   - -3.542000
   - 1.066733
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_302
   orientation:
   - -5.859326
@@ -3947,9 +3347,7 @@ mirrors:
   - -3.005000
   - 1.039119
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_303
   orientation:
   - -4.809514
@@ -3960,9 +3358,7 @@ mirrors:
   - -2.468000
   - 1.039112
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_304
   orientation:
   - -3.763118
@@ -3973,9 +3369,7 @@ mirrors:
   - -1.931000
   - 1.066711
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_305
   orientation:
   - -2.718288
@@ -3986,9 +3380,7 @@ mirrors:
   - -1.394000
   - 1.122080
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_306
   orientation:
   - -1.673177
@@ -3999,9 +3391,7 @@ mirrors:
   - -0.857000
   - 1.205555
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_307
   orientation:
   - -0.627858
@@ -4012,9 +3402,7 @@ mirrors:
   - -0.321000
   - 1.317675
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_308
   orientation:
   - -10.161458
@@ -4025,9 +3413,7 @@ mirrors:
   - -5.153000
   - 1.484602
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_309
   orientation:
   - -9.077045
@@ -4038,9 +3424,7 @@ mirrors:
   - -4.616000
   - 1.385247
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_310
   orientation:
   - -8.003727
@@ -4051,9 +3435,7 @@ mirrors:
   - -4.079000
   - 1.314718
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_311
   orientation:
   - -6.939317
@@ -4064,9 +3446,7 @@ mirrors:
   - -3.542000
   - 1.272571
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_312
   orientation:
   - -5.881760
@@ -4077,9 +3457,7 @@ mirrors:
   - -3.005000
   - 1.258544
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_313
   orientation:
   - -4.829089
@@ -4090,9 +3468,7 @@ mirrors:
   - -2.468000
   - 1.272551
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_314
   orientation:
   - -3.779394
@@ -4103,9 +3479,7 @@ mirrors:
   - -1.931000
   - 1.314678
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_315
   orientation:
   - -2.730783
@@ -4116,9 +3490,7 @@ mirrors:
   - -1.394000
   - 1.385187
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_316
   orientation:
   - -1.681355
@@ -4129,9 +3501,7 @@ mirrors:
   - -0.857000
   - 1.484522
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_317
   orientation:
   - -0.631124
@@ -4142,9 +3512,7 @@ mirrors:
   - -0.321000
   - 1.613350
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_318
   orientation:
   - 0.614404
@@ -4155,9 +3523,7 @@ mirrors:
   - 0.321000
   - 0.049604
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_319
   orientation:
   - 1.640516
@@ -4168,9 +3534,7 @@ mirrors:
   - 0.857000
   - 0.049570
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_320
   orientation:
   - 0.615040
@@ -4181,9 +3545,7 @@ mirrors:
   - 0.321000
   - 0.111398
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_321
   orientation:
   - 1.641859
@@ -4194,9 +3556,7 @@ mirrors:
   - 0.857000
   - 0.098443
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_322
   orientation:
   - 2.671835
@@ -4207,9 +3567,7 @@ mirrors:
   - 1.394000
   - 0.111357
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_323
   orientation:
   - 0.615949
@@ -4220,9 +3578,7 @@ mirrors:
   - 0.321000
   - 0.199434
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_324
   orientation:
   - 1.643924
@@ -4233,9 +3589,7 @@ mirrors:
   - 0.857000
   - 0.173416
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_325
   orientation:
   - 2.674618
@@ -4246,9 +3600,7 @@ mirrors:
   - 1.394000
   - 0.173409
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_326
   orientation:
   - 3.707800
@@ -4259,9 +3611,7 @@ mirrors:
   - 1.931000
   - 0.199391
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_327
   orientation:
   - 0.617140
@@ -4272,9 +3622,7 @@ mirrors:
   - 0.321000
   - 0.314185
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_328
   orientation:
   - 1.646732
@@ -4285,9 +3633,7 @@ mirrors:
   - 0.857000
   - 0.274888
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_329
   orientation:
   - 2.678599
@@ -4298,9 +3644,7 @@ mirrors:
   - 1.394000
   - 0.261816
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_330
   orientation:
   - 3.712518
@@ -4311,9 +3655,7 @@ mirrors:
   - 1.931000
   - 0.274878
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_331
   orientation:
   - 4.750207
@@ -4324,9 +3666,7 @@ mirrors:
   - 2.468000
   - 0.314143
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_332
   orientation:
   - 0.618624
@@ -4337,9 +3677,7 @@ mirrors:
   - 0.321000
   - 0.456284
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_333
   orientation:
   - 1.650310
@@ -4350,9 +3688,7 @@ mirrors:
   - 0.857000
   - 0.403412
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_334
   orientation:
   - 2.683815
@@ -4363,9 +3699,7 @@ mirrors:
   - 1.394000
   - 0.377057
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_335
   orientation:
   - 3.718932
@@ -4376,9 +3710,7 @@ mirrors:
   - 1.931000
   - 0.377055
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_336
   orientation:
   - 4.757391
@@ -4389,9 +3721,7 @@ mirrors:
   - 2.468000
   - 0.403404
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_337
   orientation:
   - 5.800959
@@ -4402,9 +3732,7 @@ mirrors:
   - 3.005000
   - 0.456249
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_338
   orientation:
   - 0.620417
@@ -4415,9 +3743,7 @@ mirrors:
   - 0.321000
   - 0.626543
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_339
   orientation:
   - 1.654692
@@ -4428,9 +3754,7 @@ mirrors:
   - 0.857000
   - 0.559711
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_340
   orientation:
   - 2.690317
@@ -4441,9 +3765,7 @@ mirrors:
   - 1.394000
   - 0.519774
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_341
   orientation:
   - 3.727106
@@ -4454,9 +3776,7 @@ mirrors:
   - 1.931000
   - 0.506486
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_342
   orientation:
   - 4.766805
@@ -4467,9 +3787,7 @@ mirrors:
   - 2.468000
   - 0.519773
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_343
   orientation:
   - 5.811192
@@ -4480,9 +3798,7 @@ mirrors:
   - 3.005000
   - 0.559710
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_344
   orientation:
   - 6.862103
@@ -4493,9 +3809,7 @@ mirrors:
   - 3.542000
   - 0.626519
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_345
   orientation:
   - 0.622537
@@ -4506,9 +3820,7 @@ mirrors:
   - 0.321000
   - 0.825978
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_346
   orientation:
   - 1.659924
@@ -4519,9 +3831,7 @@ mirrors:
   - 0.857000
   - 0.744701
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_347
   orientation:
   - 2.698171
@@ -4532,9 +3842,7 @@ mirrors:
   - 1.394000
   - 0.690789
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_348
   orientation:
   - 3.737121
@@ -4545,9 +3853,7 @@ mirrors:
   - 1.931000
   - 0.663911
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_349
   orientation:
   - 4.778545
@@ -4558,9 +3864,7 @@ mirrors:
   - 2.468000
   - 0.663913
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_350
   orientation:
   - 5.824236
@@ -4571,9 +3875,7 @@ mirrors:
   - 3.005000
   - 0.690796
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_351
   orientation:
   - 6.876037
@@ -4584,9 +3886,7 @@ mirrors:
   - 3.542000
   - 0.744712
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_352
   orientation:
   - 7.935872
@@ -4597,9 +3897,7 @@ mirrors:
   - 4.079000
   - 0.825971
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_353
   orientation:
   - 0.625007
@@ -4610,9 +3908,7 @@ mirrors:
   - 0.321000
   - 1.055844
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_354
   orientation:
   - 1.666062
@@ -4623,9 +3919,7 @@ mirrors:
   - 0.857000
   - 0.959518
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_355
   orientation:
   - 2.707460
@@ -4636,9 +3930,7 @@ mirrors:
   - 1.394000
   - 0.891134
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_356
   orientation:
   - 3.749081
@@ -4649,9 +3941,7 @@ mirrors:
   - 1.931000
   - 0.850265
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_357
   orientation:
   - 4.792730
@@ -4662,9 +3952,7 @@ mirrors:
   - 2.468000
   - 0.836671
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_358
   orientation:
   - 5.840223
@@ -4675,9 +3963,7 @@ mirrors:
   - 3.005000
   - 0.850274
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_359
   orientation:
   - 6.893418
@@ -4688,9 +3974,7 @@ mirrors:
   - 3.542000
   - 0.891153
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_360
   orientation:
   - 7.954245
@@ -4701,9 +3985,7 @@ mirrors:
   - 4.079000
   - 0.959546
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_361
   orientation:
   - 9.024742
@@ -4714,9 +3996,7 @@ mirrors:
   - 4.616000
   - 1.055858
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_362
   orientation:
   - 0.627858
@@ -4727,9 +4007,7 @@ mirrors:
   - 0.321000
   - 1.317675
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_363
   orientation:
   - 1.673177
@@ -4740,9 +4018,7 @@ mirrors:
   - 0.857000
   - 1.205555
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_364
   orientation:
   - 2.718288
@@ -4753,9 +4029,7 @@ mirrors:
   - 1.394000
   - 1.122080
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_365
   orientation:
   - 3.763118
@@ -4766,9 +4040,7 @@ mirrors:
   - 1.931000
   - 1.066711
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_366
   orientation:
   - 4.809514
@@ -4779,9 +4051,7 @@ mirrors:
   - 2.468000
   - 1.039112
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_367
   orientation:
   - 5.859326
@@ -4792,9 +4062,7 @@ mirrors:
   - 3.005000
   - 1.039119
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_368
   orientation:
   - 6.914434
@@ -4805,9 +4073,7 @@ mirrors:
   - 3.542000
   - 1.066733
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_369
   orientation:
   - 7.976780
@@ -4818,9 +4084,7 @@ mirrors:
   - 4.079000
   - 1.122117
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_370
   orientation:
   - 9.048408
@@ -4831,9 +4095,7 @@ mirrors:
   - 4.616000
   - 1.205606
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_371
   orientation:
   - 10.131499
@@ -4844,9 +4106,7 @@ mirrors:
   - 5.153000
   - 1.317717
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_372
   orientation:
   - 0.631124
@@ -4857,9 +4117,7 @@ mirrors:
   - 0.321000
   - 1.613350
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_373
   orientation:
   - 1.681355
@@ -4870,9 +4128,7 @@ mirrors:
   - 0.857000
   - 1.484522
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_374
   orientation:
   - 2.730783
@@ -4883,9 +4139,7 @@ mirrors:
   - 1.394000
   - 1.385187
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_375
   orientation:
   - 3.779394
@@ -4896,9 +4150,7 @@ mirrors:
   - 1.931000
   - 1.314678
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_376
   orientation:
   - 4.829089
@@ -4909,9 +4161,7 @@ mirrors:
   - 2.468000
   - 1.272551
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_377
   orientation:
   - 5.881760
@@ -4922,9 +4172,7 @@ mirrors:
   - 3.005000
   - 1.258544
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_378
   orientation:
   - 6.939317
@@ -4935,9 +4183,7 @@ mirrors:
   - 3.542000
   - 1.272571
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_379
   orientation:
   - 8.003727
@@ -4948,9 +4194,7 @@ mirrors:
   - 4.079000
   - 1.314718
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_380
   orientation:
   - 9.077045
@@ -4961,9 +4205,7 @@ mirrors:
   - 4.616000
   - 1.385247
   template: spherical_30m
-- aperture:
-    radius: 0.300000
-    type: circular
+- aperture: *ct3_facet
   id: M_381
   orientation:
   - 10.161458

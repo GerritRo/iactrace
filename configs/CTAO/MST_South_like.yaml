@@ -33,21 +33,15 @@ mirrors:
   - 0.000000
   - 11.262696
   - 0.000000
-  aperture:
+  aperture: &mst_facet
     type: polygon
-    vertices: &id001
-    - - 0.000000
-      - 0.692820
-    - - 0.600000
-      - 0.346410
-    - - 0.600000
-      - -0.346410
-    - - 0.000000
-      - -0.692820
-    - - -0.600000
-      - -0.346410
-    - - -0.600000
-      - 0.346410
+    vertices:
+    - [0.000000, 0.692820]
+    - [0.600000, 0.346410]
+    - [0.600000, -0.346410]
+    - [0.000000, -0.692820]
+    - [-0.600000, -0.346410]
+    - [-0.600000, 0.346410]
   stage: 0
 - id: M_1
   template: spherical_32m
@@ -59,9 +53,7 @@ mirrors:
   - 1.936459
   - 10.118077
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_2
   template: spherical_32m
@@ -73,9 +65,7 @@ mirrors:
   - 3.872784
   - 8.994414
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_3
   template: spherical_32m
@@ -87,9 +77,7 @@ mirrors:
   - 5.814820
   - 7.885242
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_4
   template: spherical_32m
@@ -101,9 +89,7 @@ mirrors:
   - 7.767775
   - 6.784500
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_5
   template: spherical_32m
@@ -115,9 +101,7 @@ mirrors:
   - -1.936459
   - 10.118077
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_6
   template: spherical_32m
@@ -129,9 +113,7 @@ mirrors:
   - 0.000000
   - 8.966221
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_7
   template: spherical_32m
@@ -143,9 +125,7 @@ mirrors:
   - 1.932200
   - 7.835948
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_8
   template: spherical_32m
@@ -157,9 +137,7 @@ mirrors:
   - 3.865382
   - 6.720659
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_9
   template: spherical_32m
@@ -171,9 +149,7 @@ mirrors:
   - 5.805248
   - 5.614226
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_10
   template: spherical_32m
@@ -185,9 +161,7 @@ mirrors:
   - 7.756941
   - 4.510725
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_11
   template: spherical_32m
@@ -199,9 +173,7 @@ mirrors:
   - 9.726747
   - 3.404184
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_12
   template: spherical_32m
@@ -213,9 +185,7 @@ mirrors:
   - -3.872784
   - 8.994414
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_13
   template: spherical_32m
@@ -227,9 +197,7 @@ mirrors:
   - -1.932200
   - 7.835948
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_14
   template: spherical_32m
@@ -241,9 +209,7 @@ mirrors:
   - 0.000000
   - 6.699937
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_15
   template: spherical_32m
@@ -255,9 +221,7 @@ mirrors:
   - 1.929131
   - 5.579619
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_16
   template: spherical_32m
@@ -269,9 +233,7 @@ mirrors:
   - 3.860273
   - 4.468775
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_17
   template: spherical_32m
@@ -283,9 +245,7 @@ mirrors:
   - 5.799047
   - 3.361459
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_18
   template: spherical_32m
@@ -297,9 +257,7 @@ mirrors:
   - 7.750590
   - 2.251745
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_19
   template: spherical_32m
@@ -311,9 +269,7 @@ mirrors:
   - 9.721253
   - 1.133481
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_20
   template: spherical_32m
@@ -325,9 +281,7 @@ mirrors:
   - -5.814820
   - 7.885242
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_21
   template: spherical_32m
@@ -339,9 +293,7 @@ mirrors:
   - -3.865382
   - 6.720659
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_22
   template: spherical_32m
@@ -353,9 +305,7 @@ mirrors:
   - -1.929131
   - 5.579619
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_23
   template: spherical_32m
@@ -367,9 +317,7 @@ mirrors:
   - 0.000000
   - 4.455154
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_24
   template: spherical_32m
@@ -381,9 +329,7 @@ mirrors:
   - 1.927142
   - 3.340927
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_25
   template: spherical_32m
@@ -395,9 +341,7 @@ mirrors:
   - 3.857277
   - 2.230949
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_26
   template: spherical_32m
@@ -409,9 +353,7 @@ mirrors:
   - 5.796000
   - 1.119323
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_27
   template: spherical_32m
@@ -423,9 +365,7 @@ mirrors:
   - 7.748497
   - 0.000000
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_28
   template: spherical_32m
@@ -437,9 +377,7 @@ mirrors:
   - 9.721253
   - -1.133481
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_29
   template: spherical_32m
@@ -451,9 +389,7 @@ mirrors:
   - -7.767775
   - 6.784500
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_30
   template: spherical_32m
@@ -465,9 +401,7 @@ mirrors:
   - -5.805248
   - 5.614226
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_31
   template: spherical_32m
@@ -479,9 +413,7 @@ mirrors:
   - -3.860273
   - 4.468775
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_32
   template: spherical_32m
@@ -493,9 +425,7 @@ mirrors:
   - -1.927142
   - 3.340927
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_33
   template: spherical_32m
@@ -507,9 +437,7 @@ mirrors:
   - 0.000000
   - 2.224194
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_34
   template: spherical_32m
@@ -521,9 +449,7 @@ mirrors:
   - 1.926165
   - 1.112516
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_35
   template: spherical_32m
@@ -535,9 +461,7 @@ mirrors:
   - 3.856289
   - 0.000000
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_36
   template: spherical_32m
@@ -549,9 +473,7 @@ mirrors:
   - 5.796000
   - -1.119323
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_37
   template: spherical_32m
@@ -563,9 +485,7 @@ mirrors:
   - 7.750590
   - -2.251745
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_38
   template: spherical_32m
@@ -577,9 +497,7 @@ mirrors:
   - 9.726747
   - -3.404184
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_39
   template: spherical_32m
@@ -591,9 +509,7 @@ mirrors:
   - -7.756941
   - 4.510725
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_40
   template: spherical_32m
@@ -605,9 +521,7 @@ mirrors:
   - -5.799047
   - 3.361459
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_41
   template: spherical_32m
@@ -619,9 +533,7 @@ mirrors:
   - -3.857277
   - 2.230949
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_42
   template: spherical_32m
@@ -633,9 +545,7 @@ mirrors:
   - -1.926165
   - 1.112516
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_43
   template: spherical_32m
@@ -647,9 +557,7 @@ mirrors:
   - 1.926165
   - -1.112516
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_44
   template: spherical_32m
@@ -661,9 +569,7 @@ mirrors:
   - 3.857277
   - -2.230949
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_45
   template: spherical_32m
@@ -675,9 +581,7 @@ mirrors:
   - 5.799047
   - -3.361459
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_46
   template: spherical_32m
@@ -689,9 +593,7 @@ mirrors:
   - 7.756941
   - -4.510725
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_47
   template: spherical_32m
@@ -703,9 +605,7 @@ mirrors:
   - -9.726747
   - 3.404184
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_48
   template: spherical_32m
@@ -717,9 +617,7 @@ mirrors:
   - -7.750590
   - 2.251745
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_49
   template: spherical_32m
@@ -731,9 +629,7 @@ mirrors:
   - -5.796000
   - 1.119323
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_50
   template: spherical_32m
@@ -745,9 +641,7 @@ mirrors:
   - -3.856289
   - -0.000000
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_51
   template: spherical_32m
@@ -759,9 +653,7 @@ mirrors:
   - -1.926165
   - -1.112516
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_52
   template: spherical_32m
@@ -773,9 +665,7 @@ mirrors:
   - 0.000000
   - -2.224194
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_53
   template: spherical_32m
@@ -787,9 +677,7 @@ mirrors:
   - 1.927142
   - -3.340927
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_54
   template: spherical_32m
@@ -801,9 +689,7 @@ mirrors:
   - 3.860273
   - -4.468775
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_55
   template: spherical_32m
@@ -815,9 +701,7 @@ mirrors:
   - 5.805248
   - -5.614226
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_56
   template: spherical_32m
@@ -829,9 +713,7 @@ mirrors:
   - 7.767775
   - -6.784500
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_57
   template: spherical_32m
@@ -843,9 +725,7 @@ mirrors:
   - -9.721253
   - 1.133481
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_58
   template: spherical_32m
@@ -857,9 +737,7 @@ mirrors:
   - -7.748497
   - -0.000000
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_59
   template: spherical_32m
@@ -871,9 +749,7 @@ mirrors:
   - -5.796000
   - -1.119323
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_60
   template: spherical_32m
@@ -885,9 +761,7 @@ mirrors:
   - -3.857277
   - -2.230949
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_61
   template: spherical_32m
@@ -899,9 +773,7 @@ mirrors:
   - -1.927142
   - -3.340927
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_62
   template: spherical_32m
@@ -913,9 +785,7 @@ mirrors:
   - 0.000000
   - -4.455154
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_63
   template: spherical_32m
@@ -927,9 +797,7 @@ mirrors:
   - 1.929131
   - -5.579619
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_64
   template: spherical_32m
@@ -941,9 +809,7 @@ mirrors:
   - 3.865382
   - -6.720659
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_65
   template: spherical_32m
@@ -955,9 +821,7 @@ mirrors:
   - 5.814820
   - -7.885242
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_66
   template: spherical_32m
@@ -969,9 +833,7 @@ mirrors:
   - -9.721253
   - -1.133481
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_67
   template: spherical_32m
@@ -983,9 +845,7 @@ mirrors:
   - -7.750590
   - -2.251745
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_68
   template: spherical_32m
@@ -997,9 +857,7 @@ mirrors:
   - -5.799047
   - -3.361459
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_69
   template: spherical_32m
@@ -1011,9 +869,7 @@ mirrors:
   - -3.860273
   - -4.468775
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_70
   template: spherical_32m
@@ -1025,9 +881,7 @@ mirrors:
   - -1.929131
   - -5.579619
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_71
   template: spherical_32m
@@ -1039,9 +893,7 @@ mirrors:
   - 0.000000
   - -6.699937
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_72
   template: spherical_32m
@@ -1053,9 +905,7 @@ mirrors:
   - 1.932200
   - -7.835948
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_73
   template: spherical_32m
@@ -1067,9 +917,7 @@ mirrors:
   - 3.872784
   - -8.994414
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_74
   template: spherical_32m
@@ -1081,9 +929,7 @@ mirrors:
   - -9.726747
   - -3.404184
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_75
   template: spherical_32m
@@ -1095,9 +941,7 @@ mirrors:
   - -7.756941
   - -4.510725
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_76
   template: spherical_32m
@@ -1109,9 +953,7 @@ mirrors:
   - -5.805248
   - -5.614226
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_77
   template: spherical_32m
@@ -1123,9 +965,7 @@ mirrors:
   - -3.865382
   - -6.720659
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_78
   template: spherical_32m
@@ -1137,9 +977,7 @@ mirrors:
   - -1.932200
   - -7.835948
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_79
   template: spherical_32m
@@ -1151,9 +989,7 @@ mirrors:
   - 0.000000
   - -8.966221
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_80
   template: spherical_32m
@@ -1165,9 +1001,7 @@ mirrors:
   - 1.936459
   - -10.118077
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_81
   template: spherical_32m
@@ -1179,9 +1013,7 @@ mirrors:
   - -7.767775
   - -6.784500
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_82
   template: spherical_32m
@@ -1193,9 +1025,7 @@ mirrors:
   - -5.814820
   - -7.885242
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_83
   template: spherical_32m
@@ -1207,9 +1037,7 @@ mirrors:
   - -3.872784
   - -8.994414
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_84
   template: spherical_32m
@@ -1221,9 +1049,7 @@ mirrors:
   - -1.936459
   - -10.118077
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 - id: M_85
   template: spherical_32m
@@ -1235,9 +1061,7 @@ mirrors:
   - 0.000000
   - -11.262696
   - 0.000000
-  aperture:
-    type: polygon
-    vertices: *id001
+  aperture: *mst_facet
   stage: 0
 obstructions:
 - id: Camera_Enclosure
