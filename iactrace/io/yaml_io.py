@@ -32,13 +32,141 @@ class YAMLConfigError(Exception):
     pass
 
 
+# Reading files, with !include
+
+
+_MERGE_KEY = "<<"
+_MERGE_TAG = "tag:yaml.org,2002:merge"
+
+
+class Include:
+    """An unresolved ``!include path`` reference to another YAML file.
+
+    load_yaml(..., resolve_includes=False) keeps these in place of the
+    included content, and IncludeDumper writes them back as ``!include path``,
+    so a config can be edited and saved without inlining its included files.
+    """
+
+    def __init__(self, path: str | Path) -> None:
+        self.path = str(path)
+
+    def __repr__(self) -> str:
+        return f"Include({self.path!r})"
+
+    def __eq__(self, other: object) -> bool:
+        return isinstance(other, Include) and other.path == self.path
+
+    def __hash__(self) -> int:
+        return hash(("Include", self.path))
+
+
+def _apply_merges(data: Any) -> Any:
+    """Fold every resolved ``<<: !include`` mapping into the mapping holding it."""
+    if isinstance(data, list):
+        return [_apply_merges(v) for v in data]
+    if not isinstance(data, dict):
+        return data
+    out = {k: _apply_merges(v) for k, v in data.items()}
+    base = out.get(_MERGE_KEY)
+    if base is None or isinstance(base, Include):
+        return out
+    if not isinstance(base, dict):
+        raise YAMLConfigError("'<<: !include' needs a file that holds a mapping")
+    del out[_MERGE_KEY]
+    return {**base, **out}
+
+
+def load_yaml(
+    filename: str | Path, resolve_includes: bool = True, _stack: tuple[Path, ...] = ()
+) -> Any:
+    """Load a YAML file that may pull in other files with ``!include``.
+
+    ``key: !include other.yaml`` inserts the content of other.yaml as the
+    value of key. ``<<: !include other.yaml`` merges the mapping in
+    other.yaml into the mapping it appears in; keys written next to it
+    override the included ones. Paths are relative to the file containing
+    the tag, and included files may include further files.
+
+    Parameters
+    ----------
+    filename
+        Path to the YAML file.
+    resolve_includes
+        If False, leave Include placeholders instead of loading the files
+        (a merge stays as an Include under the key ``<<``).
+    """
+    path = Path(filename).resolve()
+    if path in _stack:
+        raise YAMLConfigError(f"Circular !include of {path}")
+
+    class Loader(yaml.SafeLoader):
+        def flatten_mapping(self, node: yaml.MappingNode) -> None:
+            # Keep "<<: !include file" as an ordinary entry; _apply_merges folds it in.
+            for i, (key, value) in enumerate(node.value):
+                if key.tag == _MERGE_TAG and value.tag == "!include":
+                    node.value[i] = (yaml.ScalarNode("tag:yaml.org,2002:str", _MERGE_KEY), value)
+            super().flatten_mapping(node)
+
+    def include(loader: Loader, node: yaml.Node) -> Any:
+        if not isinstance(node, yaml.ScalarNode):
+            raise YAMLConfigError(f"!include takes a file path ({path})")
+        target = str(loader.construct_scalar(node))
+        if not resolve_includes:
+            return Include(target)
+        included = path.parent / target
+        if not included.is_file():
+            raise YAMLConfigError(f"!include file not found: {included} (from {path})")
+        return load_yaml(included, True, (*_stack, path))
+
+    Loader.add_constructor("!include", include)
+    with open(path) as f:
+        data = yaml.load(f, Loader=Loader)  # noqa: S506 - a SafeLoader subclass
+    return _apply_merges(data)
+
+
+def resolve_includes(data: Any, base_dir: str | Path) -> Any:
+    """Copy of data with every Include replaced by the file it points to.
+
+    Paths are relative to base_dir, the directory of the file data came from.
+    """
+
+    def resolve(value: Any) -> Any:
+        if isinstance(value, Include):
+            return load_yaml(Path(base_dir) / value.path)
+        if isinstance(value, dict):
+            return {k: resolve(v) for k, v in value.items()}
+        if isinstance(value, list):
+            return [resolve(v) for v in value]
+        return value
+
+    return _apply_merges(resolve(data))
+
+
+class IncludeDumper(yaml.SafeDumper):
+    """SafeDumper that writes Include objects back as ``!include path``."""
+
+
+def _represent_mapping(dumper: IncludeDumper, data: dict) -> yaml.MappingNode:
+    node = yaml.SafeDumper.represent_dict(dumper, data)
+    for key, value in node.value:
+        if key.value == _MERGE_KEY and value.tag == "!include":
+            key.tag = _MERGE_TAG  # written as a plain "<<" merge key
+    return node
+
+
+IncludeDumper.add_representer(
+    Include, lambda dumper, value: dumper.represent_scalar("!include", value.path)
+)
+IncludeDumper.add_representer(dict, _represent_mapping)
+
+
 # Dumping and file helpers
 
 
 def _make_precision_dumper(precision: int) -> type:
     """Return a yaml.SafeDumper subclass that formats floats to precision."""
 
-    class PrecisionDumper(yaml.SafeDumper):
+    class PrecisionDumper(IncludeDumper):
         pass
 
     def float_representer(dumper: PrecisionDumper, value: Any) -> yaml.ScalarNode:
@@ -89,8 +217,7 @@ def load_telescope_config(
     key
         JAX random key for sampling and roughness.
     """
-    with open(filename) as f:
-        config = yaml.safe_load(f)
+    config = load_yaml(filename)
 
     return build_telescope_config(config, n_samples, key)
 
@@ -146,8 +273,7 @@ def load_camera_config(filename: str | Path) -> Camera:
     -------
     Camera object.
     """
-    with open(filename) as f:
-        raw = yaml.safe_load(f)
+    raw = load_yaml(filename)
 
     return build_camera_config(raw)
 

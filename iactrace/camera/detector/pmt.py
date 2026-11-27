@@ -8,78 +8,67 @@ from ...core.ray_bundle import RayBundle
 from ...core.refractive_index import ConstantIndex, RefractiveIndex, as_refractive_index
 from ...core.responses import ResponseCurve, fresnel_unpolarized
 from ...core.surfaces import AsphericSurfaceGroup, SurfaceGroup
+from .landing import AngularResponse
 from .photodetector import PhotoDetector, _validate_qe, apply_qe, incidence_cos
 from .surface import DetectionSurface
 
 
 class PMT(PhotoDetector):
-    """A photomultiplier: a sensor surface + a cylindrical body.
+    """
+    A sensor surface plus a cylindrical body.
 
-    A self-contained photodetector bundling everything a PMT contributes to
-    detection, applied after the chain hands rays over to the sensor surface:
+    Each ray the chain traces onto the sensor surface is weighted by
 
-    - Geometry. The sensor surface is the sensor surface the chain traces
-      rays onto (surface): bounded by face_radius and placed with
-      its vertex at vertex_z (relative to the detector plane; 0 = flush
-      with the mount, > 0 peeks toward the light, as for a domed window).
-    - Efficiency. The usual qe / qe_curve pair, applied to every ray
-      landing on the sensor surface. By default this is the single bulk scalar
-      qe (real PMT efficiencies are measured with the entrance glass in
-      place, so qe is the whole measured number). For a wavelength- or
-      angle-dependent photocathode, pass qe_curve.
-    - Optional entrance window. Set window_index to also weight each ray
-      by the unpolarized Fresnel transmittance at the air/window interface for
-      its incident angle -- the angular response a single measured scalar cannot
-      capture. When you do, qe should be the intrinsic photocathode QE (the
-      glass loss is then modelled by the Fresnel term, not folded into qe).
-      A number gives a non-dispersive window; a RefractiveIndex model gives a
-      dispersive one, n(lambda).
+        qe * qe_curve * angular_response * T_window
+
+    where any factor not given is 1.
+
+    Without window_index, the efficiency should be the measured datasheet
+    value, which already includes the entrance glass. With it, T_window is
+    the unpolarized air/window Fresnel transmittance at the ray's incidence
+    angle, so the efficiency should be that of the photocathode.
 
     Parameters
     ----------
     qe
-        Bulk detection efficiency in [0, 1] applied at the
-        photocathode. Defaults to 1.0. With qe_curve it acts as a
-        bulk multiplier.
-    qe_curve : ndarray
-        Optional QE(theta, lambda)
-        ResponseCurve multiplying qe
-        per ray; None (default) is flat.
+        Bulk efficiency scalar in [0, 1]. Default 1.0.
+    qe_curve
+        QE(lambda) as a ResponseCurve, optionally with an incidence-angle
+        axis. None (default) is flat.
+    angular_response
+        Relative response against incidence angle, as an AngularResponse.
+        May also depend on landing radius, direction azimuth and
+        wavelength. None (default) is 1.
     window_index
-        Refractive index of the entrance window. None
-        (default) applies qe alone. A number > 1 (e.g. 1.48 for
-        borosilicate glass) additionally weights each ray by the
-        incident-angle Fresnel transmittance through the window; a
-        RefractiveIndex model does
-        the same with a dispersive n(lambda).
+        Entrance-window refractive index: a number > 1 (e.g. 1.48 for
+        borosilicate) or a RefractiveIndex model for a dispersive
+        n(lambda). None (default) applies no Fresnel term.
     face_radius
-        Sensor surface aperture radius (and the body radius).
+        Radius of the sensor aperture and of the body.
     surface
-        The sensor surface figure, a single-element
-        SurfaceGroup (typically an
-        AsphericSurfaceGroup, optionally
-        summed with a ZernikeSurfaceGroup
-        via SumSurfaceGroup). None
-        (default) is a flat window.
+        Sensor surface figure: a single-element SurfaceGroup (typically an
+        AsphericSurfaceGroup, optionally summed with a ZernikeSurfaceGroup
+        via SumSurfaceGroup). None (default) is flat.
     vertex_z
-        Axial position of the surface's vertex, relative to the
-        detector plane.
+        Axial position of the surface vertex relative to the detector
+        plane: 0 is flush with the mount, > 0 protrudes toward the light
+        (e.g. a domed window).
     length
-        Axial length of the cylindrical body behind the sensor surface.
-        None defaults to 2 * face_radius.
+        Axial length of the body behind the sensor surface. None (default)
+        is 2 * face_radius.
     n_facets
-        Facets of the revolved body (48 ~ round).
+        Facets of the revolved body (48 is approximately round).
 
     Raises
     ------
     ValueError
-        on qe outside [0, 1], a constant window_index
-        <= 1, non-positive face_radius, negative length, or
-        n_facets < 3.
+        If qe is outside [0, 1], a constant window_index is <= 1,
+        face_radius is not positive, length is negative, or n_facets < 3.
     """
 
     qe: float = eqx.field(static=True)
     qe_curve: ResponseCurve | None
+    angular_response: AngularResponse | None
     window_index: RefractiveIndex | None
     face_radius: float = eqx.field(static=True)
     shape: SurfaceGroup
@@ -92,6 +81,7 @@ class PMT(PhotoDetector):
         qe: float = 1.0,
         *,
         qe_curve: ResponseCurve | None = None,
+        angular_response: AngularResponse | None = None,
         window_index: RefractiveIndex | Array | float | None = None,
         face_radius: float,
         surface: SurfaceGroup | None = None,
@@ -107,6 +97,7 @@ class PMT(PhotoDetector):
             raise ValueError(f"n_facets must be >= 3, got {n_facets}")
         self.qe = _validate_qe(qe)
         self.qe_curve = qe_curve
+        self.angular_response = angular_response
         self.window_index = None if window_index is None else as_refractive_index(window_index, 1)
         if (
             isinstance(self.window_index, ConstantIndex)
@@ -132,8 +123,12 @@ class PMT(PhotoDetector):
         normals = self.surface.normals_at(local_rays.origins)
         cos_theta_i = incidence_cos(local_rays.directions, normals)
         values = apply_qe(local_rays, self.qe, self.qe_curve, cos_theta_i)
+        elem = jnp.zeros(local_rays.wavelength.shape[0], dtype=jnp.int32)
+        if self.angular_response is not None:
+            values = values * self.angular_response.at(
+                local_rays.origins, local_rays.directions, normals, local_rays.wavelength
+            )
         if self.window_index is not None:
-            elem = jnp.zeros(local_rays.wavelength.shape[0], dtype=jnp.int32)
             n_window = self.window_index.n_at(elem, local_rays.wavelength)
             _, T = fresnel_unpolarized(cos_theta_i, 1.0, n_window)
             values = values * T

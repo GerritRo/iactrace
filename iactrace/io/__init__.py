@@ -21,12 +21,16 @@ from .aperture_table import (
 )
 from .schemas import CameraFileSchema, TelescopeConfigSchema
 from .yaml_io import (
+    Include,
+    IncludeDumper,
     YAMLConfigError,
     build_camera_config,
     build_telescope_config,
     camera_to_dict,
     load_camera_config,
     load_telescope_config,
+    load_yaml,
+    resolve_includes,
     save_camera,
     save_telescope,
     telescope_to_dict,
@@ -38,6 +42,11 @@ __all__ = [
     "load_camera_config",
     "build_telescope_config",
     "build_camera_config",
+    # -- Configuration: !include of other YAML files
+    "load_yaml",
+    "resolve_includes",
+    "Include",
+    "IncludeDumper",
     # -- Configuration: YAML out
     "save_telescope",
     "save_camera",

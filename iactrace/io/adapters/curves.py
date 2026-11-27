@@ -122,6 +122,7 @@ def _build_index_for_bucket(
 
 def _curve_to_schema(
     curve: ResponseCurve | None,
+    schema_cls: type[TabulatedCurveSchema] = TabulatedCurveSchema,
 ) -> TabulatedCurveSchema | None:
     """Project a ResponseCurve to a serialisable curve, or None if trivial.
 
@@ -160,11 +161,11 @@ def _curve_to_schema(
         if curve.wl_table.shape[0] == 1:
             # Angle-only curve: emit the 1-D form (byte-identical to before).
             values = [float(x) for x in grid[order, 0]]
-            return TabulatedCurveSchema(angles_deg=angles_deg, values=values)
+            return schema_cls(angles_deg=angles_deg, values=values)
         # (angle, wavelength) grid; wl_table is already ascending.
         wl_table = np.asarray(curve.wl_table)
         values2d = [[float(x) for x in grid[a, :]] for a in order]
-        return TabulatedCurveSchema(
+        return schema_cls(
             angles_deg=angles_deg,
             values=values2d,
             wavelengths_nm=[float(w) for w in wl_table],

@@ -6,11 +6,14 @@ import math
 from collections.abc import Callable
 from typing import TYPE_CHECKING, NamedTuple
 
-from ...camera.detector import PMT, ConstantQE, TabulatedQE
+import numpy as np
+
+from ...camera.detector import PMT, AngularResponse, ConstantQE, TabulatedQE
 from ...camera.optics import OkumuraCone, WinstonCone
 from ...camera.optics.winston import cpc_full_length
 from ...core.responses import ResponseCurve
 from ..schemas import (
+    AngularResponseSchema,
     ConcentratorSchema,
     ConstantQESchema,
     OkumuraConeSchema,
@@ -229,6 +232,34 @@ def _tabulated_qe_from_schema(schema: TabulatedQESchema) -> TabulatedQE:
     return TabulatedQE(qe_curve=curve, qe=schema.qe)
 
 
+def _angular_response_to_schema(response: AngularResponse | None) -> AngularResponseSchema | None:
+    if response is None:
+        return None
+    # An axis with a single node carries no dependence and is not written.
+    extra = {
+        name: np.asarray(getattr(response, name)).tolist()
+        for name in ("radius", "azimuth_deg", "wavelengths_nm")
+        if getattr(response, name).shape[0] > 1
+    }
+    angles = np.asarray(response.angles_deg).tolist()
+    shape = (len(angles), *(len(v) for v in extra.values()))
+    return AngularResponseSchema(
+        angles_deg=angles, values=np.asarray(response.values).reshape(shape).tolist(), **extra
+    )
+
+
+def _angular_response_from_schema(schema: AngularResponseSchema | None) -> AngularResponse | None:
+    if schema is None:
+        return None
+    return AngularResponse(
+        schema.angles_deg,
+        schema.values,
+        radius=schema.radius,
+        azimuth_deg=schema.azimuth_deg,
+        wavelengths_nm=schema.wavelengths_nm,
+    )
+
+
 def _pmt_to_schema(photodetector: PMT) -> PMTSchema:
     # The photocathode figure round-trips through the exact same
     # (aspheric, zernike) decomposition mirrors and lenses use.
@@ -246,6 +277,7 @@ def _pmt_to_schema(photodetector: PMT) -> PMTSchema:
     return PMTSchema(
         qe=float(photodetector.qe),
         qe_curve=qe_curve,
+        angular_response=_angular_response_to_schema(photodetector.angular_response),
         window_index=window_index,
         face_radius=float(photodetector.face_radius),
         surface=_surface_to_spec(asph, zern, 0),
@@ -263,6 +295,7 @@ def _pmt_from_schema(schema: PMTSchema) -> PMT:
         qe_curve=(
             _build_curve_for_bucket([schema.qe_curve], 1) if schema.qe_curve is not None else None
         ),
+        angular_response=_angular_response_from_schema(schema.angular_response),
         window_index=(
             _build_index_for_bucket([schema.window_index], 1)
             if schema.window_index is not None
