@@ -1,5 +1,5 @@
-CTAO Telescope Configuration Data
-=====================================
+CTAO-like Telescope Configuration Data
+======================================
 
 License
 -------
@@ -7,23 +7,52 @@ License
 All files in this folder are licensed under
 `CC-BY-4.0 <https://creativecommons.org/licenses/by/4.0/>`_.
 
-Attribution
------------
+Source
+------
 
-All telescope geometries and SST camera design are based on sim_telarray configuration files shared by the CTA Observatory.
+The files are derived from the CTAO Simulation Telescope Models for CORSIKA
+and sim_telarray, Prod6 v1.0, published by the CTA Observatory under
+CC-BY-4.0.
 
-- **Original source**: https://zenodo.org/records/14198379
-- **Changes**: Geometric parameters were extracted and converted to YAML format
+- **Original source**: https://doi.org/10.5281/zenodo.14198379
+- **Citation**: CTA Observatory. CTAO Simulation Telescope Models for CORSIKA 
+  and sim_telarray - Prod6. 1.0, Zenodo, 21 Nov. 2024,
+  https://doi.org/10.5281/zenodo.14198379.
 
-**Citation**: CTA Observatory. CTAO Simulation Telescope Models for CORSIKA and Sim_telarray - Prod6. 1.0, Zenodo, 21 Nov. 2024, https://doi.org/10.5281/zenodo.14198379.
+The camera pixel layouts were read from the camera geometry tables of ctapipe.
 
-Camera design for MST/LST based on ctapipe.
+- **Citation**: Maximilian Linhoff et al. Cta-observatory/ctapipe: V0.30.0 –
+  2026-03-20. v0.30.0, Zenodo, 20 Mar. 2026,
+  https://doi.org/10.5281/zenodo.19134070.
 
-- **Original source** https://github.com/cta-observatory/ctapipe-extra
-- **Changes**: Pixel positions extracted from camgeom files.
+Obstruction and support geometry are not accurate, but reproduced from publically 
+available images.
 
-**Citation**: Maximilian Linhoff et al. Cta-observatory/ctapipe: V0.30.0 – 2026-03-20. v0.30.0, Zenodo, 20 Mar. 2026, https://doi.org/10.5281/zenodo.19134070.
+Changes
+-------
 
+These files are not copies of the Prod6 configuration. They were produced in
+three ways:
+
+- **Extracted**: values read from the Prod6 files and converted to YAML, with
+  units and coordinate conventions changed to those of iactrace.
+- **Simplified**: structures that Prod6 does not describe as geometry, or
+  describes in more detail than is used here, replaced by simple shapes.
+- **Fitted or modelled**: parameters with no direct counterpart in Prod6,
+  chosen so that the model reproduces a Prod6 table.
+
+These are approximate, "CTAO-like" models made for iactrace. They are not
+official CTAO telescope models.
+
+Acknowledgement
+---------------
+
+The CTAO asks that work using the Prod6 telescope models carries the following
+acknowledgement. It applies to work using the files in this folder as well:
+
+    This research has made use of the CTAO Simulation Telescope Models
+    provided by the CTAO Central Organisation and Consortium (version prod6
+    v1.0; https://doi.org/10.5281/zenodo.14198379).
 
 Disclaimer
 ----------
