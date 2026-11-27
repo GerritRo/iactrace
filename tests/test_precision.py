@@ -54,12 +54,29 @@ def _traced_in(dtype64, build):
 # --- whole-telescope traces ----------------------------------------------------
 
 
+def _without_scattering(telescope):
+    """Replace every BSDF with a zero-width one."""
+    import equinox as eqx
+
+    from iactrace.core.bsdf import GaussianBSDF
+
+    for kind in ("mirror_groups", "lens_groups"):
+        for i, group in enumerate(getattr(telescope, kind)):
+            n = jax.tree_util.tree_leaves(group.bsdf)[0].shape[0]
+            telescope = eqx.tree_at(
+                lambda t, kind=kind, i=i: getattr(t, kind)[i].bsdf,
+                telescope,
+                GaussianBSDF(scale=jnp.zeros(n)),
+            )
+    return telescope
+
+
 def _trace_config(telescope_yaml, camera_yaml, aperture_radius, height, n_rays=400):
     """Spot positions and detection mask for a fan of rays down the optic axis."""
     from iactrace import Camera, Telescope
     from iactrace.camera.camera import intersect_sensor
 
-    telescope = Telescope.from_yaml(telescope_yaml, 8, key=jax.random.key(42))
+    telescope = _without_scattering(Telescope.from_yaml(telescope_yaml, 8, key=jax.random.key(42)))
     camera = Camera.from_yaml(camera_yaml)
 
     rng = np.random.default_rng(7)
